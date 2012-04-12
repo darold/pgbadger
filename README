@@ -1,0 +1,57 @@
+PgBadger - An other PostgreSQL log analyzer that aims to replace and
+           outperforms pgFouine
+
+This is still a work in progress.
+
+------------------------------------------------------------------------------
+
+You must first enable SQL query logging to have something to parse:
+
+	log_min_duration_statement = 0
+
+With 'stderr' log format, log line prefix must be at least:
+
+	log_line_prefix = '%t [%p]: [%l-1] '
+
+Log line prefix could add user and database name as follow:
+
+	log_line_prefix = '%t [%p]: [%l-1] user=username,db=dbname '
+
+or for syslog log file format:
+
+	log_line_prefix = 'user=username,db=dbname '
+
+Log line prefix could also be:
+
+	log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
+
+Additional informations that could be collected need logging activation into postgresql.conf:
+
+	log_checkpoints = on
+	log_connections = on
+	log_disconnections = on
+	log_lock_waits = on
+	log_temp_files = 0
+
+-------------------------------------------------------------------------------
+
+Usage: pgbadger -l logfile ... > out.html
+
+    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
+			     be a plain text log or a gzip compressed file
+			     with the .gz extension.
+    -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -h | --help            : show this message and exit.
+    -d | --dbname database : only report what concern the given database
+    -u | --dbuser username : only report what concern the given user
+    -t | --top number      : number of query to store/display. Default: 20
+    -s | --sample number   : number of query sample to store/display. Default: 3
+    -x | --extension       : output format. Values: text or html. Default: html
+    -m | --maxlength size  : maximum length of a query, it will be cutted above
+			     the given size. Default: no truncate
+    -g | --graph           : generate graphs, requires GD::Graph perl module
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -e | --end datetime    : end date/time for the data to be parsed in log.
+
+

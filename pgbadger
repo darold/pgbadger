@@ -1,0 +1,1814 @@
+#!/usr/bin/perl
+#------------------------------------------------------------------------------
+#
+# PgBadger - An other PostgreSQL log analyzer that aims to replace and
+#           outperforms pgFouine
+#
+# This program is open source, licensed under the simplified BSD license.
+# For license terms, see the LICENSE file.
+#------------------------------------------------------------------------------
+# You must enable SQL query logging : log_min_duration_statement = 0
+# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
+# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=username,db=dbname'
+# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
+#
+# Additional informations that could be collected
+#
+# log_checkpoints = on
+# log_connections = on
+# log_disconnections = on
+# log_lock_waits = on
+# log_temp_files = 0
+#------------------------------------------------------------------------------
+use strict;
+use Getopt::Long;
+use IO::File;
+use Benchmark;
+
+$| = 1;
+
+# Global variables overriden during install
+my $ZCAT_PROG = '/bin/zcat';
+my $VERSION = '1.0';
+
+# Command line options
+my $logfile = '';
+my $format  = '';
+my $outdir  = '';
+my $help    = '';
+my $dbname  = '';
+my $dbuser  = '';
+my $ident   = '';
+my $top     = 0;
+my $sample  = 0;
+my $extension = '';
+my $maxlength = 0;
+my $graph = 0;
+my $debug = 1;
+my $nohighlight = 0;
+my $from = '';
+my $to = '';
+
+my $t0 = Benchmark->new;
+
+# get the command line parameters
+my $result = GetOptions (
+	"l|logfile=s"	=> \$logfile,
+	"f|format=s"	=> \$format,
+	"o|outdir=s"	=> \$outdir,
+	"h|help!"	=> \$help,
+	"d|dbname=s"	=> \$dbname,
+	"u|dbuser=s"	=> \$dbuser,
+	"i|ident=s"	=> \$ident,
+	"t|top=i"	=> \$top,
+	"s|sample=i"	=> \$sample,
+	"x|extension=s" => \$extension,
+	"m|maxlength=i" => \$maxlength,
+	"g|graph!"      => \$graph,
+	"n|nohighlight!"=> \$nohighlight,
+	"b|begin=s"     => \$from,
+	"e|end=s"       => \$to,
+);
+
+&usage() if ($help);
+if (!$logfile) {
+	print STDERR "FATAL: you must set a log file. See option -f.\n\n";
+	&usage();
+}
+
+# Set default format
+$format ||= 'stderr';
+# Set default syslog ident name
+$ident ||= 'postgres';
+# Set default top query
+$top ||= 20;
+# Set the default number of samples
+$sample ||= 3;
+# Set the default extension and output format
+$extension ||= 'html';
+$graph = 0 if ($extension ne 'html');
+
+my $end_top = $top - 1;
+
+# Check if the logfile exists
+die "FATAL: logfile $logfile must exists!\n" if (!-e $logfile || -z $logfile);
+die "FATAL: logfile $logfile must not be empty!\n" if (!-e $logfile || -z $logfile);
+
+# Check start/end date time
+if ($from) {
+	if ($from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
+		$from = "$1$2$3$4$5$6";
+	} elsif ($from =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
+		$from = "$1$2$3" . "000000";
+	} else {
+		die "FATAL: bad format for begin datetime, shoud be yyyy-mm-dd hh:mm:ss\n";
+	}
+}
+if ($to) {
+	if ($to =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
+		$to = "$1$2$3$4$5$6";
+	} elsif ($to =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
+		$to = "$1$2$3" . "000000";
+	} else {
+		die "FATAL: bad format for ending datetime, shoud be yyyy-mm-dd hh:mm:ss\n";
+	}
+}
+
+# Stores the last parsed line from log file to allow incremental parsing
+my $LAST_LINE = '';
+# Set the level of the data aggregator, can be minute, hour or day follow the
+# size of the log file.
+my $LEVEL = 'hour';
+
+# Month names
+my %month_abbr = (
+	'Jan'=>'01','Feb'=>'02','Mar'=>'03','Apr'=>'04','May'=>'05','Jun'=>'06',
+	'Jul'=>'07','Aug'=>'08','Sep'=>'09','Oct'=>'10','Nov'=>'11','Dec'=>'12'
+);
+my %abbr_month = (
+	'01'=>'Jan','02'=>'Feb','03'=>'Mar','04'=>'Apr','05'=>'May','06'=>'Jun',
+	'07'=>'Jul','08'=>'Aug','09'=>'Sep','10'=>'Oct','11'=>'Nov','12'=>'Dec'
+);
+# Highlight variables
+my @KEYWORDS1 = (
+	'ALL', 'ASC', 'AS',  'ALTER', 'AND', 'ADD', 'AUTO_INCREMENT', 'ANY', 'ANALYZE',
+	'BETWEEN', 'BINARY', 'BOTH', 'BY', 'BOOLEAN', 'BEGIN',
+	'CHANGE', 'CHECK', 'COLUMNS', 'COLUMN', 'CROSS','CREATE', 'CASE', 'COMMIT', 'COALESCE', 'CLUSTER', 'COPY',
+	'DATABASES', 'DATABASE', 'DATA', 'DELAYED', 'DESCRIBE', 'DESC',  'DISTINCT', 'DELETE', 'DROP', 'DEFAULT',
+	'ENCLOSED', 'ESCAPED', 'EXISTS', 'EXPLAIN', 'ELSE', 'END', 'EXCEPT',
+	'FIELDS', 'FIELD', 'FLUSH', 'FOR', 'FOREIGN', 'FUNCTION', 'FROM', 'FULL',
+	'GROUP', 'GRANT', 'GREATEST',
+	'HAVING',
+	'IGNORE', 'INDEX', 'INFILE', 'INSERT', 'INNER', 'INTO', 'IDENTIFIED', 'IN', 'IS', 'IF', 'INTERSECT', 'INHERIT',
+	'JOIN',
+	'KEYS', 'KILL','KEY',
+	'LEADING', 'LIKE', 'LIMIT', 'LINES', 'LOAD', 'LOCAL', 'LOCK', 'LOW_PRIORITY', 'LEFT', 'LANGUAGE', 'LEAST', 'LOGIN',
+	'MODIFY',
+	'NATURAL', 'NOT', 'NULL', 'NEXTVAL', 'NULLIF', 'NOSUPERUSER', 'NOCREATEDB', 'NOCREATEROLE',
+	'OPTIMIZE', 'OPTION', 'OPTIONALLY', 'ORDER', 'OUTFILE', 'OR', 'OUTER', 'ON', 'OVERLAPS', 'OWNER',
+	'PROCEDURE','PROCEDURAL', 'PRIMARY',
+	'READ', 'REFERENCES', 'REGEXP', 'RENAME', 'REPLACE', 'RETURN', 'REVOKE', 'RLIKE', 'RIGHT', 'ROLE', 'ROLLBACK',
+	'SHOW', 'SONAME', 'STATUS', 'STRAIGHT_JOIN', 'SELECT', 'SETVAL', 'SET', 'SOME', 'SEQUENCE',
+	'TABLES', 'TEMINATED', 'TO', 'TRAILING','TRUNCATE', 'TABLE', 'TEMPORARY', 'TRIGGER', 'TRUSTED', 'THEN',
+	'UNIQUE', 'UNLOCK', 'USE', 'USING', 'UPDATE', 'UNSIGNED', 'UNION',
+	'VALUES', 'VARIABLES', 'VIEW', 'VACUUM', 'VERBOSE',
+	'WITH', 'WRITE', 'WHERE', 'WHEN',
+	'ZEROFILL',
+	'XOR',
+);
+my @KEYWORDS2 = (
+	'ascii', 'age',
+	'bit_length', 'btrim',
+	'char_length', 'character_length', 'convert', 'chr', 'current_date', 'current_time', 'current_timestamp', 'count',
+	'decode', 'date_part', 'date_trunc', 
+	'encode', 'extract',
+	'get_byte', 'get_bit',
+	'initcap', 'isfinite', 'interval',
+	'justify_hours', 'justify_days',
+	'lower', 'length', 'lpad', 'ltrim', 'localtime', 'localtimestamp',
+	'md5',
+	'now',
+	'octet_length', 'overlay',
+	'position', 'pg_client_encoding',
+	'quote_ident', 'quote_literal',
+	'repeat', 'replace', 'rpad', 'rtrim',
+	'substring', 'split_part', 'strpos', 'substr', 'set_byte', 'set_bit',
+	'trim', 'to_ascii', 'to_hex', 'translate', 'to_char', 'to_date', 'to_timestamp', 'to_number', 'timeofday',
+	'upper',
+);
+my @KEYWORDS3 = (
+	'STDIN', 'STDOUT'
+);
+my %SYMBOLS = ( '=' => '=', '<' => '&lt;', '>' => '&gt;', '\|' => '|', ',' => ',', '\.' => '.', '\+' => '+', '\-' => '-', '\*' => '*', '\/' => '/', '\!=' => '!=' );
+my @BRACKETS = ( '(', ')' );
+map { $_ = quotemeta($_) } @BRACKETS;
+
+
+# Where statistic are stored
+my %STATS = ();
+my $first_log_date = '';
+my $last_log_date = '';
+my %overall_stat = ();
+my @top_slowest = ();
+my %normalyzed_info = ();
+my %error_info = ();
+my %per_hour_info = ();
+my %per_minute_info = ();
+my %lock_info = ();
+my %tempfile_info = ();
+my %connection_info = ();
+my %session_info = ();
+my %conn_received = ();
+my %checkpoint_info = ();
+my @graph_values = ();
+
+# Open log file for reading
+my $nlines = 0;
+my $lfile = new IO::File;
+if ($logfile !~ /\.gz/) {
+	$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
+} else {
+	# Open a pipe to zcat program for compressed log
+	$lfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+}
+my %cur_info = ();
+
+my $curdate = localtime(time);
+# Syslog do not have year information, so take care of year overlapping
+my ($gsec,$gmin,$ghour,$gmday,$gmon,$gyear,$gwday,$gyday,$gisdst) = localtime(time);
+$gyear += 1900;
+my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
+
+my $cur_td = $t0;
+
+while (my $line = <$lfile>) {
+	chomp($line);
+	$line =~ s///;
+	$nlines++;
+	next if (!$line);
+
+	if ($debug && (($nlines % 100000) == 0)) {
+		my $t1 = Benchmark->new;
+		my $td = timediff($t1, $cur_td);
+		&logmsg('DEBUG', "Lines parsed $nlines in " . timestr($td) . "...");
+		$cur_td = $t1;
+	}
+
+	# Parse syslog lines
+	if ($format eq 'syslog') {
+		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^:]+:)\s+(.*)/) {
+			# skip non postgresql lines
+			next if ($7 ne $ident);
+			# Syslog do not have year information, so take care of year overlapping
+			my $tmp_year = $gyear;
+			if ("$tmp_year$month_abbr{$1}$2" > $CURRENT_DATE) {
+				$tmp_year = substr($CURRENT_DATE,1, 4) - 1;
+			}
+			# Skip unwanted lines
+			my $cur_date = "$tmp_year$1$2$3$4$5";
+			next if ($from && ($from > $cur_date));
+			last if ($to && ($to < $cur_date));
+			# Process the log line
+			&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11);
+		} elsif ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+(#011)[\t\s]*(.*)/) {
+
+			$cur_info{query} .= "\n" . $11;
+		} else {
+			&logmsg('DEBUG', "Unknown syslog line format: $line");
+		}
+
+	} elsif ($format eq 'stderr') {
+
+		# Parse stderr lines
+		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^:]+:)\s+(.*)/) {
+			# Skip unwanted lines
+			my $cur_date = "$1$2$3$4$5$6";
+			next if ($from && ($from > $cur_date));
+			last if ($to && ($to < $cur_date));
+			# Process the log line
+			&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+		} else {
+			$cur_info{query} .= "\n" . $line if ($cur_info{query});
+		}
+
+	} else {
+		# unknown format
+		&logmsg('DEBUG', "Unknown line format: $line");
+	}
+}
+
+$lfile->close();
+
+
+my $t1 = Benchmark->new;
+my $td = timediff($t1, $t0);
+
+&logmsg('DEBUG', "Ok, generating report...") if ($debug);
+
+if ( ($extension eq 'text') || ($extension eq 'txt') ) {
+	&dump_as_text();
+} else {
+	&dump_as_html();
+}
+
+exit 0;
+
+#-------------------------------------------------------------------------------
+
+# Show PgBadger command line usage
+sub usage
+{
+	print qq{
+Usage: $0 -l logfile ... > out.html
+
+    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
+			     be a plain text log or a gzip compressed file
+			     with the .gz extension.
+    -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -h | --help            : show this message and exit.
+    -d | --dbname database : only report what concern the given database
+    -u | --dbuser username : only report what concern the given user
+    -t | --top number      : number of query to store/display. Default: 20
+    -s | --sample number   : number of query sample to store/display. Default: 3
+    -x | --extension       : output format. Values: text or html. Default: html
+    -m | --maxlength size  : maximum length of a query, it will be cutted above
+			     the given size. Default: no truncate
+    -g | --graph           : generate graphs, requires GD::Graph perl module
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -e | --end datetime    : end date/time for the data to be parsed in log.
+
+};
+
+	exit 0;
+}
+
+# Display message following the log level
+sub logmsg
+{
+	my ($level, $str) = @_;
+
+	if ($level =~ /(\d+)/) {
+		print STDERR "\t"x$1;
+	}
+	
+	print STDERR "$level: $str\n";
+}
+
+# Normalyze SQL queries by removing parameters
+sub normalize_query
+{
+	my $orig_query = shift;
+
+	return if (!$orig_query);
+
+	$orig_query = lc($orig_query);
+
+	# Remove extra space, new line and tab caracters by a single space
+	$orig_query =~ s/[\t\s\r\n]+/ /gs;
+	# Remove string content
+	$orig_query =~ s/\\'//g;
+	$orig_query =~ s/'[^']*'/''/g;
+	$orig_query =~ s/''('')+/''/g;
+	# Remove NULL parameters
+	$orig_query =~ s/=\s*NULL/=''/g;
+	# Remove numbers
+	$orig_query =~ s/([^a-z_\$-])-?([0-9]+)/${1}0/g;
+	# Remove hexadecimal numbers
+	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/g;
+	# Remove IN values
+	$orig_query =~ s/in\s*\([\'0x,\s]*\)/in (...)/g;
+
+	return $orig_query;
+}
+
+# Format numbers with comma for better reading
+sub comma_numbers
+{
+	return 0 if ($#_ < 0);
+
+        my $text = reverse $_[0];
+
+        $text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1,/g;
+
+        return scalar reverse $text;
+}
+
+# Format duration
+sub convert_time
+{ 
+	my $time = shift; 
+
+	my $days = int($time / 86400000); 
+	$time -= ($days * 86400000); 
+	my $hours = int($time / 3600000); 
+	$time -= ($hours * 3600000); 
+	my $minutes = int($time / 60000); 
+	$time -= ($minutes * 60000); 
+	my $seconds = sprintf("%0.2f", $time / 1000);
+
+	$days = $days < 1 ? '' : $days .'d'; 
+	$hours = $hours < 1 ? '' : $hours .'h'; 
+	$minutes = $minutes < 1 ? '' : $minutes . 'm'; 
+	$time = $days . $hours . $minutes . $seconds . 's'; 
+
+	return $time; 
+}
+
+# Stores the top N slowest queries
+sub set_top_slowest
+{
+	my ($q, $dt, $date) = @_;
+
+	push(@top_slowest, [ ($dt,$date,$q) ]);
+
+	@top_slowest = (sort {$b->[0] <=> $a->[0]} @top_slowest)[0..$end_top];
+
+}
+
+# Stores top N slowest sample queries
+sub set_top_sample
+{
+	my ($norm, $q, $dt, $date) = @_;
+
+	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
+	$normalyzed_info{$norm}{samples}{$dt}{date} = $date;
+
+	my $i = 1;
+	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
+		if ($i > $sample) {
+			delete $normalyzed_info{$norm}{samples}{$k};
+		}
+		$i++;
+	}
+}
+
+# Stores top N error sample queries
+sub set_top_error_sample
+{
+	my ($q, $date, $detail) = @_;
+
+	
+	# always keep the last error messages
+	if (exists $error_info{$q}{date} && ($#{$error_info{$q}{date}} >= $sample)) {
+		shift(@{$error_info{$q}{date}});
+		shift(@{$error_info{$q}{detail}});
+	}
+	push(@{$error_info{$q}{date}}, $date);
+	push(@{$error_info{$q}{detail}}, $detail);
+}
+
+
+sub dump_as_text
+{
+
+	# Global informations
+	my $curdate = localtime(time);
+	my $fmt_nlines = &comma_numbers($nlines);
+	my $total_time = timestr($td);
+	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
+	$total_time = &convert_time($total_time*1000);
+	print qq{
+
+- Global informations --------------------------------------------------
+
+Generated on $curdate
+Log file: $logfile
+Parsed $fmt_nlines log entries in $total_time
+Log start from $first_log_date to $last_log_date
+};
+
+	# Overall statistics
+	my $fmt_unique = &comma_numbers(scalar keys %normalyzed_info) || 0;
+	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
+	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
+	print qq{
+
+- Overall statistics ---------------------------------------------------
+
+Number of unique normalized queries: $fmt_unique
+Number of queries: $fmt_queries
+Total query duration: $fmt_duration
+First query: $overall_stat{'first_query'}
+Last query: $overall_stat{'last_query'}
+};
+	foreach (sort { $overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a} } keys %{$overall_stat{'query_peak'}}) {
+		print "Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_";
+		last;
+	}
+	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
+	my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
+	print qq{
+Number of errors: $fmt_errors
+Number of unique normalized errors: $fmt_unique_error
+};
+	if ($tempfile_info{count}) {
+		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
+		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", ($tempfile_info{maxsize}/$tempfile_info{count})));
+		print qq{
+Number temporary file: $tempfile_info{count}
+Max size of temporary file: $fmt_temp_maxsise
+Average size of temporary file: $fmt_temp_avsize
+};
+	}
+	print qq{
+
+- Hourly statistics ----------------------------------------------------
+
+Report not supported by text format
+
+};
+
+	# INSERT/DELETE/UPDATE/SELECT repartition
+	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+	my $total = $overall_stat{'queries_number'};
+	print "\n- Queries by type ------------------------------------------------------\n\n";
+	print "SELECT: ", &comma_numbers($overall_stat{'SELECT'}), " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n" if ($overall_stat{'SELECT'});
+	print "INSERT: ", &comma_numbers($overall_stat{'INSERT'}), " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n" if ($overall_stat{'INSERT'});
+	print "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}), " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n" if ($overall_stat{'UPDATE'});
+	print "DELETE: ", &comma_numbers($overall_stat{'DELETE'}), " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n" if ($overall_stat{'DELETE'});
+	print "OTHERS: ", &comma_numbers($total - $totala), " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
+	print "\n";
+
+	# Show top informations
+	print "\n- Slowest queries ------------------------------------------------------\n\n";
+	for (my $i = 0; $i <= $#top_slowest; $i++) {
+		print $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
+		print "--\n";
+	}
+	@top_slowest = ();
+
+	print "\n- Queries that took up the most time (N) -------------------------------\n\n";
+	my $idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach (keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$_}{query};
+				last;
+			}
+		}
+		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
+		print "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
+		print "--\n";
+		$idx++;
+	}
+
+	print "\n- Most frequent queries (N) --------------------------------------------\n\n";
+	$idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach (keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$_}{query};
+				last;
+			}
+		}
+		print "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
+		print "--\n";
+		$idx++;
+	}
+
+	print "\n- Slowest queries (N) --------------------------------------------------\n\n";
+	$idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach (keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$_}{query};
+				last;
+			}
+		}
+		print "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
+		print "--\n";
+		$idx++;
+	}
+
+	print "\n- Most frequent errors (N) ---------------------------------------------\n\n";
+	$idx = 1;
+	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
+		next if (!$error_info{$k}{count});
+		last if ($idx > $top);
+		print "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
+		print "--\n";
+		$idx++;
+	}
+	print "\n\n";
+	print "Report generated by <a href=\"https://github.com/dalibo/pgbadger\">PgBadger</a> $VERSION. License: GPL v3.\n";
+
+}
+
+sub html_header
+{
+	print qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>PgBadger: PostgreSQL log analyzer</title>
+<style type="text/css">
+/* common.css */
+body { background-color: #FFFFFF; }
+* { font-family: Verdana, Arial, Helvetica; }
+div, p, th, td { font-size:12px; }
+a {color:rgb(180, 80, 80);text-decoration:underline}
+a:hover {color:rgb(180, 80, 80);text-decoration:none}
+h1 { font-size:16px; color:#FFFFFF; font-weight:normal; padding:6px; background-color:rgb(180, 80, 80); margin-bottom:0px; }
+h2 { margin-top:15px; margin-bottom:10px; font-weight:normal; font-size:14px; padding:2px 10px 2px 0px; border-bottom:1px solid #7B8CBE; color:#7B8CBE; }
+h2 a, h2 a:hover { color:black; text-decoration:none; }
+h3 { color:#FFB462; border-bottom:1px solid #FFB462; font-weight:bold; font-size:12px; margin-bottom:10px; padding-bottom:2px; }
+div.menu { background-color:rgb(220,230,252); padding:4px; margin-bottom:20px; }
+div.menu a { padding-right:3px; padding-left:3px; color:black; text-decoration:none; }
+div.menu a:hover { padding-right:3px; padding-left:3px; padding-top:2px; padding-bottom:2px; text-decoration:none; background-color:rgb(180, 80, 80); color:white; -moz-border-radius:3px; }
+div.information { border:1px solid #FFB462; -moz-border-radius:6px;	padding:10px; margin-top:5px; background-color:#FEE3C4; }
+.tip { background-color:#EBF0FC; -moz-border-radius:10px; padding:6px; margin:5px; }
+ul { padding-left: 14px; padding-top: 0px; padding-bottom: 0px; margin-bottom: 0px; margin-top: 0px; }
+ul li { list-style-type: square; }
+div.reports { padding:4px; }
+table.queryList td, table.queryList th { padding: 2px; white-space: nowrap; }
+table.queryList th { background-color: #DDDDDD; border:1px solid #CCCCCC; white-space: nowrap; }
+table.queryList th.left { text-align:left !important; }
+table.queryList tr.row0 td { background-color: #FFFFFF; border: 1px solid #EEEEEE; }
+table.queryList tr.row1 td { background-color: #EEEEEE; border: 1px solid #EEEEEE; }
+table.queryList td.top { vertical-align:top; }
+table.queryList td.right { text-align:right; }
+table.queryList td.center { text-align:center; }
+table.queryList td.relevantInformation { font-weight:bold; }
+table.queryList div.sql { width: 1500px; }
+table.queryList div.examples { background-color:#EBF0FC; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
+table.queryList div.examples div.example0 { padding:2px; }
+table.queryList div.examples div.example1 { background-color:#FFFFFF; padding:2px; border:1px solid #EBF0FC; -moz-border-radius:5px; }
+.normal { color: green; font-weight:bold; }
+.warning { color: orange; font-weight:bold; }
+.fatal { color: red; font-weight:bold; font-style:italic; }
+div.tooltipLink { position:relative; cursor:pointer; }
+div.tooltipLink span.information { border-bottom:1px dotted gray; z-index:10; }
+div.tooltipLink div.tooltip { display:none; background-color:#EBF0FC; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; width:250px; }
+div.tooltipLink div.tooltip table { background-color:white; width:250px; }
+div.tooltipLink div.tooltip table tr.row0 td { background-color: #FFFFFF; border: 1px solid #EEEEEE; }
+div.tooltipLink div.tooltip table tr.row1 td { background-color: #EEEEEE; border: 1px solid #EEEEEE; }
+div.tooltipLink div.tooltip th { font-size:10px; }
+div.tooltipLink div.tooltip td { font-size:9px; font-weight:normal; padding:1px; }
+div.tooltipLink:hover div.tooltip { display:block; z-index:20; position:absolute; top:1.5em; left:2em; }
+table.queryList div.queryNotice { color: #8D8D8D; font-style:italic; }
+table.queryList div.error { color: #D53131; font-weight:bold; }
+table.queryList div.errorInformation { color: #8D8D8D; font-style:italic; }
+table.queryList input { border:1px solid black; background-color:#FFFFFF; padding:1px; font-size:11px; }
+table.sortable a.sortheader { color: black; text-decoration: none; }
+table.sortable a.sortheader:hover { color: rgb(180, 80, 80); }
+table.sortable span.sortarrow { color: black; text-decoration: none; font-weight:bold; }
+.indexInformation { background-color:#EBF0FC; -moz-border-radius:10px; padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; margin:5px; }
+.indexInformation table.queryList { margin-top:10px; }
+div.footer { font-size:12px; margin-top:30px; margin-bottom:400px; background-color:rgb(180, 80, 80); padding:5px; text-align:right; color:white; }
+div.footer a, div.footer a:hover { color:white; text-decoration:underline; }
+
+div#littleToc { display:none; }
+html>body div#littleToc { display:block; background-color:white; color:black; position:fixed; bottom:10px; right:10px; width:160px; font-size:11px; text-align:left; border:1px dotted #BBBBBB; }
+div#littleToc div#littleTocContent { display:none; padding:2px; }
+div#littleToc:hover { width:205px; }
+div#littleToc:hover div#littleTocContent { display:block; border-right:5px solid #BBBBBB; }
+
+div#littleToc div#littleTocTitle { font-weight:bold; text-align:center;padding:2px; }
+div#littleToc:hover div#littleTocTitle { display:none; }
+
+div#littleToc ul { padding:0px; text-indent:0px; margin:0px; }
+div#littleToc li { font-size:11px; list-style-type:none; padding:0px; text-indent:0px; margin:0px; }
+
+div#littleToc a { color:#000000; padding:2px; margin:2px; display:block; text-decoration:none; border:1px solid #CCCCCC; }
+div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
+
+.sql  {font-family:monospace;}
+.sql .imp {font-weight: bold; color: red;}
+.sql .kw1 {color: #993333; font-weight: bold; text-transform: uppercase;}
+.sql .kw2 {color: #993333; font-style: italic;}
+.sql .kw3 {color: #993333; text-transform: uppercase;}
+.sql .co1 {color: #808080; font-style: italic;}
+.sql .co2 {color: #808080; font-style: italic;}
+.sql .coMULTI {color: #808080; font-style: italic;}
+.sql .es0 {color: #000099; font-weight: bold;}
+.sql .br0 {color: #66cc66;}
+.sql .sy0 {color: #000000;}
+.sql .st0 {color: #ff0000;}
+.sql .nu0 {color: #cc66cc;}
+.sql span.xtra { display:block; }
+
+</style>
+<script type="text/javascript">
+ /* <![CDATA[ */
+function toggle(idButton, idDiv, label) {
+	if(document.getElementById(idDiv)) {
+		if(document.getElementById(idDiv).style.display == 'none') {
+			document.getElementById(idDiv).style.display = 'block';
+			document.getElementById(idButton).value = 'Hide '+label;
+		} else {
+			document.getElementById(idDiv).style.display = 'none';
+			document.getElementById(idButton).value = 'Show '+label;
+		}
+	}
+}
+
+
+/* ]]> */
+</script>
+</head>
+<body>
+<div id="content">
+
+<h1 id="top">PgBadger: PostgreSQL log analyzer report</h1>
+
+<div class="menu">
+<a href="#OverallStatsReport">Overall statistics</a> |
+<a href="#HourlyStatsReport">Hourly statistics</a> |
+<a href="#QueriesByTypeReport">Queries by type</a> |
+<a href="#LocksByTypeReport">Locks by type</a> |
+<a href="#SessionsDatabaseReport">Sessions per database</a> |
+<a href="#SessionsUserReport">Sessions per user</a> |
+<a href="#SessionsHostReport">Sessions per host</a> |
+<a href="#SlowestQueriesReport">Slowest queries</a> |
+<a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
+<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
+<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> |
+<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a>
+</div>
+<p>Normalized reports are marked with a "(N)".</p>
+};
+
+}
+
+
+sub html_footer
+{
+	print qq{
+	<div class="footer">
+		Report generated by <a href="https://github.com/dalibo/pgbadger">PgBadger</a> $VERSION. License: GPL v3.
+	</div>
+</div>
+<div id="littleToc">
+	<div id="littleTocContent">
+
+		<ul>
+			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li><li><a href="#HourlyStatsReport">Hourly statistics</a></li><li><a href="#QueriesByTypeReport">Queries by type</a></li><li><a href="#LocksByTypeReport">Locks by type</a></li><li><a href="#SessionsDatabaseReport">Sessions per database</a></li><li><a href="#SessionsUserReport">Sessions per user</a></li><li><a href="#SessionsHostReport">Sessions per host</a></li><li><a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li><li><a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a></li>
+		</ul>
+	</div>
+	<div id="littleTocTitle">Table of contents</div>
+</div>
+</body>
+</html>
+};
+
+}
+
+sub dump_as_html
+{
+
+	# Dump the html header
+	&html_header();
+
+	# Global informations
+	my $curdate = localtime(time);
+	my $fmt_nlines = &comma_numbers($nlines);
+	my $total_time = timestr($td);
+	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
+	$total_time = &convert_time($total_time*1000);
+	print qq{
+<div class="information">
+<ul>
+<li>Generated on $curdate</li>
+<li>Log file: $logfile</li>
+<li>Parsed $fmt_nlines log entries in $total_time</li>
+<li>Log start from $first_log_date to $last_log_date</li>
+</ul>
+</div>
+};
+
+	# Overall statistics
+	my $fmt_unique = &comma_numbers(scalar keys %normalyzed_info) || 0;
+	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
+	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
+	print qq{
+<div class="reports">
+<h2 id="OverallStatsReport">Overall statistics <a href="#top" title="Back to top">^</a></h2>
+<ul>
+<li>Number of unique normalized queries: $fmt_unique</li>
+<li>Number of queries: $fmt_queries</li>
+<li>Total query duration: $fmt_duration</li>
+<li>First query: $overall_stat{'first_query'}</li>
+<li>Last query: $overall_stat{'last_query'}</li>
+};
+	foreach (sort { $overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a} } keys %{$overall_stat{'query_peak'}}) {
+		print "<li>Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_</li>";
+		last;
+	}
+	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
+	my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
+	print qq{
+<li>Number of errors: $fmt_errors</li>
+<li>Number of unique normalized errors: $fmt_unique_error</li>
+};
+	if ($tempfile_info{count}) {
+		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
+		my $fmt_temp_avsize = &comma_numbers($tempfile_info{maxsize}/$tempfile_info{count});
+		print qq{
+<li>Number temporary file: $tempfile_info{count}</li>
+<li>Max size of temporary file: $fmt_temp_maxsise</li>
+<li>Average size of temporary file: $fmt_temp_avsize</li>
+};
+	}
+	if ($session_info{count}) {
+		my $avg_session_duration = &convert_time($session_info{duration}/$session_info{count});
+		my $tot_session_duration = &convert_time($session_info{duration});
+		print qq{
+<li>Total number of sessions: $session_info{count}</li>
+<li>Total duration of sessions: $tot_session_duration</li>
+<li>Average duration of sessions: $avg_session_duration</li>
+};
+	}
+	if ($connection_info{count}) {
+		print qq{
+<li>Total number of connections: $connection_info{count}</li>
+}
+	}
+	print qq{
+</ul>
+};
+
+
+	print qq{
+<h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
+
+<table class="queryList" width="100%">
+	<tr>
+		<th rowspan="2" style="white-space: nowrap">Day</th>
+		<th rowspan="2" style="white-space: nowrap">Time</th>
+		<th colspan="2" style="white-space: nowrap">Queries</th>
+		<th colspan="2" style="white-space: nowrap">SELECT queries</th>
+		<th colspan="4" style="white-space: nowrap">Write queries</th>
+};
+	if ($tempfile_info{count}) {
+		print qq{
+		<th colspan="2" style="white-space: nowrap">Temporary files</th>
+};
+	}
+	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
+		print qq{
+		<th colspan="7" style="white-space: nowrap">Checkpoints</th>
+};
+	}
+
+
+	print qq{
+	</tr>
+	<tr>
+		<th>Count</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Count</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+
+		<th>INSERT</th>
+		<th>UPDATE</th>
+		<th>DELETE</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+};
+	if ($tempfile_info{count}) {
+		print qq{
+		<th>Count</th>
+		<th>Av.&nbsp;size</th>
+};
+	}
+	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
+		print qq{
+		<th>Wrote buffers</th>
+		<th>Added</th>
+		<th>Removed</th>
+		<th>Recycled</th>
+		<th>Write time (sec)</th>
+		<th>Sync time (sec)</th>
+		<th>Total time (sec)</th>
+	};
+	}
+
+	print qq{
+	</tr>
+};
+
+	foreach my $d (sort keys %per_hour_info) {
+		my $c = 1;
+		$d =~ /^\d{4}(\d{2})(\d{2})$/;
+		my $zday = "$abbr_month{$1} $2";
+		foreach my $h (sort keys %{$per_hour_info{$d}}) {
+			my $colb = $c % 2;
+			$zday = "&nbsp;" if ($c > 1);
+			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
+			$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
+			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
+			print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
+			if ($tempfile_info{count}) {
+				my $temp_average = '0.00';
+				if ($tempfile_info{chronos}{$d}{$h}{count}) {
+					$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
+				}
+				print "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
+			}
+			if (exists $checkpoint_info{chronos}{$d}{$h}) {
+				print "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
+			} elsif (exists $checkpoint_info{chronos}) {
+				print "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
+			}
+			print "</tr>\n";
+			$c++;
+		}
+	}
+	print "</table>\n";
+
+	if ($graph) {
+		my @labels = ();
+		my @data1 = ();
+		my @data2 = ();
+		my @data3 = ();
+		foreach my $tm (keys %{$per_minute_info{query}}) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $prefix = "$1-$2-$3 ";
+			foreach my $h ("00" .. "23") {
+				my %dataavg = ();
+				foreach my $m ("00" .. "59") {
+					my $rd = &average_five_minutes($m);
+					if (exists $per_minute_info{query}{$tm}{$h}{$m}) {
+						# Average per minute
+						$dataavg{average}{"$rd"} += $per_minute_info{query}{$tm}{$h}{$m}{count};
+						# Search minimum and maximum during this minute
+						foreach my $s (keys %{$per_minute_info{query}{$tm}{$h}{$m}{second}}) {
+							$dataavg{max}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
+							$dataavg{min}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+						}
+					}
+				}
+				foreach my $rd ('00','05','10','15','20','25','30','35','40','45','50','55') {
+					push(@data2, int(($dataavg{average}{"$rd"} || 0) / 300));
+					# Maxi per minute
+					push(@data1, $dataavg{max}{"$rd"} || 0);
+					# Mini per minute
+					push(@data3, $dataavg{min}{"$rd"} || 0);
+					push(@labels, "$prefix $h:$rd");
+				}
+			}
+		}
+		delete $per_minute_info{query};
+		push(@graph_values, [ @labels ] ); @labels = ();
+		push(@graph_values, [ @data1 ] ); @data1 = ();
+		push(@graph_values, [ @data2 ] ); @data2 = ();
+		push(@graph_values, [ @data3 ] ); @data3 = ();
+		&create_graph('queriespersecond', 'Queries per second (5 minutes average)', 'Hours', 'Queries per second', 'Maximum', 'Average', 'Minimum');
+		@graph_values = ();
+		print qq{<p><img src="queriespersecond.png" alt="Queries per second" /></p>};
+		# All queries
+		foreach my $tm (keys %per_hour_info) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $prefix = "$1-$2-$3 ";
+			foreach my $h ("00" .. "23") {
+				push(@labels, "$prefix $h:00");
+				push(@data1, $per_hour_info{$tm}{$h}{count} || 0);
+				push(@data2, sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) /1000));
+			}
+		}
+		push(@graph_values, [ @labels ] ); @labels = ();
+		push(@graph_values, [ @data1 ] ); @data1 = ();
+		push(@graph_values, [ @data2 ] ); @data2 = ();
+		&create_graph_twoaxes('allqueries', 'All queries', 'Hours', 'Queries', 'Duration', 'Number of queries','Average duration (s)');
+		print qq{<p><img src="allqueries.png" alt="All queries" /></p>};
+		@graph_values = ();
+		# Select queries
+		foreach my $tm (keys %per_hour_info) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $prefix = "$1-$2-$3 ";
+			foreach my $h ("00" .. "23") {
+				push(@labels, "$prefix $h:00");
+				push(@data1, $per_hour_info{$tm}{$h}{'SELECT'}{count} || 0);
+				push(@data2, sprintf("%.2f", (($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) /1000));
+			}
+		}
+		push(@graph_values, [ @labels ] ); @labels = ();
+		push(@graph_values, [ @data1 ] ); @data1 = ();
+		push(@graph_values, [ @data2 ] ); @data2 = ();
+		&create_graph_twoaxes('selectqueries', 'SELECT queries', 'Hours', 'Queries', 'Duration', 'Number of queries','Average duration (s)');
+		print qq{<p><img src="selectqueries.png" alt="SELECT queries" /></p>};
+		@graph_values = ();
+
+		# Write queries
+		my @data4 = ();
+		foreach my $tm (keys %per_hour_info) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $prefix = "$1-$2-$3 ";
+			foreach my $h ("00" .. "23") {
+				push(@labels, "$prefix $h:00");
+				my $wcount = $per_hour_info{$tm}{$h}{'UPDATE'}{count} + $per_hour_info{$tm}{$h}{'DELETE'}{count} + $per_hour_info{$tm}{$h}{'INSERT'}{count};
+				my $wduration = $per_hour_info{$tm}{$h}{'UPDATE'}{duration} + $per_hour_info{$tm}{$h}{'DELETE'}{duration} + $per_hour_info{$tm}{$h}{'INSERT'}{duration};
+				push(@data1, $per_hour_info{$tm}{$h}{'DELETE'}{count} || 0);
+				push(@data2, $per_hour_info{$tm}{$h}{'INSERT'}{count} || 0);
+				push(@data3, $per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0);
+				push(@data4, sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) /1000));
+			}
+		}
+		push(@graph_values, [ @labels ] ); @labels = ();
+		push(@graph_values, [ @data1 ] ); @data1 = ();
+		push(@graph_values, [ @data2 ] ); @data2 = ();
+		push(@graph_values, [ @data3 ] ); @data2 = ();
+		push(@graph_values, [ @data4 ] ); @data4 = ();
+		&create_graph_twoaxes('writequeries', 'Write queries', 'Hours', 'Queries', 'Duration', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Average duration (s)');
+		print qq{<p><img src="writequeries.png" alt="Write queries" /></p>};
+		@graph_values = ();
+
+
+	}
+
+	# INSERT/DELETE/UPDATE/SELECT repartition
+	print qq{
+<h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Type</th>
+
+		<th>Count</th>
+		<th>Percentage</th>
+	</tr>
+};
+	$overall_stat{'SELECT'} ||= 0; $overall_stat{'INSERT'} ||= 0; $overall_stat{'UPDATE'} ||= 0; $overall_stat{'DELETE'} ||= 0;
+	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+	my $total = $overall_stat{'queries_number'} || 1;
+
+	print "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%</td></tr>\n";
+	print "<tr class=\"row1\"><td>INSERT</td><td class=\"right\">", &comma_numbers($overall_stat{'INSERT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%</td></tr>\n";
+	print "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
+	print "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
+	print "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
+	print "</table>\n";
+
+	# Lock stats per type
+	print qq{
+<h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Type</th>
+		<th>Object</th>
+		<th>Count</th>
+		<th>Total Duration</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+	</tr>
+};
+	my $total_count = 0;
+	my $total_duration = 0;
+	foreach my $t (sort keys %lock_info) {
+		print "<tr class=\"row1\"><td colspan=\"2\">$t</td><td class=\"right\">", &comma_numbers($lock_info{$t}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "</td></tr>\n";
+		foreach my $o (sort keys %{$lock_info{$t}}) {
+			next if (($o eq 'count') || ($o eq 'duration') || ($o eq 'chronos'));
+			print "<tr class=\"row0\"><td  class=\"right\" colspan=\"2\">$o</td><td class=\"right\">", &comma_numbers($lock_info{$t}{$o}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "</td></tr>\n";
+		}
+		$total_count += $lock_info{$t}{count};
+		$total_duration += $lock_info{$t}{duration};
+	}
+	print "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
+	print "</table>\n";
+
+	# Show session per database statistics
+	print qq{
+<h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Database</th>
+		<th>Count</th>
+		<th>Total Duration</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+	</tr>
+};
+
+	foreach my $d (sort keys %{$session_info{database}}) {
+		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+	}
+	print "</table>\n";
+
+	# Show session per user statistics
+	print qq{
+<h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>User</th>
+		<th>Count</th>
+		<th>Total Duration</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+	</tr>
+};
+
+	foreach my $d (sort keys %{$session_info{user}}) {
+		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+	}
+	print "</table>\n";
+
+	# Show session per host statistics
+	print qq{
+<h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Host</th>
+		<th>Count</th>
+		<th>Total Duration</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+	</tr>
+};
+
+	foreach my $d (sort keys %{$session_info{host}}) {
+		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+	}
+	print "</table>\n";
+
+		$connection_info{count}++;
+
+	# Show connection per database statistics
+	print qq{
+<h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Database</th>
+		<th>User</th>
+		<th>Count</th>
+	</tr>
+};
+
+	foreach my $d (sort keys %{$connection_info{database}}) {
+		print "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
+		foreach my $u (sort keys %{$connection_info{user}}) {
+			next if (!exists $connection_info{database_user}{$d}{$u});
+			print "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
+		}
+	}
+	print "</table>\n";
+
+	# Show connection per user statistics
+	print qq{
+<h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>User</th>
+		<th>Count</th>
+	</tr>
+};
+
+	foreach my $u (sort keys %{$connection_info{user}}) {
+		print "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+	}
+	print "</table>\n";
+
+	# Show connection per host statistics
+	print qq{
+<h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Host</th>
+		<th>Count</th>
+	</tr>
+};
+
+	foreach my $h (sort keys %{$connection_info{host}}) {
+		print "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+	}
+	print "</table>\n";
+
+
+	# Show top informations
+	print qq{
+<h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Rank</th>
+
+		<th>Duration&nbsp;(s)</th>
+		<th>Query</th>
+	</tr>
+};
+	for (my $i = 0; $i <= $#top_slowest; $i++) {
+		my $col = $i % 2;
+		print "<tr class=\"row$col\"><td class=\"center top\">", $i+1, "</td><td class=\"relevantInformation top center\">", &convert_time($top_slowest[$i]->[0]), "</td><td title=\"$top_slowest[$i]->[1]\"><div class=\"sql\">", &highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
+	}
+	print "</table>\n";
+	@top_slowest = ();
+
+	print qq{
+<h2 id="NormalizedQueriesMostTimeReport">Queries that took up the most time (N) <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Rank</th>
+		<th>Total duration</th>
+		<th>Times executed</th>
+
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Query</th>
+	</tr>
+};
+	my $idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$d}{query};
+				last;
+			}
+		}
+		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
+		my $col = $idx % 2;
+		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				$c++;
+			}
+		}
+		print "</table></div></div></td>";
+		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+
+		if ($normalyzed_info{$k}{count} > 1) {
+			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			my $i = 0;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				$i++;
+			}
+			print "</div>";
+		}
+		print "</td></tr>\n";
+		$idx++;
+	}
+	print "</table>\n";
+
+	print qq{
+<h2 id="NormalizedQueriesMostFrequentReport">Most frequent queries (N) <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Rank</th>
+		<th>Times executed</th>
+		<th>Total duration</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Query</th>
+	</tr>
+};
+	$idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$d}{query};
+				last;
+			}
+		}
+		my $col = $idx % 2;
+		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				$c++;
+			}
+		}
+		print "</table></div></div></td>";
+		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+
+		if ($normalyzed_info{$k}{count} > 1) {
+			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			my $i = 0;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				$i++;
+			}
+			print "</div>";
+		}
+		print "</td></tr>\n";
+		$idx++;
+	}
+	print "</table>\n";
+
+	print qq{
+<h2 id="NormalizedQueriesSlowestAverageReport">Slowest queries (N) <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+	<tr>
+		<th>Rank</th>
+		<th>Av.&nbsp;duration&nbsp;(s)</th>
+
+		<th>Times executed</th>
+		<th>Total duration</th>
+		<th>Query</th>
+	</tr>
+};
+	$idx = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+		next if (!$k || !$normalyzed_info{$k}{count});
+		last if ($idx > $top);
+		my $q = $k;
+		if ($normalyzed_info{$k}{count} == 1) {
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				$q = $normalyzed_info{$k}{samples}{$d}{query};
+				last;
+			}
+		}
+		my $col = $idx % 2;
+		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				$c++;
+			}
+		}
+		print "</table></div></div></td>";
+		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+		if ($normalyzed_info{$k}{count} > 1) {
+			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			my $i = 0;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				$i++;
+			}
+			print "</div>";
+		}
+		print "</td></tr>\n";
+		$idx++;
+	}
+	print "</table>\n";
+
+	print qq{
+<h2 id="NormalizedErrorsMostFrequentReport">Most frequent errors (N) <a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+<tr>
+	<th>Rank</th>
+	<th>Times reported</th>
+	<th>Error</th>
+
+</tr>
+};
+	$idx = 1;
+	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
+		next if (!$error_info{$k}{count});
+		last if ($idx > $top);
+		my $col = $idx % 2;
+		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($error_info{$k}{count}), "</span>";
+		print "<div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th></tr>";
+		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}), "</td></tr>";
+				$c++;
+			}
+		}
+		print "</table></div></div></td>\n";
+		if ($error_info{$k}{count} > 1) {
+			print "<td><div class=\"error\">$k</div>";
+			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
+				print "<div class=\"example$i\" title=\"$error_info{$k}{date}[$i]\">$k</div>\n";
+				print "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
+			}
+			print "</div>";
+		} elsif ($error_info{$k}{detail}[0]) {
+			print "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
+			print "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n";
+		} else {
+			print "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
+		}
+		print "</td></tr>\n";
+		$idx++;
+	}
+	print "</table>\n";
+
+	# Dump the html footer
+	&html_footer();
+
+}
+
+# Highlight SQL code
+sub highlight_code
+{
+	my $code = shift;
+
+	return $code if ($nohighlight);
+
+	foreach my $x (keys %SYMBOLS) {
+		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/igs;
+	}
+	$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
+	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/igs;
+	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/igs;
+
+	for (my $x = 0; $x <= $#KEYWORDS1; $x++) {
+		#$code =~ s/\b($KEYWORDS1[$x])\b/<span class="kw1">$1<\/span>/igs;
+		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+	}
+	for (my $x = 0; $x <= $#KEYWORDS2; $x++) {
+		#$code =~ s/\b($KEYWORDS2[$x])\b/<span class="kw2">$1<\/span>/igs;
+		$code =~ s/\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
+	}
+	for (my $x = 0; $x <= $#KEYWORDS3; $x++) {
+		#$code =~ s/\b($KEYWORDS3[$x])\b/<span class="kw3">$1<\/span>/igs;
+		$code =~ s/\b$KEYWORDS3[$x]\b/<span class="kw3">$KEYWORDS3[$x]<\/span>/igs;
+	}
+	for (my $x = 0; $x <= $#BRACKETS; $x++) {
+		$code =~ s/($BRACKETS[$x])/<span class="br0">$1<\/span>/igs;
+	}
+	$code =~ s/\$\$CLASSSY0A\$\$([^\$]+)\$\$CLASSSY0B\$\$/<span class="sy0">$1<\/span>/igs;
+
+	$code =~ s/\b(\d+)\b/<span class="nu0">$1<\/span>/igs;
+
+	return $code;
+}
+
+sub parse_query
+{
+	my ($t_year, $t_month, $t_day, $t_hour, $t_min, $t_sec, $t_host, $t_pid, $t_session, $t_loglevel, $t_query) = @_;
+
+	# Extract user and database information from the loglevel part
+	my $t_dbname = '';
+	my $t_dbuser = '';
+	if ($t_loglevel =~ /^user=([^,]*),\s*db=([^\s]*)\s+([^:]*)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
+		$t_dbuser = $1;
+		$t_dbname = $2;
+		$t_loglevel = $4;
+	} elsif ($t_loglevel =~ /^db=([^,]*),\s*user=([^\s]*)\s+([^:]*)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
+		$t_dbname = $1;
+		$t_dbuser = $2;
+		$t_loglevel = $4;
+	} elsif ($t_loglevel =~ /(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
+		$t_loglevel = $1;
+	} elsif ($t_loglevel =~ /(CONTEXT):/) {
+		next;
+	} else {
+		# Unrecognized loglevel format
+		&logmsg('DEBUG', "Unrecognized loglevel format: $t_query");
+		return;
+	}
+
+	# Check user and/or database if require
+	if ($dbname) {
+		# Log line do not match the required dbname
+		if (!$cur_info{dbname} || ($dbname ne $cur_info{dbname})) {
+			%cur_info = ();
+			return;
+		}
+	}
+	if ($dbuser) {
+		# Log line do not match the required dbuser
+		if (!$cur_info{dbuser} || ($dbuser ne $cur_info{dbuser})) {
+			%cur_info = ();
+			return;
+		}
+	}
+
+	# Store the current timestamp of the log line
+	$first_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec" if (!$first_log_date);
+	$last_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec";
+
+	# Stores lock activity
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/)) {
+			$lock_info{$1}{count}++;
+			$lock_info{$1}{duration} += $3;
+			$lock_info{$1}{$2}{count}++;
+			$lock_info{$1}{$2}{duration} += $3;
+			$lock_info{$1}{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++; 
+			$lock_info{$1}{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{duration}++; 
+			return;
+	}
+
+	# Stores temporary files activity
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /temporary file: path .*, size (\d+)/)) {
+		$tempfile_info{count}++;
+		$tempfile_info{size} += $1;
+		$tempfile_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
+		$tempfile_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{size} += $1;
+		$tempfile_info{maxsize} = $1 if ($tempfile_info{maxsize} < $1);
+		return;
+	}
+
+	# Stores pre connection activity
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection received: host=([^\s]+) port=(\d+)/)) {
+		$conn_received{$t_pid} = $1;
+		return;
+	}
+	# Stores connection activity
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection authorized: user=([^\s]+) database=([^\s]+)/)) {
+		my $usr = $1;
+		my $db = $2;
+		$connection_info{count}++;
+		$connection_info{user}{$usr}++;
+		$connection_info{database}{$db}++;
+		$connection_info{database_user}{$db}{$usr}++;
+		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
+		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{user}{$usr}++;
+		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database}{$db}++;
+		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database_user}{$db}{$usr}++;
+		if (exists $conn_received{$t_pid}) {
+			$connection_info{host}{$conn_received{$t_pid}}++;
+			$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{host}{$conn_received{$t_pid}}++;
+			delete $conn_received{$t_pid};
+		}
+		return;
+	}
+
+	# Stores session duration
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/)) {
+		my $time = $1;
+		my $usr = $2;
+		my $db = $3;
+		my $host = $4;
+		# Store time in millisecond
+		$time =~ /(\d+):(\d+):(\d+\.\d+)/;
+		$time = ($3*1000)+($2*60*1000)+($1*60*60*1000);
+		$session_info{count}++;
+		$session_info{duration} += $time;
+		$session_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
+		$session_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{duration} += $time;
+		$session_info{database}{$db}{count}++;
+		$session_info{database}{$db}{duration} += $time;
+		$session_info{user}{$usr}{count}++;
+		$session_info{user}{$usr}{duration} += $time;
+		$session_info{host}{$host}{count}++;
+		$session_info{host}{$host}{duration} += $time;
+		return;
+	}
+
+	# Store checkpoint information
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /checkpoint complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) transaction log file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/)) {
+		$checkpoint_info{wbuffer} += $1;
+		#$checkpoint_info{percent_wbuffer} += $2;
+		$checkpoint_info{file_added} += $3;
+		$checkpoint_info{file_removed} += $4;
+		$checkpoint_info{file_recycled} += $5;
+		$checkpoint_info{write} += $6;
+		$checkpoint_info{sync} += $7;
+		$checkpoint_info{total} += $8;
+
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{wbuffer} += $1;
+		#$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{percent_wbuffer} += $2;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_added} += $3;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_removed} += $4;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_recycled} += $5;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{write} += $6;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{sync} += $7;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{total} += $8;
+		return;
+	}
+	
+	# Store errors statistics
+	if ($cur_info{query}) {
+		delete $conn_received{$cur_info{pid}};
+		if ($cur_info{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
+			$cur_info{query} = substr($cur_info{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{query}) > $maxlength));
+			$cur_info{query} = $cur_info{loglevel} . ": " . $cur_info{query};
+			$overall_stat{'errors_number'}++;
+			my $normalized_error = &normalize_error($cur_info{query});
+			$overall_stat{'unique_normalized_errors'}{"$normalized_error"}++;
+			# Store normalyzed error count
+			$error_info{$normalized_error}{count}++; 
+			# Store normalyzed error count per time
+			$error_info{$normalized_error}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
+			# Store normalyzed query samples
+			my $cur_last_log_date = "$cur_info{year}-$cur_info{month}-$cur_info{day} $cur_info{hour}:$cur_info{min}:$cur_info{sec}";
+			if ($t_loglevel =~ /DETAIL|STATEMENT/) {
+				&set_top_error_sample($normalized_error, $cur_last_log_date, $t_query);
+			} else {
+				&set_top_error_sample($normalized_error, $cur_last_log_date);
+			}
+			%cur_info = ();
+			return;
+		}
+
+		# Process complete query but not debug/info logs
+		if ($cur_info{loglevel} eq 'LOG') {
+			# Apply bind parameters if any
+			if ( ($t_loglevel eq 'DETAIL') && ($t_query =~ /parameters: (.*)/)) {
+				my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $1);
+				shift(@t_res);
+				for (my $i = 0; $i < $#t_res; $i+=2) {
+					$cur_info{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+				}
+			}
+
+			# Cleanup and normalize the current query
+			$cur_info{query} =~ s/^[\t\s]+//s;
+			$cur_info{query} =~ s/[\t\s]+$//s;
+			$cur_info{query} = substr($cur_info{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{query}) > $maxlength));
+			$cur_info{query} .= ';' if (substr($cur_info{query}, -1, 1) ne ';');
+			my $normalized = &normalize_query($cur_info{query});
+
+			# Stores global statistics
+			my $cur_last_log_date = "$cur_info{year}-$cur_info{month}-$cur_info{day} $cur_info{hour}:$cur_info{min}:$cur_info{sec}";
+			$overall_stat{'queries_number'}++;
+			$overall_stat{'queries_duration'} += $cur_info{duration};
+			$overall_stat{'first_query'} = $cur_last_log_date if (!$overall_stat{'first_query'});
+			$overall_stat{'last_query'} = $cur_last_log_date;
+			$overall_stat{'query_peak'}{$cur_last_log_date}++;
+			$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
+			$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{duration} += $cur_info{duration}; 
+			if ($graph) {
+				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{count}++; 
+				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{second}{$cur_info{sec}}++; 
+				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{duration} += $cur_info{duration}; 
+			}
+			if ($normalized =~ /delete from/) {
+				$overall_stat{'DELETE'}++;
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'DELETE'}{count}++; 
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'DELETE'}{duration} += $cur_info{duration}; 
+				if ($graph) {
+					$per_minute_info{delete}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{count}++; 
+					$per_minute_info{delete}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{duration} += $cur_info{duration}; 
+				}
+			} elsif ($normalized =~ /insert into/) {
+				$overall_stat{'INSERT'}++;
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'INSERT'}{count}++; 
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'INSERT'}{duration} += $cur_info{duration}; 
+				if ($graph) {
+					$per_minute_info{insert}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
+					$per_minute_info{insert}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
+				}
+			} elsif ($normalized =~ /update.*set\b/) {
+				$overall_stat{'UPDATE'}++;
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'UPDATE'}{count}++; 
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'UPDATE'}{duration} += $cur_info{duration}; 
+				if ($graph) {
+					$per_minute_info{update}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
+					$per_minute_info{update}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
+				}
+			} elsif ($normalized =~ /\bselect\b/is) {
+				$overall_stat{'SELECT'}++;
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'SELECT'}{count}++; 
+				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'SELECT'}{duration} += $cur_info{duration}; 
+				if ($graph) {
+					$per_minute_info{select}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
+					$per_minute_info{select}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
+				}
+			}
+			&set_top_slowest($cur_info{query}, $cur_info{duration}, $cur_last_log_date);
+
+			# Store normalyzed query count
+			$normalyzed_info{$normalized}{count}++; 
+			# Store normalyzed query total duration
+			$normalyzed_info{$normalized}{duration} += $cur_info{duration}; 
+			# Store normalyzed query count and duration per time
+			$normalyzed_info{$normalized}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
+			$normalyzed_info{$normalized}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{duration} += $cur_info{duration}; 
+			# Store normalyzed query samples
+			&set_top_sample($normalized, $cur_info{query}, $cur_info{duration}, $last_log_date);
+			%cur_info = ();
+		}
+	}
+
+	# Extract the duration part from the query
+	my $t_action = '';
+	my $t_duration = '';
+	if ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(query|statement):\s*//is) {
+		$t_duration = $1;
+		$t_action = $2;
+	} elsif ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(prepare|parse|bind|execute|execute from fetch)\s+[^:]+://is) {
+		$t_duration = $1;
+		$t_action = $2;
+	} elsif ($t_loglevel eq 'LOG') {
+		if ($t_query !~ /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file/) {
+			&logmsg('WARNING', "Unrecognized line: $t_loglevel: $t_query at line $nlines");
+		}
+		return;
+	}
+
+	# Skiping parse and bind logs
+	return if ( $t_action && ($t_action !~ /query|statement|execute/) );
+
+
+	$cur_info{year} = $t_year;
+	$cur_info{month} = $t_month;
+	$cur_info{day} = $t_day;
+	$cur_info{hour} = $t_hour;
+	$cur_info{min} = $t_min;
+	$cur_info{sec} = $t_sec;
+	$cur_info{host} = $t_host;
+	$cur_info{pid} = $t_pid;
+	$cur_info{session} = $t_session;
+	$cur_info{loglevel} = $t_loglevel;
+	$cur_info{query} = $t_query;
+	$cur_info{duration} = $t_duration;
+	$cur_info{dbname} = $t_dbname;
+	$cur_info{dbuser} = $t_dbuser;
+
+	return 1;
+}
+
+# Normalyze error messages
+sub normalize_error
+{
+	my $orig_query = shift;
+
+	return if (!$orig_query);
+
+	# Remove character position
+	$orig_query =~ s/ at character \d+//;
+
+	return $orig_query;
+}
+
+
+sub create_graph
+{
+	my ($filename, $title, $x_label, $y_label, @legends) = @_;
+
+        use GD::Graph::lines;
+        my $graf = new GD::Graph::lines(800, 400);
+        $graf->set(
+                x_label         => $x_label || '',
+                y_label         => $y_label || '',
+                title           => $title || '',
+		bgclr           => '#ffffff',
+                fgclr           => '#dddddd',
+                legendclr       => '#993300',
+		legend_placement=> 'RC',
+                dclrs           => [ qw(red orange green) ],
+                x_labels_vertical => 1,
+		transparent     => 1,
+                long_ticks  => 1,
+                shadow_depth => 5,
+                box_axis => 0,
+                show_values     => 0,
+		x_label_skip => 12,
+        ) or die "FATAL: error creating graph, " . $graf->error . "\n";
+	$graf->set_text_clr('#993300');
+	$graf->set_legend(@legends) if ($#legends >= 0);
+	my $gd = $graf->plot(\@graph_values) or die $graf->error;
+	open(IMG, ">$filename.png") or die $!;
+	binmode IMG;
+	print IMG $gd->png;
+	close IMG;
+	@graph_values = ();
+
+}
+
+sub average_five_minutes
+{
+	my $val = shift;
+
+	my @avgs = ('00','05','10','15','20','25','30','35','40','45','50','55','59');
+	for (my $i = 0; $i <= $#avgs; $i++) {
+		if ($val == $avgs[$i]) {
+			return "$avgs[$i]";
+		} elsif ($i == 12) {
+			return "$avgs[$i-1]";
+		} elsif ( ($val > $avgs[$i]) && ($val < $avgs[$i+1])) {
+			return "$avgs[$i]";
+		}
+	}
+	return $val;
+}
+
+sub create_graph_twoaxes
+{
+	my ($filename, $title, $x_label, $y1_label, $y2_label, @legends) = @_;
+
+        use GD::Graph::lines;
+	my $len = $#graph_values;
+	my @use_axis = ();
+	for (my $i = 0; $i <= $len; $i++) {
+		if ($i < $len) {
+			push(@use_axis, '1');
+		} else {
+			push(@use_axis, '2');
+		}
+	}
+        my $graf = new GD::Graph::lines(800, 400);
+        $graf->set(
+                x_label         => $x_label || '',
+                y1_label         => $y1_label || '',
+                y2_label         => $y2_label || '',
+                title           => $title || '',
+		two_axes        => 1,
+		use_axis        => \@use_axis,
+		bgclr           => '#ffffff',
+                fgclr           => '#dddddd',
+                legendclr       => '#993300',
+		legend_placement=> 'RC',
+                dclrs           => [ qw(red orange green blue) ],
+                x_labels_vertical => 1,
+		transparent     => 1,
+                long_ticks  => 1,
+                shadow_depth => 5,
+                box_axis => 0,
+                show_values     => 0,
+        ) or die "FATAL: error creating graph, " . $graf->error . "\n";
+	$graf->set_text_clr('#993300');
+	$graf->set_legend(@legends) if ($#legends >= 0);
+	my $gd = $graf->plot(\@graph_values) or die $graf->error;
+	open(IMG, ">$filename.png") or die $!;
+	binmode IMG;
+	print IMG $gd->png;
+	close IMG;
+	@graph_values = ();
+
+}
+
+
