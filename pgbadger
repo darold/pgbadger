@@ -78,6 +78,12 @@ if ($ver) {
 	exit 0;
 }
 &usage() if ($help);
+# If we just have one command line argument assume it's the log file
+# and use default values for all other ones.
+if ($#ARGV == 0) {
+	$logfile = shift(@ARGV);
+}
+# Logfile is a mandatory parameter
 if (!$logfile) {
 	print STDERR "FATAL: you must set a log file. See option -l.\n\n";
 	&usage();
