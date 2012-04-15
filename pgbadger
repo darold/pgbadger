@@ -862,7 +862,6 @@ sub dump_as_html
 </ul>
 };
 
-
 	print $fh qq{
 <h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
 
@@ -879,13 +878,11 @@ sub dump_as_html
 		<th colspan="2" style="white-space: nowrap">Temporary files</th>
 };
 	}
-	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
+	if (exists $checkpoint_info{chronos}) {
 		print $fh qq{
 		<th colspan="7" style="white-space: nowrap">Checkpoints</th>
 };
 	}
-
-
 	print $fh qq{
 	</tr>
 	<tr>
@@ -905,7 +902,7 @@ sub dump_as_html
 		<th>Av.&nbsp;size</th>
 };
 	}
-	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
+	if (exists $checkpoint_info{chronos}) {
 		print $fh qq{
 		<th>Wrote buffers</th>
 		<th>Added</th>
@@ -914,9 +911,8 @@ sub dump_as_html
 		<th>Write time (sec)</th>
 		<th>Sync time (sec)</th>
 		<th>Total time (sec)</th>
-	};
+};
 	}
-
 	print $fh qq{
 	</tr>
 };
@@ -939,10 +935,12 @@ sub dump_as_html
 				}
 				print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
 			}
-			if (exists $checkpoint_info{chronos}{$d}{$h}) {
-				print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
-			} elsif (exists $checkpoint_info{chronos}) {
-				print $fh "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
+			if (exists $checkpoint_info{chronos}) {
+				if (exists $checkpoint_info{chronos}{$d}{$h}) {
+					print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
+				} else {
+					print $fh "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
+				}
 			}
 			print $fh "</tr>\n";
 			$c++;
