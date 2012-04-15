@@ -24,6 +24,7 @@ use strict;
 use Getopt::Long;
 use IO::File;
 use Benchmark;
+use IO::File;
 
 $| = 1;
 
@@ -34,7 +35,7 @@ my $VERSION = '0.1';
 # Command line options
 my $logfile = '';
 my $format  = '';
-my $outdir  = '';
+my $outfile = '';
 my $help    = '';
 my $ver     = '';
 my $dbname  = '';
@@ -56,7 +57,7 @@ my $t0 = Benchmark->new;
 my $result = GetOptions (
 	"l|logfile=s"	=> \$logfile,
 	"f|format=s"	=> \$format,
-	"o|outdir=s"	=> \$outdir,
+	"o|outfile=s"	=> \$outfile,
 	"h|help!"	=> \$help,
 	"v|version!"	=> \$ver,
 	"d|dbname=s"	=> \$dbname,
@@ -72,10 +73,13 @@ my $result = GetOptions (
 	"e|end=s"       => \$to,
 );
 
-die "pgbadger version $VERSION\n" if ($ver);
+if ($ver) {
+	print "pgbadger version $VERSION\n";
+	exit 0;
+}
 &usage() if ($help);
 if (!$logfile) {
-	print STDERR "FATAL: you must set a log file. See option -f.\n\n";
+	print STDERR "FATAL: you must set a log file. See option -l.\n\n";
 	&usage();
 }
 
@@ -88,7 +92,19 @@ $top ||= 20;
 # Set the default number of samples
 $sample ||= 3;
 # Set the default extension and output format
-$extension ||= 'html';
+if (!$extension) {
+	if ($outfile =~ /\.htm[l]*/i) {
+		$extension = 'html';
+	} elsif ($outfile) {
+		$extension = 'txt';
+	} else {
+		$extension = 'html';
+	}
+}
+# Set default filename of the output file
+$outfile ||= 'out.' . $extension;
+
+# Remove graph support if output is not html
 $graph = 0 if ($extension ne 'html');
 
 my $end_top = $top - 1;
@@ -96,6 +112,14 @@ my $end_top = $top - 1;
 # Check if the logfile exists
 die "FATAL: logfile $logfile must exists!\n" if (!-e $logfile || -z $logfile);
 die "FATAL: logfile $logfile must not be empty!\n" if (!-e $logfile || -z $logfile);
+
+# Test file creation before going to parse log
+my $tmpfh = new IO::File ">$outfile";
+if (not defined $tmpfh) {
+	die "FATAL: can't write to $logfile, $!\n";
+}
+$tmpfh->close();
+unlink($outfile) if (-e $outfile);
 
 # Check start/end date time
 if ($from) {
@@ -288,11 +312,17 @@ my $td = timediff($t1, $t0);
 
 &logmsg('DEBUG', "Ok, generating report...") if ($debug);
 
+# Open filehandle
+my $fh = new IO::File ">$outfile";
+if (not defined $fh) {
+	die "FATAL: can't write to $outfile, $!\n";
+}
 if ( ($extension eq 'text') || ($extension eq 'txt') ) {
 	&dump_as_text();
 } else {
 	&dump_as_html();
 }
+$fh->close;
 
 exit 0;
 
@@ -302,12 +332,15 @@ exit 0;
 sub usage
 {
 	print qq{
-Usage: $0 -l logfile ... > out.html
+Usage: $0 -l logfile [...]
 
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
 			     be a plain text log or a gzip compressed file
 			     with the .gz extension.
     -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -o | --outfile filename: define the filename for the output. Default depends
+			     of the output format: out.html or out.txt. To dump
+			     output to stdout use - as filename.
     -i | --ident name      : programname used as syslog ident. Default: postgres
     -h | --help            : show this message and exit.
     -d | --dbname database : only report what concern the given database
@@ -451,7 +484,7 @@ sub dump_as_text
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	print qq{
+	print $fh qq{
 
 - Global informations --------------------------------------------------
 
@@ -465,7 +498,7 @@ Log start from $first_log_date to $last_log_date
 	my $fmt_unique = &comma_numbers(scalar keys %normalyzed_info) || 0;
 	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
-	print qq{
+	print $fh qq{
 
 - Overall statistics ---------------------------------------------------
 
@@ -476,25 +509,25 @@ First query: $overall_stat{'first_query'}
 Last query: $overall_stat{'last_query'}
 };
 	foreach (sort { $overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a} } keys %{$overall_stat{'query_peak'}}) {
-		print "Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_";
+		print $fh "Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_";
 		last;
 	}
 	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
 	my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
-	print qq{
+	print $fh qq{
 Number of errors: $fmt_errors
 Number of unique normalized errors: $fmt_unique_error
 };
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", ($tempfile_info{maxsize}/$tempfile_info{count})));
-		print qq{
+		print $fh qq{
 Number temporary file: $tempfile_info{count}
 Max size of temporary file: $fmt_temp_maxsise
 Average size of temporary file: $fmt_temp_avsize
 };
 	}
-	print qq{
+	print $fh qq{
 
 - Hourly statistics ----------------------------------------------------
 
@@ -505,23 +538,23 @@ Report not supported by text format
 	# INSERT/DELETE/UPDATE/SELECT repartition
 	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
 	my $total = $overall_stat{'queries_number'};
-	print "\n- Queries by type ------------------------------------------------------\n\n";
-	print "SELECT: ", &comma_numbers($overall_stat{'SELECT'}), " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n" if ($overall_stat{'SELECT'});
-	print "INSERT: ", &comma_numbers($overall_stat{'INSERT'}), " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n" if ($overall_stat{'INSERT'});
-	print "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}), " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n" if ($overall_stat{'UPDATE'});
-	print "DELETE: ", &comma_numbers($overall_stat{'DELETE'}), " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n" if ($overall_stat{'DELETE'});
-	print "OTHERS: ", &comma_numbers($total - $totala), " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
-	print "\n";
+	print $fh "\n- Queries by type ------------------------------------------------------\n\n";
+	print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}), " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n" if ($overall_stat{'SELECT'});
+	print $fh "INSERT: ", &comma_numbers($overall_stat{'INSERT'}), " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n" if ($overall_stat{'INSERT'});
+	print $fh "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}), " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n" if ($overall_stat{'UPDATE'});
+	print $fh "DELETE: ", &comma_numbers($overall_stat{'DELETE'}), " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n" if ($overall_stat{'DELETE'});
+	print $fh "OTHERS: ", &comma_numbers($total - $totala), " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
+	print $fh "\n";
 
 	# Show top informations
-	print "\n- Slowest queries ------------------------------------------------------\n\n";
+	print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 	for (my $i = 0; $i <= $#top_slowest; $i++) {
-		print $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
-		print "--\n";
+		print $fh $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
+		print $fh "--\n";
 	}
 	@top_slowest = ();
 
-	print "\n- Queries that took up the most time (N) -------------------------------\n\n";
+	print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
 	my $idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -534,12 +567,12 @@ Report not supported by text format
 			}
 		}
 		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
-		print "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
-		print "--\n";
+		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
+		print $fh "--\n";
 		$idx++;
 	}
 
-	print "\n- Most frequent queries (N) --------------------------------------------\n\n";
+	print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
 	$idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -551,12 +584,12 @@ Report not supported by text format
 				last;
 			}
 		}
-		print "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
-		print "--\n";
+		print $fh "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
+		print $fh "--\n";
 		$idx++;
 	}
 
-	print "\n- Slowest queries (N) --------------------------------------------------\n\n";
+	print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
 	$idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -568,28 +601,28 @@ Report not supported by text format
 				last;
 			}
 		}
-		print "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
-		print "--\n";
+		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
+		print $fh "--\n";
 		$idx++;
 	}
 
-	print "\n- Most frequent errors (N) ---------------------------------------------\n\n";
+	print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
 	$idx = 1;
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
-		print "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
-		print "--\n";
+		print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
+		print $fh "--\n";
 		$idx++;
 	}
-	print "\n\n";
-	print "Report generated by <a href=\"https://github.com/dalibo/pgbadger\">PgBadger</a> $VERSION. License: GPL v3.\n";
+	print $fh "\n\n";
+	print $fh "Report generated by <a href=\"https://github.com/dalibo/pgbadger\">PgBadger</a> $VERSION. License: GPL v3.\n";
 
 }
 
 sub html_header
 {
-	print qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+	print $fh qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <title>PgBadger: PostgreSQL log analyzer</title>
@@ -725,7 +758,7 @@ function toggle(idButton, idDiv, label) {
 
 sub html_footer
 {
-	print qq{
+	print $fh qq{
 	<div class="footer">
 		Report generated by <a href="https://github.com/dalibo/pgbadger">PgBadger</a> $VERSION. License: GPL v3.
 	</div>
@@ -757,7 +790,7 @@ sub dump_as_html
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	print qq{
+	print $fh qq{
 <div class="information">
 <ul>
 <li>Generated on $curdate</li>
@@ -772,7 +805,7 @@ sub dump_as_html
 	my $fmt_unique = &comma_numbers(scalar keys %normalyzed_info) || 0;
 	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
-	print qq{
+	print $fh qq{
 <div class="reports">
 <h2 id="OverallStatsReport">Overall statistics <a href="#top" title="Back to top">^</a></h2>
 <ul>
@@ -783,19 +816,19 @@ sub dump_as_html
 <li>Last query: $overall_stat{'last_query'}</li>
 };
 	foreach (sort { $overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a} } keys %{$overall_stat{'query_peak'}}) {
-		print "<li>Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_</li>";
+		print $fh "<li>Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_</li>";
 		last;
 	}
 	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
 	my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
-	print qq{
+	print $fh qq{
 <li>Number of errors: $fmt_errors</li>
 <li>Number of unique normalized errors: $fmt_unique_error</li>
 };
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers($tempfile_info{maxsize}/$tempfile_info{count});
-		print qq{
+		print $fh qq{
 <li>Number temporary file: $tempfile_info{count}</li>
 <li>Max size of temporary file: $fmt_temp_maxsise</li>
 <li>Average size of temporary file: $fmt_temp_avsize</li>
@@ -804,23 +837,23 @@ sub dump_as_html
 	if ($session_info{count}) {
 		my $avg_session_duration = &convert_time($session_info{duration}/$session_info{count});
 		my $tot_session_duration = &convert_time($session_info{duration});
-		print qq{
+		print $fh qq{
 <li>Total number of sessions: $session_info{count}</li>
 <li>Total duration of sessions: $tot_session_duration</li>
 <li>Average duration of sessions: $avg_session_duration</li>
 };
 	}
 	if ($connection_info{count}) {
-		print qq{
+		print $fh qq{
 <li>Total number of connections: $connection_info{count}</li>
 }
 	}
-	print qq{
+	print $fh qq{
 </ul>
 };
 
 
-	print qq{
+	print $fh qq{
 <h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
 
 <table class="queryList" width="100%">
@@ -832,18 +865,18 @@ sub dump_as_html
 		<th colspan="4" style="white-space: nowrap">Write queries</th>
 };
 	if ($tempfile_info{count}) {
-		print qq{
+		print $fh qq{
 		<th colspan="2" style="white-space: nowrap">Temporary files</th>
 };
 	}
 	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
-		print qq{
+		print $fh qq{
 		<th colspan="7" style="white-space: nowrap">Checkpoints</th>
 };
 	}
 
 
-	print qq{
+	print $fh qq{
 	</tr>
 	<tr>
 		<th>Count</th>
@@ -857,13 +890,13 @@ sub dump_as_html
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 };
 	if ($tempfile_info{count}) {
-		print qq{
+		print $fh qq{
 		<th>Count</th>
 		<th>Av.&nbsp;size</th>
 };
 	}
 	if (scalar keys %{$checkpoint_info{chronos}} > 0) {
-		print qq{
+		print $fh qq{
 		<th>Wrote buffers</th>
 		<th>Added</th>
 		<th>Removed</th>
@@ -874,7 +907,7 @@ sub dump_as_html
 	};
 	}
 
-	print qq{
+	print $fh qq{
 	</tr>
 };
 
@@ -888,24 +921,24 @@ sub dump_as_html
 			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
 			$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
 			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
-			print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
+			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
 			if ($tempfile_info{count}) {
 				my $temp_average = '0.00';
 				if ($tempfile_info{chronos}{$d}{$h}{count}) {
 					$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
 				}
-				print "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
+				print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
 			}
 			if (exists $checkpoint_info{chronos}{$d}{$h}) {
-				print "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
+				print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
 			} elsif (exists $checkpoint_info{chronos}) {
-				print "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
+				print $fh "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
 			}
-			print "</tr>\n";
+			print $fh "</tr>\n";
 			$c++;
 		}
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	if ($graph) {
 		my @labels = ();
@@ -946,7 +979,7 @@ sub dump_as_html
 		push(@graph_values, [ @data3 ] ); @data3 = ();
 		&create_graph('queriespersecond', 'Queries per second (5 minutes average)', 'Hours', 'Queries per second', 'Maximum', 'Average', 'Minimum');
 		@graph_values = ();
-		print qq{<p><img src="queriespersecond.png" alt="Queries per second" /></p>};
+		print $fh qq{<p><img src="queriespersecond.png" alt="Queries per second" /></p>};
 		# All queries
 		foreach my $tm (keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
@@ -961,7 +994,7 @@ sub dump_as_html
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
 		&create_graph_twoaxes('allqueries', 'All queries', 'Hours', 'Queries', 'Duration', 'Number of queries','Average duration (s)');
-		print qq{<p><img src="allqueries.png" alt="All queries" /></p>};
+		print $fh qq{<p><img src="allqueries.png" alt="All queries" /></p>};
 		@graph_values = ();
 		# Select queries
 		foreach my $tm (keys %per_hour_info) {
@@ -977,7 +1010,7 @@ sub dump_as_html
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
 		&create_graph_twoaxes('selectqueries', 'SELECT queries', 'Hours', 'Queries', 'Duration', 'Number of queries','Average duration (s)');
-		print qq{<p><img src="selectqueries.png" alt="SELECT queries" /></p>};
+		print $fh qq{<p><img src="selectqueries.png" alt="SELECT queries" /></p>};
 		@graph_values = ();
 
 		# Write queries
@@ -1001,14 +1034,14 @@ sub dump_as_html
 		push(@graph_values, [ @data3 ] ); @data2 = ();
 		push(@graph_values, [ @data4 ] ); @data4 = ();
 		&create_graph_twoaxes('writequeries', 'Write queries', 'Hours', 'Queries', 'Duration', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Average duration (s)');
-		print qq{<p><img src="writequeries.png" alt="Write queries" /></p>};
+		print $fh qq{<p><img src="writequeries.png" alt="Write queries" /></p>};
 		@graph_values = ();
 
 
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	print qq{
+	print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1022,15 +1055,15 @@ sub dump_as_html
 	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
 	my $total = $overall_stat{'queries_number'} || 1;
 
-	print "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%</td></tr>\n";
-	print "<tr class=\"row1\"><td>INSERT</td><td class=\"right\">", &comma_numbers($overall_stat{'INSERT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%</td></tr>\n";
-	print "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
-	print "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
-	print "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
-	print "</table>\n";
+	print $fh "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%</td></tr>\n";
+	print $fh "<tr class=\"row1\"><td>INSERT</td><td class=\"right\">", &comma_numbers($overall_stat{'INSERT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%</td></tr>\n";
+	print $fh "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
+	print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
+	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
+	print $fh "</table>\n";
 
 	# Lock stats per type
-	print qq{
+	print $fh qq{
 <h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1044,19 +1077,19 @@ sub dump_as_html
 	my $total_count = 0;
 	my $total_duration = 0;
 	foreach my $t (sort keys %lock_info) {
-		print "<tr class=\"row1\"><td colspan=\"2\">$t</td><td class=\"right\">", &comma_numbers($lock_info{$t}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td colspan=\"2\">$t</td><td class=\"right\">", &comma_numbers($lock_info{$t}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "</td></tr>\n";
 		foreach my $o (sort keys %{$lock_info{$t}}) {
 			next if (($o eq 'count') || ($o eq 'duration') || ($o eq 'chronos'));
-			print "<tr class=\"row0\"><td  class=\"right\" colspan=\"2\">$o</td><td class=\"right\">", &comma_numbers($lock_info{$t}{$o}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "</td></tr>\n";
+			print $fh "<tr class=\"row0\"><td  class=\"right\" colspan=\"2\">$o</td><td class=\"right\">", &comma_numbers($lock_info{$t}{$o}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "</td></tr>\n";
 		}
 		$total_count += $lock_info{$t}{count};
 		$total_duration += $lock_info{$t}{duration};
 	}
-	print "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
-	print "</table>\n";
+	print $fh "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
+	print $fh "</table>\n";
 
 	# Show session per database statistics
-	print qq{
+	print $fh qq{
 <h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1068,12 +1101,12 @@ sub dump_as_html
 };
 
 	foreach my $d (sort keys %{$session_info{database}}) {
-		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	# Show session per user statistics
-	print qq{
+	print $fh qq{
 <h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1085,12 +1118,12 @@ sub dump_as_html
 };
 
 	foreach my $d (sort keys %{$session_info{user}}) {
-		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	# Show session per host statistics
-	print qq{
+	print $fh qq{
 <h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1102,14 +1135,14 @@ sub dump_as_html
 };
 
 	foreach my $d (sort keys %{$session_info{host}}) {
-		print "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 		$connection_info{count}++;
 
 	# Show connection per database statistics
-	print qq{
+	print $fh qq{
 <h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1120,16 +1153,16 @@ sub dump_as_html
 };
 
 	foreach my $d (sort keys %{$connection_info{database}}) {
-		print "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
 		foreach my $u (sort keys %{$connection_info{user}}) {
 			next if (!exists $connection_info{database_user}{$d}{$u});
-			print "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
+			print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
 		}
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	# Show connection per user statistics
-	print qq{
+	print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1139,12 +1172,12 @@ sub dump_as_html
 };
 
 	foreach my $u (sort keys %{$connection_info{user}}) {
-		print "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	# Show connection per host statistics
-	print qq{
+	print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1154,13 +1187,13 @@ sub dump_as_html
 };
 
 	foreach my $h (sort keys %{$connection_info{host}}) {
-		print "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 
 	# Show top informations
-	print qq{
+	print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1172,12 +1205,12 @@ sub dump_as_html
 };
 	for (my $i = 0; $i <= $#top_slowest; $i++) {
 		my $col = $i % 2;
-		print "<tr class=\"row$col\"><td class=\"center top\">", $i+1, "</td><td class=\"relevantInformation top center\">", &convert_time($top_slowest[$i]->[0]), "</td><td title=\"$top_slowest[$i]->[1]\"><div class=\"sql\">", &highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i+1, "</td><td class=\"relevantInformation top center\">", &convert_time($top_slowest[$i]->[0]), "</td><td title=\"$top_slowest[$i]->[1]\"><div class=\"sql\">", &highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 	@top_slowest = ();
 
-	print qq{
+	print $fh qq{
 <h2 id="NormalizedQueriesMostTimeReport">Queries that took up the most time (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1202,7 +1235,7 @@ sub dump_as_html
 		}
 		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
 		my $col = $idx % 2;
-		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -1211,28 +1244,28 @@ sub dump_as_html
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
 				my $colb = $c % 2;
 				$zday = "&nbsp;" if ($c > 1);
-				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
 				$c++;
 			}
 		}
-		print "</table></div></div></td>";
-		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+		print $fh "</table></div></div></td>";
+		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
 
 		if ($normalyzed_info{$k}{count} > 1) {
-			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
-			print "</div>";
+			print $fh "</div>";
 		}
-		print "</td></tr>\n";
+		print $fh "</td></tr>\n";
 		$idx++;
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
-	print qq{
+	print $fh qq{
 <h2 id="NormalizedQueriesMostFrequentReport">Most frequent queries (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1255,7 +1288,7 @@ sub dump_as_html
 			}
 		}
 		my $col = $idx % 2;
-		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -1264,28 +1297,28 @@ sub dump_as_html
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
 				my $colb = $c % 2;
 				$zday = "&nbsp;" if ($c > 1);
-				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
 				$c++;
 			}
 		}
-		print "</table></div></div></td>";
-		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+		print $fh "</table></div></div></td>";
+		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
 
 		if ($normalyzed_info{$k}{count} > 1) {
-			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
-			print "</div>";
+			print $fh "</div>";
 		}
-		print "</td></tr>\n";
+		print $fh "</td></tr>\n";
 		$idx++;
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
-	print qq{
+	print $fh qq{
 <h2 id="NormalizedQueriesSlowestAverageReport">Slowest queries (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1309,7 +1342,7 @@ sub dump_as_html
 			}
 		}
 		my $col = $idx % 2;
-		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -1318,27 +1351,27 @@ sub dump_as_html
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
 				my $colb = $c % 2;
 				$zday = "&nbsp;" if ($c > 1);
-				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
 				$c++;
 			}
 		}
-		print "</table></div></div></td>";
-		print "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+		print $fh "</table></div></div></td>";
+		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
 		if ($normalyzed_info{$k}{count} > 1) {
-			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
-			print "</div>";
+			print $fh "</div>";
 		}
-		print "</td></tr>\n";
+		print $fh "</td></tr>\n";
 		$idx++;
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
-	print qq{
+	print $fh qq{
 <h2 id="NormalizedErrorsMostFrequentReport">Most frequent errors (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 <tr>
@@ -1353,8 +1386,8 @@ sub dump_as_html
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
 		my $col = $idx % 2;
-		print "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($error_info{$k}{count}), "</span>";
-		print "<div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th></tr>";
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($error_info{$k}{count}), "</span>";
+		print $fh "<div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th></tr>";
 		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -1362,29 +1395,29 @@ sub dump_as_html
 			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
 				my $colb = $c % 2;
 				$zday = "&nbsp;" if ($c > 1);
-				print "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}), "</td></tr>";
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}), "</td></tr>";
 				$c++;
 			}
 		}
-		print "</table></div></div></td>\n";
+		print $fh "</table></div></div></td>\n";
 		if ($error_info{$k}{count} > 1) {
-			print "<td><div class=\"error\">$k</div>";
-			print "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+			print $fh "<td><div class=\"error\">$k</div>";
+			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
-				print "<div class=\"example$i\" title=\"$error_info{$k}{date}[$i]\">$k</div>\n";
-				print "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
+				print $fh "<div class=\"example$i\" title=\"$error_info{$k}{date}[$i]\">$k</div>\n";
+				print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
 			}
-			print "</div>";
+			print $fh "</div>";
 		} elsif ($error_info{$k}{detail}[0]) {
-			print "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
-			print "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n";
+			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
+			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n";
 		} else {
-			print "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
+			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
 		}
-		print "</td></tr>\n";
+		print $fh "</td></tr>\n";
 		$idx++;
 	}
-	print "</table>\n";
+	print $fh "</table>\n";
 
 	# Dump the html footer
 	&html_footer();
