@@ -50,6 +50,8 @@ my $debug = 1;
 my $nohighlight = 0;
 my $from = '';
 my $to = '';
+my $regex_prefix_dbname = '';
+my $regex_prefix_dbuser = '';
 
 my $t0 = Benchmark->new;
 
@@ -71,6 +73,8 @@ my $result = GetOptions (
 	"n|nohighlight!"=> \$nohighlight,
 	"b|begin=s"     => \$from,
 	"e|end=s"       => \$to,
+	"regex-db=s"    => \$regex_prefix_dbname,
+	"regex-user=s"  => \$regex_prefix_dbuser,
 );
 
 if ($ver) {
@@ -1481,26 +1485,41 @@ sub parse_query
 	# Extract user and database information from the logprefix part
 	my $t_dbname = '';
 	my $t_dbuser = '';
-	if ($t_logprefix =~ /^(user|usr)=([^,]*)/) {
-		$t_dbuser = $1;
-	}
-	if ($t_logprefix =~ /^(dbname|db|database)=([^,]*)/) {
-		$t_dbname = $1;
-	}
-
-	# Check user and/or database if require
-	if ($dbname) {
-		# Log line do not match the required dbname
-		if (!$cur_info{dbname} || ($dbname ne $cur_info{dbname})) {
-			%cur_info = ();
-			return;
+	$t_logprefix =~ s/\s+$//;
+	if ($t_logprefix) {
+		# User defined regex
+		if ($regex_prefix_dbuser) {
+			if ($t_logprefix =~ /$regex_prefix_dbuser/) {
+				$t_dbuser = $1;
+			}
+		# Default regex
+		} elsif ($t_logprefix =~ /^user=([^,]*)/) {
+			$t_dbuser = $1;
 		}
-	}
-	if ($dbuser) {
-		# Log line do not match the required dbuser
-		if (!$cur_info{dbuser} || ($dbuser ne $cur_info{dbuser})) {
-			%cur_info = ();
-			return;
+		# User defined regex
+		if ($regex_prefix_dbname) {
+			if ($t_logprefix =~ /$regex_prefix_dbname/) {
+				$t_dbname = $1;
+			}
+		# Default regex
+		} elsif ($t_logprefix =~ /^db=([^,]*)/) {
+			$t_dbname = $1;
+		}
+
+		# Check user and/or database if require
+		if ($dbname) {
+			# Log line do not match the required dbname
+			if (!$cur_info{dbname} || ($dbname ne $cur_info{dbname})) {
+				%cur_info = ();
+				return;
+			}
+		}
+		if ($dbuser) {
+			# Log line do not match the required dbuser
+			if (!$cur_info{dbuser} || ($dbuser ne $cur_info{dbuser})) {
+				%cur_info = ();
+				return;
+			}
 		}
 	}
 
