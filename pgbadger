@@ -269,7 +269,7 @@ while (my $line = <$lfile>) {
 
 	# Parse syslog lines
 	if ($format eq 'syslog') {
-		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^:]+:)\s+(.*)/) {
+		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
 			# skip non postgresql lines
 			next if ($7 ne $ident);
 			# Syslog do not have year information, so take care of year overlapping
@@ -282,7 +282,7 @@ while (my $line = <$lfile>) {
 			next if ($from && ($from > $cur_date));
 			last if ($to && ($to < $cur_date));
 			# Process the log line
-			&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11);
+			&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11,$12);
 		} elsif ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+(#011)[\t\s]*(.*)/) {
 
 			$cur_info{query} .= "\n" . $11;
@@ -293,13 +293,13 @@ while (my $line = <$lfile>) {
 	} elsif ($format eq 'stderr') {
 
 		# Parse stderr lines
-		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^:]+:)\s+(.*)/) {
+		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
 			# Skip unwanted lines
 			my $cur_date = "$1$2$3$4$5$6";
 			next if ($from && ($from > $cur_date));
 			last if ($to && ($to < $cur_date));
 			# Process the log line
-			&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+			&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 		} else {
 			$cur_info{query} .= "\n" . $line if ($cur_info{query});
 		}
@@ -1468,27 +1468,24 @@ sub highlight_code
 
 sub parse_query
 {
-	my ($t_year, $t_month, $t_day, $t_hour, $t_min, $t_sec, $t_host, $t_pid, $t_session, $t_loglevel, $t_query) = @_;
+	my ($t_year, $t_month, $t_day, $t_hour, $t_min, $t_sec, $t_host, $t_pid, $t_session, $t_logprefix, $t_loglevel, $t_query) = @_;
 
-	# Extract user and database information from the loglevel part
+	# Get log level
+	if ($t_loglevel !~ s/^.*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):$/$1/) {
+		# Unrecognized loglevel format
+		&logmsg('DEBUG', "Unrecognized loglevel format: $t_loglevel");
+		return;
+	}
+	next if ($t_loglevel eq 'CONTEXT');
+
+	# Extract user and database information from the logprefix part
 	my $t_dbname = '';
 	my $t_dbuser = '';
-	if ($t_loglevel =~ /^user=([^,]*),\s*db=([^\s]*)\s+([^:]*)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
+	if ($t_logprefix =~ /^(user|usr)=([^,]*)/) {
 		$t_dbuser = $1;
-		$t_dbname = $2;
-		$t_loglevel = $4;
-	} elsif ($t_loglevel =~ /^db=([^,]*),\s*user=([^\s]*)\s+([^:]*)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
+	}
+	if ($t_logprefix =~ /^(dbname|db|database)=([^,]*)/) {
 		$t_dbname = $1;
-		$t_dbuser = $2;
-		$t_loglevel = $4;
-	} elsif ($t_loglevel =~ /(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT):/) {
-		$t_loglevel = $1;
-	} elsif ($t_loglevel =~ /(CONTEXT):/) {
-		next;
-	} else {
-		# Unrecognized loglevel format
-		&logmsg('DEBUG', "Unrecognized loglevel format: $t_query");
-		return;
 	}
 
 	# Check user and/or database if require
