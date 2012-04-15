@@ -29,13 +29,14 @@ $| = 1;
 
 # Global variables overriden during install
 my $ZCAT_PROG = '/bin/zcat';
-my $VERSION = '1.0';
+my $VERSION = '0.1';
 
 # Command line options
 my $logfile = '';
 my $format  = '';
 my $outdir  = '';
 my $help    = '';
+my $ver     = '';
 my $dbname  = '';
 my $dbuser  = '';
 my $ident   = '';
@@ -57,6 +58,7 @@ my $result = GetOptions (
 	"f|format=s"	=> \$format,
 	"o|outdir=s"	=> \$outdir,
 	"h|help!"	=> \$help,
+	"v|version!"	=> \$ver,
 	"d|dbname=s"	=> \$dbname,
 	"u|dbuser=s"	=> \$dbuser,
 	"i|ident=s"	=> \$ident,
@@ -70,6 +72,7 @@ my $result = GetOptions (
 	"e|end=s"       => \$to,
 );
 
+die "pgbadger version $VERSION\n" if ($ver);
 &usage() if ($help);
 if (!$logfile) {
 	print STDERR "FATAL: you must set a log file. See option -f.\n\n";
