@@ -84,7 +84,7 @@ if (!$logfile) {
 }
 
 # Set default format
-$format ||= 'stderr';
+$format ||= &autodetect_format();
 # Set default syslog ident name
 $ident ||= 'postgres';
 # Set default top query
@@ -1847,4 +1847,41 @@ sub create_graph_twoaxes
 
 }
 
+sub autodetect_format
+{
+
+	# Open log file for reading
+	my $nfound = 0;
+	my $nline = 0;
+	my $fmt = '';
+	my $tfile = new IO::File;
+	if ($logfile !~ /\.gz/) {
+		$tfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
+	} else {
+		# Open a pipe to zcat program for compressed log
+		$tfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+	}
+	while (my $line = <$tfile>) {
+		chomp($line);
+		$line =~ s///;
+		next if (!$line);
+		$nline++;
+		# Is syslog lines ?
+		if ($line =~ /^...\s+\d+\s+\d+:\d+:\d+\s+[^\s]+\s+[^\[]+\[\d+\]:\s+\[[0-9\-]+\]\s+[^:]+:\s+duration:/) {
+			$fmt = 'syslog';
+			$nfound++;
+		# Is stderr lines
+		} elsif ($line =~ /\d+-\d+-\d+\s+\d+:\d+:\d+\s+[^\s]+\s+\[\d+\]:\s+\[[0-9\-]+\]\s+[^:]+:\s+duration:/) {
+			$fmt = 'stderr';
+			$nfound++;
+		}
+		last if (($nfound > 10) || ($nline > 5000));
+	}
+	$tfile->close();
+	if (!$fmt || ($nfound < 10)) {
+		die "FATAL: unable to detect log file format, please use -f option.\n";
+	}
+
+	return $fmt;
+}
 
