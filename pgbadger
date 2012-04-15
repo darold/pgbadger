@@ -750,10 +750,29 @@ function toggle(idButton, idDiv, label) {
 <a href="#OverallStatsReport">Overall statistics</a> |
 <a href="#HourlyStatsReport">Hourly statistics</a> |
 <a href="#QueriesByTypeReport">Queries by type</a> |
-<a href="#LocksByTypeReport">Locks by type</a> |
-<a href="#SessionsDatabaseReport">Sessions per database</a> |
-<a href="#SessionsUserReport">Sessions per user</a> |
-<a href="#SessionsHostReport">Sessions per host</a> |
+};
+if (scalar keys %lock_info > 0) {
+	print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
+}
+if (exists $session_info{database}) {
+	print $fh qq{<a href="#SessionsDatabaseReport">Sessions per database</a> |};
+}
+if (exists $session_info{user}) {
+	print $fh qq{<a href="#SessionsUserReport">Sessions per user</a> |};
+}
+if (exists $session_info{host}) {
+	print $fh qq{<a href="#SessionsHostReport">Sessions per host</a> |};
+}
+if (exists $connection_info{database}) {
+	print $fh qq{<a href="#ConnectionsDatabaseReport">Connections per database</a> |};
+}
+if (exists $connection_info{user}) {
+	print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> |};
+}
+if (exists $connection_info{host}) {
+	print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> |};
+}
+print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> |
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
 <a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
@@ -777,7 +796,32 @@ sub html_footer
 	<div id="littleTocContent">
 
 		<ul>
-			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li><li><a href="#HourlyStatsReport">Hourly statistics</a></li><li><a href="#QueriesByTypeReport">Queries by type</a></li><li><a href="#LocksByTypeReport">Locks by type</a></li><li><a href="#SessionsDatabaseReport">Sessions per database</a></li><li><a href="#SessionsUserReport">Sessions per user</a></li><li><a href="#SessionsHostReport">Sessions per host</a></li><li><a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li><li><a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a></li>
+			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li><li><a href="#HourlyStatsReport">Hourly statistics</a></li><li><a href="#QueriesByTypeReport">Queries by type</a></li>
+};
+if (scalar keys %lock_info > 0) {
+	print $fh qq{<li><a href="#LocksByTypeReport">Locks by type</a></li>};
+}
+if (exists $session_info{database}) {
+	print $fh qq{<li><a href="#SessionsDatabaseReport">Sessions per database</a></li>};
+}
+if (exists $session_info{user}) {
+	print $fh qq{<li><a href="#SessionsUserReport">Sessions per user</a></li>};
+}
+if (exists $session_info{host}) {
+	print $fh qq{<li><a href="#SessionsHostReport">Sessions per host</a></li><li>};
+}
+if (exists $connection_info{database}) {
+	print $fh qq{<li><a href="#ConnectionsDatabaseReport">Connections per database</a></li>};
+}
+if (exists $connection_info{user}) {
+	print $fh qq{<li><a href="#ConnectionsUserReport">Connections per user</a></li>};
+}
+if (exists $connection_info{host}) {
+	print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
+}
+
+
+print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li><li><a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a></li>
 		</ul>
 	</div>
 	<div id="littleTocTitle">Table of contents</div>
@@ -1071,7 +1115,8 @@ sub dump_as_html
 	print $fh "</table>\n";
 
 	# Lock stats per type
-	print $fh qq{
+	if (scalar keys %lock_info > 0) {
+		print $fh qq{
 <h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1082,22 +1127,24 @@ sub dump_as_html
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
-	my $total_count = 0;
-	my $total_duration = 0;
-	foreach my $t (sort keys %lock_info) {
-		print $fh "<tr class=\"row1\"><td colspan=\"2\">$t</td><td class=\"right\">", &comma_numbers($lock_info{$t}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "</td></tr>\n";
-		foreach my $o (sort keys %{$lock_info{$t}}) {
-			next if (($o eq 'count') || ($o eq 'duration') || ($o eq 'chronos'));
-			print $fh "<tr class=\"row0\"><td  class=\"right\" colspan=\"2\">$o</td><td class=\"right\">", &comma_numbers($lock_info{$t}{$o}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "</td></tr>\n";
+		my $total_count = 0;
+		my $total_duration = 0;
+		foreach my $t (sort keys %lock_info) {
+			print $fh "<tr class=\"row1\"><td colspan=\"2\">$t</td><td class=\"right\">", &comma_numbers($lock_info{$t}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "</td></tr>\n";
+			foreach my $o (sort keys %{$lock_info{$t}}) {
+				next if (($o eq 'count') || ($o eq 'duration') || ($o eq 'chronos'));
+				print $fh "<tr class=\"row0\"><td  class=\"right\" colspan=\"2\">$o</td><td class=\"right\">", &comma_numbers($lock_info{$t}{$o}{count}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}), "</td><td class=\"right\">", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "</td></tr>\n";
+			}
+			$total_count += $lock_info{$t}{count};
+			$total_duration += $lock_info{$t}{duration};
 		}
-		$total_count += $lock_info{$t}{count};
-		$total_duration += $lock_info{$t}{duration};
+		print $fh "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
+		print $fh "</table>\n";
 	}
-	print $fh "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
-	print $fh "</table>\n";
 
 	# Show session per database statistics
-	print $fh qq{
+	if (exists $session_info{database}) {
+		print $fh qq{
 <h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1108,13 +1155,14 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort keys %{$session_info{database}}) {
-		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+		foreach my $d (sort keys %{$session_info{database}}) {
+			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
-
 	# Show session per user statistics
-	print $fh qq{
+	if (exists $session_info{user}) {
+		print $fh qq{
 <h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1125,13 +1173,15 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort keys %{$session_info{user}}) {
-		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+		foreach my $d (sort keys %{$session_info{user}}) {
+			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
 
 	# Show session per host statistics
-	print $fh qq{
+	if (exists $session_info{host}) {
+		print $fh qq{
 <h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1142,15 +1192,16 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort keys %{$session_info{host}}) {
-		print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+		foreach my $d (sort keys %{$session_info{host}}) {
+			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
-
 		$connection_info{count}++;
 
 	# Show connection per database statistics
-	print $fh qq{
+	if (exists $connection_info{database}) {
+		print $fh qq{
 <h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1160,17 +1211,18 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort keys %{$connection_info{database}}) {
-		print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
-		foreach my $u (sort keys %{$connection_info{user}}) {
-			next if (!exists $connection_info{database_user}{$d}{$u});
-			print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
+		foreach my $d (sort keys %{$connection_info{database}}) {
+			print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
+			foreach my $u (sort keys %{$connection_info{user}}) {
+				next if (!exists $connection_info{database_user}{$d}{$u});
+				print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
+			}
 		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
-
 	# Show connection per user statistics
-	print $fh qq{
+	if (exists $connection_info{user}) {
+		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1179,13 +1231,15 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $u (sort keys %{$connection_info{user}}) {
-		print $fh "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+		foreach my $u (sort keys %{$connection_info{user}}) {
+			print $fh "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
 
 	# Show connection per host statistics
-	print $fh qq{
+	if (exists $connection_info{host}) {
+		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -1194,11 +1248,11 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $h (sort keys %{$connection_info{host}}) {
-		print $fh "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+		foreach my $h (sort keys %{$connection_info{host}}) {
+			print $fh "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+		}
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
-
 
 	# Show top informations
 	print $fh qq{
