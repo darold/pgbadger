@@ -981,7 +981,7 @@ sub dump_as_html
 			}
 			if (exists $checkpoint_info{chronos}) {
 				if (exists $checkpoint_info{chronos}{$d}{$h}) {
-					print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}), "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}), "</td>";
+					print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
 				} else {
 					print $fh "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
 				}
@@ -1032,6 +1032,7 @@ sub dump_as_html
 		&create_graph('queriespersecond', 'Queries per second (5 minutes average)', 'Hours', 'Queries per second', 'Maximum', 'Average', 'Minimum');
 		@graph_values = ();
 		print $fh qq{<p><img src="queriespersecond.png" alt="Queries per second" /></p>};
+
 		# All queries
 		foreach my $tm (keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
@@ -1048,6 +1049,24 @@ sub dump_as_html
 		&create_graph_twoaxes('allqueries', 'All queries', 'Hours', 'Queries', 'Duration', 'Number of queries','Average duration (s)');
 		print $fh qq{<p><img src="allqueries.png" alt="All queries" /></p>};
 		@graph_values = ();
+
+		# checkpoint size
+		if (exists $checkpoint_info{chronos}) {
+			foreach my $tm (keys %{$checkpoint_info{chronos}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $prefix = "$1-$2-$3 ";
+				foreach my $h ("00" .. "23") {
+					push(@labels, "$prefix $h:00");
+					push(@data1, $checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0);
+				}
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_twoaxes('checkpointbuffers', 'Checkpoint write buffers', 'Hours', 'Buffers');
+			print $fh qq{<p><img src="checkpointbuffers.png" alt="Checkpoint write buffers" /></p>};
+			@graph_values = ();
+		}
+
 		# Select queries
 		foreach my $tm (keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
