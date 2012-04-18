@@ -961,11 +961,11 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort keys %per_hour_info) {
+	foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
 		my $c = 1;
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort keys %{$per_hour_info{$d}}) {
+		foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
 			my $colb = $c % 2;
 			$zday = "&nbsp;" if ($c > 1);
 			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
