@@ -1114,6 +1114,8 @@ sub dump_as_html
 	# INSERT/DELETE/UPDATE/SELECT repartition
 	print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Type</th>
@@ -1131,7 +1133,18 @@ sub dump_as_html
 	print $fh "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
 	print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
 	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
-	print $fh "</table>\n";
+	print $fh "</table></td><td width=\"500\" align=\"center\">\n";
+	if ($graph) {
+		my @data1 = ();
+		push(@data1, sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total));
+		my @labels = ('SELECT' . " $data1[0]\%", 'INSERT' . " $data1[1]\%", 'UPDATE' . " $data1[2]\%", 'DELETE' . " $data1[3]\%");
+		push(@graph_values, [ @labels ] ); @labels = ();
+		push(@graph_values, [ @data1 ] ); @data1 = ();
+		&create_graph_pie('querytype', 'Type of queries');
+		print $fh qq{<p><img src="querytype.png" alt="Type of queries" /></p>};
+		@graph_values = ();
+	}
+	print $fh "</td></tr></table>\n";
 
 	# Lock stats per type
 	if (scalar keys %lock_info > 0) {
@@ -1874,7 +1887,6 @@ sub create_graph
 	binmode IMG;
 	print IMG $gd->png;
 	close IMG;
-	@graph_values = ();
 
 }
 
@@ -1936,7 +1948,6 @@ sub create_graph_twoaxes
 	binmode IMG;
 	print IMG $gd->png;
 	close IMG;
-	@graph_values = ();
 
 }
 
@@ -1977,4 +1988,29 @@ sub autodetect_format
 
 	return $fmt;
 }
+
+sub create_graph_pie
+{
+	my ($filename, $title, @legends) = @_;
+
+        use GD::Graph::pie;
+        my $graf = new GD::Graph::pie(400, 200);
+        $graf->set(
+                title           => $title || '',
+		bgclr           => '#ffffff',
+                fgclr           => '#dddddd',
+                legendclr       => '#993300',
+                dclrs           => [ qw(lbrown lorange lgray lyellow lgreen lblue lpurple lred) ],
+		transparent     => 1,
+        ) or die "FATAL: error creating graph, " . $graf->error . "\n";
+	$graf->set_text_clr('#993300');
+	$graf->set_legend(@legends) if ($#legends >= 0);
+	my $gd = $graf->plot(\@graph_values) or die $graf->error;
+	open(IMG, ">$filename.png") or die $!;
+	binmode IMG;
+	print IMG $gd->png;
+	close IMG;
+
+}
+
 
