@@ -997,7 +997,7 @@ sub dump_as_html
 		my @data1 = ();
 		my @data2 = ();
 		my @data3 = ();
-		foreach my $tm (keys %{$per_minute_info{query}}) {
+		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{query}}) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $prefix = "$1-$2-$3 ";
 			foreach my $h ("00" .. "23") {
@@ -1034,7 +1034,7 @@ sub dump_as_html
 		print $fh qq{<p><img src="queriespersecond.png" alt="Queries per second" /></p>};
 
 		# All queries
-		foreach my $tm (keys %per_hour_info) {
+		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $prefix = "$1-$2-$3 ";
 			foreach my $h ("00" .. "23") {
@@ -1052,7 +1052,7 @@ sub dump_as_html
 
 		# checkpoint size
 		if (exists $checkpoint_info{chronos}) {
-			foreach my $tm (keys %{$checkpoint_info{chronos}}) {
+			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
 				$tm =~ /(\d{4})(\d{2})(\d{2})/;
 				my $prefix = "$1-$2-$3 ";
 				foreach my $h ("00" .. "23") {
@@ -1068,7 +1068,7 @@ sub dump_as_html
 		}
 
 		# Select queries
-		foreach my $tm (keys %per_hour_info) {
+		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $prefix = "$1-$2-$3 ";
 			foreach my $h ("00" .. "23") {
@@ -1086,7 +1086,7 @@ sub dump_as_html
 
 		# Write queries
 		my @data4 = ();
-		foreach my $tm (keys %per_hour_info) {
+		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $prefix = "$1-$2-$3 ";
 			foreach my $h ("00" .. "23") {
