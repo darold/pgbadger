@@ -98,6 +98,9 @@ if (!$logfile) {
 	&usage();
 }
 
+# Quiet mode is forced with progress bar
+$quiet = 1 if ($progress);
+
 # Set default format
 $format ||= &autodetect_format();
 # Set default syslog ident name
