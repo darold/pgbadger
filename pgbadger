@@ -912,7 +912,7 @@ sub dump_as_html
 };
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
-		my $fmt_temp_avsize = &comma_numbers($tempfile_info{maxsize}/$tempfile_info{count});
+		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", $tempfile_info{maxsize}/$tempfile_info{count}));
 		print $fh qq{
 <li>Number temporary file: $tempfile_info{count}</li>
 <li>Max size of temporary file: $fmt_temp_maxsise</li>
