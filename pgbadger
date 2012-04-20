@@ -52,6 +52,9 @@ my $from = '';
 my $to = '';
 my $regex_prefix_dbname = '';
 my $regex_prefix_dbuser = '';
+my $quiet = 0;
+my $progress = 0;
+my $NUMPROGRESS = 10000;
 
 my $t0 = Benchmark->new;
 
@@ -75,6 +78,8 @@ my $result = GetOptions (
 	"e|end=s"       => \$to,
 	"regex-db=s"    => \$regex_prefix_dbname,
 	"regex-user=s"  => \$regex_prefix_dbuser,
+	"q|quiet!"      => \$quiet,
+	"p|progress!"   => \$progress,
 );
 
 if ($ver) {
@@ -241,12 +246,16 @@ my @graph_values = ();
 
 # Open log file for reading
 my $nlines = 0;
+my $totalsize = (stat("$logfile"))[7] || 0;
+my $cursize = 0;
 my $lfile = new IO::File;
 if ($logfile !~ /\.gz/) {
 	$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
 } else {
 	# Open a pipe to zcat program for compressed log
 	$lfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+	# Real size of the file is unknow
+	$totalsize = 0;
 }
 my %cur_info = ();
 
@@ -259,15 +268,24 @@ my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
 my $cur_td = $t0;
 
 while (my $line = <$lfile>) {
+	$cursize += length($line);
 	chomp($line);
 	$line =~ s///;
 	$nlines++;
 	next if (!$line);
 
+	if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+		if ($totalsize) {
+			print progress_bar($cursize, $totalsize, 25, '=' );
+		} else {
+			print ".";
+		}
+	}
+
 	if ($debug && (($nlines % 100000) == 0)) {
 		my $t1 = Benchmark->new;
 		my $td = timediff($t1, $cur_td);
-		&logmsg('DEBUG', "Lines parsed $nlines in " . timestr($td) . "...");
+		&logmsg('DEBUG', "Lines parsed $nlines, [ 100000 in " . timestr($td) . " ]");
 		$cur_td = $t1;
 	}
 
@@ -312,6 +330,12 @@ while (my $line = <$lfile>) {
 		# unknown format
 		&logmsg('DEBUG', "Unknown line format: $line");
 	}
+}
+if ($progress) {
+	if ($totalsize) {
+		print progress_bar($cursize, $totalsize, 25, '=' );
+	}
+	print STDERR "\n";
 }
 
 $lfile->close();
@@ -363,6 +387,7 @@ Usage: $0 -l logfile [...]
     -g | --graph           : generate graphs, requires GD::Graph perl module
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -e | --end datetime    : end date/time for the data to be parsed in log.
+    -q | --quiet           : disable output to stderr and don't print debug informations.
 
 };
 
@@ -373,6 +398,8 @@ Usage: $0 -l logfile [...]
 sub logmsg
 {
 	my ($level, $str) = @_;
+
+	return if ($quiet && ($level ne 'FATAL'));
 
 	if ($level =~ /(\d+)/) {
 		print STDERR "\t"x$1;
@@ -1134,10 +1161,11 @@ sub dump_as_html
 	print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
 	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
 	print $fh "</table></td><td width=\"500\" align=\"center\">\n";
+
 	if ($graph) {
 		my @data1 = ();
-		push(@data1, sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total));
-		my @labels = ('SELECT' . " $data1[0]\%", 'INSERT' . " $data1[1]\%", 'UPDATE' . " $data1[2]\%", 'DELETE' . " $data1[3]\%");
+		push(@data1, sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total));
+		my @labels = ('SELECT' . " $data1[0]\%", 'INSERT' . " $data1[1]\%", 'UPDATE' . " $data1[2]\%", 'DELETE' . " $data1[3]\%", 'OTHER' . " $data1[4]\%");
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		&create_graph_pie('querytype', 'Type of queries');
@@ -1150,6 +1178,8 @@ sub dump_as_html
 	if (scalar keys %lock_info > 0) {
 		print $fh qq{
 <h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Type</th>
@@ -1171,13 +1201,29 @@ sub dump_as_html
 			$total_duration += $lock_info{$t}{duration};
 		}
 		print $fh "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $t (sort keys %lock_info) {
+				push(@data1, sprintf("%0.2f", ($lock_info{$t}{count}*100)/($total_count || 1)));
+				push(@labels, "$t $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('locktype', 'Type of locks');
+			print $fh qq{<p><img src="locktype.png" alt="Type of locks" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 
 	# Show session per database statistics
 	if (exists $session_info{database}) {
 		print $fh qq{
 <h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Database</th>
@@ -1186,11 +1232,26 @@ sub dump_as_html
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
-
+		my $total_count = 0;
 		foreach my $d (sort keys %{$session_info{database}}) {
 			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+			$total_count += $session_info{database}{$d}{count};
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $d (sort keys %{$session_info{database}}) {
+				push(@data1, sprintf("%0.2f", ($session_info{database}{$d}{count}*100)/$total_count));
+				push(@labels, "$d $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('databaseconn', 'Database connections');
+			print $fh qq{<p><img src="databaseconn.png" alt="Databases connections" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 	# Show session per user statistics
 	if (exists $session_info{user}) {
@@ -1235,6 +1296,8 @@ sub dump_as_html
 	if (exists $connection_info{database}) {
 		print $fh qq{
 <h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Database</th>
@@ -1242,20 +1305,37 @@ sub dump_as_html
 		<th>Count</th>
 	</tr>
 };
-
+		my $total_count = 0;
 		foreach my $d (sort keys %{$connection_info{database}}) {
 			print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">", &comma_numbers($connection_info{database}{$d}), "</td></tr>\n";
+			$total_count += $connection_info{database}{$d};
 			foreach my $u (sort keys %{$connection_info{user}}) {
 				next if (!exists $connection_info{database_user}{$d}{$u});
 				print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$u</td><td class=\"right\">", &comma_numbers($connection_info{database_user}{$d}{$u}), "</td></tr>\n";
 			}
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph && (scalar keys %{$connection_info{database}} > 1)) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $d (sort keys %{$connection_info{database}}) {
+				push(@data1, sprintf("%0.2f", ($connection_info{database}{$d}*100)/$total_count));
+				push(@labels, "$d $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('databaseconn', 'Database connections');
+			print $fh qq{<p><img src="databaseconn.png" alt="Databases connections" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 	# Show connection per user statistics
 	if (exists $connection_info{user}) {
 		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>User</th>
@@ -1263,16 +1343,34 @@ sub dump_as_html
 	</tr>
 };
 
+		my $total_count = 0;
 		foreach my $u (sort keys %{$connection_info{user}}) {
 			print $fh "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+			$total_count += $connection_info{user}{$u};
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph && (scalar keys %{$connection_info{user}} > 1)) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $u (sort keys %{$connection_info{user}}) {
+				push(@data1, sprintf("%0.2f", ($connection_info{user}{$u}*100)/$total_count));
+				push(@labels, "$u $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('userconn', 'Users connections');
+			print $fh qq{<p><img src="userconn.png" alt="Users connections" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 
 	# Show connection per host statistics
 	if (exists $connection_info{host}) {
 		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Host</th>
@@ -1280,10 +1378,26 @@ sub dump_as_html
 	</tr>
 };
 
+		my $total_count = 0;
 		foreach my $h (sort keys %{$connection_info{host}}) {
 			print $fh "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+			$total_count += $connection_info{host}{$h};
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph && (scalar keys %{$connection_info{host}} > 1)) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $h (sort keys %{$connection_info{host}}) {
+				push(@data1, sprintf("%0.2f", ($connection_info{host}{$h}*100)/$total_count));
+				push(@labels, "$h $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('hostconn', 'Hosts connections');
+			print $fh qq{<p><img src="hostconn.png" alt="Hosts connections" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 
 	# Show top informations
@@ -2013,4 +2127,11 @@ sub create_graph_pie
 
 }
 
-
+sub progress_bar {
+    my ( $got, $total, $width, $char ) = @_;
+    $width ||= 25; $char ||= '=';
+    my $num_width = length $total;
+    sprintf "|%-${width}s| Parsed %${num_width}s bytes of %s (%.2f%%)\r", 
+        $char x (($width-1)*$got/$total). '>', 
+        $got, $total, 100*$got/+$total;
+}
