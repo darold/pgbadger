@@ -1000,7 +1000,7 @@ sub dump_as_html
 			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
 			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
 			if ($tempfile_info{count}) {
-				my $temp_average = '0.00';
+				my $temp_average = '0';
 				if ($tempfile_info{chronos}{$d}{$h}{count}) {
 					$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
 				}
@@ -1010,7 +1010,7 @@ sub dump_as_html
 				if (exists $checkpoint_info{chronos}{$d}{$h}) {
 					print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
 				} else {
-					print $fh "<td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td><td class=\"right\">&nbsp;</td>";
+					print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
 				}
 			}
 			print $fh "</tr>\n";
@@ -1164,7 +1164,7 @@ sub dump_as_html
 
 	if ($graph) {
 		my @data1 = ();
-		push(@data1, sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total));
+		push(@data1, sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), sprintf("%0.2f", (($total - $totala)*100)/$total));
 		my @labels = ('SELECT' . " $data1[0]\%", 'INSERT' . " $data1[1]\%", 'UPDATE' . " $data1[2]\%", 'DELETE' . " $data1[3]\%", 'OTHER' . " $data1[4]\%");
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
@@ -1247,8 +1247,8 @@ sub dump_as_html
 			}
 			push(@graph_values, [ @labels ] ); @labels = ();
 			push(@graph_values, [ @data1 ] ); @data1 = ();
-			&create_graph_pie('databaseconn', 'Database connections');
-			print $fh qq{<p><img src="databaseconn.png" alt="Databases connections" /></p>};
+			&create_graph_pie('databasesession', 'Databases sessions');
+			print $fh qq{<p><img src="databasesession.png" alt="Databases Sessions" /></p>};
 			@graph_values = ();
 		}
 		print $fh "</td></tr></table>\n";
@@ -1257,6 +1257,8 @@ sub dump_as_html
 	if (exists $session_info{user}) {
 		print $fh qq{
 <h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>User</th>
@@ -1265,17 +1267,34 @@ sub dump_as_html
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
-
+		my $total_count = 0;
 		foreach my $d (sort keys %{$session_info{user}}) {
+			$total_count += $session_info{user}{$d}{count};
 			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $d (sort keys %{$session_info{user}}) {
+				push(@data1, sprintf("%0.2f", ($session_info{user}{$d}{count}*100)/$total_count));
+				push(@labels, "$d $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('usersession', 'Users sessions');
+			print $fh qq{<p><img src="usersession.png" alt="Users Sessions" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 
 	# Show session per host statistics
 	if (exists $session_info{host}) {
 		print $fh qq{
 <h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="300" align="left">
 <table class="queryList">
 	<tr>
 		<th>Host</th>
@@ -1284,11 +1303,26 @@ sub dump_as_html
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
-
+		my $total_count = 0;
 		foreach my $d (sort keys %{$session_info{host}}) {
+			$total_count += $session_info{host}{$d}{count};
 			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
 		}
-		print $fh "</table>\n";
+		print $fh "</table></td><td width=\"500\" align=\"center\"\n";
+		if ($graph) {
+			my @data1 = ();
+			my @labels = ();
+			foreach my $d (sort keys %{$session_info{host}}) {
+				push(@data1, sprintf("%0.2f", ($session_info{host}{$d}{count}*100)/$total_count));
+				push(@labels, "$d $data1[-1]\%");
+			}
+			push(@graph_values, [ @labels ] ); @labels = ();
+			push(@graph_values, [ @data1 ] ); @data1 = ();
+			&create_graph_pie('hostsession', 'Hosts sessions');
+			print $fh qq{<p><img src="hostsession.png" alt="Hosts Sessions" /></p>};
+			@graph_values = ();
+		}
+		print $fh "</td></tr></table>\n";
 	}
 		$connection_info{count}++;
 
