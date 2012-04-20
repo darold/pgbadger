@@ -35,12 +35,15 @@ Additional informations that could be collected need logging activation into pos
 
 -------------------------------------------------------------------------------
 
-Usage: pgbadger -l logfile ... > out.html
+Usage: pgbadger -l logfile [...]
 
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
-			     be a plain text log or a gzip compressed file
-			     with the .gz extension.
+                             be a plain text log or a gzip compressed file
+                             with the .gz extension.
     -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -o | --outfile filename: define the filename for the output. Default depends
+                             of the output format: out.html or out.txt. To dump
+                             output to stdout use - as filename.
     -i | --ident name      : programname used as syslog ident. Default: postgres
     -h | --help            : show this message and exit.
     -d | --dbname database : only report what concern the given database
@@ -49,9 +52,12 @@ Usage: pgbadger -l logfile ... > out.html
     -s | --sample number   : number of query sample to store/display. Default: 3
     -x | --extension       : output format. Values: text or html. Default: html
     -m | --maxlength size  : maximum length of a query, it will be cutted above
-			     the given size. Default: no truncate
+                             the given size. Default: no truncate
     -g | --graph           : generate graphs, requires GD::Graph perl module
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -e | --end datetime    : end date/time for the data to be parsed in log.
+    -q | --quiet           : disable output to stderr and don't print debug informations.
+    -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+
 
 
