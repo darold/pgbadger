@@ -2001,9 +2001,16 @@ sub normalize_error
 	my $orig_query = shift;
 
 	return if (!$orig_query);
-
+	
 	# Remove character position
 	$orig_query =~ s/ at character \d+//;
+	# Remove encoding detail
+	$orig_query =~ s/(byte sequence for encoding).*/$1/;
+	# Replace changing parameter by ...
+	$orig_query =~ s/"[^"]*"/"..."/g;
+	$orig_query =~ s/\(.*\)/\(...\)/g;
+	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
+	# Need more normalization stuff here
 
 	return $orig_query;
 }
