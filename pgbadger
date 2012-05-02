@@ -25,6 +25,7 @@ use Getopt::Long;
 use IO::File;
 use Benchmark;
 use IO::File;
+use File::Basename;
 
 $| = 1;
 
@@ -36,6 +37,7 @@ my $VERSION = '0.1';
 my $logfile = '';
 my $format  = '';
 my $outfile = '';
+my $outdir  = '';
 my $help    = '';
 my $ver     = '';
 my $dbname  = '';
@@ -121,6 +123,11 @@ if (!$extension) {
 }
 # Set default filename of the output file
 $outfile ||= 'out.' . $extension;
+
+# Extract the output directory from outfile so that graphs will
+# be created in the same directoty
+my @infs = fileparse($outfile);
+$outdir = $infs[1] . '/';
 
 # Remove graph support if output is not html
 $graph = 0 if ($extension ne 'html');
@@ -2043,7 +2050,7 @@ sub create_graph
 	$graf->set_text_clr('#993300');
 	$graf->set_legend(@legends) if ($#legends >= 0);
 	my $gd = $graf->plot(\@graph_values) or die $graf->error;
-	open(IMG, ">$filename.png") or die $!;
+	open(IMG, ">$outdir$filename.png") or die $!;
 	binmode IMG;
 	print IMG $gd->png;
 	close IMG;
@@ -2104,7 +2111,7 @@ sub create_graph_twoaxes
 	$graf->set_text_clr('#993300');
 	$graf->set_legend(@legends) if ($#legends >= 0);
 	my $gd = $graf->plot(\@graph_values) or die $graf->error;
-	open(IMG, ">$filename.png") or die $!;
+	open(IMG, ">$outdir$filename.png") or die $!;
 	binmode IMG;
 	print IMG $gd->png;
 	close IMG;
@@ -2166,7 +2173,7 @@ sub create_graph_pie
 	$graf->set_text_clr('#993300');
 	$graf->set_legend(@legends) if ($#legends >= 0);
 	my $gd = $graf->plot(\@graph_values) or die $graf->error;
-	open(IMG, ">$filename.png") or die $!;
+	open(IMG, ">$outdir$filename.png") or die $!;
 	binmode IMG;
 	print IMG $gd->png;
 	close IMG;
