@@ -901,6 +901,7 @@ sub dump_as_html
 	print $fh qq{
 <div class="reports">
 <h2 id="OverallStatsReport">Overall statistics <a href="#top" title="Back to top">^</a></h2>
+<table><tr><td valign="top">
 <ul>
 <li>Number of unique normalized queries: $fmt_unique</li>
 <li>Number of queries: $fmt_queries</li>
@@ -917,6 +918,9 @@ sub dump_as_html
 	print $fh qq{
 <li>Number of errors: $fmt_errors</li>
 <li>Number of unique normalized errors: $fmt_unique_error</li>
+</ul>
+</td><td valign="top">
+<ul>
 };
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
@@ -943,6 +947,7 @@ sub dump_as_html
 	}
 	print $fh qq{
 </ul>
+</td></tr></table>
 };
 
 	print $fh qq{
