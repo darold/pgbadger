@@ -1069,6 +1069,7 @@ sub dump_as_html
 			}
 		}
 		delete $per_minute_info{query};
+		map {s/^\d{4}-//; s/^\d{2}-\d{2} // if ($_ !~ /(00:00|12:00)/); } @labels;
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
@@ -1087,6 +1088,7 @@ sub dump_as_html
 				push(@data2, sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) /1000));
 			}
 		}
+		map {s/^\d{4}-//; s/^\d{2}-\d{2} // if ($_ !~ /(00:00|12:00)/); } @labels;
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
@@ -1104,6 +1106,7 @@ sub dump_as_html
 					push(@data1, $checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0);
 				}
 			}
+			map {s/^\d{4}-//; s/^\d{2}-\d{2} // if ($_ !~ /(00:00|12:00)/); } @labels;
 			push(@graph_values, [ @labels ] ); @labels = ();
 			push(@graph_values, [ @data1 ] ); @data1 = ();
 			&create_graph_twoaxes('checkpointbuffers', 'Checkpoint write buffers', 'Hours', 'Buffers');
@@ -1121,6 +1124,7 @@ sub dump_as_html
 				push(@data2, sprintf("%.2f", (($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) /1000));
 			}
 		}
+		map {s/^\d{4}-//; s/^\d{2}-\d{2} // if ($_ !~ /(00:00|12:00)/); } @labels;
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
@@ -1143,6 +1147,7 @@ sub dump_as_html
 				push(@data4, sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) /1000));
 			}
 		}
+		map {s/^\d{4}-//; s/^\d{2}-\d{2} // if ($_ !~ /(00:00|12:00)/); } @labels;
 		push(@graph_values, [ @labels ] ); @labels = ();
 		push(@graph_values, [ @data1 ] ); @data1 = ();
 		push(@graph_values, [ @data2 ] ); @data2 = ();
@@ -2034,7 +2039,7 @@ sub create_graph
 	my ($filename, $title, $x_label, $y_label, @legends) = @_;
 
         use GD::Graph::lines;
-        my $graf = new GD::Graph::lines(800, 400);
+        my $graf = new GD::Graph::lines(1000, 350);
         $graf->set(
                 x_label         => $x_label || '',
                 y_label         => $y_label || '',
@@ -2093,7 +2098,7 @@ sub create_graph_twoaxes
 			push(@use_axis, '2');
 		}
 	}
-        my $graf = new GD::Graph::lines(800, 400);
+        my $graf = new GD::Graph::lines(1000, 350);
         $graf->set(
                 x_label         => $x_label || '',
                 y1_label         => $y1_label || '',
@@ -2189,7 +2194,7 @@ sub progress_bar {
     my ( $got, $total, $width, $char ) = @_;
     $width ||= 25; $char ||= '=';
     my $num_width = length $total;
-    sprintf "|%-${width}s| Parsed %${num_width}s bytes of %s (%.2f%%)\r", 
+    sprintf "[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%)\r", 
         $char x (($width-1)*$got/$total). '>', 
         $got, $total, 100*$got/+$total;
 }
