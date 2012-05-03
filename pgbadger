@@ -59,8 +59,9 @@ my $regex_prefix_dbuser = '';
 my $quiet = 0;
 my $progress = 0;
 my $NUMPROGRESS = 10000;
-my @DIMENSIONS = (1000,400);
+my @DIMENSIONS = (800,300);
 my $RESRC_URL = '';
+my $IMG_FORMAT = 'png';
 
 my $t0 = Benchmark->new;
 
@@ -1102,11 +1103,6 @@ sub dump_as_html
 			}
 		}
 		delete $per_minute_info{query};
-#		print $fh qq{
-#<input type="button" value="To Image" id="toimage1" onclick="return false;">
-#<input type="button" value="Download" id="download1" onclick="return false;">
-#<input type="button" value="Reset" id="reset1" onclick="return false;">
-#};
 		$d1 =~ s/,$//;
 		$d2 =~ s/,$//;
 		$d3 =~ s/,$//;
@@ -1128,11 +1124,6 @@ sub dump_as_html
 				$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) /1000) . "],";
 			}
 		}
-#		print $fh qq{
-#<input type="button" value="To Image" id="toimage2" onclick="return false;">
-#<input type="button" value="Download" id="download2" onclick="return false;">
-#<input type="button" value="Reset" id="reset2" onclick="return false;">
-#};
 		$d1 =~ s/,$//;
 		$d2 =~ s/,$//;
 		&flotr2_graph(2, 'allqueries_graph', $d1, '', '', 'All queries',
@@ -1152,11 +1143,6 @@ sub dump_as_html
 				$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) /1000) . "],";
 			}
 		}
-#		print $fh qq{
-#<input type="button" value="To Image" id="toimage3" onclick="return false;">
-#<input type="button" value="Download" id="download3" onclick="return false;">
-#<input type="button" value="Reset" id="reset3" onclick="return false;">
-#};
 		$d1 =~ s/,$//;
 		$d2 =~ s/,$//;
 		&flotr2_graph(3, 'selectqueries_graph', $d1, '', '', 'SELECT queries',
@@ -1181,11 +1167,6 @@ sub dump_as_html
 				$d4 .= "[$t, " .  sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) /1000) . "],";
 			}
 		}
-#		print $fh qq{
-#<input type="button" value="To Image" id="toimage4" onclick="return false;">
-#<input type="button" value="Download" id="download4" onclick="return false;">
-#<input type="button" value="Reset" id="reset4" onclick="return false;">
-#};
 		$d1 =~ s/,$//;
 		$d2 =~ s/,$//;
 		$d3 =~ s/,$//;
@@ -1209,12 +1190,6 @@ sub dump_as_html
 					$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
 				}
 			}
-#			print $fh qq{
-#<input type="button" value="To Image" id="toimage5" onclick="return false;">
-#<input type="button" value="Download" id="download5" onclick="return false;">
-#<input type="button" value="Reset" id="reset5" onclick="return false;">
-#};
-
 			$d1 =~ s/,$//;
 			&flotr2_graph(5, 'checkpointwritebuffers_graph', $d1, '', '', 'Checkpoint write buffers',
 					'Buffers','Write buffers','','');
@@ -1234,11 +1209,6 @@ sub dump_as_html
 					$d2 .= "[$t, " .  ($tempfile_info{chronos}{$tm}{$h}{count} || 0) . "],";
 				}
 			}
-#		print $fh qq{
-#<input type="button" value="To Image" id="toimage6" onclick="return false;">
-#<input type="button" value="Download" id="download6" onclick="return false;">
-#<input type="button" value="Reset" id="reset6" onclick="return false;">
-#};
 			$d1 =~ s/,$//;
 			$d2 =~ s/,$//;
 			&flotr2_graph(6, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
@@ -2163,6 +2133,11 @@ sub flotr2_graph
 <div id="$divid"></div>
 <script type="text/javascript">
 (function mouse_zoom(container) {
+
+document.writeln('<input type="button" class="examplesButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
+	'<input type="button" class="examplesButton" value="Download" id="download$buttonid" onclick="return false;">' +
+	'<input type="button" class="examplesButton" value="Reset" id="reset$buttonid" onclick="return false;">'
+	);
     $data1
     $data2
     $data3
@@ -2221,7 +2196,6 @@ sub flotr2_graph
     Flotr.EventAdapter.observe(container, "flotr:click", function() {
         drawGraph();
     });
-/*
     document.getElementById('reset$buttonid').onclick = function() {
       graph.download.restoreCanvas();
     };
@@ -2232,7 +2206,7 @@ sub flotr2_graph
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('jpeg');
+      graph.download.saveImage('$IMG_FORMAT');
     };
     document.getElementById('toimage$buttonid').onclick = function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
@@ -2241,9 +2215,8 @@ sub flotr2_graph
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('jpeg', null, null, true);
+      graph.download.saveImage('$IMG_FORMAT', null, null, true);
     };
-*/
 
 })(document.getElementById("$divid"));
 </script>
