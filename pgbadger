@@ -1242,7 +1242,7 @@ sub dump_as_html
 			$d1 =~ s/,$//;
 			$d2 =~ s/,$//;
 			&flotr2_graph(6, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
-					'Size','Size of files','','','Number',$d2,'Number of files');
+					'Size of files','Size of files','','','Number of files',$d2,'Number of files');
 			$d1 = '';
 			$d2 = '';
 		}
@@ -2156,9 +2156,10 @@ sub flotr2_graph
 
 	my $yaxis2 = '';
 	if ($ytitle2) {
-		$yaxis2 = "yaxis2: { title: \"$ytitle2\", min: 0 },";
+		$yaxis2 = "y2axis: { title: \"$ytitle2\", min: 0, color: \"#4DA74D\" },";
 	}
-			print $fh <<EOF;
+
+	print $fh <<EOF;
 <div id="$divid"></div>
 <script type="text/javascript">
 (function mouse_zoom(container) {
@@ -2172,7 +2173,8 @@ sub flotr2_graph
             labelsAngle: 45
         },
         yaxis: {
-            mode: "$ytitle"
+            mode: "normal",
+            title: "$ytitle",
         },
 	$yaxis2
         selection: {
