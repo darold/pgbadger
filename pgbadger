@@ -2179,11 +2179,16 @@ sub flotr2_graph
             mode: "x",
             fps: 30
         },
-        title: "$title"
+        title: "$title",
+        legend: {
+            position: "nw",
+            backgroundColor: "#D2E8FF"
+        },
+        HtmlText: false,
     };
 
     function drawGraph(opts) {
-        var o = Flotr._.extend(Flotr._.clone(options), opts || { legend: { position: "nw", color: "#000000", backgroundColor: "#D2E8FF" } } );
+        var o = Flotr._.extend(Flotr._.clone(options), opts );
         return Flotr.draw(
         	container,
         	[
