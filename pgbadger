@@ -61,7 +61,7 @@ my $progress = 0;
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
 my $RESRC_URL = '';
-my $IMG_FORMAT = 'png';
+my $img_format = 'png';
 
 # Do not display data in pie where percentage is lower than this value
 # to avoid label overlaping. 
@@ -92,6 +92,7 @@ my $result = GetOptions (
 	"q|quiet!"      => \$quiet,
 	"p|progress!"   => \$progress,
 	"pie-limit=i"   => \$pie_percentage_limit,
+	"image-format=s"   => \$img_format,
 );
 
 if ($ver) {
@@ -138,6 +139,11 @@ $outfile ||= 'out.' . $extension;
 $pie_percentage_limit = 0 if ($pie_percentage_limit < 0);
 $pie_percentage_limit = 2 if ($pie_percentage_limit eq '');
 $pie_percentage_limit = 100 if ($pie_percentage_limit > 100);
+
+# Set default download image format
+$img_format = lc($img_format);
+$img_format = 'jpeg' if ($img_format eq 'jpg');
+$img_format = 'png' if ($img_format ne 'jpeg');
 
 # Extract the output directory from outfile so that graphs will
 # be created in the same directoty
@@ -2291,7 +2297,7 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('$IMG_FORMAT');
+      graph.download.saveImage('$img_format');
     };
     document.getElementById('toimage$buttonid').onclick = function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
@@ -2300,7 +2306,7 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('$IMG_FORMAT', null, null, true);
+      graph.download.saveImage('$img_format', null, null, true);
     };
 
 })(document.getElementById("$divid"));
@@ -2370,7 +2376,7 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('$IMG_FORMAT');
+      graph.download.saveImage('$img_format');
     };
     document.getElementById('toimage$buttonid').onclick = function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
@@ -2379,7 +2385,7 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
 		"you can only get a VML image that you can use in Microsoft Office.<br />"
 		);
 	}
-      graph.download.saveImage('$IMG_FORMAT', null, null, true);
+      graph.download.saveImage('$img_format', null, null, true);
     };
 
 
