@@ -788,7 +788,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
     width : 1000px;
     height: 400px;
     margin: 8px auto;
@@ -1211,6 +1211,27 @@ sub dump_as_html
 			&flotr2_graph(5, 'checkpointwritebuffers_graph', $d1, '', '', 'Checkpoint write buffers',
 					'Buffers','Write buffers','','');
 			$d1 = '';
+
+			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d = $3;
+				foreach my $h ("00" .. "23") {
+					my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
+					$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_added} || 0) . "],";
+					$d2 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_removed} || 0) . "],";
+					$d3 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_recycled} || 0) . "],";
+				}
+			}
+			$d1 =~ s/,$//;
+			$d2 =~ s/,$//;
+			$d3 =~ s/,$//;
+			&flotr2_graph(6, 'checkpointfiles_graph', $d1, $d2, $d3, 'Checkpoint Wal files usage',
+					'Number of files','Added','Removed','Recycled');
+			$d1 = '';
+			$d2 = '';
+			$d3 = '';
 		}
 
 		# Temporary file size
@@ -1228,7 +1249,7 @@ sub dump_as_html
 			}
 			$d1 =~ s/,$//;
 			$d2 =~ s/,$//;
-			&flotr2_graph(6, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
+			&flotr2_graph(7, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
 					'Size of files','Size of files','','','Number of files',$d2,'Number of files');
 			$d1 = '';
 			$d2 = '';
@@ -1268,7 +1289,7 @@ sub dump_as_html
 			}
 		}
 		$data{'Others'} = $total - $totala;
-		&flotr2_piegraph(7, 'queriesbytype_graph','Type of queries', %data);
+		&flotr2_piegraph(8, 'queriesbytype_graph','Type of queries', %data);
 	}
 	print $fh "</td></tr></table>\n";
 
@@ -1316,7 +1337,7 @@ sub dump_as_html
 				$locktype{$small[0]} = $locktype{"Sum types < $pie_percentage_limit%"};
 				delete $locktype{"Sum types < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(8, 'lockbytype_graph','Type of locks', %locktype);
+			&flotr2_piegraph(9, 'lockbytype_graph','Type of locks', %locktype);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1356,7 +1377,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(9, 'databasesessions_graph','Sessions per database', %infos);
+			&flotr2_piegraph(10, 'databasesessions_graph','Sessions per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1395,7 +1416,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(10, 'usersessions_graph','Sessions per user', %infos);
+			&flotr2_piegraph(11, 'usersessions_graph','Sessions per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1435,7 +1456,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(11, 'hostsessions_graph','Sessions per host', %infos);
+			&flotr2_piegraph(12, 'hostsessions_graph','Sessions per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1478,7 +1499,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(12, 'databaseconnections_graph','Connections per database', %infos);
+			&flotr2_piegraph(13, 'databaseconnections_graph','Connections per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1516,7 +1537,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(13, 'userconnections_graph','Connections per user', %infos);
+			&flotr2_piegraph(14, 'userconnections_graph','Connections per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1555,7 +1576,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(14, 'hostconnections_graph','Connections per host', %infos);
+			&flotr2_piegraph(15, 'hostconnections_graph','Connections per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
