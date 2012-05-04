@@ -1262,7 +1262,7 @@ sub dump_as_html
 			}
 		}
 		$data{'Others'} = $total - $totala;
-		&flotr2_piegraph('queriesbytype_graph','Type of queries', %data);
+		&flotr2_piegraph(7, 'queriesbytype_graph','Type of queries', %data);
 	}
 	print $fh "</td></tr></table>\n";
 
@@ -1310,7 +1310,7 @@ sub dump_as_html
 				$locktype{$small[0]} = $locktype{"Sum types < $pie_percentage_limit%"};
 				delete $locktype{"Sum types < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('lockbytype_graph','Type of locks', %locktype);
+			&flotr2_piegraph(8, 'lockbytype_graph','Type of locks', %locktype);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1350,7 +1350,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('databasesessions_graph','Sessions per database', %infos);
+			&flotr2_piegraph(9, 'databasesessions_graph','Sessions per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1389,7 +1389,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('usersessions_graph','Sessions per user', %infos);
+			&flotr2_piegraph(10, 'usersessions_graph','Sessions per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1429,7 +1429,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('hostsessions_graph','Sessions per host', %infos);
+			&flotr2_piegraph(11, 'hostsessions_graph','Sessions per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1472,7 +1472,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('databaseconnections_graph','Connections per database', %infos);
+			&flotr2_piegraph(12, 'databaseconnections_graph','Connections per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1510,7 +1510,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('userconnections_graph','Connections per user', %infos);
+			&flotr2_piegraph(13, 'userconnections_graph','Connections per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -1549,7 +1549,7 @@ sub dump_as_html
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph('hostconnections_graph','Connections per host', %infos);
+			&flotr2_piegraph(14, 'hostconnections_graph','Connections per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -2219,9 +2219,9 @@ sub flotr2_graph
 <script type="text/javascript">
 (function mouse_zoom(container) {
 
-document.writeln('<input type="button" class="examplesButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
-	'<input type="button" class="examplesButton" value="Download" id="download$buttonid" onclick="return false;">' +
-	'<input type="button" class="examplesButton" value="Reset" id="reset$buttonid" onclick="return false;">'
+document.writeln('<input type="button" class="dldButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
+	'<input type="button" class="dldButton" value="Download" id="download$buttonid" onclick="return false;">' +
+	'<input type="button" class="dldButton" value="Reset" id="reset$buttonid" onclick="return false;">'
 	);
     $data1
     $data2
@@ -2311,7 +2311,7 @@ EOF
 
 sub flotr2_piegraph
 {
-	my ($divid, $title, %data) = @_;
+	my ($buttonid, $divid, $title, %data) = @_;
 
 	my @datadef = ();
 	my @contdef = ();
@@ -2325,6 +2325,13 @@ sub flotr2_piegraph
 <div id="$divid"></div>
 <script type="text/javascript">
 (function basic_pie(container) {
+
+
+document.writeln('<input type="button" class="dldButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
+	'<input type="button" class="dldButton" value="Download" id="download$buttonid" onclick="return false;">' +
+	'<input type="button" class="dldButton" value="Reset" id="reset$buttonid" onclick="return false;">'
+	);
+
     @datadef
     var graph = Flotr.draw(container, [
     @contdef
@@ -2353,6 +2360,29 @@ sub flotr2_piegraph
             backgroundColor: "#D2E8FF"
         }
     });
+    document.getElementById('reset$buttonid').onclick = function() {
+      graph.download.restoreCanvas();
+    };
+    document.getElementById('download$buttonid').onclick = function(){
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$IMG_FORMAT');
+    };
+    document.getElementById('toimage$buttonid').onclick = function() {
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$IMG_FORMAT', null, null, true);
+    };
+
+
 })(document.getElementById("$divid"));
 </script>
 EOF
