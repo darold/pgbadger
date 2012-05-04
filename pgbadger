@@ -63,6 +63,10 @@ my @DIMENSIONS = (800,300);
 my $RESRC_URL = '';
 my $IMG_FORMAT = 'png';
 
+# Do not display data in pie where percentage is lower than this value
+# to avoid label overlaping. 
+my $pie_percentage_limit = 2;
+
 my $t0 = Benchmark->new;
 
 # get the command line parameters
@@ -87,6 +91,7 @@ my $result = GetOptions (
 	"regex-user=s"  => \$regex_prefix_dbuser,
 	"q|quiet!"      => \$quiet,
 	"p|progress!"   => \$progress,
+	"pie-limit=i"   => \$pie_percentage_limit,
 );
 
 if ($ver) {
@@ -128,6 +133,11 @@ if (!$extension) {
 }
 # Set default filename of the output file
 $outfile ||= 'out.' . $extension;
+
+# Set default pie percentage limit or fix value
+$pie_percentage_limit = 0 if ($pie_percentage_limit < 0);
+$pie_percentage_limit = 2 if ($pie_percentage_limit eq '');
+$pie_percentage_limit = 100 if ($pie_percentage_limit > 100);
 
 # Extract the output directory from outfile so that graphs will
 # be created in the same directoty
@@ -404,6 +414,7 @@ Usage: $0 -l logfile [...]
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -q | --quiet           : disable output to stderr and don't print debug informations.
     -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
 
 };
 
@@ -1241,13 +1252,17 @@ sub dump_as_html
 	print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
 	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
 	print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-	if ($graph) {
-		&flotr2_piegraph('queriesbytype_graph','Type of queries',
-			(
-			 'SELECT' => $overall_stat{'SELECT'},'INSERT'=>$overall_stat{'INSERT'},'UPDATE'=>$overall_stat{'UPDATE'},
-			 'DELETE'=>$overall_stat{'DELETE'},'Others' => $total - $totala
-			)
-		);
+	if ($graph && $totala) {
+		my %data = ();
+		foreach my $t ('SELECT','INSERT','UPDATE','DELETE') {
+			if ((($overall_stat{$t}*100)/$total) > $pie_percentage_limit) {
+				$data{$t} = $overall_stat{$t} || 0;
+			} else {
+				$data{"Sum types < $pie_percentage_limit%"} += $overall_stat{$t} || 0;
+			}
+		}
+		$data{'Others'} = $total - $totala;
+		&flotr2_piegraph('queriesbytype_graph','Type of queries', %data);
 	}
 	print $fh "</td></tr></table>\n";
 
@@ -1279,10 +1294,21 @@ sub dump_as_html
 		}
 		print $fh "<tr class=\"row1\"><td colspan=\"2\"><b>Total</b></td><td class=\"right\">", &comma_numbers($total_count), "</td><td class=\"right\">", &convert_time($total_duration), "</td><td class=\"right\">", &convert_time($total_duration/($total_count||1)), "</td></tr>\n";
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %locktype = ();
-			foreach my $t (sort keys %lock_info) {
-				$locktype{$t} = $lock_info{$t}{count} || 0;
+			my @small = ();
+			foreach my $d (sort keys %lock_info) {
+				if ((($lock_info{$d}{count}*100)/$total_count) > $pie_percentage_limit) {
+					$locktype{$d} = $lock_info{$d}{count} || 0;
+				} else {
+					$locktype{"Sum types < $pie_percentage_limit%"} += $lock_info{$d}{count} || 0;
+					push(@small, $d);
+					
+				}
+			}
+			if ($#small == 0) {
+				$locktype{$small[0]} = $locktype{"Sum types < $pie_percentage_limit%"};
+				delete $locktype{"Sum types < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('lockbytype_graph','Type of locks', %locktype);
 		}
@@ -1309,10 +1335,20 @@ sub dump_as_html
 			$total_count += $session_info{database}{$d}{count};
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$session_info{database}}) {
-				$infos{$d} = $session_info{database}{$d}{count} || 0;
+				if ((($session_info{database}{$d}{count}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $session_info{database}{$d}{count} || 0;
+				} else {
+					$infos{"Sum sessions < $pie_percentage_limit%"} += $session_info{database}{$d}{count} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('databasesessions_graph','Sessions per database', %infos);
 		}
@@ -1338,10 +1374,20 @@ sub dump_as_html
 			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$session_info{user}}) {
-				$infos{$d} = $session_info{user}{$d}{count} || 0;
+				if ((($session_info{user}{$d}{count}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $session_info{user}{$d}{count} || 0;
+				} else {
+					$infos{"Sum sessions < $pie_percentage_limit%"} += $session_info{user}{$d}{count} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('usersessions_graph','Sessions per user', %infos);
 		}
@@ -1368,16 +1414,25 @@ sub dump_as_html
 			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$session_info{host}}) {
-				$infos{$d} = $session_info{host}{$d}{count} || 0;
+				if ((($session_info{host}{$d}{count}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $session_info{host}{$d}{count} || 0;
+				} else {
+					$infos{"Sum sessions < $pie_percentage_limit%"} += $session_info{host}{$d}{count} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('hostsessions_graph','Sessions per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
-		$connection_info{count}++;
 
 	# Show connection per database statistics
 	if (exists $connection_info{database}) {
@@ -1402,10 +1457,20 @@ sub dump_as_html
 			}
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$connection_info{database}}) {
-				$infos{$d} = $connection_info{database}{$d} || 0;
+				if ((($connection_info{database}{$d}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $connection_info{database}{$d} || 0;
+				} else {
+					$infos{"Sum connections < $pie_percentage_limit%"} += $connection_info{database}{$d} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('databaseconnections_graph','Connections per database', %infos);
 		}
@@ -1430,10 +1495,20 @@ sub dump_as_html
 			$total_count += $connection_info{user}{$u};
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$connection_info{user}}) {
-				$infos{$d} = $connection_info{user}{$d} || 0;
+				if ((($connection_info{user}{$d}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $connection_info{user}{$d} || 0;
+				} else {
+					$infos{"Sum connections < $pie_percentage_limit%"} += $connection_info{user}{$d} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('userconnections_graph','Connections per user', %infos);
 		}
@@ -1459,10 +1534,20 @@ sub dump_as_html
 			$total_count += $connection_info{host}{$h};
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph) {
+		if ($graph && $total_count) {
 			my %infos = ();
+			my @small = ();
 			foreach my $d (sort keys %{$connection_info{host}}) {
-				$infos{$d} = $connection_info{host}{$d} || 0;
+				if ((($connection_info{host}{$d}*100)/$total_count) > $pie_percentage_limit) {
+					$infos{$d} = $connection_info{host}{$d} || 0;
+				} else {
+					$infos{"Sum connections < $pie_percentage_limit%"} += $connection_info{host}{$d} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph('hostconnections_graph','Connections per host', %infos);
 		}
