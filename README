@@ -1,9 +1,13 @@
+DESCRIPTION:
+------------
+
 PgBadger - An other PostgreSQL log analyzer that aims to replace and
            outperforms pgFouine
 
 This is still a work in progress.
 
-------------------------------------------------------------------------------
+PREREQUISITE:
+-------------
 
 You must first enable SQL query logging to have something to parse:
 
@@ -21,9 +25,13 @@ or for syslog log file format:
 
 	log_line_prefix = 'user=username,db=dbname '
 
-Log line prefix could also be:
+Log line prefix for stderr output could also be:
 
 	log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
+
+or for syslog output:
+
+	log_line_prefix = 'db=dbname,user=username'
 
 Additional informations that could be collected need logging activation into postgresql.conf:
 
@@ -33,9 +41,11 @@ Additional informations that could be collected need logging activation into pos
 	log_lock_waits = on
 	log_temp_files = 0
 
--------------------------------------------------------------------------------
 
-Usage: pgbadger -l logfile [...]
+USAGE:
+------
+
+pgbadger -l logfile [...]
 
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
                              be a plain text log or a gzip compressed file
@@ -58,6 +68,10 @@ Usage: pgbadger -l logfile [...]
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -q | --quiet           : disable output to stderr and don't print debug informations.
     -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
 
+AUTHORS:
+--------
 
+Gilles Darold <gilles.darold@dalibo.com>
 
