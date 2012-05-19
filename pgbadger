@@ -12,6 +12,8 @@
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=username,db=dbname'
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
+# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
 #
 # Additional informations that could be collected and reported
 #
