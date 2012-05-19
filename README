@@ -19,19 +19,19 @@ With 'stderr' log format, log line prefix must be at least:
 
 Log line prefix could add user and database name as follow:
 
-	log_line_prefix = '%t [%p]: [%l-1] user=username,db=dbname '
+	log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
 
 or for syslog log file format:
 
-	log_line_prefix = 'user=username,db=dbname '
+	log_line_prefix = 'user=%u,db=%d '
 
 Log line prefix for stderr output could also be:
 
-	log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
+	log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
 
 or for syslog output:
 
-	log_line_prefix = 'db=dbname,user=username'
+	log_line_prefix = 'db=%d,user=%u '
 
 Additional informations that could be collected need logging activation into postgresql.conf:
 
