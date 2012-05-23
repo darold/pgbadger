@@ -304,7 +304,8 @@ my $cur_td = $t0;
 while (my $line = <$lfile>) {
 	$cursize += length($line);
 	chomp($line);
-	$line =~ s///;
+	$line =~ s/
+//;
 	$nlines++;
 	next if (!$line);
 
@@ -2194,7 +2195,8 @@ sub autodetect_format
 	}
 	while (my $line = <$tfile>) {
 		chomp($line);
-		$line =~ s///;
+		$line =~ s/
+//;
 		next if (!$line);
 		$nline++;
 		# Is syslog lines ?
