@@ -65,9 +65,12 @@ pgbadger -l logfile [...]
                              the given size. Default: no truncate
     -g | --graph           : generate graphs, requires GD::Graph perl module
     -b | --begin datetime  : start date/time for the data to be parsed in log.
+                             Format: -b "yyyy-mm-dd hh:mm:ss"
     -e | --end datetime    : end date/time for the data to be parsed in log.
+                             Format: -e "yyyy-mm-dd hh:mm:ss"
     -q | --quiet           : disable output to stderr and don't print debug informations.
     -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+    -v | --version         : show current version
     --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
 
 AUTHORS:
