@@ -323,7 +323,7 @@ while (my $line = <$lfile>) {
 
 	# Parse syslog lines
 	if ($format eq 'syslog') {
-		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
+		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
 			# skip non postgresql lines
 			next if ($7 ne $ident);
 			# Syslog do not have year information, so take care of year overlapping
@@ -347,7 +347,7 @@ while (my $line = <$lfile>) {
 	} elsif ($format eq 'stderr') {
 
 		# Parse stderr lines
-		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s+([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
+		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
 			# Skip unwanted lines
 			my $cur_date = "$1$2$3$4$5$6";
 			next if ($from && ($from > $cur_date));
