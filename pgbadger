@@ -10,8 +10,6 @@
 #
 # You must enable SQL query logging : log_min_duration_statement = 0
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
-# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=username,db=dbname'
-# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=dbname,user=username'
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
 # Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
 #
@@ -304,8 +302,7 @@ my $cur_td = $t0;
 while (my $line = <$lfile>) {
 	$cursize += length($line);
 	chomp($line);
-	$line =~ s/
-//;
+	$line =~ s///;
 	$nlines++;
 	next if (!$line);
 
@@ -2195,8 +2192,7 @@ sub autodetect_format
 	}
 	while (my $line = <$tfile>) {
 		chomp($line);
-		$line =~ s/
-//;
+		$line =~ s///;
 		next if (!$line);
 		$nline++;
 		# Is syslog lines ?
