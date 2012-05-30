@@ -50,7 +50,7 @@ pgbadger -l logfile [...]
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
                              be a plain text log or a gzip compressed file
                              with the .gz extension.
-    -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
                              of the output format: out.html or out.txt. To dump
                              output to stdout use - as filename.

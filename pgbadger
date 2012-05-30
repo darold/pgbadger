@@ -25,7 +25,6 @@ use strict;
 use Getopt::Long;
 use IO::File;
 use Benchmark;
-use IO::File;
 use File::Basename;
 use Time::Local 'timelocal_nocheck';
 
@@ -299,6 +298,12 @@ my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
 
 my $cur_td = $t0;
 
+my $csv_obj;
+if ($format eq 'csv') {
+	require Text::CSV;
+	$csv_obj = Text::CSV->new({'binary'=>1});
+}
+
 while (my $line = <$lfile>) {
 	$cursize += length($line);
 	chomp($line);
@@ -358,7 +363,38 @@ while (my $line = <$lfile>) {
 			$cur_info{query} .= "\n" . $line if ($cur_info{query});
 		}
 
-	} else {
+	} elsif ($format eq 'csv') {
+
+		# Parse csvlog lines
+		if ($csv_obj->parse($line)) {
+			my @cols = $csv_obj->fields();
+
+			# Extract the date
+			$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
+			my @date = ($1, $2, $3, $4, $5, $6);
+
+			# Skip unwanted lines
+			my $cur_date = join('', @date);
+			next if ($from && ($from > $cur_date));
+			last if ($to && ($to < $cur_date));
+
+			# Process the log line
+			&parse_query(
+				@date,
+				$cols[4],	# connection from
+				$cols[3],	# pid
+				$cols[5],	# session
+				# logprefix
+				'user='.$cols[1] . ',db='.$cols[2],
+				$cols[11].':', # loglevel
+				$cols[13], # query
+			);
+		}else {
+			&logmsg('DEBUG', "Unknown csv line format: $line, error: ". $csv_obj->error_input());
+		}
+
+	} else
+	{
 		# unknown format
 		&logmsg('DEBUG', "Unknown line format: $line");
 	}
@@ -403,7 +439,7 @@ Usage: $0 -l logfile [...]
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
 			     be a plain text log or a gzip compressed file
 			     with the .gz extension.
-    -f | --format logtype  : the value can be: syslog or stderr. Default: stderr
+    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
 			     output to stdout use - as filename.
@@ -2202,6 +2238,9 @@ sub autodetect_format
 		# Is stderr lines
 		} elsif ($line =~ /\d+-\d+-\d+\s+\d+:\d+:\d+\s+[^\s]+\s+\[\d+\]:\s+\[[0-9\-]+\]\s+[^:]+:\s+duration:/) {
 			$fmt = 'stderr';
+			$nfound++;
+		} elsif ($line =~ tr/,/,/ >= 12) {
+			$fmt = 'csv';
 			$nfound++;
 		}
 		last if (($nfound > 10) || ($nline > 5000));
