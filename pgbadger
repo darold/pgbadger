@@ -337,7 +337,7 @@ while (my $line = <$lfile>) {
 				$tmp_year = substr($CURRENT_DATE,1, 4) - 1;
 			}
 			# Skip unwanted lines
-			my $cur_date = "$tmp_year$1$2$3$4$5";
+			my $cur_date = "$tmp_year$month_abbr{$1}$2$3$4$5";
 			next if ($from && ($from > $cur_date));
 			last if ($to && ($to < $cur_date));
 			# Process the log line
