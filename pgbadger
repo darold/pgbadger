@@ -1925,14 +1925,14 @@ sub parse_query
 		# Check user and/or database if require
 		if ($dbname) {
 			# Log line do not match the required dbname
-			if (!$cur_info{dbname} || ($dbname ne $cur_info{dbname})) {
+			if (!$t_dbname || ($dbname ne $t_dbname)) {
 				%cur_info = ();
 				return;
 			}
 		}
 		if ($dbuser) {
 			# Log line do not match the required dbuser
-			if (!$cur_info{dbuser} || ($dbuser ne $cur_info{dbuser})) {
+			if (!$t_dbuser || ($dbuser ne $t_dbuser)) {
 				%cur_info = ();
 				return;
 			}
