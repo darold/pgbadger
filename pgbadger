@@ -1909,7 +1909,7 @@ sub parse_query
 				$t_dbuser = $1;
 			}
 		# Default regex
-		} elsif ($t_logprefix =~ /^user=([^,]*)/) {
+		} elsif ($t_logprefix =~ /user=([^,]*)/) {
 			$t_dbuser = $1;
 		}
 		# User defined regex
@@ -1918,21 +1918,21 @@ sub parse_query
 				$t_dbname = $1;
 			}
 		# Default regex
-		} elsif ($t_logprefix =~ /^db=([^,]*)/) {
+		} elsif ($t_logprefix =~ /db=([^,]*)/) {
 			$t_dbname = $1;
 		}
 
 		# Check user and/or database if require
 		if ($dbname) {
 			# Log line do not match the required dbname
-			if (!$cur_info{dbname} || ($dbname ne $cur_info{dbname})) {
+			if (!$t_dbname || ($dbname ne $t_dbname)) {
 				%cur_info = ();
 				return;
 			}
 		}
 		if ($dbuser) {
 			# Log line do not match the required dbuser
-			if (!$cur_info{dbuser} || ($dbuser ne $cur_info{dbuser})) {
+			if (!$t_dbuser || ($dbuser ne $t_dbuser)) {
 				%cur_info = ();
 				return;
 			}
