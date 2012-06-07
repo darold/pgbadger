@@ -58,10 +58,12 @@ my $regex_prefix_dbname = '';
 my $regex_prefix_dbuser = '';
 my $quiet = 0;
 my $progress = 0;
+
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
 my $RESRC_URL = '';
 my $img_format = 'png';
+my @log_files = ();
 
 # Do not display data in pie where percentage is lower than this value
 # to avoid label overlaping. 
@@ -96,18 +98,28 @@ my $result = GetOptions (
 );
 
 if ($ver) {
-	print "pgbadger version $VERSION\n";
+	print "pgBadger version $VERSION\n";
 	exit 0;
 }
 &usage() if ($help);
-# If we just have one command line argument assume it's the log file
-# and use default values for all other ones.
-if ($#ARGV == 0) {
-	$logfile = shift(@ARGV);
+
+# If we have command line argument and no -l option assume it's the list
+# of log file to parse.
+if (!$logfile && ($#ARGV >= 0)) {
+	foreach my $file (@ARGV) {
+		die "FATAL: logfile $file must exists!\n" if (!-f $file);
+		next if (-z $file);
+		push(@log_files, $file);
+	}
+} elsif ($logfile) {
+	die "FATAL: logfile $logfile must exists!\n" if (!-f $logfile);
+	die "FATAL: logfile $logfile is empty!\n" if (-z $logfile);
+	push(@log_files, $logfile);
 }
+
 # Logfile is a mandatory parameter
-if (!$logfile) {
-	print STDERR "FATAL: you must set a log file. See option -l.\n\n";
+if ($#log_files < 0) {
+	print STDERR "FATAL: you must set a log file.\n\n";
 	&usage();
 }
 
@@ -115,7 +127,7 @@ if (!$logfile) {
 $quiet = 1 if ($progress);
 
 # Set default format
-$format ||= &autodetect_format();
+$format ||= &autodetect_format($log_files[0]);
 # Set default syslog ident name
 $ident ||= 'postgres';
 # Set default top query
@@ -155,14 +167,10 @@ $graph = 0 if ($extension ne 'html');
 
 my $end_top = $top - 1;
 
-# Check if the logfile exists
-die "FATAL: logfile $logfile must exists!\n" if (!-e $logfile || -z $logfile);
-die "FATAL: logfile $logfile must not be empty!\n" if (!-e $logfile || -z $logfile);
-
 # Test file creation before going to parse log
 my $tmpfh = new IO::File ">$outfile";
 if (not defined $tmpfh) {
-	die "FATAL: can't write to $logfile, $!\n";
+	die "FATAL: can't write to $outfile, $!\n";
 }
 $tmpfh->close();
 unlink($outfile) if (-e $outfile);
@@ -274,140 +282,141 @@ my %session_info = ();
 my %conn_received = ();
 my %checkpoint_info = ();
 my @graph_values = ();
-
-# Open log file for reading
-my $nlines = 0;
-my $totalsize = (stat("$logfile"))[7] || 0;
-my $cursize = 0;
-my $lfile = new IO::File;
-if ($logfile !~ /\.gz/) {
-	$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
-} else {
-	# Open a pipe to zcat program for compressed log
-	$lfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
-	# Real size of the file is unknow
-	$totalsize = 0;
-}
 my %cur_info = ();
+my $nlines = 0;
 
-my $curdate = localtime(time);
-# Syslog do not have year information, so take care of year overlapping
-my ($gsec,$gmin,$ghour,$gmday,$gmon,$gyear,$gwday,$gyday,$gisdst) = localtime(time);
-$gyear += 1900;
-my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
-
-my $cur_td = $t0;
-
-my $csv_obj;
-if ($format eq 'csv') {
-	require Text::CSV;
-	$csv_obj = Text::CSV->new({'binary'=>1});
-}
-
-while (my $line = <$lfile>) {
-	$cursize += length($line);
-	chomp($line);
-	$line =~ s///;
-	$nlines++;
-	next if (!$line);
-
-	if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-		if ($totalsize) {
-			print progress_bar($cursize, $totalsize, 25, '=' );
-		} else {
-			print ".";
-		}
+foreach $logfile (@log_files) {
+	# Open log file for reading
+	my $totalsize = (stat("$logfile"))[7] || 0;
+	my $cursize = 0;
+	my $lfile = new IO::File;
+	if ($logfile !~ /\.gz/) {
+		$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
+	} else {
+		# Open a pipe to zcat program for compressed log
+		$lfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+		# Real size of the file is unknow
+		$totalsize = 0;
 	}
 
-	if ($debug && (($nlines % 100000) == 0)) {
-		my $t1 = Benchmark->new;
-		my $td = timediff($t1, $cur_td);
-		&logmsg('DEBUG', "Lines parsed $nlines, [ 100000 in " . timestr($td) . " ]");
-		$cur_td = $t1;
+	my $curdate = localtime(time);
+	# Syslog do not have year information, so take care of year overlapping
+	my ($gsec,$gmin,$ghour,$gmday,$gmon,$gyear,$gwday,$gyday,$gisdst) = localtime(time);
+	$gyear += 1900;
+	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
+
+	my $cur_td = $t0;
+
+	my $csv_obj;
+	if ($format eq 'csv') {
+		require Text::CSV;
+		$csv_obj = Text::CSV->new({'binary'=>1});
 	}
 
-	# Parse syslog lines
-	if ($format eq 'syslog') {
-		if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
-			# skip non postgresql lines
-			next if ($7 ne $ident);
-			# Syslog do not have year information, so take care of year overlapping
-			my $tmp_year = $gyear;
-			if ("$tmp_year$month_abbr{$1}$2" > $CURRENT_DATE) {
-				$tmp_year = substr($CURRENT_DATE,1, 4) - 1;
+	while (my $line = <$lfile>) {
+		$cursize += length($line);
+		chomp($line);
+		$line =~ s///;
+		$nlines++;
+		next if (!$line);
+
+		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+			if ($totalsize) {
+				print progress_bar($cursize, $totalsize, 25, '=' );
+			} else {
+				print ".";
 			}
-			# Skip unwanted lines
-			my $cur_date = "$tmp_year$month_abbr{$1}$2$3$4$5";
-			next if ($from && ($from > $cur_date));
-			last if ($to && ($to < $cur_date));
-			# Process the log line
-			&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11,$12);
-		} elsif ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+(#011)[\t\s]*(.*)/) {
-
-			$cur_info{query} .= "\n" . $11;
-		} else {
-			&logmsg('DEBUG', "Unknown syslog line format: $line");
 		}
 
-	} elsif ($format eq 'stderr') {
-
-		# Parse stderr lines
-		if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
-			# Skip unwanted lines
-			my $cur_date = "$1$2$3$4$5$6";
-			next if ($from && ($from > $cur_date));
-			last if ($to && ($to < $cur_date));
-			# Process the log line
-			&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
-		} else {
-			$cur_info{query} .= "\n" . $line if ($cur_info{query});
+		if ($debug && (($nlines % 100000) == 0)) {
+			my $t1 = Benchmark->new;
+			my $td = timediff($t1, $cur_td);
+			&logmsg('DEBUG', "Lines parsed $nlines, [ 100000 in " . timestr($td) . " ]");
+			$cur_td = $t1;
 		}
 
-	} elsif ($format eq 'csv') {
+		# Parse syslog lines
+		if ($format eq 'syslog') {
+			if ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
+				# skip non postgresql lines
+				next if ($7 ne $ident);
+				# Syslog do not have year information, so take care of year overlapping
+				my $tmp_year = $gyear;
+				if ("$tmp_year$month_abbr{$1}$2" > $CURRENT_DATE) {
+					$tmp_year = substr($CURRENT_DATE,1, 4) - 1;
+				}
+				# Skip unwanted lines
+				my $cur_date = "$tmp_year$month_abbr{$1}$2$3$4$5";
+				next if ($from && ($from > $cur_date));
+				last if ($to && ($to < $cur_date));
+				# Process the log line
+				&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11,$12);
+			} elsif ($line =~ /^(...)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+([^\[]+)\[(\d+)\]:\s+\[([0-9\-]+)\]\s+(#011)[\t\s]*(.*)/) {
 
-		# Parse csvlog lines
-		if ($csv_obj->parse($line)) {
-			my @cols = $csv_obj->fields();
+				$cur_info{query} .= "\n" . $11;
+			} else {
+				&logmsg('DEBUG', "Unknown syslog line format: $line");
+			}
 
-			# Extract the date
-			$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-			my @date = ($1, $2, $3, $4, $5, $6);
+		} elsif ($format eq 'stderr') {
 
-			# Skip unwanted lines
-			my $cur_date = join('', @date);
-			next if ($from && ($from > $cur_date));
-			last if ($to && ($to < $cur_date));
+			# Parse stderr lines
+			if ($line =~ /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\s+([^\s]+)\s+\[(\d+)\]:\s+\[([0-9\-]+)\]\s*([^\s]*)\s+([A-Z]+:)\s+(.*)/) {
+				# Skip unwanted lines
+				my $cur_date = "$1$2$3$4$5$6";
+				next if ($from && ($from > $cur_date));
+				last if ($to && ($to < $cur_date));
+				# Process the log line
+				&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+			} else {
+				$cur_info{query} .= "\n" . $line if ($cur_info{query});
+			}
 
-			# Process the log line
-			&parse_query(
-				@date,
-				$cols[4],	# connection from
-				$cols[3],	# pid
-				$cols[5],	# session
-				# logprefix
-				'user='.$cols[1] . ',db='.$cols[2],
-				$cols[11].':', # loglevel
-				$cols[13], # query
-			);
-		}else {
-			&logmsg('DEBUG', "Unknown csv line format: $line, error: ". $csv_obj->error_input());
+		} elsif ($format eq 'csv') {
+
+			# Parse csvlog lines
+			if ($csv_obj->parse($line)) {
+				my @cols = $csv_obj->fields();
+
+				# Extract the date
+				$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
+				my @date = ($1, $2, $3, $4, $5, $6);
+
+				# Skip unwanted lines
+				my $cur_date = join('', @date);
+				next if ($from && ($from > $cur_date));
+				last if ($to && ($to < $cur_date));
+
+				# Process the log line
+				&parse_query(
+					@date,
+					$cols[4],	# connection from
+					$cols[3],	# pid
+					$cols[5],	# session
+					# logprefix
+					'user='.$cols[1] . ',db='.$cols[2],
+					$cols[11].':', # loglevel
+					$cols[13], # query
+				);
+			}else {
+				&logmsg('DEBUG', "Unknown csv line format: $line, error: ". $csv_obj->error_input());
+			}
+
+		} else
+		{
+			# unknown format
+			&logmsg('DEBUG', "Unknown line format: $line");
 		}
-
-	} else
-	{
-		# unknown format
-		&logmsg('DEBUG', "Unknown line format: $line");
 	}
-}
-if ($progress) {
-	if ($totalsize) {
-		print progress_bar($cursize, $totalsize, 25, '=' );
+	if ($progress) {
+		if ($totalsize) {
+			print progress_bar($cursize, $totalsize, 25, '=');
+		}
+		print STDERR "\n";
 	}
-	print STDERR "\n";
+
+	$lfile->close();
 }
-
-$lfile->close();
-
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
@@ -434,11 +443,22 @@ exit 0;
 sub usage
 {
 	print qq{
-Usage: $0 -l logfile [...]
+Usage: pgbadger [options] logfile [...]
+
+	PostgreSQL log analyzer with fully detailed reports and graphs.
+
+Arguments:
+
+    logfile can be a single log file, a list of files or a shell command 
+    returning a list of file.
+
+Options:
 
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
 			     be a plain text log or a gzip compressed file
-			     with the .gz extension.
+			     with the .gz extension. Note that this option is
+			     DEPRECATED, set logfile as a command line argument
+			     instead.
     -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
@@ -459,6 +479,11 @@ Usage: $0 -l logfile [...]
     -p | --progress        : show a progress bar, quiet mode is enabled with this option.
     --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
 
+Examples:
+
+	pgbadger -p -g /var/log/postgresql.log
+	pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
+	pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
 };
 
 	exit 0;
@@ -592,12 +617,13 @@ sub dump_as_text
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
+	my $logfile_str = join(',', @log_files);
 	print $fh qq{
 
 - Global informations --------------------------------------------------
 
 Generated on $curdate
-Log file: $logfile
+Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
 Log start from $first_log_date to $last_log_date
 };
@@ -965,11 +991,12 @@ sub dump_as_html
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
+	my $logfile_str = join(',', @log_files);
 	print $fh qq{
 <div class="information">
 <ul>
 <li>Generated on $curdate</li>
-<li>Log file: $logfile</li>
+<li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
 <li>Log start from $first_log_date to $last_log_date</li>
 </ul>
@@ -2214,17 +2241,18 @@ sub average_five_minutes
 
 sub autodetect_format
 {
+	my $file = shift;
 
 	# Open log file for reading
 	my $nfound = 0;
 	my $nline = 0;
 	my $fmt = '';
 	my $tfile = new IO::File;
-	if ($logfile !~ /\.gz/) {
-		$tfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
+	if ($file !~ /\.gz/) {
+		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
 	} else {
 		# Open a pipe to zcat program for compressed log
-		$tfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+		$tfile->open("$ZCAT_PROG $file |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $file. $!\n";
 	}
 	while (my $line = <$tfile>) {
 		chomp($line);
@@ -2247,7 +2275,7 @@ sub autodetect_format
 	}
 	$tfile->close();
 	if (!$fmt || ($nfound < 10)) {
-		die "FATAL: unable to detect log file format, please use -f option.\n";
+		die "FATAL: unable to detect log file format from $file, please use -f option.\n";
 	}
 
 	return $fmt;
@@ -2257,9 +2285,9 @@ sub progress_bar {
     my ( $got, $total, $width, $char ) = @_;
     $width ||= 25; $char ||= '=';
     my $num_width = length $total;
-    sprintf "[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%)\r", 
+    sprintf("[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%)\r", 
         $char x (($width-1)*$got/$total). '>', 
-        $got, $total, 100*$got/+$total;
+        $got, $total, 100*$got/+$total);
 }
 
 sub flotr2_graph
