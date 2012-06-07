@@ -766,40 +766,54 @@ sub html_header
 <meta HTTP-EQUIV="Generator" CONTENT="PgBadger v$VERSION">
 <meta HTTP-EQUIV="Date" CONTENT="$date">
 <style type="text/css">
-/* common.css */
-body { background-color: #FFFFFF; }
-* { font-family: Verdana, Arial, Helvetica; }
+body { background-color: #dedede; font-family: Verdana ;font-size: 14px;font-style: normal;font-weight: normal;text-transform: normal;letter-spacing: normal;line-height: 17px;padding: 0px; color: rgb(69,54,37); }
 div, p, th, td { font-size:12px; }
 a {color:rgb(180, 80, 80);text-decoration:underline}
 a:hover {color:rgb(180, 80, 80);text-decoration:none}
-h1 { font-size:16px; color:#FFFFFF; font-weight:normal; padding:6px; background-color:rgb(180, 80, 80); margin-bottom:0px; }
-h2 { margin-top:15px; margin-bottom:10px; font-weight:normal; font-size:14px; padding:2px 10px 2px 0px; border-bottom:1px solid #7B8CBE; color:#7B8CBE; }
-h2 a, h2 a:hover { color:black; text-decoration:none; }
-h3 { color:#FFB462; border-bottom:1px solid #FFB462; font-weight:bold; font-size:12px; margin-bottom:10px; padding-bottom:2px; }
-div.menu { background-color:rgb(220,230,252); padding:4px; margin-bottom:20px; }
-div.menu a { padding-right:3px; padding-left:3px; color:black; text-decoration:none; }
-div.menu a:hover { padding-right:3px; padding-left:3px; padding-top:2px; padding-bottom:2px; text-decoration:none; background-color:rgb(180, 80, 80); color:white; -moz-border-radius:3px; }
-div.information { border:1px solid #FFB462; -moz-border-radius:6px;	padding:10px; margin-top:5px; background-color:#FEE3C4; }
-.tip { background-color:#EBF0FC; -moz-border-radius:10px; padding:6px; margin:5px; }
+h1 { border-left:8px #007DFC solid; color: #007DFC; font: lighter 30px Arial, Helvetica, sans-serif; margin: 0px; padding: 7px;border-top: 1px solid #CCCCCC;}
+h1 a, h1 a:visited { color: #007DFC; text-decoration: none; }
+h1 a:hover { color: #888888; text-decoration: none; }
+h2 { border-bottom: 1px solid #CCCCCC; color: #0c57a3; font: lighter 18px Arial, Helvetica, sans-serif; letter-spacing: -1px; margin: 0px 0px 2px; padding-bottom: 3px; padding-top:7px;}
+h2 a, h2 a:visited { color: #007dfc; text-decoration: none; }
+h2 a:hover { color: #6f6e6e; text-decoration: none; }
+
+div.menu {background-color:#EFEFEF; margin-bottom:15px; padding:4px; -moz-border-radius:8px; padding-left:10px; color:#8F8F8F; border:1px solid #D8D8D8; text-align: left; width: 1050px; -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; }
+div.menu a { color: #007dfc; text-decoration: none; }
+div.menu a:hover { color: #6f6e6e; text-decoration: none; }
+div.menu a:visited { color: #007dfc; text-decoration: none; }
+
+div.information { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 14px; width: 1035px; }
+
+input { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #ffffff; padding: 4px; }
+
 ul { padding-left: 14px; padding-top: 0px; padding-bottom: 0px; margin-bottom: 0px; margin-top: 0px; }
 ul li { list-style-type: square; }
 div.reports { padding:4px; }
+
+table th.left { text-align:left !important; }
+table tr.row0 td { background-color: #FFFFFF; border: Opx solid #E7E7E7;}
+table tr.row1 td { background-color: #E7E7E7; border: Opx solid #FFFFFF;}
+table td.top { vertical-align:top; }
+table td.right { text-align:right; }
+table td.center { text-align:center; }
+table td.relevantInformation { font-weight:bold; }
+
+table.HourStatsTable { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; width: 1065px }
+table.HourStatsTable th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
+table.SmallTableList { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; width: 520px }
+table.SmallTableList th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
+
+table.queryList { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; }
+table.queryList th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
 table.queryList td, table.queryList th { padding: 2px; white-space: nowrap; }
-table.queryList th { background-color: #DDDDDD; border:1px solid #CCCCCC; white-space: nowrap; }
-table.queryList th.left { text-align:left !important; }
-table.queryList tr.row0 td { background-color: #FFFFFF; border: 1px solid #EEEEEE; }
-table.queryList tr.row1 td { background-color: #EEEEEE; border: 1px solid #EEEEEE; }
-table.queryList td.top { vertical-align:top; }
-table.queryList td.right { text-align:right; }
-table.queryList td.center { text-align:center; }
-table.queryList td.relevantInformation { font-weight:bold; }
 table.queryList div.sql { width: 1500px; }
 table.queryList div.examples { background-color:#EBF0FC; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
 table.queryList div.examples div.example0 { padding:2px; }
 table.queryList div.examples div.example1 { background-color:#FFFFFF; padding:2px; border:1px solid #EBF0FC; -moz-border-radius:5px; }
-.normal { color: green; font-weight:bold; }
-.warning { color: orange; font-weight:bold; }
-.fatal { color: red; font-weight:bold; font-style:italic; }
+table.queryList div.error { color: #D53131; font-weight:bold; }
+table.queryList div.errorInformation { color: #8D8D8D; font-style:italic; }
+table.queryList input { border:1px solid black; background-color:#FFFFFF; padding:1px; font-size:11px; }
+
 div.tooltipLink { position:relative; cursor:pointer; }
 div.tooltipLink span.information { border-bottom:1px dotted gray; z-index:10; }
 div.tooltipLink div.tooltip { display:none; background-color:#EBF0FC; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; width:250px; }
@@ -809,17 +823,11 @@ div.tooltipLink div.tooltip table tr.row1 td { background-color: #EEEEEE; border
 div.tooltipLink div.tooltip th { font-size:10px; }
 div.tooltipLink div.tooltip td { font-size:9px; font-weight:normal; padding:1px; }
 div.tooltipLink:hover div.tooltip { display:block; z-index:20; position:absolute; top:1.5em; left:2em; }
-table.queryList div.queryNotice { color: #8D8D8D; font-style:italic; }
-table.queryList div.error { color: #D53131; font-weight:bold; }
-table.queryList div.errorInformation { color: #8D8D8D; font-style:italic; }
-table.queryList input { border:1px solid black; background-color:#FFFFFF; padding:1px; font-size:11px; }
-table.sortable a.sortheader { color: black; text-decoration: none; }
-table.sortable a.sortheader:hover { color: rgb(180, 80, 80); }
-table.sortable span.sortarrow { color: black; text-decoration: none; font-weight:bold; }
-.indexInformation { background-color:#EBF0FC; -moz-border-radius:10px; padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; margin:5px; }
-.indexInformation table.queryList { margin-top:10px; }
-div.footer { font-size:12px; margin-top:30px; margin-bottom:400px; background-color:rgb(180, 80, 80); padding:5px; text-align:right; color:white; }
-div.footer a, div.footer a:hover { color:white; text-decoration:underline; }
+
+div.footer { font: 14px Helvetica, Arial, sans-serif;clear: both; height:30px; color: #dddddd; padding:13px 0px 0 0;margin-left: auto; margin-right: auto;  text-align: center; background-color: #0c57a3; }
+div.footer a strong { color: #eeeeee; font-weight: bold;}
+div.footer a, #footer a:visited { color: #eeeeee; }
+div.footer a:hover { color: #eeeeee; }
 
 div#littleToc { display:none; }
 html>body div#littleToc { display:block; background-color:white; color:black; position:fixed; bottom:10px; right:10px; width:160px; font-size:11px; text-align:left; border:1px dotted #BBBBBB; }
@@ -852,15 +860,29 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql span.xtra { display:block; }
 
 #queriespersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
-    width : 1000px;
+    width : 1025px;
     height: 400px;
-    margin: 8px auto;
+    margin: 40px;
+    background-color:white;
+   -moz-box-shadow: 3px 3px 5px #000000;
+   -webkit-box-shadow: 3px 3px 5px #000000;
+   -khtml-box-shadow: 3px 3px 5px #000000;
+   -o-box-shadow: 3px 3px 5px #000000;
+    box-shadow: 3px 3px 5px #000000;
+    border-color: #DBDBCC;
 }
 #queriesbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph {
     width : 500px;
     height: 250px;
-    margin: 8px auto;
+    background-color:white;
+   -moz-box-shadow: 3px 3px 5px #000000;
+   -webkit-box-shadow: 3px 3px 5px #000000;
+   -khtml-box-shadow: 3px 3px 5px #000000;
+   -o-box-shadow: 3px 3px 5px #000000;
+    box-shadow: 3px 3px 5px #000000;
+    border-color: #DBDBCC;
 }
+
 </style>
 <script type="text/javascript">
  /* <![CDATA[ */
@@ -891,12 +913,19 @@ EOF
 <body>
 <div id="content">
 
-<h1 id="top">PgBadger: PostgreSQL log analyzer report</h1>
+<h1 id="top">PgBadger</h1>
 
 <div class="menu">
 <a href="#OverallStatsReport">Overall statistics</a> |
 <a href="#HourlyStatsReport">Hourly statistics</a> |
 <a href="#QueriesByTypeReport">Queries by type</a> |
+};
+print $fh qq{
+<a href="#SlowestQueriesReport">Slowest queries</a> |
+<a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
+<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
+<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a><br />
+<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> |
 };
 if (scalar keys %lock_info > 0) {
 	print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
@@ -920,11 +949,6 @@ if (exists $connection_info{host}) {
 	print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> |};
 }
 print $fh qq{
-<a href="#SlowestQueriesReport">Slowest queries</a> |
-<a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
-<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
-<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> |
-<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a>
 </div>
 <p>Normalized reports are marked with a "(N)".</p>
 };
@@ -935,6 +959,7 @@ print $fh qq{
 sub html_footer
 {
 	print $fh qq{
+	<p>&nbsp;</p>
 	<div class="footer">
 		Report generated by <a href="https://github.com/dalibo/pgbadger">PgBadger</a> $VERSION.
 	</div>
@@ -1010,6 +1035,7 @@ sub dump_as_html
 	print $fh qq{
 <div class="reports">
 <h2 id="OverallStatsReport">Overall statistics <a href="#top" title="Back to top">^</a></h2>
+<div class="information">
 <table><tr><td valign="top">
 <ul>
 <li>Number of unique normalized queries: $fmt_unique</li>
@@ -1057,60 +1083,29 @@ sub dump_as_html
 	print $fh qq{
 </ul>
 </td></tr></table>
+</div>
 };
 
 	print $fh qq{
 <h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
 
-<table class="queryList" width="100%">
+<table class="HourStatsTable">
 	<tr>
-		<th rowspan="2" style="white-space: nowrap">Day</th>
-		<th rowspan="2" style="white-space: nowrap">Time</th>
-		<th colspan="2" style="white-space: nowrap">Queries</th>
-		<th colspan="2" style="white-space: nowrap">SELECT queries</th>
-		<th colspan="4" style="white-space: nowrap">Write queries</th>
-};
-	if ($tempfile_info{count}) {
-		print $fh qq{
-		<th colspan="2" style="white-space: nowrap">Temporary files</th>
-};
-	}
-	if (exists $checkpoint_info{chronos}) {
-		print $fh qq{
-		<th colspan="7" style="white-space: nowrap">Checkpoints</th>
-};
-	}
-	print $fh qq{
+		<th rowspan="2">Day</th>
+		<th rowspan="2">Time</th>
+		<th colspan="2">Queries</th>
+		<th colspan="2">SELECT queries</th>
+		<th colspan="4">Write queries</th>
 	</tr>
 	<tr>
 		<th>Count</th>
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
 		<th>Count</th>
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
-
 		<th>INSERT</th>
 		<th>UPDATE</th>
 		<th>DELETE</th>
 		<th>Av.&nbsp;duration&nbsp;(s)</th>
-};
-	if ($tempfile_info{count}) {
-		print $fh qq{
-		<th>Count</th>
-		<th>Av.&nbsp;size</th>
-};
-	}
-	if (exists $checkpoint_info{chronos}) {
-		print $fh qq{
-		<th>Wrote buffers</th>
-		<th>Added</th>
-		<th>Removed</th>
-		<th>Recycled</th>
-		<th>Write time (sec)</th>
-		<th>Sync time (sec)</th>
-		<th>Total time (sec)</th>
-};
-	}
-	print $fh qq{
 	</tr>
 };
 
@@ -1124,25 +1119,11 @@ sub dump_as_html
 			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
 			$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
 			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
-			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
-			if ($tempfile_info{count}) {
-				my $temp_average = '0';
-				if ($tempfile_info{chronos}{$d}{$h}{count}) {
-					$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
-				}
-				print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
-			}
-			if (exists $checkpoint_info{chronos}) {
-				if (exists $checkpoint_info{chronos}{$d}{$h}) {
-					print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
-				} else {
-					print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
-				}
-			}
-			print $fh "</tr>\n";
+			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>";
 			$c++;
 		}
 	}
+
 	print $fh "</table>\n";
 
 	if ($graph) {
@@ -1259,6 +1240,77 @@ sub dump_as_html
 		$d3 = '';
 		$d4 = '';
 
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+			print $fh qq{
+<table class="HourStatsTable">
+	<tr>
+		<th rowspan="2">Day</th>
+		<th rowspan="2">Time</th>
+};
+		}
+		if ($tempfile_info{count}) {
+			print $fh qq{
+		<th colspan="2">Temporary files</th>
+};
+		}
+		if (exists $checkpoint_info{chronos}) {
+			print $fh qq{
+		<th colspan="7">Checkpoints</th>
+};
+		}
+		print $fh qq{
+	</tr>
+	<tr>
+};
+		if ($tempfile_info{count}) {
+		print $fh qq{
+		<th>Count</th>
+		<th>Av.&nbsp;size</th>
+};
+		}
+		if (exists $checkpoint_info{chronos}) {
+			print $fh qq{
+		<th>Wrote buffers</th>
+		<th>Added</th>
+		<th>Removed</th>
+		<th>Recycled</th>
+		<th>Write time (sec)</th>
+		<th>Sync time (sec)</th>
+		<th>Total time (sec)</th>
+};
+		}
+		print $fh qq{
+	</tr>
+};
+
+		foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td>";
+				if ($tempfile_info{count}) {
+					my $temp_average = '0';
+					if ($tempfile_info{chronos}{$d}{$h}{count}) {
+						$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
+					}
+					print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
+				}
+				if (exists $checkpoint_info{chronos}) {
+					if (exists $checkpoint_info{chronos}{$d}{$h}) {
+						print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
+					} else {
+						print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+					}
+				}
+				print $fh "</tr>\n";
+				$c++;
+			}
+		}
+		print $fh "</table>\n";
+
 		# checkpoint size
 		if (exists $checkpoint_info{chronos}) {
 			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
@@ -1325,7 +1377,7 @@ sub dump_as_html
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Type</th>
 
@@ -1363,7 +1415,7 @@ sub dump_as_html
 <h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Type</th>
 		<th>Object</th>
@@ -1412,7 +1464,7 @@ sub dump_as_html
 <h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Database</th>
 		<th>Count</th>
@@ -1421,9 +1473,12 @@ sub dump_as_html
 	</tr>
 };
 		my $total_count = 0;
+		my $c = 0;
 		foreach my $d (sort keys %{$session_info{database}}) {
-			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
+			my $colb = $c % 2;
+			print $fh "<tr class=\"row$colb\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{database}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "</td></tr>\n";
 			$total_count += $session_info{database}{$d}{count};
+			$c++;
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
 		if ($graph && $total_count) {
@@ -1451,7 +1506,7 @@ sub dump_as_html
 <h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>User</th>
 		<th>Count</th>
@@ -1460,9 +1515,12 @@ sub dump_as_html
 	</tr>
 };
 		my $total_count = 0;
+		my $c = 0;
 		foreach my $d (sort keys %{$session_info{user}}) {
+			my $colb = $c % 2;
 			$total_count += $session_info{user}{$d}{count};
-			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+			print $fh "<tr class=\"row$colb\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{user}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "</td></tr>\n";
+			$c++;
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
 		if ($graph && $total_count) {
@@ -1491,7 +1549,7 @@ sub dump_as_html
 <h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Host</th>
 		<th>Count</th>
@@ -1500,9 +1558,12 @@ sub dump_as_html
 	</tr>
 };
 		my $total_count = 0;
+		my $c = 0;
 		foreach my $d (sort keys %{$session_info{host}}) {
+			my $colb = $c % 2;
 			$total_count += $session_info{host}{$d}{count};
-			print $fh "<tr class=\"row1\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+			print $fh "<tr class=\"row$colb\"><td>$d</td><td class=\"right\">", &comma_numbers($session_info{host}{$d}{count}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}), "</td><td class=\"right\">", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "</td></tr>\n";
+			$c++;
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
 		if ($graph && $total_count) {
@@ -1531,7 +1592,7 @@ sub dump_as_html
 <h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Database</th>
 		<th>User</th>
@@ -1573,7 +1634,7 @@ sub dump_as_html
 <h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>User</th>
 		<th>Count</th>
@@ -1581,9 +1642,12 @@ sub dump_as_html
 };
 
 		my $total_count = 0;
+		my $c = 0;
 		foreach my $u (sort keys %{$connection_info{user}}) {
-			print $fh "<tr class=\"row1\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
+			my $colb = $c % 2;
+			print $fh "<tr class=\"row$colb\"><td>$u</td><td class=\"right\">", &comma_numbers($connection_info{user}{$u}), "</td></tr>\n";
 			$total_count += $connection_info{user}{$u};
+			$c++;
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
 		if ($graph && $total_count) {
@@ -1612,7 +1676,7 @@ sub dump_as_html
 <h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
-<table class="queryList">
+<table class="SmallTableList">
 	<tr>
 		<th>Host</th>
 		<th>Count</th>
@@ -1620,9 +1684,12 @@ sub dump_as_html
 };
 
 		my $total_count = 0;
+		my $c = 0;
 		foreach my $h (sort keys %{$connection_info{host}}) {
-			print $fh "<tr class=\"row1\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
+			my $colb = $c % 2;
+			print $fh "<tr class=\"row$colb\"><td>$h</td><td class=\"right\">", &comma_numbers($connection_info{host}{$h}), "</td></tr>\n";
 			$total_count += $connection_info{host}{$h};
+			$c++;
 		}
 		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
 		if ($graph && $total_count) {
@@ -2314,9 +2381,9 @@ sub flotr2_graph
 <script type="text/javascript">
 (function mouse_zoom(container) {
 
-document.writeln('<input type="button" class="dldButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
+document.writeln('<table align="center"><tr><td><input type="button" class="dldButton" value="To Image" id="toimage$buttonid" onclick="return false;">'+
 	'<input type="button" class="dldButton" value="Download" id="download$buttonid" onclick="return false;">' +
-	'<input type="button" class="dldButton" value="Reset" id="reset$buttonid" onclick="return false;">'
+	'<input type="button" class="dldButton" value="Reset" id="reset$buttonid" onclick="return false;"></td></tr><tr><td>&nbsp;</td></tr></table>'
 	);
     $data1
     $data2
@@ -2435,7 +2502,9 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
         HtmlText: false,
         grid: {
             verticalLines: false,
-            horizontalLines: false
+            horizontalLines: false,
+	    backgroundColor: '#ffffff',
+	    outline: 's',
         },
         xaxis: {
             showLabels: false
