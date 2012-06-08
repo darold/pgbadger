@@ -2025,7 +2025,7 @@ sub highlight_code
 	foreach my $x (keys %SYMBOLS) {
 		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/igs;
 	}
-	$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
+	#$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
 	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/igs;
 	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/igs;
 
