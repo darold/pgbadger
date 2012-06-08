@@ -770,7 +770,7 @@ body { background-color: #dedede; font-family: Verdana ;font-size: 14px;font-sty
 div, p, th, td { font-size:12px; }
 a {color:rgb(180, 80, 80);text-decoration:underline}
 a:hover {color:rgb(180, 80, 80);text-decoration:none}
-h1 { border-left:8px #007DFC solid; color: #007DFC; font: lighter 30px Arial, Helvetica, sans-serif; margin: 0px; padding: 7px;border-top: 1px solid #CCCCCC;}
+h1 { border-left:8px #0c57a3 solid; color: #0c57a3; font: lighter 30px Arial, Helvetica, sans-serif; margin: 0px; padding: 7px;border-top: 1px solid #CCCCCC;}
 h1 a, h1 a:visited { color: #007DFC; text-decoration: none; }
 h1 a:hover { color: #888888; text-decoration: none; }
 h2 { border-bottom: 1px solid #CCCCCC; color: #0c57a3; font: lighter 18px Arial, Helvetica, sans-serif; letter-spacing: -1px; margin: 0px 0px 2px; padding-bottom: 3px; padding-top:7px;}
@@ -782,14 +782,38 @@ div.menu a { color: #007dfc; text-decoration: none; }
 div.menu a:hover { color: #6f6e6e; text-decoration: none; }
 div.menu a:visited { color: #007dfc; text-decoration: none; }
 
-div.information { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 14px; width: 1035px; }
+div.information {
+	background:#F3F2ED;
+	border:4px double white;
+	padding:0 10px;
+	margin:30px 0 30px 0;
+	border-radius:10px;
+	-moz-border-radius:10px;
+	-webkit-border-radius:10px;
+	box-shadow:3px 3px 6px 2px #A9A9A9;
+	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+	-webkit-box-shadow:3px 3px 6px #A9A9A9;
+	width: 1035px;
+}
 
-input { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #ffffff; padding: 4px; }
+input {
+	background:#F3F2ED;
+	border:4px double white;
+	padding:2 2px;
+	margin:3px 3px 3px 3px;
+	border-radius:6px;
+	-moz-border-radius:10px;
+	-webkit-border-radius:10px;
+	box-shadow:3px 3px 6px 2px #A9A9A9;
+	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+	-webkit-box-shadow:3px 3px 6px #A9A9A9;
+}
 
 ul { padding-left: 14px; padding-top: 0px; padding-bottom: 0px; margin-bottom: 0px; margin-top: 0px; }
 ul li { list-style-type: square; }
 div.reports { padding:4px; }
 
+table { border-collapse:collapse;}
 table th.left { text-align:left !important; }
 table tr.row0 td { background-color: #FFFFFF; border: Opx solid #E7E7E7;}
 table tr.row1 td { background-color: #E7E7E7; border: Opx solid #FFFFFF;}
@@ -798,20 +822,60 @@ table td.right { text-align:right; }
 table td.center { text-align:center; }
 table td.relevantInformation { font-weight:bold; }
 
-table.HourStatsTable { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; width: 1065px }
-table.HourStatsTable th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
-table.SmallTableList { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; width: 520px }
-table.SmallTableList th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
+table.HourStatsTable {
+	background:#F3F2ED;
+	border:4px double white;
+	padding:0 10px;
+	margin:30px 0 30px 0;
+	/*css3*/
+	border-radius:10px;
+	-moz-border-radius:10px;
+	-webkit-border-radius:10px;
+	box-shadow:3px 3px 6px 2px #A9A9A9;
+	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+	-webkit-box-shadow:3px 3px 6px #A9A9A9;
+	width: 1065px;
+}
 
-table.queryList { -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; background-color: #EEEEDD; padding: 5px; }
-table.queryList th { background-color: #FEE3C4; border:1px solid #FEE3C4;}
+table.HourStatsTable th { background-color: #770818; border:1px solid #FEE3C4; color: white; font-weight: normal;}
+table.SmallTableList {
+        background:#F3F2ED;
+        border:4px double white;
+        padding:0 10px;
+        margin:30px 0 30px 0;
+        /*css3*/
+        border-radius:10px;
+        -moz-border-radius:10px;
+        -webkit-border-radius:10px;
+        box-shadow:3px 3px 6px 2px #A9A9A9;
+        -moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+        -webkit-box-shadow:3px 3px 6px #A9A9A9;
+        width: 520px;
+}
+table.SmallTableList th { background-color: #770818; border:1px solid #FEE3C4; color: white; font-weight: normal;}
+
+table.queryList {
+        background:#F3F2ED;
+        border:4px double white;
+        padding:2 2px;
+        margin:3px 3px 3px 3px;
+        /*css3*/
+        border-radius:6px;
+        -moz-border-radius:10px;
+        -webkit-border-radius:10px;
+        box-shadow:3px 3px 6px 2px #A9A9A9;
+        -moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+        -webkit-box-shadow:3px 3px 6px #A9A9A9;
+}
+table.queryList th { background-color: #770818; border:1px solid #FEE3C4; color: white; font-weight: normal;}
 table.queryList td, table.queryList th { padding: 2px; white-space: nowrap; }
 table.queryList div.sql { width: 1500px; }
-table.queryList div.examples { background-color:#EBF0FC; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
+table.queryList div.examples { background-color:#E7E7E7; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
 table.queryList div.examples div.example0 { padding:2px; }
 table.queryList div.examples div.example1 { background-color:#FFFFFF; padding:2px; border:1px solid #EBF0FC; -moz-border-radius:5px; }
 table.queryList div.error { color: #D53131; font-weight:bold; }
-table.queryList div.errorInformation { color: #8D8D8D; font-style:italic; }
+table.queryList div.errorInformation0 { background-color:#E7E7E7; color: #8D8D8D; font-style:italic; }
+table.queryList div.errorInformation1 { background-color:#FFFFFF; color: #8D8D8D; font-style:italic; }
 table.queryList input { border:1px solid black; background-color:#FFFFFF; padding:1px; font-size:11px; }
 
 div.tooltipLink { position:relative; cursor:pointer; }
@@ -860,27 +924,33 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql span.xtra { display:block; }
 
 #queriespersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
-    width : 1025px;
-    height: 400px;
-    margin: 40px;
-    background-color:white;
-   -moz-box-shadow: 3px 3px 5px #000000;
-   -webkit-box-shadow: 3px 3px 5px #000000;
-   -khtml-box-shadow: 3px 3px 5px #000000;
-   -o-box-shadow: 3px 3px 5px #000000;
-    box-shadow: 3px 3px 5px #000000;
-    border-color: #DBDBCC;
+	width : 1025px;
+	height: 400px;
+	background:#F3F2ED;
+	border:4px double white;
+	padding:0 10px;
+	margin:30px 0 30px 0;
+	border-radius:10px;
+	-moz-border-radius:10px;
+	-webkit-border-radius:10px;
+	box-shadow:3px 3px 6px 2px #A9A9A9;
+	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
 #queriesbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph {
-    width : 500px;
-    height: 250px;
-    background-color:white;
-   -moz-box-shadow: 3px 3px 5px #000000;
-   -webkit-box-shadow: 3px 3px 5px #000000;
-   -khtml-box-shadow: 3px 3px 5px #000000;
-   -o-box-shadow: 3px 3px 5px #000000;
-    box-shadow: 3px 3px 5px #000000;
-    border-color: #DBDBCC;
+	width : 500px;
+	height: 250px;
+	background:#F3F2ED;
+	border:4px double white;
+	padding:0 10px;
+	margin:30px 0 30px 0;
+	/*css3*/
+	border-radius:10px;
+	-moz-border-radius:10px;
+	-webkit-border-radius:10px;
+	box-shadow:3px 3px 6px 2px #A9A9A9;
+	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
+	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
 
 </style>
@@ -1924,8 +1994,9 @@ sub dump_as_html
 			print $fh "<td><div class=\"error\">$k</div>";
 			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
-				print $fh "<div class=\"example$i\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
-				print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
+				my $c = $i % 2;
+				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
+				print $fh "<div class=\"errorInformation$c\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
 			}
 			print $fh "</div>";
 		} elsif ($error_info{$k}{detail}[0]) {
@@ -2504,7 +2575,7 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
             verticalLines: false,
             horizontalLines: false,
 	    backgroundColor: '#ffffff',
-	    outline: 's',
+	    outline: '',
         },
         xaxis: {
             showLabels: false
