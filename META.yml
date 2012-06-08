@@ -1,0 +1,11 @@
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         pgBadger
+version:      1.0
+version_from: pgbadger
+installdirs:  site
+recommends:
+    Text::CSV:                     0
+
+distribution_type: script
+generated_by: ExtUtils::MakeMaker version 6.17

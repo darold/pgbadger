@@ -1,0 +1,150 @@
+=head1 ABSTRACT
+
+pgBadger - a fast PostgreSQL log analysis report
+
+=head1 SYNOPSIS
+
+pgbadger [options] logfile [...]
+
+	PostgreSQL log analyzer with fully detailed reports and graphs.
+
+Arguments:
+
+  logfile can be a single log file, a list of files or a shell command
+  returning a list of file.
+
+Options:
+
+    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
+			     be a plain text log or a gzip compressed file
+			     with the .gz extension. Note that this option is
+			     DEPRECATED, set logfile as a command line argument
+			     instead.
+    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
+    -o | --outfile filename: define the filename for the output. Default depends
+                             of the output format: out.html or out.txt. To dump
+                             output to stdout use - as filename.
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -h | --help            : show this message and exit.
+    -d | --dbname database : only report what concern the given database
+    -u | --dbuser username : only report what concern the given user
+    -t | --top number      : number of query to store/display. Default: 20
+    -s | --sample number   : number of query sample to store/display. Default: 3
+    -x | --extension       : output format. Values: text or html. Default: html
+    -m | --maxlength size  : maximum length of a query, it will be cutted above
+                             the given size. Default: no truncate
+    -g | --graph           : generate graphs, requires GD::Graph perl module
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+                             Format: -b "yyyy-mm-dd hh:mm:ss"
+    -e | --end datetime    : end date/time for the data to be parsed in log.
+                             Format: -e "yyyy-mm-dd hh:mm:ss"
+    -q | --quiet           : disable output to stderr and don't print debug informations.
+    -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+    -v | --version         : show current version
+    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
+
+Examples:
+
+        pgbadger -p -g /var/log/postgresql.log
+        pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
+        pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
+
+
+=head1 DESCRIPTION
+
+pgBadger is a PostgreSQL log analyzer build for speed with fully detailed reports from your PostgreSQL log file. It's a single and small Perl script that aims to replace and outperform the old php script pgFouine.
+
+By the way, we would like to thank Guillaume Smet for all the work he has done on this really nice tool. We've been using it a long time, it was a really great tool!
+
+pgBadger is written in pure Perl language. It uses a javascript library to draw graphs so that you don't need additional Perl modules or any other package to install. Furthermore, this library gives us more features such as zooming.
+
+pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files as well as gzip compressed file. See a complete list of features below.
+
+=head1 FEATURE
+
+pgBadger reports everything about your SQL queries: the slowest, those which take up the most time, the most frequent queries and the most frequent errors. The following reports are also available:
+
+    Overall statistics.
+    Hourly statistics.
+    Temporary file statistics.
+    Checkpoints statistics.
+    Locks statistics.
+    Queries by type (select/insert/update/delete).
+    Sessions per database/user/client.
+    Connections per database/user/client.
+
+All graphs are zoomable and can be saved as PNG images.
+
+=head1 REQUIREMENT
+
+PgBadger comes as a single Perl script, you do not need anything else than a modern Perl distribution. Charts are rendered using a Javascript library so you don't need anything, your browser will do all the work.
+
+If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:
+
+    Text::CSV - to parse PostgreSQL CSV log files.
+
+=head1 POSTGRESQL CONFIGURATION
+
+You must enable some configuration directives into your postgresql.conf before starting.
+
+You must first enable SQL query logging to have something to parse:
+
+        log_min_duration_statement = 0
+
+Note that pgBadger is not compatible with statements logs provided by log_statement and log_duration.
+
+With 'stderr' log format, log_line_prefix must be at least:
+
+        log_line_prefix = '%t [%p]: [%l-1] '
+
+Log line prefix could add user and database name as follow:
+
+        log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+
+or for syslog log file format:
+
+        log_line_prefix = 'user=%u,db=%d '
+
+Log line prefix for stderr output could also be:
+
+        log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+
+or for syslog output:
+
+        log_line_prefix = 'db=%d,user=%u '
+
+You need to enable other parameters in postgresql.conf to get more informations from your log files:
+
+        log_checkpoints = on
+        log_connections = on
+        log_disconnections = on
+        log_lock_waits = on
+        log_temp_files = 0
+
+=head1 INSTALLATION
+
+Download the tarball from github and unpack the archive as follow:
+
+	tar xzf pgbadger-1.x.tar.gz
+	cd pgbadger-1.x/
+	perl Makefile.PL
+	make && make install
+
+This will copy the Perl script pgbadger in /usr/local/bin/pgbadger directory by default and the man page into /usr/local/share/man/man1/pgbadger.1. Those are the default installation directory for 'site' install.
+
+If you want to install all under /usr/ location, use INSTALLDIRS='perl' as argument of Makefile.PL. The script will be installed into /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.
+
+For example to install everything just like Debian does, proceed as follow:
+
+	perl Makefile.PL INSTALLDIRS=vendor
+
+By default INSTALLDIRS is set to site.
+
+=head1 AUTHORS
+
+pgBadger is an original work from Gilles Darold. It is maintained by the good folks at Dalibo and every one who wants to contribute.
+
+=head1 LICENSE
+
+pgBadger is free software distributed under the simplified BSD License.
+
