@@ -4,7 +4,7 @@ ABSTRACT
 SYNOPSIS
     pgbadger [options] logfile [...]
 
-            PostgreSQL log analyzer with fully detailed reports and graphs.
+            PostgreSQL log analyzer with fully detailed reports and charts.
 
     Arguments:
 
@@ -31,7 +31,7 @@ SYNOPSIS
         -x | --extension       : output format. Values: text or html. Default: html
         -m | --maxlength size  : maximum length of a query, it will be cutted above
                                  the given size. Default: no truncate
-        -g | --graph           : generate graphs, requires GD::Graph perl module
+        -g | --graph           : generate graphs with a javascript plotting library.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
                                  Format: -b "yyyy-mm-dd hh:mm:ss"
         -e | --end datetime    : end date/time for the data to be parsed in log.
@@ -67,20 +67,25 @@ DESCRIPTION
     compressed file. See a complete list of features below.
 
 FEATURE
-    pgBadger reports everything about your SQL queries: the slowest, those
-    which take up the most time, the most frequent queries and the most
-    frequent errors. The following reports are also available:
+    pgBadger reports everything about your SQL queries:
 
-        Overall statistics.
-        Hourly statistics.
-        Temporary file statistics.
-        Checkpoints statistics.
-        Locks statistics.
-        Queries by type (select/insert/update/delete).
-        Sessions per database/user/client.
-        Connections per database/user/client.
+            Overall statistics.
+            The slowest queries.
+            Queries that took up the most time.
+            The most frequent queries.
+            The most frequent errors.
 
-    All graphs are zoomable and can be saved as PNG images.
+    The following reports are also available with hourly charts:
+
+            Hourly queries statistics.
+            Hourly temporary file statistics.
+            Hourly checkpoints statistics.
+            Locks statistics.
+            Queries by type (select/insert/update/delete).
+            Sessions per database/user/client.
+            Connections per database/user/client.
+
+    All charts are zoomable and can be saved as PNG images.
 
 REQUIREMENT
     PgBadger comes as a single Perl script, you do not need anything else
@@ -90,7 +95,10 @@ REQUIREMENT
     If you planned to parse PostgreSQL CSV log files you might need some
     Perl Modules:
 
-        Text::CSV - to parse PostgreSQL CSV log files.
+            Text::CSV - to parse PostgreSQL CSV log files.
+
+    This module is optional, if you don't have PostgreSQL log in the CSV
+    format you don't need to install it.
 
 POSTGRESQL CONFIGURATION
     You must enable some configuration directives into your postgresql.conf
@@ -131,6 +139,9 @@ POSTGRESQL CONFIGURATION
             log_disconnections = on
             log_lock_waits = on
             log_temp_files = 0
+
+    Do not enable log_statement and log_duration, their log format will not
+    be parsed by pgBadger.
 
 INSTALLATION
     Download the tarball from github and unpack the archive as follow:
