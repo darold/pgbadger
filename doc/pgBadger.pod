@@ -42,6 +42,7 @@ Options:
     -p | --progress        : show a progress bar, quiet mode is enabled with this option.
     -v | --version         : show current version
     --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
+    -w | -watch-mode       : only report errors just like logwatch could do.
 
 Examples:
 
@@ -49,6 +50,11 @@ Examples:
         pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
         pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
 
+Reporting errors every week by cron job:
+
+    30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
+
+this suppose that your log file and HTML report are also rotated every weeks.
 
 =head1 DESCRIPTION
 
