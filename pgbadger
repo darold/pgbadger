@@ -29,6 +29,8 @@ use IO::File;
 use Benchmark;
 use File::Basename;
 use Time::Local 'timelocal_nocheck';
+use POSIX qw(setlocale LC_NUMERIC);
+setlocale LC_NUMERIC, "";
 
 $VERSION = '1.0';
 
@@ -74,6 +76,11 @@ my @log_files = ();
 my $pie_percentage_limit = 2;
 
 my $t0 = Benchmark->new;
+
+# Get the decimal separator
+my $n = 5/2;
+my $num_sep = ',';
+$num_sep = ' ' if ($n =~ /,/);
 
 # get the command line parameters
 my $result = GetOptions (
@@ -560,7 +567,7 @@ sub comma_numbers
 
         my $text = reverse $_[0];
 
-        $text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1,/g;
+        $text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1$num_sep/g;
 
         return scalar reverse $text;
 }
