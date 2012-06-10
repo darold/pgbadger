@@ -685,12 +685,23 @@ Number of unique normalized errors: $fmt_unique_error
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", ($tempfile_info{maxsize}/$tempfile_info{count})));
-		print $fh qq{
-Number temporary file: $tempfile_info{count}
+		print $fh qq{Number temporary file: $tempfile_info{count}
 Max size of temporary file: $fmt_temp_maxsise
 Average size of temporary file: $fmt_temp_avsize
 };
 	}
+	if ($session_info{count}) {
+		my $avg_session_duration = &convert_time($session_info{duration}/$session_info{count});
+		my $tot_session_duration = &convert_time($session_info{duration});
+		print $fh qq{Total number of sessions: $session_info{count}
+Total duration of sessions: $tot_session_duration
+Average duration of sessions: $avg_session_duration
+};
+	}
+	if ($connection_info{count}) {
+		print $fh "Total number of connections: $connection_info{count}\n";
+	}
+
 	print $fh qq{
 
 - Hourly statistics ----------------------------------------------------
@@ -703,15 +714,92 @@ Report not supported by text format
 	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
 	my $total = $overall_stat{'queries_number'};
 	print $fh "\n- Queries by type ------------------------------------------------------\n\n";
-	print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}), " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n" if ($overall_stat{'SELECT'});
-	print $fh "INSERT: ", &comma_numbers($overall_stat{'INSERT'}), " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n" if ($overall_stat{'INSERT'});
-	print $fh "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}), " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n" if ($overall_stat{'UPDATE'});
-	print $fh "DELETE: ", &comma_numbers($overall_stat{'DELETE'}), " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n" if ($overall_stat{'DELETE'});
-	print $fh "OTHERS: ", &comma_numbers($total - $totala), " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
+	print $fh "Type     Count     Percentage\n";
+	print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n";
+	print $fh "INSERT: ", &comma_numbers($overall_stat{'INSERT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n";
+	print $fh "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n";
+	print $fh "DELETE: ", &comma_numbers($overall_stat{'DELETE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n";
+	print $fh "OTHERS: ", &comma_numbers($total - $totala) || 0, " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
 	print $fh "\n";
+
+	if (scalar keys %lock_info > 0) {
+		print $fh "\n- Locks by type ------------------------------------------------------\n\n";
+		print $fh "Type     Object     Count     Total Duration     Av. duration (s)\n";
+		my $total_count = 0;
+		my $total_duration = 0;
+		foreach my $t (sort keys %lock_info) {
+			print $fh "$t\t\t", &comma_numbers($lock_info{$t}{count}), " ", &convert_time($lock_info{$t}{duration}), " ", &convert_time($lock_info{$t}{duration}/$lock_info{$t}{count}), "\n";
+			foreach my $o (sort keys %{$lock_info{$t}}) {
+				next if (($o eq 'count') || ($o eq 'duration') || ($o eq 'chronos'));
+				print $fh "\t$o\t", &comma_numbers($lock_info{$t}{$o}{count}), " ", &convert_time($lock_info{$t}{$o}{duration}), " ", &convert_time($lock_info{$t}{$o}{duration}/$lock_info{$t}{$o}{count}), "\n";
+			}
+			$total_count += $lock_info{$t}{count};
+			$total_duration += $lock_info{$t}{duration};
+		}
+		print $fh "Total:\t\t\t", &comma_numbers($total_count), " ", &convert_time($total_duration), " ", &convert_time($total_duration/($total_count||1)), "\n";
+	}
+
+	# Show session per database statistics
+	if (exists $session_info{database}) {
+		print $fh "\n- Sessions per database ------------------------------------------------------\n\n";
+		print $fh "Database     Count     Total Duration     Av. duration (s)\n";
+		foreach my $d (sort keys %{$session_info{database}}) {
+			print $fh "$d - ", &comma_numbers($session_info{database}{$d}{count}), " ", &convert_time($session_info{database}{$d}{duration}), " ", &convert_time($session_info{database}{$d}{duration}/$session_info{database}{$d}{count}), "\n";
+		}
+	}
+
+        # Show session per user statistics
+        if (exists $session_info{user}) {
+		print $fh "\n- Sessions per user ------------------------------------------------------\n\n";
+		print $fh "User     Count     Total Duration     Av. duration (s)\n";
+		foreach my $d (sort keys %{$session_info{user}}) {
+			print $fh "$d - ", &comma_numbers($session_info{user}{$d}{count}), " ", &convert_time($session_info{user}{$d}{duration}), " ", &convert_time($session_info{user}{$d}{duration}/$session_info{user}{$d}{count}), "\n";
+		}
+	}
+
+        # Show session per host statistics
+        if (exists $session_info{host}) {
+		print $fh "\n- Sessions per host ------------------------------------------------------\n\n";
+		print $fh "User     Count     Total Duration     Av. duration (s)\n";
+		foreach my $d (sort keys %{$session_info{host}}) {
+			print $fh "$d - ", &comma_numbers($session_info{host}{$d}{count}), " ", &convert_time($session_info{host}{$d}{duration}), " ", &convert_time($session_info{host}{$d}{duration}/$session_info{host}{$d}{count}), "\n";
+		}
+	}
+
+	# Show connection per database statistics
+	if (exists $connection_info{database}) {
+		print $fh "\n- Connections per database ------------------------------------------------------\n\n";
+		print $fh "Database     User     Count\n";
+                foreach my $d (sort keys %{$connection_info{database}}) {
+                        print $fh "$d - ", &comma_numbers($connection_info{database}{$d}), "\n";
+                        foreach my $u (sort keys %{$connection_info{user}}) {
+                                next if (!exists $connection_info{database_user}{$d}{$u});
+                                print $fh "\t$u ", &comma_numbers($connection_info{database_user}{$d}{$u}), "\n";
+                        }
+                }
+	}
+
+	# Show connection per user statistics
+	if (exists $connection_info{user}) {
+		print $fh "\n- Connections per user ------------------------------------------------------\n\n";
+		print $fh "User     Count\n";
+                foreach my $d (sort keys %{$connection_info{user}}) {
+                        print $fh "$d - ", &comma_numbers($connection_info{user}{$d}), "\n";
+                }
+	}
+
+	# Show connection per host statistics
+	if (exists $connection_info{host}) {
+		print $fh "\n- Connections per host ------------------------------------------------------\n\n";
+		print $fh "User     Count\n";
+                foreach my $d (sort keys %{$connection_info{host}}) {
+                        print $fh "$d - ", &comma_numbers($connection_info{host}{$d}), "\n";
+                }
+	}
 
 	# Show top informations
 	print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
+	print $fh "Rank     Duration (s)     Query\n";
 	for (my $i = 0; $i <= $#top_slowest; $i++) {
 		print $fh $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
 		print $fh "--\n";
@@ -719,6 +807,7 @@ Report not supported by text format
 	@top_slowest = ();
 
 	print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
+	print $fh "Rank     Total duration      Times executed     Av. duration (s)     Query\n";
 	my $idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -733,10 +822,16 @@ Report not supported by text format
 		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
 		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
 		print $fh "--\n";
+		my $i = 1;
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			print $fh "\t- Example $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+			$i++;
+		}
 		$idx++;
 	}
 
 	print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
+	print $fh "Rank     Times executed     Total duration     Av. duration (s)     Query\n";
 	$idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -750,10 +845,16 @@ Report not supported by text format
 		}
 		print $fh "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
 		print $fh "--\n";
+		my $i = 1;
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+			$i++;
+		}
 		$idx++;
 	}
 
 	print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
+	print $fh "Rank     Av. duration (s)     Times executed     Total duration     Query\n";
 	$idx = 1;
 	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 		next if (!$normalyzed_info{$k}{count});
@@ -767,16 +868,35 @@ Report not supported by text format
 		}
 		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
 		print $fh "--\n";
+		my $i = 1;
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+			$i++;
+		}
 		$idx++;
 	}
 
 	print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
+	print $fh "Rank     Times reported     Error\n";
 	$idx = 1;
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
 		print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
 		print $fh "--\n";
+		if ($error_info{$k}{count} > 1) {
+			my $j = 1;
+			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
+				print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
+				print $fh "\t\tDetail: $error_info{$k}{detail}[$i]\n" if ($error_info{$k}{detail}[$i]);
+				$j++;
+			}
+		} elsif ($error_info{$k}{detail}[0]) {
+			print $fh "\t- Example: $error_info{$k}{date}[0] - $k";
+			print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n";
+		} else {
+			print $fh "\t- Example: $error_info{$k}{date}[0] - $k\n";
+		}
 		$idx++;
 	}
 	print $fh "\n\n";
@@ -811,6 +931,19 @@ Log start from $first_log_date to $last_log_date
 		last if ($idx > $top);
 		print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
 		print $fh "--\n";
+		if ($error_info{$k}{count} > 1) {
+			my $j = 1;
+			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
+				print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
+				print $fh "\t\tDetail: $error_info{$k}{detail}[$i]\n" if ($error_info{$k}{detail}[$i]);
+				$j++;
+			}
+		} elsif ($error_info{$k}{detail}[0]) {
+			print $fh "\t- Example: $error_info{$k}{date}[0] - $k";
+			print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n";
+		} else {
+			print $fh "\t- Example: $error_info{$k}{date}[0] - $k\n";
+		}
 		$idx++;
 	}
 	print $fh "\n\n";
