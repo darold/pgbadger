@@ -272,7 +272,7 @@ my @KEYWORDS2 = (
 my @KEYWORDS3 = (
 	'STDIN', 'STDOUT'
 );
-my %SYMBOLS = ( '=' => '=', '<' => '&lt;', '>' => '&gt;', '\|' => '|', ',' => ',', '\.' => '.', '\+' => '+', '\-' => '-', '\*' => '*', '\/' => '/', '\!=' => '!=' );
+my %SYMBOLS = ( '=' => '=', '<' => '&lt;', '>' => '&gt;', '\|' => '|', ',' => ',', '\.' => '.', '\+' => '+', '\-' => '-', '\*' => '*', '\/' => '/', '!=' => '!=' );
 my @BRACKETS = ( '(', ')' );
 map { $_ = quotemeta($_) } @BRACKETS;
 
@@ -2307,11 +2307,11 @@ sub highlight_code
 	return $code if ($nohighlight);
 
 	foreach my $x (keys %SYMBOLS) {
-		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/igs;
+		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/gs;
 	}
 	#$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
-	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/igs;
-	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/igs;
+	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/gs;
+	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/gs;
 
 	for (my $x = 0; $x <= $#KEYWORDS1; $x++) {
 		#$code =~ s/\b($KEYWORDS1[$x])\b/<span class="kw1">$1<\/span>/igs;
@@ -2328,7 +2328,7 @@ sub highlight_code
 	for (my $x = 0; $x <= $#BRACKETS; $x++) {
 		$code =~ s/($BRACKETS[$x])/<span class="br0">$1<\/span>/igs;
 	}
-	$code =~ s/\$\$CLASSSY0A\$\$([^\$]+)\$\$CLASSSY0B\$\$/<span class="sy0">$1<\/span>/igs;
+	$code =~ s/\$\$CLASSSY0A\$\$([^\$]+)\$\$CLASSSY0B\$\$/<span class="sy0">$1<\/span>/gs;
 
 	$code =~ s/\b(\d+)\b/<span class="nu0">$1<\/span>/igs;
 
