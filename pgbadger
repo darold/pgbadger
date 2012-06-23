@@ -1081,8 +1081,8 @@ table.queryList {
         -webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
 table.queryList th { background-color: #770818; border:1px solid #FEE3C4; color: white; font-weight: normal;}
-table.queryList td, table.queryList th { padding: 2px; white-space: nowrap; }
-table.queryList div.sql { width: 1500px; }
+table.queryList td, table.queryList th { padding: 2px;}
+table.queryList div.sql { width: 800px; }
 table.queryList div.examples { background-color:#E7E7E7; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
 table.queryList div.examples div.example0 { padding:2px; }
 table.queryList div.examples div.example1 { background-color:#FFFFFF; padding:2px; border:1px solid #EBF0FC; -moz-border-radius:5px; }
@@ -2065,7 +2065,8 @@ sub dump_as_html
 			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				my $colb = $i % 2;
+				print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
 			print $fh "</div>";
@@ -2118,7 +2119,8 @@ sub dump_as_html
 			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				my $colb = $i % 2;
+				print $fh "<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
 			print $fh "</div>";
@@ -2171,7 +2173,8 @@ sub dump_as_html
 			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			my $i = 0;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "<div class=\"example$i\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				my $colb = $i % 2;
+				print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 				$i++;
 			}
 			print $fh "</div>";
