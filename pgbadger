@@ -64,6 +64,7 @@ my $regex_prefix_dbuser = '';
 my $quiet = 0;
 my $progress = 0;
 my $error_only = 0;
+my @exclude_query = ();
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
@@ -107,6 +108,7 @@ my $result = GetOptions (
 	"pie-limit=i"   => \$pie_percentage_limit,
 	"image-format=s"=> \$img_format,
 	"w|watch-mode!" => \$error_only,
+	"exclude-query=s" => \@exclude_query,
 );
 
 if ($ver) {
@@ -187,6 +189,15 @@ if (not defined $tmpfh) {
 $tmpfh->close();
 unlink($outfile) if (-e $outfile);
 
+# Testing regex syntaxe
+if ($#exclude_query >= 0) {
+	foreach my $r (@exclude_query) {
+		eval { m/$r/i; };
+		if ($@) {
+			die "FATAL: invalid regex '$r', $!\n";
+		}
+	}
+}
 # Check start/end date time
 if ($from) {
 	if ($from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
@@ -500,6 +511,9 @@ Options:
 			     enabled with this option.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     -w | -watch-mode       : only report errors just like logwatch could do.
+    --exclude-query regex  : any query matching the given regex will be excluded
+			     from the report. For example: "^(COPY|VACUUM|COMMIT)"
+			     you can use this option multiple time.
 
 Examples:
 
@@ -507,6 +521,7 @@ Examples:
 	pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
 		       /var/log/postgres.log
 	pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
+	pgbadger -p -g --exclude-query="^(COPY|VACUUM|COMMIT)" /var/log/postgresql.log
 
 Reporting errors every week by cron job:
 
@@ -2521,8 +2536,19 @@ sub parse_query
 			# Cleanup and normalize the current query
 			$cur_info{query} =~ s/^[\t\s]+//s;
 			$cur_info{query} =~ s/[\t\s]+$//s;
+			# Should we have to exclude some queries
+			if ($#exclude_query >= 0) {
+				foreach (@exclude_query) {
+					if ($cur_info{query} =~ /$_/i) {
+						$cur_info{query} = '';
+						return;
+					}
+				}
+			}
 			$cur_info{query} = substr($cur_info{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{query}) > $maxlength));
 			$cur_info{query} .= ';' if (substr($cur_info{query}, -1, 1) ne ';');
+
+
 			my $normalized = &normalize_query($cur_info{query});
 
 			# Stores global statistics

@@ -43,12 +43,17 @@ Options:
     -v | --version         : show current version
     --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
     -w | -watch-mode       : only report errors just like logwatch could do.
+    --exclude-query regex  : any query matching the given regex will be excluded
+                             from the report. For example: "^(COPY|VACUUM|COMMIT)"
+                             you can use this option multiple time.
 
 Examples:
 
         pgbadger -p -g /var/log/postgresql.log
         pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
         pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
+	pgbadger -p -g --exclude-query="^(COPY|VACUUM|COMMIT)" /var/log/postgresql.log
+
 
 Reporting errors every week by cron job:
 
