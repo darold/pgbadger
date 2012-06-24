@@ -44,6 +44,7 @@ SYNOPSIS
         --exclude-query regex  : any query matching the given regex will be excluded
                                  from the report. For example: "^(COPY|VACUUM|COMMIT)"
                                  you can use this option multiple time.
+        --disable-error        : do not generate error report.
 
     Examples:
 
