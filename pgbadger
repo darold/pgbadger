@@ -1430,7 +1430,7 @@ sub dump_as_html
 			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
 			$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
 			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
-			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>";
+			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>\n";
 			$c++;
 		}
 	}
@@ -1569,12 +1569,14 @@ sub dump_as_html
 		<th colspan="7">Checkpoints</th>
 };
 		}
-		print $fh qq{
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+			print $fh qq{
 	</tr>
 	<tr>
 };
+		}
 		if ($tempfile_info{count}) {
-		print $fh qq{
+			print $fh qq{
 		<th>Count</th>
 		<th>Av.&nbsp;size</th>
 };
@@ -1590,37 +1592,38 @@ sub dump_as_html
 		<th>Total time (sec)</th>
 };
 		}
-		print $fh qq{
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+			print $fh qq{
 	</tr>
 };
-
-		foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
-				my $colb = $c % 2;
-				$zday = "&nbsp;" if ($c > 1);
-				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td>";
-				if ($tempfile_info{count}) {
-					my $temp_average = '0';
-					if ($tempfile_info{chronos}{$d}{$h}{count}) {
-						$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
+			foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
+				my $c = 1;
+				$d =~ /^\d{4}(\d{2})(\d{2})$/;
+				my $zday = "$abbr_month{$1} $2";
+				foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
+					my $colb = $c % 2;
+					$zday = "&nbsp;" if ($c > 1);
+					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td>";
+					if ($tempfile_info{count}) {
+						my $temp_average = '0';
+						if ($tempfile_info{chronos}{$d}{$h}{count}) {
+							$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
+						}
+						print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
 					}
-					print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
-				}
-				if (exists $checkpoint_info{chronos}) {
-					if (exists $checkpoint_info{chronos}{$d}{$h}) {
-						print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
-					} else {
-						print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+					if (exists $checkpoint_info{chronos}) {
+						if (exists $checkpoint_info{chronos}{$d}{$h}) {
+							print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
+						} else {
+							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+						}
 					}
+					print $fh "</tr>\n";
+					$c++;
 				}
-				print $fh "</tr>\n";
-				$c++;
 			}
+			print $fh "</table>\n";
 		}
-		print $fh "</table>\n";
 
 		# checkpoint size
 		if (exists $checkpoint_info{chronos}) {
