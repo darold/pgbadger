@@ -67,6 +67,8 @@ my $error_only = 0;
 my @exclude_query = ();
 my $disable_error = 0;
 my $disable_hourly = 0;
+my $disable_type = 0;
+my $disable_query = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
@@ -113,6 +115,8 @@ my $result = GetOptions (
 	"exclude-query=s" => \@exclude_query,
 	"disable-error!"=> \$disable_error,
 	"disable-hourly!"=> \$disable_hourly,
+	"disable-type!"=> \$disable_type,
+	"disable-query!"=> \$disable_query,
 );
 
 if ($ver) {
@@ -525,6 +529,8 @@ Options:
 			     you can use this option multiple time.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
+    --disable-type         : do not generate query type report.
+    --disable-query        : do not generate queries reports (slowest, most frequent, ...).
 
 Examples:
 
@@ -739,17 +745,19 @@ Report not supported by text format
 };
 	}
 
-	# INSERT/DELETE/UPDATE/SELECT repartition
-	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
-	my $total = $overall_stat{'queries_number'};
-	print $fh "\n- Queries by type ------------------------------------------------------\n\n";
-	print $fh "Type     Count     Percentage\n";
-	print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n";
-	print $fh "INSERT: ", &comma_numbers($overall_stat{'INSERT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n";
-	print $fh "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n";
-	print $fh "DELETE: ", &comma_numbers($overall_stat{'DELETE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n";
-	print $fh "OTHERS: ", &comma_numbers($total - $totala) || 0, " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
-	print $fh "\n";
+	if (!$disable_type) {
+		# INSERT/DELETE/UPDATE/SELECT repartition
+		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+		my $total = $overall_stat{'queries_number'};
+		print $fh "\n- Queries by type ------------------------------------------------------\n\n";
+		print $fh "Type     Count     Percentage\n";
+		print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%\n";
+		print $fh "INSERT: ", &comma_numbers($overall_stat{'INSERT'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%\n";
+		print $fh "UPDATE: ", &comma_numbers($overall_stat{'UPDATE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%\n";
+		print $fh "DELETE: ", &comma_numbers($overall_stat{'DELETE'}) || 0, " ", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%\n";
+		print $fh "OTHERS: ", &comma_numbers($total - $totala) || 0, " ", sprintf("%0.2f", (($total - $totala)*100)/$total), "%\n" if (($total - $totala) > 0);
+		print $fh "\n";
+	}
 
 	if (scalar keys %lock_info > 0) {
 		print $fh "\n- Locks by type ------------------------------------------------------\n\n";
@@ -827,88 +835,90 @@ Report not supported by text format
 	}
 
 	# Show top informations
-	print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
-	print $fh "Rank     Duration (s)     Query\n";
-	for (my $i = 0; $i <= $#top_slowest; $i++) {
-		print $fh $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
-		print $fh "--\n";
-	}
-	@top_slowest = ();
+	if (!$disable_query) {
+		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
+		print $fh "Rank     Duration (s)     Query\n";
+		for (my $i = 0; $i <= $#top_slowest; $i++) {
+			print $fh $i+1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
+			print $fh "--\n";
+		}
+		@top_slowest = ();
 
-	print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
-	print $fh "Rank     Total duration      Times executed     Av. duration (s)     Query\n";
-	my $idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach (keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$_}{query};
-				last;
+		print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
+		print $fh "Rank     Total duration      Times executed     Av. duration (s)     Query\n";
+		my $idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
+			next if (!$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach (keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$_}{query};
+					last;
+				}
 			}
+			$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
+			print $fh "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
+			print $fh "--\n";
+			my $i = 1;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print $fh "\t- Example $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				$i++;
+			}
+			$idx++;
 		}
-		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
-		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{average}) . " - $q\n";
-		print $fh "--\n";
-		my $i = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-			print $fh "\t- Example $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
-			$i++;
-		}
-		$idx++;
-	}
 
-	print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
-	print $fh "Rank     Times executed     Total duration     Av. duration (s)     Query\n";
-	$idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach (keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$_}{query};
-				last;
+		print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
+		print $fh "Rank     Times executed     Total duration     Av. duration (s)     Query\n";
+		$idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+			next if (!$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach (keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$_}{query};
+					last;
+				}
 			}
+			print $fh "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
+			print $fh "--\n";
+			my $i = 1;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				$i++;
+			}
+			$idx++;
 		}
-		print $fh "$idx) " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - " . &convert_time($normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count}) . " - $q\n";
-		print $fh "--\n";
-		my $i = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-			print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
-			$i++;
-		}
-		$idx++;
-	}
 
-	print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
-	print $fh "Rank     Av. duration (s)     Times executed     Total duration     Query\n";
-	$idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach (keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$_}{query};
-				last;
+		print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
+		print $fh "Rank     Av. duration (s)     Times executed     Total duration     Query\n";
+		$idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+			next if (!$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach (keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$_}{query};
+					last;
+				}
 			}
+			print $fh "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
+			print $fh "--\n";
+			my $i = 1;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				$i++;
+			}
+			$idx++;
 		}
-		print $fh "$idx) " . &convert_time($normalyzed_info{$k}{average}) . " - " . &comma_numbers($normalyzed_info{$k}{count}) . " - " . &convert_time($normalyzed_info{$k}{duration}) . " - $q\n";
-		print $fh "--\n";
-		my $i = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-			print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
-			$i++;
-		}
-		$idx++;
 	}
 
 	if (!$disable_error) {
 		print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
 		print $fh "Rank     Times reported     Error\n";
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 			next if (!$error_info{$k}{count});
 			last if ($idx > $top);
@@ -1217,26 +1227,24 @@ EOF
 	if (!$error_only) {
 		print $fh qq{
 <div class="menu">
-<a href="#OverallStatsReport">Overall statistics</a> |
+<a href="#OverallStatsReport">Overall statistics</a> | 
 };
-	if (!$disable_hourly) {
+		if (!$disable_hourly) {
+			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
+		}
+		if (!$disable_type) {
+			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
+		}
+		if (!$disable_query) {
+			print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a> | };
+		}
 		print $fh qq{
-<a href="#HourlyStatsReport">Hourly statistics</a> |
-};
-	}
-	print $fh qq{
-<a href="#QueriesByTypeReport">Queries by type</a> |
-};
-		print $fh qq{
-<a href="#SlowestQueriesReport">Slowest queries</a> |
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
 <a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
 <a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a><br />
 };
 		if (!$disable_error) {
-			print $fh qq{
-<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> |
-};
+			print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> | };
 		}
 		if (scalar keys %lock_info > 0) {
 			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
@@ -1286,7 +1294,9 @@ sub html_footer
 		if (!$disable_hourly) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
-		print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
+		if (!$disable_type) {
+			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
+		}
 		if (scalar keys %lock_info > 0) {
 			print $fh qq{<li><a href="#LocksByTypeReport">Locks by type</a></li>};
 		}
@@ -1308,9 +1318,9 @@ sub html_footer
 		if (exists $connection_info{host}) {
 			print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
 		}
-
-		print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>
-};
+		if (!$disable_query) {
+			print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
+		}
 		if (!$disable_error) {
 			print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent errors (N)</a></li>\n";
 		}
@@ -1678,7 +1688,8 @@ sub dump_as_html
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	print $fh qq{
+	if (!$disable_type) {
+		print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
@@ -1690,29 +1701,30 @@ sub dump_as_html
 		<th>Percentage</th>
 	</tr>
 };
-	$overall_stat{'SELECT'} ||= 0; $overall_stat{'INSERT'} ||= 0; $overall_stat{'UPDATE'} ||= 0; $overall_stat{'DELETE'} ||= 0;
-	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
-	my $total = $overall_stat{'queries_number'} || 1;
+		$overall_stat{'SELECT'} ||= 0; $overall_stat{'INSERT'} ||= 0; $overall_stat{'UPDATE'} ||= 0; $overall_stat{'DELETE'} ||= 0;
+		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+		my $total = $overall_stat{'queries_number'} || 1;
 
-	print $fh "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%</td></tr>\n";
-	print $fh "<tr class=\"row1\"><td>INSERT</td><td class=\"right\">", &comma_numbers($overall_stat{'INSERT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%</td></tr>\n";
-	print $fh "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
-	print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
-	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
-	print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-	if ($graph && $totala) {
-		my %data = ();
-		foreach my $t ('SELECT','INSERT','UPDATE','DELETE') {
-			if ((($overall_stat{$t}*100)/$total) > $pie_percentage_limit) {
-				$data{$t} = $overall_stat{$t} || 0;
-			} else {
-				$data{"Sum types < $pie_percentage_limit%"} += $overall_stat{$t} || 0;
+		print $fh "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'SELECT'}*100)/$total), "%</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>INSERT</td><td class=\"right\">", &comma_numbers($overall_stat{'INSERT'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'INSERT'}*100)/$total), "%</td></tr>\n";
+		print $fh "<tr class=\"row0\"><td>UPDATE</td><td class=\"right\">", &comma_numbers($overall_stat{'UPDATE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'UPDATE'}*100)/$total), "%</td></tr>\n";
+		print $fh "<tr class=\"row1\"><td>DELETE</td><td class=\"right\">", &comma_numbers($overall_stat{'DELETE'}), "</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{'DELETE'}*100)/$total), "%</td></tr>\n";
+		print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala), "</td><td class=\"right\">", sprintf("%0.2f", (($total - $totala)*100)/$total), "%</td></tr>\n" if (($total - $totala) > 0);
+		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
+		if ($graph && $totala) {
+			my %data = ();
+			foreach my $t ('SELECT','INSERT','UPDATE','DELETE') {
+				if ((($overall_stat{$t}*100)/$total) > $pie_percentage_limit) {
+					$data{$t} = $overall_stat{$t} || 0;
+				} else {
+					$data{"Sum types < $pie_percentage_limit%"} += $overall_stat{$t} || 0;
+				}
 			}
+			$data{'Others'} = $total - $totala;
+			&flotr2_piegraph(8, 'queriesbytype_graph','Type of queries', %data);
 		}
-		$data{'Others'} = $total - $totala;
-		&flotr2_piegraph(8, 'queriesbytype_graph','Type of queries', %data);
+		print $fh "</td></tr></table>\n";
 	}
-	print $fh "</td></tr></table>\n";
 
 	# Lock stats per type
 	if (scalar keys %lock_info > 0) {
@@ -2018,7 +2030,8 @@ sub dump_as_html
 	}
 
 	# Show top informations
-	print $fh qq{
+	if (!$disable_query) {
+		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -2028,14 +2041,14 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-	for (my $i = 0; $i <= $#top_slowest; $i++) {
-		my $col = $i % 2;
-		print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i+1, "</td><td class=\"relevantInformation top center\">", &convert_time($top_slowest[$i]->[0]), "</td><td title=\"$top_slowest[$i]->[1]\"><div class=\"sql\">", &highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
-	}
-	print $fh "</table>\n";
-	@top_slowest = ();
+		for (my $i = 0; $i <= $#top_slowest; $i++) {
+			my $col = $i % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i+1, "</td><td class=\"relevantInformation top center\">", &convert_time($top_slowest[$i]->[0]), "</td><td title=\"$top_slowest[$i]->[1]\"><div class=\"sql\">", &highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
+		}
+		print $fh "</table>\n";
+		@top_slowest = ();
 
-	print $fh qq{
+		print $fh qq{
 <h2 id="NormalizedQueriesMostTimeReport">Queries that took up the most time (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -2047,51 +2060,51 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-	my $idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$d}{query};
-				last;
+		my $idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
+			next if (!$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$d}{query};
+					last;
+				}
 			}
-		}
-		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
-		my $col = $idx % 2;
-		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				my $colb = $c % 2;
-				$zday = "&nbsp;" if ($c > 1);
-				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
-				$c++;
+			$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration}/$normalyzed_info{$k}{count};
+			my $col = $idx % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+				my $c = 1;
+				$d =~ /^\d{4}(\d{2})(\d{2})$/;
+				my $zday = "$abbr_month{$1} $2";
+				foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+					$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+					my $colb = $c % 2;
+					$zday = "&nbsp;" if ($c > 1);
+					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+					$c++;
+				}
 			}
-		}
-		print $fh "</table></div></div></td>";
-		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+			print $fh "</table></div></div></td>";
+			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
 
-		if ($normalyzed_info{$k}{count} > 1) {
-			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
-			my $i = 0;
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				my $colb = $i % 2;
-				print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
-				$i++;
+			if ($normalyzed_info{$k}{count} > 1) {
+				print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostTimeReport_$idx\" name=\"button_NormalizedQueriesMostTimeReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostTimeReport_$idx', 'examples_NormalizedQueriesMostTimeReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostTimeReport_$idx\" class=\"examples\" style=\"display:none;\">";
+				my $i = 0;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $colb = $i % 2;
+					print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+					$i++;
+				}
+				print $fh "</div>";
 			}
-			print $fh "</div>";
+			print $fh "</td></tr>\n";
+			$idx++;
 		}
-		print $fh "</td></tr>\n";
-		$idx++;
-	}
-	print $fh "</table>\n";
+		print $fh "</table>\n";
 
-	print $fh qq{
+		print $fh qq{
 <h2 id="NormalizedQueriesMostFrequentReport">Most frequent queries (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -2102,50 +2115,50 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-	$idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$d}{query};
-				last;
+		$idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+			next if (!$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$d}{query};
+					last;
+				}
 			}
-		}
-		my $col = $idx % 2;
-		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				my $colb = $c % 2;
-				$zday = "&nbsp;" if ($c > 1);
-				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
-				$c++;
+			my $col = $idx % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+				my $c = 1;
+				$d =~ /^\d{4}(\d{2})(\d{2})$/;
+				my $zday = "$abbr_month{$1} $2";
+				foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+					$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+					my $colb = $c % 2;
+					$zday = "&nbsp;" if ($c > 1);
+					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+					$c++;
+				}
 			}
-		}
-		print $fh "</table></div></div></td>";
-		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+			print $fh "</table></div></div></td>";
+			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
 
-		if ($normalyzed_info{$k}{count} > 1) {
-			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
-			my $i = 0;
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				my $colb = $i % 2;
-				print $fh "<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
-				$i++;
+			if ($normalyzed_info{$k}{count} > 1) {
+				print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+				my $i = 0;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $colb = $i % 2;
+					print $fh "<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+					$i++;
+				}
+				print $fh "</div>";
 			}
-			print $fh "</div>";
+			print $fh "</td></tr>\n";
+			$idx++;
 		}
-		print $fh "</td></tr>\n";
-		$idx++;
-	}
-	print $fh "</table>\n";
+		print $fh "</table>\n";
 
-	print $fh qq{
+		print $fh qq{
 <h2 id="NormalizedQueriesSlowestAverageReport">Slowest queries (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 	<tr>
@@ -2157,47 +2170,48 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-	$idx = 1;
-	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
-		next if (!$k || !$normalyzed_info{$k}{count});
-		last if ($idx > $top);
-		my $q = $k;
-		if ($normalyzed_info{$k}{count} == 1) {
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				$q = $normalyzed_info{$k}{samples}{$d}{query};
-				last;
+		$idx = 1;
+		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+			next if (!$k || !$normalyzed_info{$k}{count});
+			last if ($idx > $top);
+			my $q = $k;
+			if ($normalyzed_info{$k}{count} == 1) {
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					$q = $normalyzed_info{$k}{samples}{$d}{query};
+					last;
+				}
 			}
-		}
-		my $col = $idx % 2;
-		print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				my $colb = $c % 2;
-				$zday = "&nbsp;" if ($c > 1);
-				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
-				$c++;
+			my $col = $idx % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">", &convert_time($normalyzed_info{$k}{average}), "</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($normalyzed_info{$k}{count}), "</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+				my $c = 1;
+				$d =~ /^\d{4}(\d{2})(\d{2})$/;
+				my $zday = "$abbr_month{$1} $2";
+				foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+					$normalyzed_info{$k}{chronos}{$d}{$h}{average} = $normalyzed_info{$k}{chronos}{$d}{$h}{duration}/$normalyzed_info{$k}{chronos}{$d}{$h}{count};
+					my $colb = $c % 2;
+					$zday = "&nbsp;" if ($c > 1);
+					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}), "</td><td>", &convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}), "</td></tr>";
+					$c++;
+				}
 			}
-		}
-		print $fh "</table></div></div></td>";
-		print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
-		if ($normalyzed_info{$k}{count} > 1) {
-			print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
-			my $i = 0;
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				my $colb = $i % 2;
-				print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
-				$i++;
+			print $fh "</table></div></div></td>";
+			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td><div class=\"sql\">", &highlight_code($q), "</div>";
+			if ($normalyzed_info{$k}{count} > 1) {
+				print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesSlowestAverageReport_$idx\" name=\"button_NormalizedQueriesSlowestAverageReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesSlowestAverageReport_$idx', 'examples_NormalizedQueriesSlowestAverageReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesSlowestAverageReport_$idx\" class=\"examples\" style=\"display:none;\">";
+				my $i = 0;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $colb = $i % 2;
+					print $fh "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\">", &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+					$i++;
+				}
+				print $fh "</div>";
 			}
-			print $fh "</div>";
+			print $fh "</td></tr>\n";
+			$idx++;
 		}
-		print $fh "</td></tr>\n";
-		$idx++;
+		print $fh "</table>\n";
 	}
-	print $fh "</table>\n";
 
 	if (!$disable_error) {
 		print $fh qq{
@@ -2210,7 +2224,7 @@ sub dump_as_html
 
 </tr>
 };
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 			next if (!$error_info{$k}{count});
 			last if ($idx > $top);

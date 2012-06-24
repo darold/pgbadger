@@ -48,6 +48,7 @@ Options:
                              you can use this option multiple time.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
+    --disable-query        : do not generate queries reports (slowest, most frequent, ...).
 
 Examples:
 
