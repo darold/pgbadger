@@ -66,6 +66,7 @@ my $progress = 0;
 my $error_only = 0;
 my @exclude_query = ();
 my $disable_error = 0;
+my $disable_hourly = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
@@ -111,6 +112,7 @@ my $result = GetOptions (
 	"w|watch-mode!" => \$error_only,
 	"exclude-query=s" => \@exclude_query,
 	"disable-error!"=> \$disable_error,
+	"disable-hourly!"=> \$disable_hourly,
 );
 
 if ($ver) {
@@ -522,6 +524,7 @@ Options:
 			     from the report. For example: "^(COPY|VACUUM|COMMIT)"
 			     you can use this option multiple time.
     --disable-error        : do not generate error report.
+    --disable-hourly       : do not generate hourly reports.
 
 Examples:
 
@@ -726,14 +729,15 @@ Average duration of sessions: $avg_session_duration
 	if ($connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 	}
-
-	print $fh qq{
+	if (!$disable_hourly) {
+		print $fh qq{
 
 - Hourly statistics ----------------------------------------------------
 
 Report not supported by text format
 
 };
+	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
 	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
@@ -1214,7 +1218,13 @@ EOF
 		print $fh qq{
 <div class="menu">
 <a href="#OverallStatsReport">Overall statistics</a> |
+};
+	if (!$disable_hourly) {
+		print $fh qq{
 <a href="#HourlyStatsReport">Hourly statistics</a> |
+};
+	}
+	print $fh qq{
 <a href="#QueriesByTypeReport">Queries by type</a> |
 };
 		print $fh qq{
@@ -1271,8 +1281,12 @@ sub html_footer
 	<div id="littleTocContent">
 
 		<ul>
-			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li><li><a href="#HourlyStatsReport">Hourly statistics</a></li><li><a href="#QueriesByTypeReport">Queries by type</a></li>
+			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li>
 };
+		if (!$disable_hourly) {
+			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
+		}
+		print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 		if (scalar keys %lock_info > 0) {
 			print $fh qq{<li><a href="#LocksByTypeReport">Locks by type</a></li>};
 		}
@@ -1397,7 +1411,8 @@ sub dump_as_html
 </div>
 };
 
-	print $fh qq{
+	if (!$disable_hourly) {
+		print $fh qq{
 <h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
 
 <table class="HourStatsTable">
@@ -1420,269 +1435,245 @@ sub dump_as_html
 	</tr>
 };
 
-	foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
-		my $c = 1;
-		$d =~ /^\d{4}(\d{2})(\d{2})$/;
-		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
-			my $colb = $c % 2;
-			$zday = "&nbsp;" if ($c > 1);
-			$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
-			$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
-			my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
-			print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>\n";
-			$c++;
+		foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
+				my $colb = $c % 2;
+				$zday = "&nbsp;" if ($c > 1);
+				$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
+				$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
+				my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>\n";
+				$c++;
+			}
 		}
-	}
 
-	print $fh "</table>\n";
+		print $fh "</table>\n";
 
-	if ($graph) {
-		my @labels = ();
-		my @data1 = ();
-		my @data2 = ();
-		my @data3 = ();
-		my $d1 = '';
-		my $d2 = '';
-		my $d3 = '';
-		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{query}}) {
-			$tm =~ /(\d{4})(\d{2})(\d{2})/;
-			my $y = $1 - 1900;
-			my $mo = $2 - 1;
-			my $d = $3;
-			foreach my $h ("00" .. "23") {
-				my %dataavg = ();
-				foreach my $m ("00" .. "59") {
-					my $rd = &average_five_minutes($m);
-					if (exists $per_minute_info{query}{$tm}{$h}{$m}) {
-						# Average per minute
-						$dataavg{average}{"$rd"} += $per_minute_info{query}{$tm}{$h}{$m}{count};
-						# Search minimum and maximum during this minute
-						foreach my $s (keys %{$per_minute_info{query}{$tm}{$h}{$m}{second}}) {
-							$dataavg{max}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
-							$dataavg{min}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+		if ($graph) {
+			my @labels = ();
+			my @data1 = ();
+			my @data2 = ();
+			my @data3 = ();
+			my $d1 = '';
+			my $d2 = '';
+			my $d3 = '';
+			foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{query}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d = $3;
+				foreach my $h ("00" .. "23") {
+					my %dataavg = ();
+					foreach my $m ("00" .. "59") {
+						my $rd = &average_five_minutes($m);
+						if (exists $per_minute_info{query}{$tm}{$h}{$m}) {
+							# Average per minute
+							$dataavg{average}{"$rd"} += $per_minute_info{query}{$tm}{$h}{$m}{count};
+							# Search minimum and maximum during this minute
+							foreach my $s (keys %{$per_minute_info{query}{$tm}{$h}{$m}{second}}) {
+								$dataavg{max}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
+								$dataavg{min}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+							}
 						}
 					}
-				}
-				foreach my $rd ('00','05','10','15','20','25','30','35','40','45','50','55') {
-					my $t = timelocal_nocheck(0,$rd,$h,$d,$mo,$y) * 1000;
-					# Average per 5 minutes
-					$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / 300) . "],";
-					# Maxi per minute
-					$d1 .= "[$t, " .  ($dataavg{max}{"$rd"} || 0) . "],";
-					# Mini per minute
-					$d3 .= "[$t, " .  ($dataavg{min}{"$rd"} || 0) . "],";
-				}
-			}
-		}
-		delete $per_minute_info{query};
-		$d1 =~ s/,$//;
-		$d2 =~ s/,$//;
-		$d3 =~ s/,$//;
-		&flotr2_graph(1, 'queriespersecond_graph', $d1, $d2, $d3, 'Queries per second (5 minutes average)',
-				'Queries per second','Maximum','Average','Minimum');
-		$d1 = '';
-		$d2 = '';
-		$d3 = '';
-
-		# All queries
-		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-			$tm =~ /(\d{4})(\d{2})(\d{2})/;
-			my $y = $1 - 1900;
-			my $mo = $2 - 1;
-			my $d = $3;
-			foreach my $h ("00" .. "23") {
-				my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-				$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{count} || 0) . "],";
-				$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) /1000) . "],";
-			}
-		}
-		$d1 =~ s/,$//;
-		$d2 =~ s/,$//;
-		&flotr2_graph(2, 'allqueries_graph', $d1, '', '', 'All queries',
-				'Queries','Number of queries','','','Duration',$d2,'Average duration (s)');
-		$d1 = '';
-		$d2 = '';
-
-		# Select queries
-		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-			$tm =~ /(\d{4})(\d{2})(\d{2})/;
-			my $y = $1 - 1900;
-			my $mo = $2 - 1;
-			my $d = $3;
-			foreach my $h ("00" .. "23") {
-				my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-				$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
-				$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) /1000) . "],";
-			}
-		}
-		$d1 =~ s/,$//;
-		$d2 =~ s/,$//;
-		&flotr2_graph(3, 'selectqueries_graph', $d1, '', '', 'SELECT queries',
-				'Queries','Number of queries','','','Duration',$d2,'Average duration (s)');
-		$d1 = '';
-		$d2 = '';
-
-		# Write queries
-		my $d4 = '';
-		foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-			$tm =~ /(\d{4})(\d{2})(\d{2})/;
-			my $y = $1 - 1900;
-			my $mo = $2 - 1;
-			my $d = $3;
-			foreach my $h ("00" .. "23") {
-				my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-				my $wcount = $per_hour_info{$tm}{$h}{'UPDATE'}{count} + $per_hour_info{$tm}{$h}{'DELETE'}{count} + $per_hour_info{$tm}{$h}{'INSERT'}{count};
-				my $wduration = $per_hour_info{$tm}{$h}{'UPDATE'}{duration} + $per_hour_info{$tm}{$h}{'DELETE'}{duration} + $per_hour_info{$tm}{$h}{'INSERT'}{duration};
-				$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
-				$d2 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
-				$d3 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
-				$d4 .= "[$t, " .  sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) /1000) . "],";
-			}
-		}
-		$d1 =~ s/,$//;
-		$d2 =~ s/,$//;
-		$d3 =~ s/,$//;
-		$d4 =~ s/,$//;
-		&flotr2_graph(4, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
-				'Queries','DELETE queries','INSERT queries','UPDATE queries','Duration',$d4,'Average duration (s)');
-		$d1 = '';
-		$d2 = '';
-		$d3 = '';
-		$d4 = '';
-
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-			print $fh qq{
-<table class="HourStatsTable">
-	<tr>
-		<th rowspan="2">Day</th>
-		<th rowspan="2">Time</th>
-};
-		}
-		if ($tempfile_info{count}) {
-			print $fh qq{
-		<th colspan="2">Temporary files</th>
-};
-		}
-		if (exists $checkpoint_info{chronos}) {
-			print $fh qq{
-		<th colspan="7">Checkpoints</th>
-};
-		}
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-			print $fh qq{
-	</tr>
-	<tr>
-};
-		}
-		if ($tempfile_info{count}) {
-			print $fh qq{
-		<th>Count</th>
-		<th>Av.&nbsp;size</th>
-};
-		}
-		if (exists $checkpoint_info{chronos}) {
-			print $fh qq{
-		<th>Wrote buffers</th>
-		<th>Added</th>
-		<th>Removed</th>
-		<th>Recycled</th>
-		<th>Write time (sec)</th>
-		<th>Sync time (sec)</th>
-		<th>Total time (sec)</th>
-};
-		}
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-			print $fh qq{
-	</tr>
-};
-			foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
-				my $c = 1;
-				$d =~ /^\d{4}(\d{2})(\d{2})$/;
-				my $zday = "$abbr_month{$1} $2";
-				foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
-					my $colb = $c % 2;
-					$zday = "&nbsp;" if ($c > 1);
-					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td>";
-					if ($tempfile_info{count}) {
-						my $temp_average = '0';
-						if ($tempfile_info{chronos}{$d}{$h}{count}) {
-							$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
-						}
-						print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
+					foreach my $rd ('00','05','10','15','20','25','30','35','40','45','50','55') {
+						my $t = timelocal_nocheck(0,$rd,$h,$d,$mo,$y) * 1000;
+						# Average per 5 minutes
+						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / 300) . "],";
+						# Maxi per minute
+						$d1 .= "[$t, " .  ($dataavg{max}{"$rd"} || 0) . "],";
+						# Mini per minute
+						$d3 .= "[$t, " .  ($dataavg{min}{"$rd"} || 0) . "],";
 					}
-					if (exists $checkpoint_info{chronos}) {
-						if (exists $checkpoint_info{chronos}{$d}{$h}) {
-							print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
-						} else {
-							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
-						}
-					}
-					print $fh "</tr>\n";
-					$c++;
 				}
 			}
-			print $fh "</table>\n";
-		}
+			delete $per_minute_info{query};
+			$d1 =~ s/,$//;
+			$d2 =~ s/,$//;
+			$d3 =~ s/,$//;
+			&flotr2_graph(1, 'queriespersecond_graph', $d1, $d2, $d3, 'Queries per second (5 minutes average)',
+					'Queries per second','Maximum','Average','Minimum');
+			$d1 = '';
+			$d2 = '';
+			$d3 = '';
 
-		# checkpoint size
-		if (exists $checkpoint_info{chronos}) {
-			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
+			# All queries
+			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 				$tm =~ /(\d{4})(\d{2})(\d{2})/;
 				my $y = $1 - 1900;
 				my $mo = $2 - 1;
 				my $d = $3;
 				foreach my $h ("00" .. "23") {
 					my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-					$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
+					$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{count} || 0) . "],";
+					$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) /1000) . "],";
 				}
 			}
 			$d1 =~ s/,$//;
-			&flotr2_graph(5, 'checkpointwritebuffers_graph', $d1, '', '', 'Checkpoint write buffers',
-					'Buffers','Write buffers','','');
+			$d2 =~ s/,$//;
+			&flotr2_graph(2, 'allqueries_graph', $d1, '', '', 'All queries',
+					'Queries','Number of queries','','','Duration',$d2,'Average duration (s)');
 			$d1 = '';
+			$d2 = '';
 
-			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
+			# Select queries
+			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 				$tm =~ /(\d{4})(\d{2})(\d{2})/;
 				my $y = $1 - 1900;
 				my $mo = $2 - 1;
 				my $d = $3;
 				foreach my $h ("00" .. "23") {
 					my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-					$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_added} || 0) . "],";
-					$d2 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_removed} || 0) . "],";
-					$d3 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_recycled} || 0) . "],";
+					$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
+					$d2 .= "[$t, " .  sprintf("%.2f", (($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) /1000) . "],";
+				}
+			}
+			$d1 =~ s/,$//;
+			$d2 =~ s/,$//;
+			&flotr2_graph(3, 'selectqueries_graph', $d1, '', '', 'SELECT queries',
+					'Queries','Number of queries','','','Duration',$d2,'Average duration (s)');
+			$d1 = '';
+			$d2 = '';
+
+			# Write queries
+			my $d4 = '';
+			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d = $3;
+				foreach my $h ("00" .. "23") {
+					my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
+					my $wcount = $per_hour_info{$tm}{$h}{'UPDATE'}{count} + $per_hour_info{$tm}{$h}{'DELETE'}{count} + $per_hour_info{$tm}{$h}{'INSERT'}{count};
+					my $wduration = $per_hour_info{$tm}{$h}{'UPDATE'}{duration} + $per_hour_info{$tm}{$h}{'DELETE'}{duration} + $per_hour_info{$tm}{$h}{'INSERT'}{duration};
+					$d1 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
+					$d2 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
+					$d3 .= "[$t, " .  ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
+					$d4 .= "[$t, " .  sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) /1000) . "],";
 				}
 			}
 			$d1 =~ s/,$//;
 			$d2 =~ s/,$//;
 			$d3 =~ s/,$//;
-			&flotr2_graph(6, 'checkpointfiles_graph', $d1, $d2, $d3, 'Checkpoint Wal files usage',
-					'Number of files','Added','Removed','Recycled');
+			$d4 =~ s/,$//;
+			&flotr2_graph(4, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
+					'Queries','DELETE queries','INSERT queries','UPDATE queries','Duration',$d4,'Average duration (s)');
 			$d1 = '';
 			$d2 = '';
 			$d3 = '';
-		}
+			$d4 = '';
 
-		# Temporary file size
-		if (exists $tempfile_info{chronos}) {
-			foreach my $tm (sort {$a <=> $b} keys %{$tempfile_info{chronos}}) {
-				$tm =~ /(\d{4})(\d{2})(\d{2})/;
-				my $y = $1 - 1900;
-				my $mo = $2 - 1;
-				my $d = $3;
-				foreach my $h ("00" .. "23") {
-					my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
-					$d1 .= "[$t, " .  ($tempfile_info{chronos}{$tm}{$h}{size} || 0) . "],";
-					$d2 .= "[$t, " .  ($tempfile_info{chronos}{$tm}{$h}{count} || 0) . "],";
-				}
+			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th <th rowspan="2">Time</th>};
 			}
-			$d1 =~ s/,$//;
-			$d2 =~ s/,$//;
-			&flotr2_graph(7, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
-					'Size of files','Size of files','','','Number of files',$d2,'Number of files');
-			$d1 = '';
-			$d2 = '';
+			if ($tempfile_info{count}) {
+				print $fh qq{<th colspan="2">Temporary files</th>};
+			}
+			if (exists $checkpoint_info{chronos}) {
+				print $fh qq{<th colspan="7">Checkpoints</th>};
+			}
+			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+				print $fh qq{</tr><tr>};
+			}
+			if ($tempfile_info{count}) {
+				print $fh qq{<th>Count</th><th>Av.&nbsp;size</th>};
+			}
+			if (exists $checkpoint_info{chronos}) {
+				print $fh qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+			}
+			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+				print $fh qq{</tr>};
+				foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
+					my $c = 1;
+					$d =~ /^\d{4}(\d{2})(\d{2})$/;
+					my $zday = "$abbr_month{$1} $2";
+					foreach my $h (sort {$a <=> $b} keys %{$per_hour_info{$d}}) {
+						my $colb = $c % 2;
+						$zday = "&nbsp;" if ($c > 1);
+						print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td>";
+						if ($tempfile_info{count}) {
+							my $temp_average = '0';
+							if ($tempfile_info{chronos}{$d}{$h}{count}) {
+								$temp_average = &comma_numbers(sprintf("%.2f", $tempfile_info{chronos}{$d}{$h}{size}/$tempfile_info{chronos}{$d}{$h}{count}));
+							}
+							print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0), "</td><td class=\"right\">$temp_average</td>";
+						}
+						if (exists $checkpoint_info{chronos}) {
+							if (exists $checkpoint_info{chronos}{$d}{$h}) {
+								print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
+							} else {
+								print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+							}
+						}
+						print $fh "</tr>\n";
+						$c++;
+					}
+				}
+				print $fh "</table>\n";
+			}
+
+			# checkpoint size
+			if (exists $checkpoint_info{chronos}) {
+				foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
+						$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
+					}
+				}
+				$d1 =~ s/,$//;
+				&flotr2_graph(5, 'checkpointwritebuffers_graph', $d1, '', '', 'Checkpoint write buffers',
+						'Buffers','Write buffers','','');
+				$d1 = '';
+
+				foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
+						$d1 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_added} || 0) . "],";
+						$d2 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_removed} || 0) . "],";
+						$d3 .= "[$t, " .  ($checkpoint_info{chronos}{$tm}{$h}{file_recycled} || 0) . "],";
+					}
+				}
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				$d3 =~ s/,$//;
+				&flotr2_graph(6, 'checkpointfiles_graph', $d1, $d2, $d3, 'Checkpoint Wal files usage',
+						'Number of files','Added','Removed','Recycled');
+				$d1 = '';
+				$d2 = '';
+				$d3 = '';
+			}
+
+			# Temporary file size
+			if (exists $tempfile_info{chronos}) {
+				foreach my $tm (sort {$a <=> $b} keys %{$tempfile_info{chronos}}) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timelocal_nocheck(0,0,$h,$d,$mo,$y) * 1000;
+						$d1 .= "[$t, " .  ($tempfile_info{chronos}{$tm}{$h}{size} || 0) . "],";
+						$d2 .= "[$t, " .  ($tempfile_info{chronos}{$tm}{$h}{count} || 0) . "],";
+					}
+				}
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				&flotr2_graph(7, 'temporaryfile_graph', $d1, '', '', 'Temporary files',
+						'Size of files','Size of files','','','Number of files',$d2,'Number of files');
+				$d1 = '';
+				$d2 = '';
+			}
 		}
 	}
 

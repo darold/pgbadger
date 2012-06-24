@@ -45,6 +45,7 @@ SYNOPSIS
                                  from the report. For example: "^(COPY|VACUUM|COMMIT)"
                                  you can use this option multiple time.
         --disable-error        : do not generate error report.
+        --disable-hourly       : do not generate hourly reports.
 
     Examples:
 
