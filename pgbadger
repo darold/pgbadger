@@ -139,12 +139,12 @@ if ($ver) {
 # of log file to parse.
 if (!$logfile && ($#ARGV >= 0)) {
 	foreach my $file (@ARGV) {
-		die "FATAL: logfile $file must exists!\n" if (!-f $file);
+		die "FATAL: logfile $file must exist!\n" if (!-f $file);
 		next if (-z $file);
 		push(@log_files, $file);
 	}
 } elsif ($logfile) {
-	die "FATAL: logfile $logfile must exists!\n" if (!-f $logfile);
+	die "FATAL: logfile $logfile must exist!\n" if (!-f $logfile);
 	die "FATAL: logfile $logfile is empty!\n" if (-z $logfile);
 	push(@log_files, $logfile);
 }
