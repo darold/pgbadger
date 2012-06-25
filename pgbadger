@@ -695,7 +695,10 @@ sub dump_as_text
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	my $logfile_str = join(',', @log_files);
+	my $logfile_str = $log_files[0];
+	if ($#log_files > 0) {
+		$logfile_str .= ', ..., ' . $log_files[-1]
+	}
 	print $fh qq{
 
 - Global informations --------------------------------------------------
@@ -969,7 +972,10 @@ sub dump_error_as_text
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	my $logfile_str = join(',', @log_files);
+	my $logfile_str = $log_files[0];
+	if ($#log_files > 0) {
+		$logfile_str .= ', ..., ' . $log_files[-1]
+	}
 	print $fh qq{
 
 - Global informations --------------------------------------------------
@@ -1372,7 +1378,10 @@ sub dump_as_html
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	my $logfile_str = join(',', @log_files);
+	my $logfile_str = $log_files[0];
+	if ($#log_files > 0) {
+		$logfile_str .= ', ..., ' . $log_files[-1]
+	}
 	print $fh qq{
 <div class="information">
 <ul>
@@ -2304,7 +2313,10 @@ sub dump_error_as_html
 	my $total_time = timestr($td);
 	$total_time =~ s/^([\.0-9]+) wallclock.*/$1/;
 	$total_time = &convert_time($total_time*1000);
-	my $logfile_str = join(',', @log_files);
+	my $logfile_str = $log_files[0];
+	if ($#log_files > 0) {
+		$logfile_str .= ', ..., ' . $log_files[-1]
+	}
 	print $fh qq{
 <div class="information">
 <ul>
