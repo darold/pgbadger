@@ -1609,7 +1609,7 @@ sub dump_as_html
 			$d4 = '';
 
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th <th rowspan="2">Time</th>};
+				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th><th rowspan="2">Time</th>};
 			}
 			if ($tempfile_info{count}) {
 				print $fh qq{<th colspan="2">Temporary files</th>};
