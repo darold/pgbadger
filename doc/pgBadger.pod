@@ -16,11 +16,11 @@ Arguments:
 Options:
 
     -l | --logfile filename: path to the PostgreSQL log file to parse. It can
-			     be a plain text log or a gzip compressed file
-			     with the .gz extension. Note that this option is
-			     DEPRECATED, set logfile as a command line argument
-			     instead.
-    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
+                             be a plain text log or a gzip compressed file
+                             with the .gz extension. Note that this option is
+                             DEPRECATED, set logfile as a command line argument
+                             instead.
+    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
                              of the output format: out.html or out.txt. To dump
                              output to stdout use - as filename.
@@ -33,29 +33,34 @@ Options:
     -x | --extension       : output format. Values: text or html. Default: html
     -m | --maxlength size  : maximum length of a query, it will be cutted above
                              the given size. Default: no truncate
-    -g | --graph           : generate graphs with a javascript plotting library.
+    -g | --graph           : generate graphs using the Flotr2 javascript library
     -b | --begin datetime  : start date/time for the data to be parsed in log.
-                             Format: -b "yyyy-mm-dd hh:mm:ss"
     -e | --end datetime    : end date/time for the data to be parsed in log.
-                             Format: -e "yyyy-mm-dd hh:mm:ss"
-    -q | --quiet           : disable output to stderr and don't print debug informations.
-    -p | --progress        : show a progress bar, quiet mode is enabled with this option.
-    -v | --version         : show current version
-    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
+    -q | --quiet           : don't print anything to stdout.
+    -p | --progress        : show a progress bar, quiet mode is automaticaly
+                             enabled with this option.
+    --pie-limit num        : pie data lower than num% will show a sum instead.
     -w | -watch-mode       : only report errors just like logwatch could do.
     --exclude-query regex  : any query matching the given regex will be excluded
-                             from the report. For example: "^(COPY|VACUUM|COMMIT)"
+                             from the report. For example: "^(VACUUM|COMMIT)"
                              you can use this option multiple time.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
-    --disable-query        : do not generate queries reports (slowest, most frequent, ...).
+    --disable-type         : do not generate query type report.
+    --disable-query        : do not generate queries reports (slowest, most
+                             frequent, ...).
+    --disable-session      : do not generate session report.
+    --disable-connection   : do not generate connection report.
+    --disable-lock         : do not generate lock report.
+    --disable-temporary    : do not generate temporary report.
+    --disable-checkpoint   : do not generate checkpoint report.
 
 Examples:
 
         pgbadger -p -g /var/log/postgresql.log
         pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
-        pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
-	pgbadger -p -g --exclude-query="^(COPY|VACUUM|COMMIT)" /var/log/postgresql.log
+        pgbadger -p -g /var/log/postgresql/postgresql-2012-05-*
+	pgbadger -p -g --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
 
 
 Reporting errors every week by cron job:

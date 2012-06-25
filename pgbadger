@@ -69,6 +69,11 @@ my $disable_error = 0;
 my $disable_hourly = 0;
 my $disable_type = 0;
 my $disable_query = 0;
+my $disable_session = 0;
+my $disable_connection = 0;
+my $disable_lock = 0;
+my $disable_temporary = 0;
+my $disable_checkpoint = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
@@ -117,6 +122,11 @@ my $result = GetOptions (
 	"disable-hourly!"=> \$disable_hourly,
 	"disable-type!"=> \$disable_type,
 	"disable-query!"=> \$disable_query,
+	"disable-session!"=> \$disable_session,
+	"disable-connection!"=> \$disable_connection,
+	"disable-lock!"=> \$disable_lock,
+	"disable-temporary!"=> \$disable_temporary,
+	"disable-checkpoint!"=> \$disable_checkpoint,
 );
 
 if ($ver) {
@@ -525,20 +535,26 @@ Options:
     --pie-limit num        : pie data lower than num% will show a sum instead.
     -w | -watch-mode       : only report errors just like logwatch could do.
     --exclude-query regex  : any query matching the given regex will be excluded
-			     from the report. For example: "^(COPY|VACUUM|COMMIT)"
+			     from the report. For example: "^(VACUUM|COMMIT)"
 			     you can use this option multiple time.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
     --disable-type         : do not generate query type report.
-    --disable-query        : do not generate queries reports (slowest, most frequent, ...).
+    --disable-query        : do not generate queries reports (slowest, most
+			     frequent, ...).
+    --disable-session      : do not generate session report.
+    --disable-connection   : do not generate connection report.
+    --disable-lock         : do not generate lock report.
+    --disable-temporary    : do not generate temporary report.
+    --disable-checkpoint   : do not generate checkpoint report.
 
 Examples:
 
 	pgbadger -p -g /var/log/postgresql.log
 	pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
 		       /var/log/postgres.log
-	pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
-	pgbadger -p -g --exclude-query="^(COPY|VACUUM|COMMIT)" /var/log/postgresql.log
+	pgbadger -p -g /var/log/postgresql/postgresql-2012-05-*
+	pgbadger -p -g --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
 
 Reporting errors every week by cron job:
 
@@ -724,7 +740,7 @@ Max size of temporary file: $fmt_temp_maxsise
 Average size of temporary file: $fmt_temp_avsize
 };
 	}
-	if ($session_info{count}) {
+	if (!$disable_session && $session_info{count}) {
 		my $avg_session_duration = &convert_time($session_info{duration}/$session_info{count});
 		my $tot_session_duration = &convert_time($session_info{duration});
 		print $fh qq{Total number of sessions: $session_info{count}
@@ -732,7 +748,7 @@ Total duration of sessions: $tot_session_duration
 Average duration of sessions: $avg_session_duration
 };
 	}
-	if ($connection_info{count}) {
+	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 	}
 	if (!$disable_hourly) {
@@ -759,7 +775,7 @@ Report not supported by text format
 		print $fh "\n";
 	}
 
-	if (scalar keys %lock_info > 0) {
+	if (!$disable_lock && scalar keys %lock_info > 0) {
 		print $fh "\n- Locks by type ------------------------------------------------------\n\n";
 		print $fh "Type     Object     Count     Total Duration     Av. duration (s)\n";
 		my $total_count = 0;
@@ -777,7 +793,7 @@ Report not supported by text format
 	}
 
 	# Show session per database statistics
-	if (exists $session_info{database}) {
+	if (!$disable_session && exists $session_info{database}) {
 		print $fh "\n- Sessions per database ------------------------------------------------------\n\n";
 		print $fh "Database     Count     Total Duration     Av. duration (s)\n";
 		foreach my $d (sort keys %{$session_info{database}}) {
@@ -785,8 +801,8 @@ Report not supported by text format
 		}
 	}
 
-        # Show session per user statistics
-        if (exists $session_info{user}) {
+	# Show session per user statistics
+	if (!$disable_session && exists $session_info{user}) {
 		print $fh "\n- Sessions per user ------------------------------------------------------\n\n";
 		print $fh "User     Count     Total Duration     Av. duration (s)\n";
 		foreach my $d (sort keys %{$session_info{user}}) {
@@ -794,8 +810,8 @@ Report not supported by text format
 		}
 	}
 
-        # Show session per host statistics
-        if (exists $session_info{host}) {
+	# Show session per host statistics
+	if (!$disable_session && exists $session_info{host}) {
 		print $fh "\n- Sessions per host ------------------------------------------------------\n\n";
 		print $fh "User     Count     Total Duration     Av. duration (s)\n";
 		foreach my $d (sort keys %{$session_info{host}}) {
@@ -804,34 +820,33 @@ Report not supported by text format
 	}
 
 	# Show connection per database statistics
-	if (exists $connection_info{database}) {
+	if (!$disable_connection && exists $connection_info{database}) {
 		print $fh "\n- Connections per database ------------------------------------------------------\n\n";
 		print $fh "Database     User     Count\n";
-                foreach my $d (sort keys %{$connection_info{database}}) {
-                        print $fh "$d - ", &comma_numbers($connection_info{database}{$d}), "\n";
-                        foreach my $u (sort keys %{$connection_info{user}}) {
-                                next if (!exists $connection_info{database_user}{$d}{$u});
-                                print $fh "\t$u ", &comma_numbers($connection_info{database_user}{$d}{$u}), "\n";
-                        }
-                }
+		foreach my $d (sort keys %{$connection_info{database}}) {
+			print $fh "$d - ", &comma_numbers($connection_info{database}{$d}), "\n";
+			foreach my $u (sort keys %{$connection_info{user}}) {
+				next if (!exists $connection_info{database_user}{$d}{$u});
+				print $fh "\t$u ", &comma_numbers($connection_info{database_user}{$d}{$u}), "\n";
+			}
+		}
 	}
-
 	# Show connection per user statistics
-	if (exists $connection_info{user}) {
+	if (!$disable_connection && exists $connection_info{user}) {
 		print $fh "\n- Connections per user ------------------------------------------------------\n\n";
 		print $fh "User     Count\n";
-                foreach my $d (sort keys %{$connection_info{user}}) {
-                        print $fh "$d - ", &comma_numbers($connection_info{user}{$d}), "\n";
-                }
+		foreach my $d (sort keys %{$connection_info{user}}) {
+			print $fh "$d - ", &comma_numbers($connection_info{user}{$d}), "\n";
+		}
 	}
 
 	# Show connection per host statistics
-	if (exists $connection_info{host}) {
+	if (!$disable_connection && exists $connection_info{host}) {
 		print $fh "\n- Connections per host ------------------------------------------------------\n\n";
 		print $fh "User     Count\n";
-                foreach my $d (sort keys %{$connection_info{host}}) {
-                        print $fh "$d - ", &comma_numbers($connection_info{host}{$d}), "\n";
-                }
+		foreach my $d (sort keys %{$connection_info{host}}) {
+			print $fh "$d - ", &comma_numbers($connection_info{host}{$d}), "\n";
+		}
 	}
 
 	# Show top informations
@@ -1236,36 +1251,40 @@ EOF
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 		}
 		if (!$disable_query) {
-			print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a> | };
-		}
-		print $fh qq{
+			print $fh qq{
+<a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
 <a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
 <a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a><br />
+		}
 };
 		if (!$disable_error) {
 			print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> | };
 		}
-		if (scalar keys %lock_info > 0) {
+		if (!$disable_lock && scalar keys %lock_info > 0) {
 			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
 		}
-		if (exists $session_info{database}) {
-			print $fh qq{<a href="#SessionsDatabaseReport">Sessions per database</a> |};
+		if (!$disable_session) {
+			if (exists $session_info{database}) {
+				print $fh qq{<a href="#SessionsDatabaseReport">Sessions per database</a> |};
+			}
+			if (exists $session_info{user}) {
+				print $fh qq{<a href="#SessionsUserReport">Sessions per user</a> |};
+			}
+			if (exists $session_info{host}) {
+				print $fh qq{<a href="#SessionsHostReport">Sessions per host</a> |};
+			}
 		}
-		if (exists $session_info{user}) {
-			print $fh qq{<a href="#SessionsUserReport">Sessions per user</a> |};
-		}
-		if (exists $session_info{host}) {
-			print $fh qq{<a href="#SessionsHostReport">Sessions per host</a> |};
-		}
-		if (exists $connection_info{database}) {
-			print $fh qq{<a href="#ConnectionsDatabaseReport">Connections per database</a> |};
-		}
-		if (exists $connection_info{user}) {
-			print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> |};
-		}
-		if (exists $connection_info{host}) {
-			print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> |};
+		if (!$disable_connection) {
+			if (exists $connection_info{database}) {
+				print $fh qq{<a href="#ConnectionsDatabaseReport">Connections per database</a> |};
+			}
+			if (exists $connection_info{user}) {
+				print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> |};
+			}
+			if (exists $connection_info{host}) {
+				print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> |};
+			}
 		}
 		print $fh "</div>\n";
 	}
@@ -1297,26 +1316,30 @@ sub html_footer
 		if (!$disable_type) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 		}
-		if (scalar keys %lock_info > 0) {
+		if (!$disable_lock && scalar keys %lock_info > 0) {
 			print $fh qq{<li><a href="#LocksByTypeReport">Locks by type</a></li>};
 		}
-		if (exists $session_info{database}) {
-			print $fh qq{<li><a href="#SessionsDatabaseReport">Sessions per database</a></li>};
+		if (!$disable_session) {
+			if (exists $session_info{database}) {
+				print $fh qq{<li><a href="#SessionsDatabaseReport">Sessions per database</a></li>};
+			}
+			if (exists $session_info{user}) {
+				print $fh qq{<li><a href="#SessionsUserReport">Sessions per user</a></li>};
+			}
+			if (exists $session_info{host}) {
+				print $fh qq{<li><a href="#SessionsHostReport">Sessions per host</a></li><li>};
+			}
 		}
-		if (exists $session_info{user}) {
-			print $fh qq{<li><a href="#SessionsUserReport">Sessions per user</a></li>};
-		}
-		if (exists $session_info{host}) {
-			print $fh qq{<li><a href="#SessionsHostReport">Sessions per host</a></li><li>};
-		}
-		if (exists $connection_info{database}) {
-			print $fh qq{<li><a href="#ConnectionsDatabaseReport">Connections per database</a></li>};
-		}
-		if (exists $connection_info{user}) {
-			print $fh qq{<li><a href="#ConnectionsUserReport">Connections per user</a></li>};
-		}
-		if (exists $connection_info{host}) {
-			print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
+		if (!$disable_connection) {
+			if (exists $connection_info{database}) {
+				print $fh qq{<li><a href="#ConnectionsDatabaseReport">Connections per database</a></li>};
+			}
+			if (exists $connection_info{user}) {
+				print $fh qq{<li><a href="#ConnectionsUserReport">Connections per user</a></li>};
+			}
+			if (exists $connection_info{host}) {
+				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
+			}
 		}
 		if (!$disable_query) {
 			print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
@@ -1401,7 +1424,7 @@ sub dump_as_html
 <li>Average size of temporary file: $fmt_temp_avsize</li>
 };
 	}
-	if ($session_info{count}) {
+	if (!$disable_session && $session_info{count}) {
 		my $avg_session_duration = &convert_time($session_info{duration}/$session_info{count});
 		my $tot_session_duration = &convert_time($session_info{duration});
 		print $fh qq{
@@ -1410,7 +1433,7 @@ sub dump_as_html
 <li>Average duration of sessions: $avg_session_duration</li>
 };
 	}
-	if ($connection_info{count}) {
+	if (!$disable_connection && $connection_info{count}) {
 		print $fh qq{
 <li>Total number of connections: $connection_info{count}</li>
 }
@@ -1727,7 +1750,7 @@ sub dump_as_html
 	}
 
 	# Lock stats per type
-	if (scalar keys %lock_info > 0) {
+	if (!$disable_lock && scalar keys %lock_info > 0) {
 		print $fh qq{
 <h2 id="LocksByTypeReport">Locks by type <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1776,7 +1799,7 @@ sub dump_as_html
 	}
 
 	# Show session per database statistics
-	if (exists $session_info{database}) {
+	if (!$disable_session && exists $session_info{database}) {
 		print $fh qq{
 <h2 id="SessionsDatabaseReport">Sessions per database <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1818,7 +1841,7 @@ sub dump_as_html
 		print $fh "</td></tr></table>\n";
 	}
 	# Show session per user statistics
-	if (exists $session_info{user}) {
+	if (!$disable_session && exists $session_info{user}) {
 		print $fh qq{
 <h2 id="SessionsUserReport">Sessions per user <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1861,7 +1884,7 @@ sub dump_as_html
 	}
 
 	# Show session per host statistics
-	if (exists $session_info{host}) {
+	if (!$disable_session && exists $session_info{host}) {
 		print $fh qq{
 <h2 id="SessionsHostReport">Sessions per host <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1904,7 +1927,7 @@ sub dump_as_html
 	}
 
 	# Show connection per database statistics
-	if (exists $connection_info{database}) {
+	if (!$disable_connection && exists $connection_info{database}) {
 		print $fh qq{
 <h2 id="ConnectionsDatabaseReport">Connections per database <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1946,7 +1969,7 @@ sub dump_as_html
 		print $fh "</td></tr></table>\n";
 	}
 	# Show connection per user statistics
-	if (exists $connection_info{user}) {
+	if (!$disable_connection && exists $connection_info{user}) {
 		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per user <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -1988,7 +2011,7 @@ sub dump_as_html
 	}
 
 	# Show connection per host statistics
-	if (exists $connection_info{host}) {
+	if (!$disable_connection && exists $connection_info{host}) {
 		print $fh qq{
 <h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -2444,6 +2467,7 @@ sub parse_query
 
 	# Stores lock activity
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/)) {
+			return if ($disable_lock);
 			$lock_info{$1}{count}++;
 			$lock_info{$1}{duration} += $3;
 			$lock_info{$1}{$2}{count}++;
@@ -2455,6 +2479,7 @@ sub parse_query
 
 	# Stores temporary files activity
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /temporary file: path .*, size (\d+)/)) {
+		return if ($disable_temporary);
 		$tempfile_info{count}++;
 		$tempfile_info{size} += $1;
 		$tempfile_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
@@ -2465,11 +2490,13 @@ sub parse_query
 
 	# Stores pre connection activity
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection received: host=([^\s]+) port=(\d+)/)) {
+		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
 		return;
 	}
 	# Stores connection activity
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection authorized: user=([^\s]+) database=([^\s]+)/)) {
+		return if ($disable_connection);
 		my $usr = $1;
 		my $db = $2;
 		$connection_info{count}++;
@@ -2490,6 +2517,7 @@ sub parse_query
 
 	# Stores session duration
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/)) {
+		return if ($disable_session);
 		my $time = $1;
 		my $usr = $2;
 		my $db = $3;
@@ -2512,6 +2540,7 @@ sub parse_query
 
 	# Store checkpoint information
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /checkpoint complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) transaction log file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/)) {
+		return if ($disable_checkpoint);
 		$checkpoint_info{wbuffer} += $1;
 		#$checkpoint_info{percent_wbuffer} += $2;
 		$checkpoint_info{file_added} += $3;
