@@ -37,10 +37,10 @@ $VERSION = '1.0';
 $| = 1;
 
 # Global variables overriden during install
-my $ZCAT_PROG = '/bin/zcat';
 my $JQGRAPH = 1;
 
 # Command line options
+my $zcat    = 'zcat';
 my $logfile = '';
 my $format  = '';
 my $outfile = '';
@@ -107,6 +107,7 @@ my $result = GetOptions (
 	"x|extension=s" => \$extension,
 	"m|maxlength=i" => \$maxlength,
 	"g|graph!"      => \$graph,
+	"z|zcat=s"      => \$zcat,
 	"n|nohighlight!"=> \$nohighlight,
 	"b|begin=s"     => \$from,
 	"e|end=s"       => \$to,
@@ -340,7 +341,7 @@ foreach $logfile (@log_files) {
 		$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
 	} else {
 		# Open a pipe to zcat program for compressed log
-		$lfile->open("$ZCAT_PROG $logfile |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $logfile. $!\n";
+		$lfile->open("$zcat $logfile |") || die "FATAL: cannot read from pipe to $zcat $logfile. $!\n";
 		# Real size of the file is unknow
 		$totalsize = 0;
 	}
@@ -2778,7 +2779,7 @@ sub autodetect_format
 		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
 	} else {
 		# Open a pipe to zcat program for compressed log
-		$tfile->open("$ZCAT_PROG $file |") || die "FATAL: cannot read from pipe to $ZCAT_PROG $file. $!\n";
+		$tfile->open("$zcat $file |") || die "FATAL: cannot read from pipe to $zcat $file. $!\n";
 	}
 	while (my $line = <$tfile>) {
 		chomp($line);
