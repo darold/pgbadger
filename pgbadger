@@ -533,8 +533,10 @@ Options:
     -q | --quiet           : don't print anything to stdout.
     -p | --progress        : show a progress bar, quiet mode is automaticaly
 			     enabled with this option.
-    --pie-limit num        : pie data lower than num% will show a sum instead.
     -w | -watch-mode       : only report errors just like logwatch could do.
+    -z | --zcat exec_path  : set the full path to the zcat program. Use it if
+			     zcat is not on your path or you want to use gzcat.
+    --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
 			     you can use this option multiple time.

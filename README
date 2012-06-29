@@ -35,10 +35,12 @@ SYNOPSIS
         -b | --begin datetime  : start date/time for the data to be parsed in log.
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -q | --quiet           : don't print anything to stdout.
-        -p | --progress        : show a progress bar, quiet mode is automatically
+        -p | --progress         show a progress bar, quiet mode is automatically
                                  enabled with this option.
-        --pie-limit num        : pie data lower than num% will show a sum instead.
         -w | -watch-mode       : only report errors just like logwatch could do.
+        -z | --zcat exec_path  : set the full path to the zcat program. Use it if
+                                 zcat is not on your path or you want to use gzcat.
+        --pie-limit num        : pie data lower than num% will show a sum instead.
         --exclude-query regex  : any query matching the given regex will be excluded
                                  from the report- for example: "^(VACUUM|COMMIT)".
                                  You can use this option multiple times.
@@ -65,8 +67,7 @@ SYNOPSIS
 
         30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
 
-    This suppose that your log file and HTML report are also rotated every
-    week.
+        This suppose that your log file and HTML report are also rotated every week.
 
 DESCRIPTION
     pgBadger is a PostgreSQL log analyzer built for speed with fully
@@ -85,7 +86,7 @@ DESCRIPTION
 
     pgBadger is able to autodetect your log file format (syslog, stderr or
     csvlog). It is designed to parse huge log files, as well as gzip
-    compressed files. See a complete list of features below.
+    compressed file. See a complete list of features below.
 
 FEATURE
     pgBadger reports everything about your SQL queries:
@@ -108,7 +109,7 @@ FEATURE
 
     All charts are zoomable and can be saved as PNG images.
 
-REQUIREMENTS
+REQUIREMENT
     PgBadger comes as a single Perl script- you do not need anything else
     than a modern Perl distribution. Charts are rendered using a Javascript
     library so you don't need anything. Your browser will do all the work.
@@ -136,7 +137,7 @@ POSTGRESQL CONFIGURATION
 
             log_line_prefix = '%t [%p]: [%l-1] '
 
-    Log line prefix could add user and database name as follow:
+    Log line prefix could add user and database name as follows:
 
             log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
 
@@ -165,7 +166,7 @@ POSTGRESQL CONFIGURATION
     be parsed by pgBadger.
 
 INSTALLATION
-    Download the tarball from github and unpack the archive as follows:
+    Download the tarball from github and unpack the archive as follow:
 
             tar xzf pgbadger-1.x.tar.gz
             cd pgbadger-1.x/
