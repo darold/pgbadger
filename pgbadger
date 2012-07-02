@@ -385,7 +385,7 @@ foreach $logfile (@log_files) {
 		# Parse syslog lines
 		if ($format eq 'syslog') {
 
-			if ($line =~ /^(...)\s(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s+([A-Z]+:)\s+(.*)/) {
+			if ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s+([A-Z]+:)\s+(.*)/) {
 				# skip non postgresql lines
 				next if ($7 ne $ident);
 				# Syslog do not have year information, so take care of year overlapping
@@ -399,7 +399,7 @@ foreach $logfile (@log_files) {
 				last if ($to && ($to < $cur_date));
 				# Process the log line
 				&parse_query($tmp_year, $month_abbr{$1}, sprintf("%02d", $2), $3, $4, $5, $6, $8, $9, $10, $11,$12);
-			} elsif ($line =~ /^(...)\s(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s+[^\#]*(#011)[\t\s]*(.*)/) {
+			} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s+[^\#]*(#011)[\t\s]*(.*)/) {
 
 				$cur_info{query} .= "\n" . $11;
 			} else {
