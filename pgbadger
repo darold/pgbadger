@@ -2699,6 +2699,10 @@ sub parse_query
 	}
 
 	# Extract the duration part from the query
+	my $duration_required = 1;
+	if ($error_only || ($disable_hourly  && $disable_query)) {
+		$duration_required = 0;
+	}
 	my $t_action = '';
 	my $t_duration = '';
 	if ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(query|statement):\s*//is) {
@@ -2707,6 +2711,10 @@ sub parse_query
 	} elsif ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(prepare|parse|bind|execute|execute from fetch)\s+[^:]+://is) {
 		$t_duration = $1;
 		$t_action = $2;
+	}elsif (!$duration_required && ($t_query =~ s/(query|statement):\s*//is)) {
+		$t_action = $1;
+	} elsif (!$duration_required && ($t_query =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+://is)) {
+		$t_action = $1;
 	} elsif ($t_loglevel eq 'LOG') {
 		if ($t_query !~ /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file/) {
 			&logmsg('WARNING', "Unrecognized line: $t_loglevel: $t_query at line $nlines");
@@ -2716,7 +2724,6 @@ sub parse_query
 
 	# Skiping parse and bind logs
 	return if ( $t_action && ($t_action !~ /query|statement|execute/) );
-
 
 	$cur_info{year} = $t_year;
 	$cur_info{month} = $t_month;
@@ -2788,17 +2795,21 @@ sub autodetect_format
 		# Open a pipe to zcat program for compressed log
 		$tfile->open("$zcat $file |") || die "FATAL: cannot read from pipe to $zcat $file. $!\n";
 	}
+	my $duration = 'duration:';
+	if ($error_only || ($disable_hourly  && $disable_query)) {
+		$duration = '';
+	}
 	while (my $line = <$tfile>) {
 		chomp($line);
 		$line =~ s///;
 		next if (!$line);
 		$nline++;
 		# Is syslog lines ?
-		if ($line =~ /^...\s\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+duration:/) {
+		if ($line =~ /^...\s\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+$duration/) {
 			$fmt = 'syslog';
 			$nfound++;
 		# Is stderr lines
-		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+duration:/) {
+		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+$duration/) {
 			$fmt = 'stderr';
 			$nfound++;
 		} elsif ($line =~ tr/,/,/ >= 12) {
