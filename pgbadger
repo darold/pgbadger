@@ -394,7 +394,14 @@ foreach $logfile (@log_files) {
 					$tmp_year = substr($CURRENT_DATE,1, 4) - 1;
 				}
 				# Skip unwanted lines
-				my $cur_date = "$tmp_year$month_abbr{$1}$2$3$4$5";
+				# Fix single digit days
+                                my $day;
+                                if ($2 < 10) {
+                                        $day = "0$2";
+                                } else {
+                                        $day = $2;
+                                }
+                                my $cur_date = "$tmp_year$month_abbr{$1}$day$3$4$5";				
 				next if ($from && ($from > $cur_date));
 				last if ($to && ($to < $cur_date));
 				# Process the log line
@@ -564,7 +571,7 @@ Reporting errors every week by cron job:
 
     30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
 
-this suppose that your log file and HTML report are also rotated every weeks.
+This supposes that your log file and HTML report are also rotated every weeks.
 
 };
 
