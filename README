@@ -8,8 +8,9 @@ SYNOPSIS
 
     Arguments:
 
-      logfile can be a single log file, a list of files, or a shell command
-      returning a list of file.
+        logfile can be a single log file, a list of files, or a shell command
+        returning a list of file. If you want to pass log content from stdin
+        use - as filename.
 
     Options:
 
@@ -17,7 +18,7 @@ SYNOPSIS
                                  be a plain text log or a gzip compressed file
                                  with the .gz extension. Note that this option is
                                  DEPRECATED: set logfile as a command line argument
-                                 instead.
+                                 instead. To use stdin set it to character -.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
         -o | --outfile filename: define the filename for the output. Default depends
                                  on the output format: out.html or out.txt. To dump
@@ -62,6 +63,7 @@ SYNOPSIS
             pgbadger -p -g /var/log/postgresql/postgresql-2012-05-*
             pgbadger -p -g --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
             pgbadger -p -g -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
+            cat /var/log/postgres.log | pgbadger -g -p -
 
     Reporting errors every week by cron job:
 

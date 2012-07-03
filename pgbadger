@@ -140,13 +140,17 @@ if ($ver) {
 # of log file to parse.
 if (!$logfile && ($#ARGV >= 0)) {
 	foreach my $file (@ARGV) {
-		die "FATAL: logfile $file must exist!\n" if (!-f $file);
-		next if (-z $file);
+		if ($file ne '-') {
+			die "FATAL: logfile $file must exist!\n" if (!-f $file);
+			next if (-z $file);
+		}
 		push(@log_files, $file);
 	}
 } elsif ($logfile) {
-	die "FATAL: logfile $logfile must exist!\n" if (!-f $logfile);
-	die "FATAL: logfile $logfile is empty!\n" if (-z $logfile);
+	if (!$logfile ne '-') {
+		die "FATAL: logfile $logfile must exist!\n" if (!-f $logfile);
+		die "FATAL: logfile $logfile is empty!\n" if (-z $logfile);
+	}
 	push(@log_files, $logfile);
 }
 
@@ -508,7 +512,8 @@ Usage: pgbadger [options] logfile [...]
 Arguments:
 
     logfile can be a single log file, a list of files or a shell command 
-    returning a list of file.
+    returning a list of file. If you want to pass log content from stdin
+    use - as filename.
 
 Options:
 
@@ -516,7 +521,7 @@ Options:
 			     be a plain text log or a gzip compressed file
 			     with the .gz extension. Note that this option is
 			     DEPRECATED, set logfile as a command line argument
-			     instead.
+			     instead. To use stdin set it to character -.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
@@ -561,6 +566,7 @@ Examples:
 		       /var/log/postgres.log
 	pgbadger -p -g /var/log/postgresql/postgresql-2012-05-*
 	pgbadger -p -g --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+	cat /var/log/postgres.log | pgbadger -g -p -
 
 Reporting errors every week by cron job:
 
