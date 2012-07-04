@@ -157,6 +157,13 @@ You need to enable other parameters in postgresql.conf to get more informations 
 
 Do not enable log_statement and log_duration, their log format will not be parsed by pgBadger.
 
+Of course your log messages should be in english without locale support:
+
+	lc_messages='C'
+
+but this is not only recommanded by pgbadger.
+
+
 =head1 INSTALLATION
 
 Download the tarball from github and unpack the archive as follow:
