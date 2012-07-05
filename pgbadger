@@ -165,8 +165,6 @@ $quiet = 1 if ($progress);
 
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
-# Set default syslog ident name
-$ident ||= 'postgres';
 # Set default top query
 $top ||= 20;
 # Set the default number of samples
@@ -183,6 +181,8 @@ if (!$extension) {
 }
 # Set default filename of the output file
 $outfile ||= 'out.' . $extension;
+# Set default syslog ident name
+$ident ||= 'postgres';
 
 # Set default pie percentage limit or fix value
 $pie_percentage_limit = 0 if ($pie_percentage_limit < 0);
@@ -2813,15 +2813,17 @@ sub autodetect_format
 	if ($error_only || ($disable_hourly  && $disable_query)) {
 		$duration = '';
 	}
+	my %ident_name = ();
 	while (my $line = <$tfile>) {
 		chomp($line);
 		$line =~ s///;
 		next if (!$line);
 		$nline++;
 		# Is syslog lines ?
-		if ($line =~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+$duration/) {
+		if ($line =~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+$duration/) {
 			$fmt = 'syslog';
 			$nfound++;
+			$ident_name{$1}++;
 		# Is stderr lines
 		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\]\s.*:\s+$duration/) {
 			$fmt = 'stderr';
@@ -2835,6 +2837,10 @@ sub autodetect_format
 	$tfile->close();
 	if (!$fmt || ($nfound < 10)) {
 		die "FATAL: unable to detect log file format from $file, please use -f option.\n";
+	}
+
+	if ( ($fmt eq 'syslog') && !$ident && (scalar keys %ident_name == 1) ) {
+		$ident = (keys %ident_name)[0];
 	}
 
 	return $fmt;
