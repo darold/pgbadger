@@ -404,11 +404,15 @@ foreach $logfile (@log_files) {
 				# Skip unwanted lines
 				next if ($from && ($from > $cur_date));
 				last if ($to && ($to < $cur_date));
+				# Replace syslog tablulation rewrite
+				my $tmp_query = $12;
+				$tmp_query =~ s/#011/\t/g;
 				# Process the log line
-				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11,$12);
+				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $tmp_query);
 			} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s+[^\#]*(#011)[\t\s]*(.*)/) {
-
-				$cur_info{query} .= "\n" . $11;
+				my $tmp_query = $11;
+				$tmp_query =~ s/#011/\t/g;
+				$cur_info{query} .= "\n" . $tmp_query;
 			} else {
 				&logmsg('DEBUG', "Unknown syslog line format: $line");
 			}
