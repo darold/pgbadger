@@ -74,6 +74,7 @@ my $disable_connection = 0;
 my $disable_lock = 0;
 my $disable_temporary = 0;
 my $disable_checkpoint = 0;
+my $avg_minutes = 5;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS = (800,300);
@@ -1200,7 +1201,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
 	width : 1025px;
 	height: 400px;
 	background:#F3F2ED;
@@ -1481,16 +1482,32 @@ sub dump_as_html
 		<th colspan="2">Queries</th>
 		<th colspan="2">SELECT queries</th>
 		<th colspan="4">Write queries</th>
+};
+		if (exists $connection_info{chronos}) {
+			print $fh "		<th colspan=\"2\">Connections</th>\n";
+		}
+		if (exists $session_info{chronos}) {
+			print $fh "		<th colspan=\"2\">Sessions</th>\n";
+		}
+		print $fh qq{
 	</tr>
 	<tr>
 		<th>Count</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Av.&nbsp;duration&nbsp;</th>
 		<th>Count</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Av.&nbsp;duration&nbsp;</th>
 		<th>INSERT</th>
 		<th>UPDATE</th>
 		<th>DELETE</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Av.&nbsp;duration&nbsp;</th>
+};
+		if (exists $connection_info{chronos}) {
+			print $fh "		<th>Count</th><th>Av./s</th>\n";
+		}
+		if (exists $session_info{chronos}) {
+			print $fh "		<th>Count</th><th>Av.&nbsp;duration&nbsp;</th>\n";
+		}
+		print $fh qq{
 	</tr>
 };
 
@@ -1504,7 +1521,15 @@ sub dump_as_html
 				$per_hour_info{$d}{$h}{average} = $per_hour_info{$d}{$h}{duration} / ($per_hour_info{$d}{$h}{count} || 1);
 				$per_hour_info{$d}{$h}{'SELECT'}{average} = $per_hour_info{$d}{$h}{'SELECT'}{duration} / ($per_hour_info{$d}{$h}{'SELECT'}{count} || 1);
 				my $write_average = (($per_hour_info{$d}{$h}{'INSERT'}{duration}+$per_hour_info{$d}{$h}{'UPDATE'}{duration}+$per_hour_info{$d}{$h}{'DELETE'}{duration})||0)/(($per_hour_info{$d}{$h}{'INSERT'}{count}+$per_hour_info{$d}{$h}{'UPDATE'}{count}+$per_hour_info{$d}{$h}{'DELETE'}{count})||1);
-				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td></tr>\n";
+				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{count}), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}||0), "</td><td class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'SELECT'}{average}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'UPDATE'}{count}||0), "</td><td class=\"right\">", &comma_numbers($per_hour_info{$d}{$h}{'DELETE'}{count}||0), "</td><td class=\"right\">", &convert_time($write_average), "</td>";
+				if (exists $connection_info{chronos}) {
+					print $fh "<td class=\"right\">", &comma_numbers($connection_info{chronos}{"$d"}{"$h"}{count}||0), "</td><td class=\"right\">", &comma_numbers(sprintf("%0.2f", $connection_info{chronos}{"$d"}{"$h"}{count}/3600)), "/s</td>";
+				}
+				if (exists $session_info{chronos}) {
+					$per_hour_info{$d}{$h}{'session'}{average} = $session_info{chronos}{"$d"}{"$h"}{duration} / ($session_info{chronos}{"$d"}{"$h"}{count} || 1);
+					print $fh "<td class=\"right\">", &comma_numbers($session_info{chronos}{"$d"}{"$h"}{count}||0), "</td><td  class=\"right\">", &convert_time($per_hour_info{$d}{$h}{'session'}{average}), "</td>";
+				}
+				print $fh "</tr>\n";
 				$c++;
 			}
 		}
@@ -1519,6 +1544,11 @@ sub dump_as_html
 			my $d1 = '';
 			my $d2 = '';
 			my $d3 = '';
+			my @avgs = ();
+			for (my $i = 0; $i < 59; $i += $avg_minutes) {
+				push(@avgs, sprintf("%02d", $i));
+			}
+			push(@avgs, 59);
 			foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{query}}) {
 				$tm =~ /(\d{4})(\d{2})(\d{2})/;
 				my $y = $1 - 1900;
@@ -1527,7 +1557,7 @@ sub dump_as_html
 				foreach my $h ("00" .. "23") {
 					my %dataavg = ();
 					foreach my $m ("00" .. "59") {
-						my $rd = &average_five_minutes($m);
+						my $rd = &average_per_minutes($m, $avg_minutes);
 						if (exists $per_minute_info{query}{$tm}{$h}{$m}) {
 							# Average per minute
 							$dataavg{average}{"$rd"} += $per_minute_info{query}{$tm}{$h}{$m}{count};
@@ -1538,10 +1568,10 @@ sub dump_as_html
 							}
 						}
 					}
-					foreach my $rd ('00','05','10','15','20','25','30','35','40','45','50','55') {
+					foreach my $rd (@avgs) {
 						my $t = timelocal_nocheck(0,$rd,$h,$d,$mo,$y) * 1000;
-						# Average per 5 minutes
-						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / 300) . "],";
+						# Average per minutes
+						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60*$avg_minutes)) . "],";
 						# Maxi per minute
 						$d1 .= "[$t, " .  ($dataavg{max}{"$rd"} || 0) . "],";
 						# Mini per minute
@@ -1553,8 +1583,48 @@ sub dump_as_html
 			$d1 =~ s/,$//;
 			$d2 =~ s/,$//;
 			$d3 =~ s/,$//;
-			&flotr2_graph(1, 'queriespersecond_graph', $d1, $d2, $d3, 'Queries per second (5 minutes average)',
+			&flotr2_graph(1, 'queriespersecond_graph', $d1, $d2, $d3, 'Queries per second (' . $avg_minutes . ' minutes average)',
 					'Queries per second','Maximum','Average','Minimum');
+			$d1 = '';
+			$d2 = '';
+			$d3 = '';
+
+			foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{connection}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d = $3;
+				foreach my $h ("00" .. "23") {
+					my %dataavg = ();
+					foreach my $m ("00" .. "59") {
+						my $rd = &average_per_minutes($m,$avg_minutes);
+						if (exists $per_minute_info{connection}{$tm}{$h}{$m}) {
+							# Average per minute
+							$dataavg{average}{"$rd"} += $per_minute_info{connection}{$tm}{$h}{$m}{count};
+							# Search minimum and maximum during this minute
+							foreach my $s (keys %{$per_minute_info{connection}{$tm}{$h}{$m}{second}}) {
+								$dataavg{max}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
+								$dataavg{min}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+							}
+						}
+					}
+					foreach my $rd (@avgs) {
+						my $t = timelocal_nocheck(0,$rd,$h,$d,$mo,$y) * 1000;
+						# Average per minutes
+						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60*$avg_minutes)) . "],";
+						# Maxi per minute
+						$d1 .= "[$t, " .  ($dataavg{max}{"$rd"} || 0) . "],";
+						# Mini per minute
+						$d3 .= "[$t, " .  ($dataavg{min}{"$rd"} || 0) . "],";
+					}
+				}
+			}
+			delete $per_minute_info{connection};
+			$d1 =~ s/,$//;
+			$d2 =~ s/,$//;
+			$d3 =~ s/,$//;
+			&flotr2_graph(1, 'connectionspersecond_graph', $d1, $d2, $d3, 'Connections per second (' . $avg_minutes . ' minutes average)',
+					'Connections per second','Maximum','Average','Minimum');
 			$d1 = '';
 			$d2 = '';
 			$d3 = '';
@@ -2545,6 +2615,10 @@ sub parse_query
 		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{user}{$usr}++;
 		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database}{$db}++;
 		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database_user}{$db}{$usr}++;
+		if ($graph) {
+			$per_minute_info{connection}{"$t_year$t_month$t_day"}{"$t_hour"}{"$t_min"}{count}++; 
+			$per_minute_info{connection}{"$t_year$t_month$t_day"}{"$t_hour"}{"$t_min"}{second}{$t_sec}++;
+		}
 		if (exists $conn_received{$t_pid}) {
 			$connection_info{host}{$conn_received{$t_pid}}++;
 			$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{host}{$conn_received{$t_pid}}++;
@@ -2781,15 +2855,21 @@ sub normalize_error
 	return $orig_query;
 }
 
-sub average_five_minutes
+sub average_per_minutes
 {
 	my $val = shift;
+	my $idx = shift;
 
-	my @avgs = ('00','05','10','15','20','25','30','35','40','45','50','55','59');
+	my @avgs = ();
+	for (my $i = 0; $i < 59; $i += $idx) {
+		push(@avgs, sprintf("%02d", $i));
+	}
+	push(@avgs, 59);
+	
 	for (my $i = 0; $i <= $#avgs; $i++) {
 		if ($val == $avgs[$i]) {
 			return "$avgs[$i]";
-		} elsif ($i == 12) {
+		} elsif ($avgs[$i] == $avgs[-1]) {
 			return "$avgs[$i-1]";
 		} elsif ( ($val > $avgs[$i]) && ($val < $avgs[$i+1])) {
 			return "$avgs[$i]";
