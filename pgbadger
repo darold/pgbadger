@@ -116,6 +116,7 @@ my $result = GetOptions (
 	"regex-user=s"  => \$regex_prefix_dbuser,
 	"q|quiet!"      => \$quiet,
 	"p|progress!"   => \$progress,
+	"a|average=i"	=> \$avg_minutes,
 	"pie-limit=i"   => \$pie_percentage_limit,
 	"image-format=s"=> \$img_format,
 	"w|watch-mode!" => \$error_only,
@@ -163,6 +164,11 @@ if ($#log_files < 0) {
 
 # Quiet mode is forced with progress bar
 $quiet = 1 if ($progress);
+
+# Set the default number minutes for queries and connections average
+$avg_minutes ||= 5;
+$avg_minutes = 60 if ($avg_minutes > 60);
+$avg_minutes = 1 if ($avg_minutes < 1);
 
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
@@ -550,6 +556,8 @@ Options:
     -w | -watch-mode       : only report errors just like logwatch could do.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
 			     zcat is not on your path or you want to use gzcat.
+    -a | --average minutes : number of minutes to build the average graphs of
+			     queries and connections.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
