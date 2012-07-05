@@ -1769,7 +1769,11 @@ sub dump_as_html
 					$data{"Sum types < $pie_percentage_limit%"} += $overall_stat{$t} || 0;
 				}
 			}
-			$data{'Others'} = $total - $totala;
+			if ( ((($total - $totala)*100)/$total) > $pie_percentage_limit) {
+				$data{'Others'} = $total - $totala;
+			} else {
+				$data{"Sum types < $pie_percentage_limit%"} += $total - $totala;
+			}
 			&flotr2_piegraph(8, 'queriesbytype_graph','Type of queries', %data);
 		}
 		print $fh "</td></tr></table>\n";
