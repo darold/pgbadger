@@ -33,7 +33,7 @@ WriteMakefile(
 	'MAN1PODS'     => { 'doc/pgBadger.pod' => 'blib/man1/pgbadger.1' },
 	'DESTDIR'      => $DESTDIR,
 	'INSTALLDIRS'  => $INSTALLDIRS,
-	'clean'	       => {FILES => "install_all.sh"},
+	'clean'	       => {},
 	'META_MERGE'   => {
 		resources  => {
 			homepage => 'http://projects.dalibo.org/pgbadger',

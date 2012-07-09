@@ -119,6 +119,15 @@ If you planned to parse PostgreSQL CSV log files you might need some Perl Module
 
 This module is optional, if you don't have PostgreSQL log in the CSV format you don't need to install it.
 
+Under Windows OS you may not be able to use gzipped log files unless you have a
+zcat like utility that could uncompress the log file and send content to stdout.
+If you have such an utility or in other OSes you want to use other compression
+utility like bzip2 or Zip, use the --zcat comand line option as follow:
+
+	--zcat="unzip -p" or --zcat="gunzip -c" or --zcat="bzip2 -dc"
+
+the last example can also be used like this: --zcat="bzcat"
+
 =head1 POSTGRESQL CONFIGURATION
 
 You must enable some configuration directives in your postgresql.conf before starting.
