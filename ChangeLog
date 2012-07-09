@@ -1,262 +1,122 @@
-  2012-07-04 Darold Gilles <gilles@darold.net>
+2012-07-04 - version 1.1
+
+This release fixes lot of issues and adds several main features.
+
+    New feature:
+
+	- Add possibility to get log from stdin
+	- Change syslog parsing regex to allow log timestamp in log_line_prefix
+	  very often forgotten when log destination is changed from stderr to
+	  syslog.
+	- Add documentation for the -z | --zcat command line option.
+	- Allow `zcat` location to be specified via `--zcat` - David E. Wheeler
+	- Add --disable-session,--disable-connection and disable-checkpoint
+	  command line options to remove their respective reports from the
+	  output	
+	- Add --disable-query command line option to remove queries statistics
+	  from the output
+	- Add --disable-hourly command line option to remove hourly statistics
+	  from the output
+	- Add --disable-error command line option to remove error report from
+	  the output
+	- Add --exclude-query option to exclude types of queries by specifying
+	  a regex
+	- Set thousand separator and decimal separator to be locale dependant
+	- Add -w option to only report errors
+	- Add Makefile.PL and full POD documentation to the project
+	- Allow multiple log files from command line
+	- Add simple csvlog support - Alex Hunsaker
+	- Hourly report for temporary files and checkpoints have moved in a
+	  separate table.
+	- Add hourly connections and sessions statistics.
+	- Add a chart about the number of connections per seconds.
+
+    Bug fix:
+
+	- Add information about log format requirement (lc_message = 'C').
+	  Reported by Alain Benard.
+	- Fix for begin/end dates with single digit day using syslog. Patch by
+	  Joseph Marlin.
+	- Fix handle of syslog dates with single-digit day number. Patch by
+	  Denis Orlikhin.
+	- Fix many English syntax in error messages and documentation. Patch by
+	  Joseph Marlin.
+	- Fix non terminated TH html tag in checkpoint hourly table. Reported
+	  by Joseph Marlin.
+	- "Log file" section will now only report first and last log file parsed
+	- Fix empty output in hourly temporary file stats.
+	- Fix wrapping query that goes out of the table and makes the window
+	  scroll horizontally. Asked by Isaac Reuben.
+	- Fix code where != was replaced by $$CLASSSY0A$$!=$$CLASSSY0B$$ in the
+	  output. Reported by Isaac Reuben
+	- Fix and review text report output.
+	- Fix an issue in SQL code highligh replacement.
+	- Complete review of the HTML output. 
+	- Add .gitignore for swap files. Patch by Vincent Picavet
+	- Fix wrong variable for user and database filter. Patch by Vincent
+	  Picavet.
+	- Change default regexp for user and db to be able to detect both. Patch
+	  by Vincent Picavet.
+	- Fix false cur_date when using syslog and allow -b and -e options to
+	  work. Patch by Vincent Picavet.
+	- Fix some case where logs where not detected as PostgreSQL log lines.
+	- Added explanation for --begin and --end datetime setting. Patch by
+	  ragged.
+	- Added -v / --version. Patch by ragged.
+	- Fix usage information and presentation in README file.
+
+2012-05-04 - version to 1.0
+
+  First public release of pgBadger.
+
+    New feature:
+
+	- Add graph of ckeckpoint Wal files usage (added, removed, recycled).
+	- Add --image-format to allow the change of the default png image
+	  format to jpeg.
+	- Allow download of all pie graphics as images.
+ 	- Add --pie-limit to sum all data lower than this percentage limit to
+	  avoid label overlap.
+ 	- Allow download of graphics as PNG images.
+	- Replace GD::Graph by the Flotr2 javascript library to draw graphics.
+	  Patch by Guillaume Lelarge
+	- Add pie graphs for session, database, user and host. Add a --quiet
+	  option to remove debug output and --progress to show a progress bar
+	  during log parsing
+	- Add pie graph for Queries by type.
+	- Add graph for checkpoint write buffer per hours
+	- Allow log parsing without any log_line_prefix and extend it to be
+	  defined by the user. Custom log_line prefix can be parsed using user
+	  defined regex with command line option --regex-db and --regex-user.
+	  For exemple the default regex of pgbadger to parse user and db name
+	  from log_line_prefix can be written like this:
+		pgbadger -l mylogfile.log  --regex-user="user=([^,]*)," \
+			--regex-db="db=([^,]*)"
+	- Separe log_line_prefix from log level part in the parser to extend
+	  log_line_prefix parsing
+	- If there is just one argument, assume it is the logfile and use
+	  default value for all other parameters
+	- Add autodetection of log format (syslog or stderr) if none is given
+	  with option -f
+	- Add --outfile option to dump output to a file instead of stdout.
+	  Default filename is out.html or out.txt following the output format.
+	  To dump to stdout set filename to -
+	- Add --version command line option to show current pgbadger version.
+
+    Bug fix:
+
+	- Rearrange x and y axis
+	- Fix legend opacity on graphics
+	- Rearrange Overall stats view
+	- Add more "normalization" on errors messages
+	- Fix samples error with normalyzed error instead of real error message
+	- Fix an other average size of temporary file decimal limit
+	- Force quiet mode when --progress is used
+	- Fix per sessions graphs
+	- Fix sort order of days/hours into hours array
+	- Fix sort order of days into graphics
+	- Remove display of locks, sessions and connections statistics when none
+	  are available
+	- Fix display of empty column of checkpoint when no checkpoint was found
+	  in log file
 
- * META.yml, pgbadger: Change version to 1.1
-
- * README, doc/pgBadger.pod: Add information about log format requirement -
- Alain Benard
-
-  2012-07-03 Darold <gilles@darold.net>
-
- * README, doc/pgBadger.pod, pgbadger: Add possibility to get log from stdin
- (issue #13) - Tonis Kevvai
-
- * pgbadger: Change fix on day with single digit to be formatted by sprintf()
-
-  2012-07-03 josephmarlin <joseph.a.marlin@gmail.com>
-
- * pgbadger: Fix for begin/end dates with single digit day using syslog
-
-  2012-07-02 Darold <gilles@darold.net>
-
- * pgbadger: Allow log without duration with error only report and when
- --disable-query and --disable-hourly are used
-
-  2012-07-02 Denis Orlikhin <denis@ostrovok.ru>
-
- * pgbadger: handle syslog dates with single-digit day number
-
-  2012-07-01 Darold <gilles@darold.net>
-
- * pgbadger: Change syslog parsing regex to allow log timestamp in
- log_line_prefix
-
-  2012-06-29 Darold Gilles <gilles@darold.net>
-
- * README, doc/pgBadger.pod, pgbadger: Add documentation for the --zcat
- command line option
-
-  2012-06-29 David E. Wheeler <david@justatheory.com>
-
- * pgbadger: Allow `zcat` location to be specified via `--zcat`.  Also default
- to just `zcat`, so that chances are it can be found in the path.  Even better
- might be to search the path for `gzcat` and fall back on `zcat`, but perhaps
- another time.
-
-  2012-06-25 josephmarlin <joseph.a.marlin@gmail.com>
-
- * pgbadger: Fix English in error messages.
-
- * doc/pgBadger.pod: Mirrored English changes in the doc
-
- * README: English fixes for README
-
-  2012-06-25 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Fix non terminated TH html tag in checkpoint hourly table -
- Joseph Marlin
-
- * pgbadger: "Log file" will now only report first and last log file parsed
-
- * README, doc/pgBadger.pod, pgbadger: Add
- --disable-session,--disable-connecti
- able-checkpoint command line options to remove their respective report from
- the output
-
-  2012-06-24 Darold <gilles@darold.net>
-
- * README, doc/pgBadger.pod, pgbadger: Add --disable-query command line option
- to remove queries statistics from the output
-
- * README, doc/pgBadger.pod, pgbadger: Add --disable-hourly command line
- option to remove hourly statistics from the output
-
- * pgbadger: Fix hourly temporary file stat empty output
-
- * README, doc/pgBadger.pod, pgbadger: Add --disable-error command line option
- to remove error report from the output
-
-  2012-06-23 Darold <gilles@darold.net>
-
- * pgbadger: Fix issue #8 wrapping query that goes out of the table and makes
- the window scroll horizontally - Isaac Reuben
-
- * README, doc/pgBadger.pod, pgbadger: Add --exclude-query option to exclude
- types of queries by specifying a regex - Isaac Reuben
-
- * pgbadger: Fix issue #10 where != was replaced by
- $$CLASSSY0A$$!=$$CLASSSY0B$$ in the output - Isaac Reuben
-
-  2012-06-10 Darold <gilles@darold.net>
-
- * pgbadger: Fix text output
-
-  2012-06-09 Darold <gilles@darold.net>
-
- * pgbadger: Set thousand separator and decimal separator locale dependant
-
- * README, doc/pgBadger.pod, pgbadger: Add -w option to only report errors
-
- * README, doc/pgBadger.pod: Fix some type and add some comment into
- documentation
-
-  2012-06-09 Darold Gilles <gilles@darold.net>
-
- * MANIFEST, META.yml, Makefile.PL, README, doc/pgBadger.pod, pgbadger: Add
- Makefile.PL and full POD documentation to the project
-
-  2012-06-08 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Fix a SQL code highligh replacement
-
- * pgbadger: Change a little the CSS
-
-  2012-06-07 Darold Gilles <gilles@darold.net>
-
- * LICENSE, pgbadger: Complete review of the HTML output. Hourly report for
- temporary files and checkpoints have moved in a separate table
-
- * README, pgbadger: Allow multiple log file from command line, option -l is
- now deprecated
-
-  2012-06-01 Vincent Picavet <vincent.picavet@oslandia.com>
-
- * .gitignore: Add .gitignore for swap files.
-
- * pgbadger: Fix wrong variable for user and database filter.
-
- * pgbadger: Change default regexp for user and db to be able to detect both.
-
-  2012-05-31 Vincent Picavet <vincent.picavet@oslandia.com>
-
- * pgbadger: Fix false cur_date when using syslog and allow -b and -e options
- to work.
-
-  2012-05-23 Alex Hunsaker <badalex@gmail.com>
-
- * README, pgbadger: Add simple csvlog support
-
-  2012-05-24 Darold <gilles@darold.net>
-
- * pgbadger: fix case where log line where not detected
-
- * pgbadger: fix interpreted ctrl+M and log format example from previous git
- merges
-
-  2012-05-22 ragged <ragged@gmx.de>
-
- * pgbadger: Added explanation for --begin and --end datetime setting. And
- added -v / --version
-
-  2012-05-23 ragged <ragged@gmx.de>
-
- * README: Added explanation for --begin and --end datetime setting. And added
- -v / --version
-
-  2012-05-18 Isaac Reuben <isaac@shotgunsoftware.com>
-
- * README, pgbadger: Fix config examples to use variables for user and db
-
-  2012-05-18 Darold <gilles@darold.net>
-
- * README: Fix usage information and presentation in README file
-
-  2012-05-04 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Change version to 1.0
-
- * pgbadger: Add graph of ckeckpoint Wal files usage (added, removed,
- recycled)
-
- * pgbadger: Add --image-format to allow the change of the default png image
- format to jpeg
-
- * pgbadger: Allow download of all pie graphics as images
-
- * pgbadger: Add --pie-limit to sum all data lower than this percentage limit
- to avoid label overlap
-
-  2012-05-03 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Allow download of graphics as PNG images
-
- * pgbadger: Rearrange x and y axis
-
- * pgbadger: Fix legend opacity on graphics
-
- * pgbadger: Replace GD::Graph by the Flotr2 javascript library to draw
- graphics - Guillaume Lelarge
-
-  2012-05-02 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Rearrange x-axis label of GD::Graph graphics
-
- * pgbadger: Rearrange Overall stats view
-
- * pgbadger: Force graphics images to be saved in the same directory as the
- html output file
-
- * pgbadger: Fix samples error with normalyzed error instead of real error
- message
-
-  2012-04-27 Darold Gilles <gilles@darold.net>
-
- * pgbadger: Add more "normalization" on errors messages
-
-  2012-04-20 Darold <gilles@darold.net>
-
- * pgbadger: Fix an other average size of temporary file decimal limit
-
- * README, pgbadger: Update usage information with new options
-
- * pgbadger: Force quiet mode when --progress is used
-
- * pgbadger: Fix per sessions graphs
-
- * pgbadger: Add pie graphs for session, database, user and host. Add --quiet
- option to remove debug output and --progress to show a progress bar during
- log parsing
-
-  2012-04-18 Darold <gilles@darold.net>
-
- * pgbadger: Add pie graph for Queries by type
-
- * pgbadger: Fix sort order of days/hours into hours array
-
- * pgbadger: Fix sort order of days into graphics
-
-  2012-04-17 Darold <gilles@darold.net>
-
- * pgbadger: Add graph for checkpoint write buffer per hours
-
-  2012-04-16 Darold <gilles@darold.net>
-
- * pgbadger: Remove display of locks, sessions and connections statistics when
- none are available
-
-  2012-04-15 Darold <gilles@darold.net>
-
- * pgbadger: Fix display of empty column of checkpoint when no checkpoint was
- found in log file
-
- * pgbadger: Allow log parsing without any log_line_prefix and extend it to be
- defined by the user. Custom log_line prefix can be parsed using user defined
- regex with command line option --regex-db and --regex-user. For exemple the
- default regex of pgbadger to parse user and db name from log_line_prefix can
- be written like this: pgbadger -l mylogfile.log  --regex-user="user=([^,]*),"
- --regex-db="db=([^,]*)"
-
- * pgbadger: Separe log_line_prefix from log level part in the parser to
- extend log_line_prefix parsing
-
- * pgbadger: If there is just one argument, assume it is the logfile and use
- default value for all other parameters
-
- * pgbadger: Add autodetection of log format (syslog or stderr) if none is
- given with option -f
-
- * pgbadger: Add --outfile option to dump output to a file instead of stdout.
- Default filename is out.html or out.txt following the output format. To dump
- to stdout set filename to -
-
- * pgbadger: Add --version command line option to show current pgbadger
- version
