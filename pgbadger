@@ -86,8 +86,6 @@ my @log_files = ();
 # to avoid label overlaping. 
 my $pie_percentage_limit = 2;
 
-my $t0 = Benchmark->new;
-
 # Get the decimal separator
 my $n = 5/2;
 my $num_sep = ',';
@@ -158,7 +156,7 @@ if (!$logfile && ($#ARGV >= 0)) {
 
 # Logfile is a mandatory parameter
 if ($#log_files < 0) {
-	print STDERR "FATAL: you must set a log file.\n\n";
+	print STDERR "FATAL: you must give a log file as command line parameter.\n\n";
 	&usage();
 }
 
@@ -224,15 +222,29 @@ if ($error_only && $disable_error) {
 	die "FATAL: please choose between no error report and reporting errors only.\n";
 }
 
+# Set default search pattern for database and user name in log_line_prefix
+$regex_prefix_dbname = 'db=([^,]*)' if (!$regex_prefix_dbname);
+$regex_prefix_dbuser = 'user=([^,]*)' if (!$regex_prefix_dbuser);
+
 # Testing regex syntaxe
 if ($#exclude_query >= 0) {
 	foreach my $r (@exclude_query) {
-		eval { m/$r/i; };
-		if ($@) {
-			die "FATAL: invalid regex '$r', $!\n";
-		}
+		&check_regex($r, '--exclude-query');
 	}
 }
+&check_regex($regex_prefix_dbname, '--regex-db');
+&check_regex($regex_prefix_dbuser, '--regex-user');
+
+sub check_regex
+{
+	my ($pattern, $varname) = @_;
+
+	eval { m/$pattern/i; };
+	if ($@) {
+		die "FATAL: '$varname' invalid regex '$pattern', $!\n";
+	}
+}
+
 # Check start/end date time
 if ($from) {
 	if ($from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
@@ -343,6 +355,8 @@ my @graph_values = ();
 my %cur_info = ();
 my $nlines = 0;
 
+my $t0 = Benchmark->new;
+
 foreach $logfile (@log_files) {
 	# Open log file for reading
 	my $totalsize = (stat("$logfile"))[7] || 0;
@@ -363,9 +377,8 @@ foreach $logfile (@log_files) {
 	$gyear += 1900;
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon+1) . sprintf("%02d",$gmday);
 
-	my $cur_td = $t0;
-
-	my $csv_obj;
+	my $cur_pid = '';
+	my $csv_obj = undef;
 	if ($format eq 'csv') {
 		require Text::CSV;
 		$csv_obj = Text::CSV->new({'binary'=>1});
@@ -386,17 +399,10 @@ foreach $logfile (@log_files) {
 			}
 		}
 
-		if ($debug && (($nlines % 100000) == 0)) {
-			my $t1 = Benchmark->new;
-			my $td = timediff($t1, $cur_td);
-			&logmsg('DEBUG', "Lines parsed $nlines, [ 100000 in " . timestr($td) . " ]");
-			$cur_td = $t1;
-		}
-
 		# Parse syslog lines
 		if ($format eq 'syslog') {
 
-			if ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s+([A-Z]+:)\s+(.*)/) {
+			if ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*)\s+([A-Z]+):\s+(.*)/) {
 
 				# skip non postgresql lines
 				next if ($7 ne $ident);
@@ -411,15 +417,38 @@ foreach $logfile (@log_files) {
 				# Skip unwanted lines
 				next if ($from && ($from > $cur_date));
 				last if ($to && ($to < $cur_date));
-				# Replace syslog tablulation rewrite
-				my $tmp_query = $12;
-				$tmp_query =~ s/#011/\t/g;
+				$cur_pid = $8;
 				# Process the log line
-				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $tmp_query);
+				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $12);
+
 			} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s+(.*)/) {
-				my $tmp_query = $11;
-				$tmp_query =~ s/#011/\t/g;
-				$cur_info{query} .= "\n" . $tmp_query;
+
+				$cur_pid = $8;
+				my $t_query = $10;
+				$t_query =~ s/#011/\t/g;
+				if ($cur_info{$cur_pid}{statement}) {
+					$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
+				} elsif ($cur_info{$cur_pid}{context}) {
+					$cur_info{$cur_pid}{context} .= "\n" . $t_query;
+				} elsif ($cur_info{$cur_pid}{detail}) {
+					$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
+				} else {
+					$cur_info{$cur_pid}{query} .= "\n" . $t_query;
+				}
+
+			# Collect orphans lines of multiline queries
+			} elsif ($line !~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:/) {
+
+				if ($cur_info{$cur_pid}{statement}) {
+					$cur_info{$cur_pid}{statement} .= "\n" . $line;
+				} elsif ($cur_info{$cur_pid}{context}) {
+					$cur_info{$cur_pid}{context} .= "\n" . $line;
+				} elsif ($cur_info{$cur_pid}{detail}) {
+					$cur_info{$cur_pid}{detail} .= "\n" . $line;
+				} else {
+					$cur_info{$cur_pid}{query} .= "\n" . $line;
+				}
+
 			} else {
 				&logmsg('DEBUG', "Unknown syslog line format: $line");
 			}
@@ -427,15 +456,30 @@ foreach $logfile (@log_files) {
 		} elsif ($format eq 'stderr') {
 
 			# Parse stderr lines
-			if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s+([A-Z]+:)\s+(.*)/) {
+			if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s+([A-Z]+):\s+(.*)/) {
 				# Skip unwanted lines
 				my $cur_date = "$1$2$3$4$5$6";
 				next if ($from && ($from > $cur_date));
 				last if ($to && ($to < $cur_date));
+				$cur_pid = $8;
 				# Process the log line
 				&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+
+			# Collect orphans lines of multiline queries
+			} elsif ($line !~ /^\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:/) {
+
+				if ($cur_info{$cur_pid}{statement}) {
+					$cur_info{$cur_pid}{statement} .= "\n" . $line;
+				} elsif ($cur_info{$cur_pid}{context}) {
+					$cur_info{$cur_pid}{context} .= "\n" . $line;
+				} elsif ($cur_info{$cur_pid}{detail}) {
+					$cur_info{$cur_pid}{detail} .= "\n" . $line;
+				} else {
+					$cur_info{$cur_pid}{query} .= "\n" . $line;
+				}
+
 			} else {
-				$cur_info{query} .= "\n" . $line if ($cur_info{query});
+				$cur_info{$cur_pid}{query} .= "\n" . $line if ($cur_info{$cur_pid}{query});
 			}
 
 		} elsif ($format eq 'csv') {
@@ -464,16 +508,16 @@ foreach $logfile (@log_files) {
 					$cols[11].':', # loglevel
 					$cols[13], # query
 				);
-			}else {
+			} else {
 				&logmsg('DEBUG', "Unknown csv line format: $line, error: ". $csv_obj->error_input());
 			}
 
-		} else
-		{
+		} else {
 			# unknown format
 			&logmsg('DEBUG', "Unknown line format: $line");
 		}
 	}
+
 	if ($progress) {
 		if ($totalsize) {
 			print progress_bar($cursize, $totalsize, 25, '=');
@@ -482,12 +526,19 @@ foreach $logfile (@log_files) {
 	}
 
 	$lfile->close();
+
+	# Get stats from all pending temporary storage
+	foreach my $pid (sort { $cur_info{$a}{date} <=> $cur_info{$b}{date} } %cur_info) {
+		&store_queries($pid);
+	}
+	%cur_info = ();
+
 }
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 
-&logmsg('DEBUG', "Ok, generating report...") if ($debug);
+&logmsg('DEBUG', "Ok, generating $format report...") if ($debug);
 
 # Open filehandle
 my $fh = new IO::File ">$outfile";
@@ -698,19 +749,21 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($q, $date, $real_error, $detail) = @_;
+	my ($q, $date, $real_error, $detail, $context, $statement, $hint) = @_;
 
 	
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
-		if (!grep(/\Q$real_error\E/, @{$error_info{$q}{error}})) {
+		if (($q =~ /deadlock detected/) || !grep(/\Q$real_error\E/, @{$error_info{$q}{error}})) {
 			push(@{$error_info{$q}{date}}, $date);
 			push(@{$error_info{$q}{detail}}, $detail);
+			push(@{$error_info{$q}{context}}, $context);
+			push(@{$error_info{$q}{statement}}, $statement);
+			push(@{$error_info{$q}{hint}}, $hint);
 			push(@{$error_info{$q}{error}}, $real_error);
 		}
 	}
 }
-
 
 sub dump_as_text
 {
@@ -960,30 +1013,9 @@ Report not supported by text format
 	}
 
 	if (!$disable_error) {
-		print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
-		print $fh "Rank     Times reported     Error\n";
-		my $idx = 1;
-		foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
-			next if (!$error_info{$k}{count});
-			last if ($idx > $top);
-			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
-			print $fh "--\n";
-			if ($error_info{$k}{count} > 1) {
-				my $j = 1;
-				for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
-					print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
-					print $fh "\t\tDetail: $error_info{$k}{detail}[$i]\n" if ($error_info{$k}{detail}[$i]);
-					$j++;
-				}
-			} elsif ($error_info{$k}{detail}[0]) {
-				print $fh "\t- Example: $error_info{$k}{date}[0] - $k";
-				print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n";
-			} else {
-				print $fh "\t- Example: $error_info{$k}{date}[0] - $k\n";
-			}
-			$idx++;
-		}
+		&show_error_as_text();
 	}
+
 	print $fh "\n\n";
 	print $fh "Report generated by PgBadger $VERSION (http://projects.dalibo.org/pgbadger/).\n";
 
@@ -1012,30 +1044,42 @@ Parsed $fmt_nlines log entries in $total_time
 Log start from $first_log_date to $last_log_date
 };
 
+	&show_error_as_text();
+
+	print $fh "\n\n";
+	print $fh "Report generated by pgBadger $VERSION (http://projects.dalibo.org/pgbadger/).\n";
+}
+
+sub show_error_as_text
+{
 	print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
 	my $idx = 1;
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
-		print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
-		print $fh "--\n";
 		if ($error_info{$k}{count} > 1) {
+			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
+			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
 				print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
 				print $fh "\t\tDetail: $error_info{$k}{detail}[$i]\n" if ($error_info{$k}{detail}[$i]);
+				print $fh "\t\tContext: $error_info{$k}{context}[$i]\n" if ($error_info{$k}{context}[$i]);
+				print $fh "\t\tHint: $error_info{$k}{hint}[$i]\n" if ($error_info{$k}{hint}[$i]);
+				print $fh "\t\tStatement: $error_info{$k}{statement}[$i]\n" if ($error_info{$k}{statement}[$i]);
 				$j++;
 			}
-		} elsif ($error_info{$k}{detail}[0]) {
-			print $fh "\t- Example: $error_info{$k}{date}[0] - $k";
-			print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n";
 		} else {
-			print $fh "\t- Example: $error_info{$k}{date}[0] - $k\n";
+			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
+			print $fh "--\n";
+			print $fh "\t- Date: $error_info{$k}{date}[0]\n";
+			print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n" if ($error_info{$k}{detail}[0]);
+			print $fh "\t\tContext: $error_info{$k}{context}[0]\n" if ($error_info{$k}{context}[0]);
+			print $fh "\t\tHint: $error_info{$k}{hint}[0]\n" if ($error_info{$k}{hint}[0]);
+			print $fh "\t\tStatement: $error_info{$k}{statement}[0]\n" if ($error_info{$k}{statement}[0]);
 		}
 		$idx++;
 	}
-	print $fh "\n\n";
-	print $fh "Report generated by pgBadger $VERSION (http://projects.dalibo.org/pgbadger/).\n";
 
 }
 
@@ -2345,54 +2389,7 @@ sub dump_as_html
 	}
 
 	if (!$disable_error) {
-		print $fh qq{
-<h2 id="NormalizedErrorsMostFrequentReport">Most frequent errors (N) <a href="#top" title="Back to top">^</a></h2>
-<table class="queryList">
-<tr>
-	<th>Rank</th>
-	<th>Times reported</th>
-	<th>Error</th>
-
-</tr>
-};
-		my $idx = 1;
-		foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
-			next if (!$error_info{$k}{count});
-			last if ($idx > $top);
-			my $col = $idx % 2;
-			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">", &comma_numbers($error_info{$k}{count}), "</span>";
-			print $fh "<div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th></tr>";
-			foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
-				my $c = 1;
-				$d =~ /^\d{4}(\d{2})(\d{2})$/;
-				my $zday = "$abbr_month{$1} $2";
-				foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
-					my $colb = $c % 2;
-					$zday = "&nbsp;" if ($c > 1);
-					print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td>", &comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}), "</td></tr>";
-					$c++;
-				}
-			}
-			print $fh "</table></div></div></td>\n";
-			if ($error_info{$k}{count} > 1) {
-				print $fh "<td><div class=\"error\">$k</div>";
-				print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
-				for (my $i = 0; $i <= $#{$error_info{$k}{date}}; $i++) {
-					my $c = $i % 2;
-					print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
-					print $fh "<div class=\"errorInformation$c\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
-				}
-				print $fh "</div>";
-			} elsif ($error_info{$k}{detail}[0]) {
-				print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
-				print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n";
-			} else {
-				print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
-			}
-			print $fh "</td></tr>\n";
-			$idx++;
-		}
-		print $fh "</table>\n";
+		&show_error_as_html();
 	}
 
 	# Dump the html footer
@@ -2426,7 +2423,29 @@ sub dump_error_as_html
 </ul>
 </div>
 };
+	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
+	my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
+	print $fh qq{
+<div class="reports">
+<h2 id="OverallStatsReport">Overall statistics <a href="#top" title="Back to top">^</a></h2>
+<div class="information">
+<table><tr><td valign="top">
+<ul>
+<li>Number of errors: $fmt_errors</li>
+<li>Number of unique normalized errors: $fmt_unique_error</li>
+</ul>
+</td></tr></table>
+</div>
+};
 
+	&show_error_as_html();
+
+	# Dump the html footer
+	&html_footer();
+}
+
+sub show_error_as_html
+{
 	print $fh qq{
 <h2 id="NormalizedErrorsMostFrequentReport">Most frequent errors (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
@@ -2463,21 +2482,22 @@ sub dump_error_as_html
 				my $c = $i % 2;
 				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
 				print $fh "<div class=\"errorInformation$c\">Detail: $error_info{$k}{detail}[$i]</div>\n" if ($error_info{$k}{detail}[$i]);
+				print $fh "<div class=\"errorInformation$c\">Context: $error_info{$k}{context}[$i]</div>\n" if ($error_info{$k}{context}[$i]);
+				print $fh "<div class=\"errorInformation$c\">Hint: $error_info{$k}{hint}[$i]</div>\n" if ($error_info{$k}{hint}[$i]);
+				print $fh "<div class=\"errorInformation$c\">Statement: $error_info{$k}{statement}[$i]</div>\n" if ($error_info{$k}{statement}[$i]);
 			}
 			print $fh "</div>";
-		} elsif ($error_info{$k}{detail}[0]) {
-			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
-			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n";
 		} else {
-			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$k</div>";
+			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
+			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n" if ($error_info{$k}{detail}[0]);
+			print $fh "<div class=\"errorInformation\">Context: $error_info{$k}{context}[0]</div>\n" if ($error_info{$k}{context}[0]);
+			print $fh "<div class=\"errorInformation\">Hint: $error_info{$k}{hint}[0]</div>\n" if ($error_info{$k}{hint}[0]);
+			print $fh "<div class=\"errorInformation\">Statement: $error_info{$k}{statement}[0]</div>\n" if ($error_info{$k}{statement}[0]);
 		}
 		print $fh "</td></tr>\n";
 		$idx++;
 	}
 	print $fh "</table>\n";
-
-	# Dump the html footer
-	&html_footer();
 
 }
 
@@ -2522,56 +2542,62 @@ sub parse_query
 {
 	my ($t_year, $t_month, $t_day, $t_hour, $t_min, $t_sec, $t_host, $t_pid, $t_session, $t_logprefix, $t_loglevel, $t_query) = @_;
 
-
-	# Get log level
-	if ($t_loglevel !~ s/^.*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):$/$1/) {
+	# Get log level and pass if not supported following the context
+	if ($t_loglevel !~ /^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT)$/) {
 		# Unrecognized loglevel format
-		&logmsg('DEBUG', "Unrecognized loglevel format: $t_loglevel");
+		if ($t_loglevel ne 'NOTICE') {
+			&logmsg('DEBUG', "Unrecognized loglevel format: $t_loglevel");
+		}
 		return;
 	}
-	next if ($t_loglevel eq 'CONTEXT');
-	next if ( $error_only && ($t_loglevel !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT)/) );
+	# Reclassifying the checkpoint LOG information into WARNING to be reported into error/warning sections
+	$t_loglevel = 'WARNING' if ($t_query =~ /checkpoints are occurring too frequently/);
+	# Do not parse lines that are not an error like message
+	if ($error_only && ($t_loglevel !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/) ) {
+		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
+			&store_queries($t_pid);
+			delete $cur_info{$t_pid};
+		}
+		return;
+	}
+	# Do not parse lines that are an error like message
+	if ($disable_error && ($t_loglevel =~ /WARNING|ERROR|FATAL|PANIC|HINT|CONTEXT|DETAIL|STATEMENT/) ) {
+		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
+			&store_queries($t_pid);
+			delete $cur_info{$t_pid};
+		}
+		return;
+	}
 
 	# Extract user and database information from the logprefix part
 	my $t_dbname = '';
 	my $t_dbuser = '';
-	# Remove log_line_prefix timestamp and extra space character
+	# Remove timestamp in log_line_prefix and extra space character
 	$t_logprefix =~ s/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)//;
 	$t_logprefix =~ s/\s+$//;
 	$t_logprefix =~ s/^\s+//;
 
 	if ($t_logprefix) {
-		# User defined regex
-		if ($regex_prefix_dbuser) {
-			if ($t_logprefix =~ /$regex_prefix_dbuser/) {
-				$t_dbuser = $1;
-			}
-		# Default regex
-		} elsif ($t_logprefix =~ /user=([^,]*)/) {
+		# Search for database user
+		if ($t_logprefix =~ /$regex_prefix_dbuser/) {
 			$t_dbuser = $1;
 		}
-		# User defined regex
-		if ($regex_prefix_dbname) {
-			if ($t_logprefix =~ /$regex_prefix_dbname/) {
-				$t_dbname = $1;
-			}
-		# Default regex
-		} elsif ($t_logprefix =~ /db=([^,]*)/) {
+		# Search for database name
+		if ($t_logprefix =~ /$regex_prefix_dbname/) {
 			$t_dbname = $1;
 		}
-
 		# Check user and/or database if require
 		if ($dbname) {
 			# Log line do not match the required dbname
 			if (!$t_dbname || ($dbname ne $t_dbname)) {
-				%cur_info = ();
+				delete $cur_info{$t_pid};
 				return;
 			}
 		}
 		if ($dbuser) {
 			# Log line do not match the required dbuser
 			if (!$t_dbuser || ($dbuser ne $t_dbuser)) {
-				%cur_info = ();
+				delete $cur_info{$t_pid};
 				return;
 			}
 		}
@@ -2580,6 +2606,11 @@ sub parse_query
 	# Store the current timestamp of the log line
 	$first_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec" if (!$first_log_date);
 	$last_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec";
+
+	# Replace syslog tablulation rewrite
+	$t_query =~ s/#011/\t/g if ($format eq 'syslog');
+	# Remove line from session number
+	$t_session =~ s/\-\d+//;
 
 	# Stores lock activity
 	if (($t_loglevel eq 'LOG') && ($t_query =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/)) {
@@ -2680,167 +2711,194 @@ sub parse_query
 		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{total} += $8;
 		return;
 	}
-	
-	# Store errors statistics
-	if ($cur_info{query}) {
-		delete $conn_received{$cur_info{pid}};
-		if (!$disable_error) {
-			if ($cur_info{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
-				$cur_info{query} = substr($cur_info{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{query}) > $maxlength));
-				$cur_info{query} = $cur_info{loglevel} . ": " . $cur_info{query};
-				$overall_stat{'errors_number'}++;
-				my $normalized_error = &normalize_error($cur_info{query});
-				$overall_stat{'unique_normalized_errors'}{"$normalized_error"}++;
-				# Store normalyzed error count
-				$error_info{$normalized_error}{count}++; 
-				# Store normalyzed error count per time
-				$error_info{$normalized_error}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
-				# Store normalyzed query samples
-				my $cur_last_log_date = "$cur_info{year}-$cur_info{month}-$cur_info{day} $cur_info{hour}:$cur_info{min}:$cur_info{sec}";
-				if ($t_loglevel =~ /DETAIL|STATEMENT/) {
-					&set_top_error_sample($normalized_error, $cur_last_log_date, $cur_info{query}, $t_query);
-				} else {
-					&set_top_error_sample($normalized_error, $cur_last_log_date, $cur_info{query});
-				}
-				%cur_info = ();
-				return;
-			}
-		}
 
-		# Process complete query but not debug/info logs
-		if ($cur_info{loglevel} eq 'LOG') {
+	# Store the detail of the error
+	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC/) {
+		if ($t_loglevel =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) { 
+			$cur_info{$t_pid}{"\L$1\E"} .= $t_query;
+			return;
+		}
+	}
+
+	# Process current query following context
+	if ($cur_info{$t_pid}{query}) {
+
+		# Remove obsolete connexion storage
+		delete $conn_received{$cur_info{$t_pid}{pid}};
+
+		# The query is complete but we are missing some debug/info/bind parameter logs
+		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 			# Apply bind parameters if any
 			if ( ($t_loglevel eq 'DETAIL') && ($t_query =~ /parameters: (.*)/)) {
 				my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $1);
 				shift(@t_res);
 				for (my $i = 0; $i < $#t_res; $i+=2) {
-					$cur_info{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+					$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
 				}
+				&store_queries($t_pid);
+				delete $cur_info{$t_pid};
 			}
+		}
 
-			# Cleanup and normalize the current query
-			$cur_info{query} =~ s/^[\t\s]+//s;
-			$cur_info{query} =~ s/[\t\s]+$//s;
-			# Should we have to exclude some queries
-			if ($#exclude_query >= 0) {
-				foreach (@exclude_query) {
-					if ($cur_info{query} =~ /$_/i) {
-						$cur_info{query} = '';
-						return;
-					}
-				}
-			}
-			$cur_info{query} = substr($cur_info{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{query}) > $maxlength));
-			$cur_info{query} .= ';' if (substr($cur_info{query}, -1, 1) ne ';');
-
-
-			my $normalized = &normalize_query($cur_info{query});
-
-			# Stores global statistics
-			my $cur_last_log_date = "$cur_info{year}-$cur_info{month}-$cur_info{day} $cur_info{hour}:$cur_info{min}:$cur_info{sec}";
-			$overall_stat{'queries_number'}++;
-			$overall_stat{'queries_duration'} += $cur_info{duration};
-			$overall_stat{'first_query'} = $cur_last_log_date if (!$overall_stat{'first_query'});
-			$overall_stat{'last_query'} = $cur_last_log_date;
-			$overall_stat{'query_peak'}{$cur_last_log_date}++;
-			$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
-			$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{duration} += $cur_info{duration}; 
-			if ($graph) {
-				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{count}++; 
-				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{second}{$cur_info{sec}}++; 
-				$per_minute_info{query}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{duration} += $cur_info{duration}; 
-			}
-			if ($normalized =~ /delete from/) {
-				$overall_stat{'DELETE'}++;
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'DELETE'}{count}++; 
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'DELETE'}{duration} += $cur_info{duration}; 
-				if ($graph) {
-					$per_minute_info{delete}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{count}++; 
-					$per_minute_info{delete}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{$cur_info{hour}}{$cur_info{min}}{duration} += $cur_info{duration}; 
-				}
-			} elsif ($normalized =~ /insert into/) {
-				$overall_stat{'INSERT'}++;
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'INSERT'}{count}++; 
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'INSERT'}{duration} += $cur_info{duration}; 
-				if ($graph) {
-					$per_minute_info{insert}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
-					$per_minute_info{insert}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
-				}
-			} elsif ($normalized =~ /update.*set\b/) {
-				$overall_stat{'UPDATE'}++;
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'UPDATE'}{count}++; 
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'UPDATE'}{duration} += $cur_info{duration}; 
-				if ($graph) {
-					$per_minute_info{update}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
-					$per_minute_info{update}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
-				}
-			} elsif ($normalized =~ /\bselect\b/is) {
-				$overall_stat{'SELECT'}++;
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'SELECT'}{count}++; 
-				$per_hour_info{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{'SELECT'}{duration} += $cur_info{duration}; 
-				if ($graph) {
-					$per_minute_info{select}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{count}++; 
-					$per_minute_info{select}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{"$cur_info{min}"}{duration} += $cur_info{duration}; 
-				}
-			}
-			&set_top_slowest($cur_info{query}, $cur_info{duration}, $cur_last_log_date);
-
-			# Store normalyzed query count
-			$normalyzed_info{$normalized}{count}++; 
-			# Store normalyzed query total duration
-			$normalyzed_info{$normalized}{duration} += $cur_info{duration}; 
-			# Store normalyzed query count and duration per time
-			$normalyzed_info{$normalized}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{count}++; 
-			$normalyzed_info{$normalized}{chronos}{"$cur_info{year}$cur_info{month}$cur_info{day}"}{"$cur_info{hour}"}{duration} += $cur_info{duration}; 
-			# Store normalyzed query samples
-			&set_top_sample($normalized, $cur_info{query}, $cur_info{duration}, $last_log_date);
-			%cur_info = ();
+		# When we are ready to overwrite the last storage, add it to the global stats
+		if ( ($t_loglevel =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/) && exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session}) ) {
+			&store_queries($t_pid);
+			delete $cur_info{$t_pid};
 		}
 	}
 
-	# Extract the duration part from the query
+	# Extract the duration and the query parts from the entry
 	my $duration_required = 1;
 	if ($error_only || ($disable_hourly  && $disable_query)) {
 		$duration_required = 0;
 	}
 	my $t_action = '';
 	my $t_duration = '';
-	if ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(query|statement):\s*//is) {
+	if ($t_query =~ s/duration:\s([0-9\.]+)\sms\s+(query|statement):\s//is) {
 		$t_duration = $1;
 		$t_action = $2;
-	} elsif ($t_query =~ s/duration:\s+([0-9\.]+)\s+ms\s+(prepare|parse|bind|execute|execute from fetch)\s+[^:]+://is) {
+	} elsif ($t_query =~ s/duration:\s([0-9\.]+)\sms\s+(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
 		$t_duration = $1;
 		$t_action = $2;
-	}elsif (!$duration_required && ($t_query =~ s/(query|statement):\s*//is)) {
+		# Skiping parse and bind logs
+		return if ($t_action !~ /query|statement|execute/);
+	} elsif (!$duration_required && ($t_query =~ s/(query|statement):\s//is)) {
 		$t_action = $1;
-	} elsif (!$duration_required && ($t_query =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+://is)) {
+	} elsif (!$duration_required && ($t_query =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)) {
 		$t_action = $1;
+		# Skiping parse and bind logs
+		return if ($t_action !~ /query|statement|execute/);
 	} elsif ($t_loglevel eq 'LOG') {
 		if ($t_query !~ /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file/) {
 			&logmsg('WARNING', "Unrecognized line: $t_loglevel: $t_query at line $nlines");
 		}
+		if ( exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session}) ) {
+			&store_queries($t_pid);
+			delete $cur_info{$t_pid};
+		}
 		return;
 	}
 
-	# Skiping parse and bind logs
-	return if ( $t_action && ($t_action !~ /query|statement|execute/) );
-
-	$cur_info{year} = $t_year;
-	$cur_info{month} = $t_month;
-	$cur_info{day} = $t_day;
-	$cur_info{hour} = $t_hour;
-	$cur_info{min} = $t_min;
-	$cur_info{sec} = $t_sec;
-	$cur_info{host} = $t_host;
-	$cur_info{pid} = $t_pid;
-	$cur_info{session} = $t_session;
-	$cur_info{loglevel} = $t_loglevel;
-	$cur_info{query} = $t_query;
-	$cur_info{duration} = $t_duration;
-	$cur_info{dbname} = $t_dbname;
-	$cur_info{dbuser} = $t_dbuser;
+	$cur_info{$t_pid}{year} = $t_year;
+	$cur_info{$t_pid}{month} = $t_month;
+	$cur_info{$t_pid}{day} = $t_day;
+	$cur_info{$t_pid}{hour} = $t_hour;
+	$cur_info{$t_pid}{min} = $t_min;
+	$cur_info{$t_pid}{sec} = $t_sec;
+	$cur_info{$t_pid}{date} = "$t_year$t_month$t_day$t_hour$t_min$t_sec";
+	$cur_info{$t_pid}{host} = $t_host;
+	$cur_info{$t_pid}{pid} = $t_pid;
+	$cur_info{$t_pid}{session} = $t_session;
+	$cur_info{$t_pid}{loglevel} = $t_loglevel;
+	$cur_info{$t_pid}{query} = $t_query;
+	$cur_info{$t_pid}{duration} = $t_duration;
+	$cur_info{$t_pid}{dbname} = $t_dbname;
+	$cur_info{$t_pid}{dbuser} = $t_dbuser;
 
 	return 1;
+}
+
+sub store_queries
+{
+	my $t_pid = shift;
+
+	# Cleanup and normalize the current query
+	$cur_info{$t_pid}{query} =~ s/^[\t\s]+//s;
+	$cur_info{$t_pid}{query} =~ s/[\t\s]+$//s;
+
+	# Should we have to exclude some queries
+	if ($#exclude_query >= 0) {
+		foreach (@exclude_query) {
+			if ($cur_info{$t_pid}{query} =~ /$_/i) {
+				$cur_info{$t_pid}{query} = '';
+				return;
+			}
+		}
+	}
+	# Truncate the query if requested by the user
+	$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]' if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
+
+	# Store the collected informations into global statistics
+	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
+
+		# Add log level at beginning of the query and normalyze it
+		$cur_info{$t_pid}{query} = $cur_info{$t_pid}{loglevel} . ":  " . $cur_info{$t_pid}{query};
+		my $normalized_error = &normalize_error($cur_info{$t_pid}{query});
+		# Stores total and normalyzed error count
+		$overall_stat{'errors_number'}++;
+		$overall_stat{'unique_normalized_errors'}{"$normalized_error"}++;
+		$error_info{$normalized_error}{count}++; 
+		# Stores normalyzed error count per time
+		$error_info{$normalized_error}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{count}++; 
+		# Stores normalyzed query samples
+		my $cur_last_log_date = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+		&set_top_error_sample($normalized_error, $cur_last_log_date, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail}, $cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint});
+
+	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
+
+		# Add a semi-colon at end of the query
+		$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
+		# Normalyze query
+		my $normalized = &normalize_query($cur_info{$t_pid}{query});
+		# Stores global statistics
+		my $cur_last_log_date = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+		$overall_stat{'queries_number'}++;
+		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration};
+		$overall_stat{'first_query'} = $cur_last_log_date if (!$overall_stat{'first_query'});
+		$overall_stat{'last_query'} = $cur_last_log_date;
+		$overall_stat{'query_peak'}{$cur_last_log_date}++;
+		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{count}++; 
+		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{duration} += $cur_info{$t_pid}{duration}; 
+		if ($graph) {
+			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{count}++; 
+			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{second}{$cur_info{$t_pid}{sec}}++; 
+			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration}; 
+		}
+		if ($normalized =~ /delete from/) {
+			$overall_stat{'DELETE'}++;
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'DELETE'}{count}++; 
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'DELETE'}{duration} += $cur_info{$t_pid}{duration}; 
+			if ($graph) {
+				$per_minute_info{delete}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{count}++; 
+				$per_minute_info{delete}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration}; 
+			}
+		} elsif ($normalized =~ /insert into/) {
+			$overall_stat{'INSERT'}++;
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'INSERT'}{count}++; 
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'INSERT'}{duration} += $cur_info{$t_pid}{duration}; 
+			if ($graph) {
+				$per_minute_info{insert}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++; 
+				$per_minute_info{insert}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration}; 
+			}
+		} elsif ($normalized =~ /update.*set\b/) {
+			$overall_stat{'UPDATE'}++;
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'UPDATE'}{count}++; 
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'UPDATE'}{duration} += $cur_info{$t_pid}{duration}; 
+			if ($graph) {
+				$per_minute_info{update}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++; 
+				$per_minute_info{update}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration}; 
+			}
+		} elsif ($normalized =~ /\bselect\b/is) {
+			$overall_stat{'SELECT'}++;
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'SELECT'}{count}++; 
+			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{'SELECT'}{duration} += $cur_info{$t_pid}{duration}; 
+			if ($graph) {
+				$per_minute_info{select}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++; 
+				$per_minute_info{select}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration}; 
+			}
+		}
+		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_date);
+
+		# Store normalyzed query count
+		$normalyzed_info{$normalized}{count}++; 
+		# Store normalyzed query total duration
+		$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration}; 
+		# Store normalyzed query count and duration per time
+		$normalyzed_info{$normalized}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{count}++; 
+		$normalyzed_info{$normalized}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{duration} += $cur_info{$t_pid}{duration}; 
+		# Store normalyzed query samples
+		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_date);
+	}
 }
 
 # Normalyze error messages
