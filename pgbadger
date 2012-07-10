@@ -3170,7 +3170,8 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
 	    explode: 6
         },
         mouse: {
-            track: true
+            track: true,
+	    trackFormatter: function(obj){ return obj.y },
         },
         legend: {
             position: "sw",
