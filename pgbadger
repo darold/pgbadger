@@ -1616,7 +1616,7 @@ sub dump_as_html
 							# Search minimum and maximum during this minute
 							foreach my $s (keys %{$per_minute_info{query}{$tm}{$h}{$m}{second}}) {
 								$dataavg{max}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
-								$dataavg{min}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+								$dataavg{min}{"$rd"} = $per_minute_info{query}{$tm}{$h}{$m}{second}{$s} if (not exists $dataavg{min}{"$rd"} || ($per_minute_info{query}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
 							}
 						}
 					}
@@ -1656,7 +1656,7 @@ sub dump_as_html
 							# Search minimum and maximum during this minute
 							foreach my $s (keys %{$per_minute_info{connection}{$tm}{$h}{$m}{second}}) {
 								$dataavg{max}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} if ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
-								$dataavg{min}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} if (!$dataavg{min}{"$rd"} || ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+								$dataavg{min}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} if (not exists $dataavg{min}{"$rd"} || ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
 							}
 						}
 					}
