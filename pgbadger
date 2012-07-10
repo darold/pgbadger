@@ -3056,6 +3056,11 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
             position: "nw",
             backgroundColor: "#D2E8FF"
         },
+	mouse: {
+            track: true,
+	    trackFormatter: function(obj){ return dateTracker(obj) },
+            relative: true
+        },
         HtmlText: false,
     };
 
@@ -3205,6 +3210,12 @@ EOF
 __DATA__
 
 <script type="text/javascript">
+function dateTracker(obj) 
+{
+	var dateToDisplay = new Date(parseInt(obj.x)); 
+	return '('+dateToDisplay.toGMTString()+' , '+obj.y+')';
+}
+
 /*!
   * bean.js - copyright Jacob Thornton 2011
   * https://github.com/fat/bean
