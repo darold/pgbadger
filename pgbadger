@@ -1267,7 +1267,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
 	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
-#queriesbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph {
 	width : 500px;
 	height: 250px;
 	background:#F3F2ED;
