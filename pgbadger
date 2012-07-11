@@ -538,7 +538,7 @@ foreach $logfile (@log_files) {
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 
-&logmsg('DEBUG', "Ok, generating $format report...") if ($debug);
+&logmsg('DEBUG', "Ok, generating $extension report...") if ($debug);
 
 # Open filehandle
 my $fh = new IO::File ">$outfile";
@@ -1756,6 +1756,9 @@ sub dump_as_html
 			if (exists $checkpoint_info{chronos}) {
 				print $fh qq{<th colspan="7">Checkpoints</th>};
 			}
+			if (exists $checkpoint_info{warning}) {
+				print $fh qq{<th colspan="2">Checkpoint warning</th>};
+			}
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
 				print $fh qq{</tr><tr>};
 			}
@@ -1764,6 +1767,9 @@ sub dump_as_html
 			}
 			if (exists $checkpoint_info{chronos}) {
 				print $fh qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+			}
+			if (exists $checkpoint_info{warning}) {
+				print $fh qq{<th>Count</th><th>Av. time (sec)</th>};
 			}
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
 				print $fh qq{</tr>};
@@ -1785,8 +1791,14 @@ sub dump_as_html
 						if (exists $checkpoint_info{chronos}) {
 							if (exists $checkpoint_info{chronos}{$d}{$h}) {
 								print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_removed}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_recycled}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{write}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync}) || 0, "</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0, "</td>";
+								if ($checkpoint_info{warning}) {
+									print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{warning}) || 0, "</td><td class=\"right\">", &comma_numbers(sprintf("%.2f", ($checkpoint_info{chronos}{$d}{$h}{warning_seconds}||0)/($checkpoint_info{chronos}{$d}{$h}{warning}||1))) || 0, "</td>";
+								}
 							} else {
 								print $fh "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+								if ($checkpoint_info{warning}) {
+									print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
+								}
 							}
 						}
 						print $fh "</tr>\n";
@@ -2550,8 +2562,6 @@ sub parse_query
 		}
 		return;
 	}
-	# Reclassifying the checkpoint LOG information into WARNING to be reported into error/warning sections
-	$t_loglevel = 'WARNING' if ($t_query =~ /checkpoints are occurring too frequently/);
 	# Do not parse lines that are not an error like message
 	if ($error_only && ($t_loglevel !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/) ) {
 		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
@@ -2709,6 +2719,14 @@ sub parse_query
 		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{write} += $6;
 		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{sync} += $7;
 		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{total} += $8;
+		return;
+	}
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /checkpoints are occurring too frequently \((\d+) seconds apart\)/)) {
+		return if ($disable_checkpoint);
+		$checkpoint_info{warning}++;
+		$checkpoint_info{warning_seconds} += $1;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{warning}++;
+		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{warning_seconds} += $1;
 		return;
 	}
 
