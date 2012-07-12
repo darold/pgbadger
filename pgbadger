@@ -343,6 +343,7 @@ my %overall_stat = ();
 my @top_slowest = ();
 my %normalyzed_info = ();
 my %error_info = ();
+my %logs_type = ();
 my %per_hour_info = ();
 my %per_minute_info = ();
 my %lock_info = ();
@@ -1081,6 +1082,18 @@ sub show_error_as_text
 		$idx++;
 	}
 
+	if (scalar keys %logs_type > 0) {
+		print $fh "\n- Logs per type ---------------------------------------------\n\n";
+
+		my $total_logs = 0;
+		foreach my $d (keys %logs_type) {
+			$total_logs += $logs_type{$d};
+		}
+		print $fh "Logs type	Count	Percentage\n";
+		foreach my $d (sort keys %logs_type) {
+			print $fh "$d\t\t", &comma_numbers($logs_type{$d}), "\t", sprintf("%0.2f", ($logs_type{$d}*100)/$total_logs), "%\n";
+		}
+	}
 }
 
 
@@ -1267,7 +1280,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
 	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph {
 	width : 500px;
 	height: 250px;
 	background:#F3F2ED;
@@ -1315,11 +1328,11 @@ EOF
 
 <h1 id="top">PgBadger</h1>
 };
-	if (!$error_only) {
-		print $fh qq{
+	print $fh qq{
 <div class="menu">
 <a href="#OverallStatsReport">Overall statistics</a> | 
 };
+	if (!$error_only) {
 		if (!$disable_hourly) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
@@ -1334,9 +1347,6 @@ EOF
 <a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a><br />
 		}
 };
-		if (!$disable_error) {
-			print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> | };
-		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
 			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
 		}
@@ -1359,11 +1369,15 @@ EOF
 				print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> |};
 			}
 			if (exists $connection_info{host}) {
-				print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> |};
+				print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a><br>};
 			}
 		}
-		print $fh "</div>\n";
 	}
+	if (!$disable_error) {
+		print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> | };
+		print $fh qq{<a href="#LogsTypeReport">Logs per type</a>};
+	}
+	print $fh "</div>\n";
 	print $fh "<p>Normalized reports are marked with a \"(N)\".</p>\n";
 
 }
@@ -1378,14 +1392,14 @@ sub html_footer
 	</div>
 </div>
 };
-	if (!$error_only) {
-		print $fh qq{
+	print $fh qq{
 <div id="littleToc">
 	<div id="littleTocContent">
 
 		<ul>
 			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li>
 };
+	if (!$error_only) {
 		if (!$disable_hourly) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
@@ -1420,15 +1434,16 @@ sub html_footer
 		if (!$disable_query) {
 			print $fh qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
 		}
-		if (!$disable_error) {
-			print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent errors (N)</a></li>\n";
-		}
-		print $fh qq{</ul>
+	}
+	if (!$disable_error) {
+		print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent errors (N)</a></li>\n";
+		print $fh qq{<li><a href="#LogsTypeReport">Logs per type</a></li>\n};
+	}
+	print $fh qq{</ul>
 	</div>
 	<div id="littleTocTitle">Table of contents</div>
 </div>
 };
-	}
 	print $fh qq{
 </body>
 </html>
@@ -2511,6 +2526,56 @@ sub show_error_as_html
 	}
 	print $fh "</table>\n";
 
+
+	if (scalar keys %logs_type > 0) {
+		# Show log' types
+		print $fh qq{
+	<h2 id="LogsTypeReport">Logs per type <a href="#top" title="Back to top">^</a></h2>
+	<table>
+	<tr><td width="500" align="left" valign="top">
+	<table class="SmallTableList">
+	  <tr>
+	    <th>Type</th>
+	    <th>Count</th>
+	    <th>Percentage</th>
+	  </tr>
+	};
+
+		my $total_logs = 0;
+		foreach my $d (sort keys %logs_type) {
+			$total_logs += $logs_type{$d};
+		}
+
+		my $c = 0;
+
+		foreach my $d (sort keys %logs_type) {
+			my $colb = $c % 2;
+			print $fh "<tr class=\"row$colb\"><td>$d</td><td class=\"right\">", &comma_numbers($logs_type{$d}), "</td><td class=\"right\">", sprintf("%0.2f", ($logs_type{$d}*100)/$total_logs), "%</td></tr>\n";
+			$c++;
+		}
+
+		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
+		if ($graph && $total_logs) {
+			my %infos = ();
+			my @small = ();
+			foreach my $d (sort keys %logs_type) {
+				if ((($logs_type{$d}*100)/$total_logs) > $pie_percentage_limit) {
+					$infos{$d} = $logs_type{$d} || 0;
+				} else {
+					$infos{"Sum log types < $pie_percentage_limit%"} += $logs_type{$d} || 0;
+					push(@small, $d);
+				}
+			}
+
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum log types < $pie_percentage_limit%"};
+				delete $infos{"Sum log types < $pie_percentage_limit%"};
+			}
+			&flotr2_piegraph(17, 'logstype_graph','Logs per type', %infos);
+		}
+		print $fh "</td></tr></table>\n";
+	}
+
 }
 
 
@@ -2616,6 +2681,9 @@ sub parse_query
 	# Store the current timestamp of the log line
 	$first_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec" if (!$first_log_date);
 	$last_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec";
+
+	# Store a counter of logs type
+	$logs_type{$t_loglevel}++;
 
 	# Replace syslog tablulation rewrite
 	$t_query =~ s/#011/\t/g if ($format eq 'syslog');
