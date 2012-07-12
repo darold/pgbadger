@@ -46,6 +46,7 @@ Options:
                              zcat is not on your path or you want to use gzcat.
     -a | --average minutes : number of minutes to build the average graphs of
                              queries and connections.
+    -v | --verbose         : enable verbose or debug mode. Disabled by default.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
                              from the report- for example: "^(VACUUM|COMMIT)".

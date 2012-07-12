@@ -55,7 +55,7 @@ my $sample  = 0;
 my $extension = '';
 my $maxlength = 0;
 my $graph = 0;
-my $debug = 1;
+my $debug = 0;
 my $nohighlight = 0;
 my $from = '';
 my $to = '';
@@ -118,6 +118,7 @@ my $result = GetOptions (
 	"pie-limit=i"   => \$pie_percentage_limit,
 	"image-format=s"=> \$img_format,
 	"w|watch-mode!" => \$error_only,
+	"v|verbose!" => \$debug,
 	"exclude-query=s" => \@exclude_query,
 	"disable-error!"=> \$disable_error,
 	"disable-hourly!"=> \$disable_hourly,
@@ -186,6 +187,8 @@ if (!$extension) {
 }
 # Set default filename of the output file
 $outfile ||= 'out.' . $extension;
+&logmsg('DEBUG', "Output '$extension' reports will be written to $outfile");
+
 # Set default syslog ident name
 $ident ||= 'postgres';
 
@@ -359,6 +362,7 @@ my $nlines = 0;
 my $t0 = Benchmark->new;
 
 foreach $logfile (@log_files) {
+	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 	# Open log file for reading
 	my $totalsize = (stat("$logfile"))[7] || 0;
 	my $cursize = 0;
@@ -538,8 +542,9 @@ foreach $logfile (@log_files) {
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
+&logmsg('DEBUG', "the log statistics gathering tooks:" . timestr($td));
 
-&logmsg('DEBUG', "Ok, generating $extension report...") if ($debug);
+&logmsg('DEBUG', "Ok, generating $extension report...");
 
 # Open filehandle
 my $fh = new IO::File ">$outfile";
@@ -560,6 +565,12 @@ if ( ($extension eq 'text') || ($extension eq 'txt') ) {
 	}
 }
 $fh->close;
+
+my $t2 = Benchmark->new;
+$td = timediff($t2, $t1);
+&logmsg('DEBUG', "the generating of reports tooks:" . timestr($td));
+$td = timediff($t2, $t0);
+&logmsg('DEBUG', "the total execution time tooks:" . timestr($td));
 
 exit 0;
 
@@ -610,6 +621,7 @@ Options:
 			     zcat is not on your path or you want to use gzcat.
     -a | --average minutes : number of minutes to build the average graphs of
 			     queries and connections.
+    -v | --verbose         : enable verbose or debug mode. Disabled by default.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
@@ -651,6 +663,7 @@ sub logmsg
 	my ($level, $str) = @_;
 
 	return if ($quiet && ($level ne 'FATAL'));
+	return if (!$debug && ($level eq 'DEBUG'));
 
 	if ($level =~ /(\d+)/) {
 		print STDERR "\t"x$1;
@@ -3078,6 +3091,8 @@ sub autodetect_format
 	if ( ($fmt eq 'syslog') && !$ident && (scalar keys %ident_name == 1) ) {
 		$ident = (keys %ident_name)[0];
 	}
+
+	&logmsg('DEBUG', "Autodetected log format '$fmt' from $file");
 
 	return $fmt;
 }
