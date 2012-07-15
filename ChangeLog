@@ -1,3 +1,47 @@
+2012-07-15 - version 1.2
+
+This version adds some reports and fixes a major issue in log parser. Every one 
+should upgrade.
+
+	- Rewrite this changelog to be human readable.
+	- Add -v | --verbose to enable debug mode. It is now disable by default
+	- Add hourly report of checkpoint warning when checkpoints are occuring
+	  too frequently, it will display the hourly count and the average
+	  occuring time.
+	- Add new report that sums the messages by log types. The report shows
+	  the number of messages of each log type, and a percentage. It also
+	  displays a pie graph. Patch by Guillaume Lelarge.
+	- Add missing pie graph on locks by type report.
+	- Format pie mouse track to display values only.
+	- Fix graph download button id on new connection graph.
+	- Add trackFormatter to flotr2 line graphs to show current x/y values.
+	- Fix issue on per minute minimum value.
+	- Add a note about Windows Os and zcat as well as a more general note
+	  about using compressed log file in other format than gzip.
+	- Complete rewrite of the log parser to handle unordered log lines.
+	  Data are now stored by pid before and added to the global statistics
+	  at end. Error report now include full details, statements, contexts
+	  and hints when available. Deadlock are also fully reported with the
+	  concerned queries.
+	- Fix miss handling of multi lines queries on syslog.
+	- Add -a|--average option to configure the per minutes average interval
+	  for queries and connexions. If you want the average to be calculated
+	  each minutes instead of the 5 per default, use --average 1 or for the
+	  default --average 5. If you want average per hour set it to 60.
+	- Add hourly statistics of connections and sessions as well as a chart
+	  about the number of connection per second (5 minutes average).
+	- Allow OTHERS type of queries lower than 2% to be include in the sum of
+	  types < 2%.
+	- Add autodetection of syslog ident name if different than the default
+	  "postgres" and that there is just one ident name in the log.
+	- Remove syslog replacement of tabulation by #011 still visible when
+	  there was multiple tabulation.
+	- Fix autodetection of log format syslog with single-digit day number
+	  in date.
+	- Add ChangeLog to MANIFEST and change URI in html footer.
+	- Check pgBadger compatibility with Windows Oses. Run perfectly.
+
+
 2012-07-04 - version 1.1
 
 This release fixes lot of issues and adds several main features.
