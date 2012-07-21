@@ -143,7 +143,10 @@ if (!$logfile && ($#ARGV >= 0)) {
 	foreach my $file (@ARGV) {
 		if ($file ne '-') {
 			die "FATAL: logfile $file must exist!\n" if (!-f $file);
-			next if (-z $file);
+			if (-z $file) {
+				print "WARNING: file $file is empty\n";
+				next;
+			}
 		}
 		push(@log_files, $file);
 	}
