@@ -28,7 +28,7 @@ use Getopt::Long;
 use IO::File;
 use Benchmark;
 use File::Basename;
-use Time::Local 'timelocal_nocheck';
+use Time::Local 'timegm_nocheck';
 use POSIX qw(setlocale LC_NUMERIC);
 setlocale LC_NUMERIC, "";
 
@@ -1733,7 +1733,7 @@ sub dump_as_html
 						}
 					}
 					foreach my $rd (@avgs) {
-						my $t = timelocal_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+						my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 
 						# Average per minutes
 						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
@@ -1783,7 +1783,7 @@ sub dump_as_html
 						}
 					}
 					foreach my $rd (@avgs) {
-						my $t = timelocal_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+						my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 
 						# Average per minutes
 						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
@@ -1815,7 +1815,7 @@ sub dump_as_html
 				my $mo = $2 - 1;
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
-					my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{count} || 0) . "],";
 					$d2 .= "[$t, "
 						. sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) / 1000)
@@ -1838,7 +1838,7 @@ sub dump_as_html
 				my $mo = $2 - 1;
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
-					my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
 					$d2 .= "[$t, "
 						. sprintf("%.2f",
@@ -1863,7 +1863,7 @@ sub dump_as_html
 				my $mo = $2 - 1;
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
-					my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 					my $wcount =
 						$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
 						$per_hour_info{$tm}{$h}{'DELETE'}{count} +
@@ -1980,7 +1980,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $mo = $2 - 1;
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
-						my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 						$d1 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
 					}
 				}
@@ -1997,7 +1997,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $mo = $2 - 1;
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
-						my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 						$d1 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_added}    || 0) . "],";
 						$d2 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_removed}  || 0) . "],";
 						$d3 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_recycled} || 0) . "],";
@@ -2023,7 +2023,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $mo = $2 - 1;
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
-						my $t = timelocal_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 						$d1 .= "[$t, " . ($tempfile_info{chronos}{$tm}{$h}{size}  || 0) . "],";
 						$d2 .= "[$t, " . ($tempfile_info{chronos}{$tm}{$h}{count} || 0) . "],";
 					}
