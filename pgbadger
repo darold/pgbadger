@@ -128,7 +128,7 @@ my $result = GetOptions(
 	"disable-lock!"       => \$disable_lock,
 	"disable-temporary!"  => \$disable_temporary,
 	"disable-checkpoint!" => \$disable_checkpoint,
-	"-l|last-parsed=s"  => \$last_parsed,
+	"-l|last-parsed=s"    => \$last_parsed,
 );
 
 if ($ver) {
@@ -333,8 +333,10 @@ my @KEYWORDS2 = (
 	'upper',
 );
 my @KEYWORDS3 = ('STDIN', 'STDOUT');
-my %SYMBOLS = ('=' => '=', '<' => '&lt;', '>' => '&gt;', '\|' => '|', ',' => ',', '\.' => '.', '\+' => '+', '\-' => '-', '\*' => '*',
-	'\/' => '/', '!=' => '!=');
+my %SYMBOLS = (
+	'='  => '=', '<'  => '&lt;', '>' => '&gt;', '\|' => '|', ',' => ',', '\.' => '.', '\+' => '+', '\-' => '-', '\*' => '*',
+	'\/' => '/', '!=' => '!='
+);
 my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
@@ -488,7 +490,8 @@ foreach my $logfile (@log_files) {
 		} elsif ($format eq 'stderr') {
 
 			# Parse stderr lines
-			if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/) {
+			if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+			{
 
 				# Skip unwanted lines
 				my $cur_date = "$1$2$3$4$5$6";
@@ -527,7 +530,7 @@ foreach my $logfile (@log_files) {
 
 				# Extract the date
 				$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-				my @date = ($1,$2,$3,$4,$5,$6);
+				my @date = ($1, $2, $3, $4, $5, $6);
 				my $cur_date = join('', @date);
 
 				# Skip unwanted lines
@@ -638,31 +641,35 @@ Arguments:
 
 Options:
 
+    -a | --average minutes : number of minutes to build the average graphs of
+			     queries and connections.
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -d | --dbname database : only report what concern the given database
+    -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
+    -g | --graph           : generate graphs using the Flotr2 javascript library
+    -h | --help            : show this message and exit.
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -l | --last-parsed file: allow incremental log parsing by registering the
+			     last datetime and line parsed. Useful if you want
+			     to watch errors since last run or if you want one
+			     report per day with a log rotated each week.
+    -m | --maxlength size  : maximum length of a query, it will be cutted above
+			     the given size. Default: no truncate
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
 			     output to stdout use - as filename.
-    -i | --ident name      : programname used as syslog ident. Default: postgres
-    -h | --help            : show this message and exit.
-    -d | --dbname database : only report what concern the given database
-    -u | --dbuser username : only report what concern the given user
-    -t | --top number      : number of query to store/display. Default: 20
-    -s | --sample number   : number of query sample to store/display. Default: 3
-    -x | --extension       : output format. Values: text or html. Default: html
-    -m | --maxlength size  : maximum length of a query, it will be cutted above
-			     the given size. Default: no truncate
-    -g | --graph           : generate graphs using the Flotr2 javascript library
-    -b | --begin datetime  : start date/time for the data to be parsed in log.
-    -e | --end datetime    : end date/time for the data to be parsed in log.
-    -q | --quiet           : don't print anything to stdout.
     -p | --progress        : show a progress bar, quiet mode is automaticaly
 			     enabled with this option.
+    -q | --quiet           : don't print anything to stdout.
+    -s | --sample number   : number of query sample to store/display. Default: 3
+    -t | --top number      : number of query to store/display. Default: 20
+    -u | --dbuser username : only report what concern the given user
+    -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -w | -watch-mode       : only report errors just like logwatch could do.
+    -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
 			     zcat is not on your path or you want to use gzcat.
-    -a | --average minutes : number of minutes to build the average graphs of
-			     queries and connections.
-    -v | --verbose         : enable verbose or debug mode. Disabled by default.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
@@ -677,10 +684,6 @@ Options:
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
-    -l | --last-parsed file: allow incremental log parsing by registering the
-			     last datetime and line parsed. Useful if you want
-			     to watch errors since last run or if you want one
-			     report per day with a log rotated each week.
 
 Examples:
 
@@ -715,12 +718,11 @@ sub check_incremental_position
 			}
 		}
 		$last_line{datetime} = $cur_date;
-		$last_line{orig} = $line;
+		$last_line{orig}     = $line;
 	}
 
 	return 1;
 }
-
 
 # Display message following the log level
 sub logmsg
@@ -859,8 +861,7 @@ sub dump_as_text
 	$total_time = &convert_time($total_time * 1000);
 	my $logfile_str = $log_files[0];
 	if ($#log_files > 0) {
-		$logfile_str .= ', ..., ' . $log_files[
-			-1];
+		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
 
@@ -1142,8 +1143,7 @@ sub dump_error_as_text
 	$total_time = &convert_time($total_time * 1000);
 	my $logfile_str = $log_files[0];
 	if ($#log_files > 0) {
-		$logfile_str .= ', ..., ' . $log_files[
-			-1];
+		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
 
@@ -1574,8 +1574,7 @@ sub dump_as_html
 	$total_time = &convert_time($total_time * 1000);
 	my $logfile_str = $log_files[0];
 	if ($#log_files > 0) {
-		$logfile_str .= ', ..., ' . $log_files[
-			-1];
+		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
 <div class="information">
@@ -1886,9 +1885,10 @@ sub dump_as_html
 					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
 					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
 					$d2 .= "[$t, "
-						. sprintf("%.2f",
-						(($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) / 1000)
-						. "],";
+						. sprintf(
+						"%.2f",
+						(($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) / 1000
+						) . "],";
 				}
 			}
 			$d1 =~ s/,$//;
@@ -2701,8 +2701,7 @@ sub dump_error_as_html
 	$total_time = &convert_time($total_time * 1000);
 	my $logfile_str = $log_files[0];
 	if ($#log_files > 0) {
-		$logfile_str .= ', ..., ' . $log_files[
-			-1];
+		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
 <div class="information">
@@ -3233,8 +3232,10 @@ sub store_queries
 		# Stores normalyzed query samples
 		my $cur_last_log_date =
 "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-		&set_top_error_sample($normalized_error, $cur_last_log_date, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
-			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint});
+		&set_top_error_sample(
+			$normalized_error,          $cur_last_log_date,           $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
+			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}
+		);
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 

@@ -14,35 +14,39 @@ SYNOPSIS
 
     Options:
 
-        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
-        -o | --outfile filename: define the filename for the output. Default depends
-                                 on the output format: out.html or out.txt. To dump
-                                 output to stdout use - as filename.
-        -i | --ident name      : programname used as syslog ident. Default: postgres
-        -h | --help            : show this message and exit.
-        -d | --dbname database : only report what concerns the given database
-        -u | --dbuser username : only report what concerns the given user
-        -t | --top number      : number of queries to store/display. Default: 20
-        -s | --sample number   : number of query samples to store/display. Default:3
-        -x | --extension       : output format. Values: text or html. Default: html
-        -m | --maxlength size  : maximum length of a query: it will be cut above
-                                 the given size. Default: no truncate
-        -g | --graph           : generate graphs using the Flotr2 javascript library
-        -b | --begin datetime  : start date/time for the data to be parsed in log.
-        -e | --end datetime    : end date/time for the data to be parsed in log.
-        -q | --quiet           : don't print anything to stdout.
-        -p | --progress         show a progress bar, quiet mode is automatically
-                                 enabled with this option.
-        -w | -watch-mode       : only report errors just like logwatch could do.
-        -z | --zcat exec_path  : set the full path to the zcat program. Use it if
-                                 zcat is not on your path or you want to use gzcat.
         -a | --average minutes : number of minutes to build the average graphs of
                                  queries and connections.
+        -b | --begin datetime  : start date/time for the data to be parsed in log.
+        -d | --dbname database : only report what concern the given database
+        -e | --end datetime    : end date/time for the data to be parsed in log.
+        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
+        -g | --graph           : generate graphs using the Flotr2 javascript library
+        -h | --help            : show this message and exit.
+        -i | --ident name      : programname used as syslog ident. Default: postgres
+        -l | --last-parsed file: allow incremental log parsing by registering the
+                                 last datetime and line parsed. Useful if you want
+                                 to watch errors since last run or if you want one
+                                 report per day with a log rotated each week.
+        -m | --maxlength size  : maximum length of a query, it will be cutted above
+                                 the given size. Default: no truncate
+        -o | --outfile filename: define the filename for the output. Default depends
+                                 of the output format: out.html or out.txt. To dump
+                                 output to stdout use - as filename.
+        -p | --progress        : show a progress bar, quiet mode is automaticaly
+                                 enabled with this option.
+        -q | --quiet           : don't print anything to stdout.
+        -s | --sample number   : number of query sample to store/display. Default: 3
+        -t | --top number      : number of query to store/display. Default: 20
+        -u | --dbuser username : only report what concern the given user
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
+        -w | -watch-mode       : only report errors just like logwatch could do.
+        -x | --extension       : output format. Values: text or html. Default: html
+        -z | --zcat exec_path  : set the full path to the zcat program. Use it if
+                                 zcat is not on your path or you want to use gzcat.
         --pie-limit num        : pie data lower than num% will show a sum instead.
         --exclude-query regex  : any query matching the given regex will be excluded
-                                 from the report- for example: "^(VACUUM|COMMIT)".
-                                 You can use this option multiple times.
+                                 from the report. For example: "^(VACUUM|COMMIT)"
+                                 you can use this option multiple time.
         --disable-error        : do not generate error report.
         --disable-hourly       : do not generate hourly reports.
         --disable-type         : do not generate query type report.
