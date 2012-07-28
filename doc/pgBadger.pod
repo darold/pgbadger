@@ -17,11 +17,6 @@ Arguments:
 
 Options:
 
-    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
-                             be a plain text log or a gzip compressed file
-                             with the .gz extension. Note that this option is
-                             DEPRECATED: set logfile as a command line argument
-                             instead. To use stdin set it to character -.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html or out.txt. To dump

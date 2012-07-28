@@ -41,7 +41,6 @@ my $JQGRAPH = 1;
 
 # Command line options
 my $zcat                = 'zcat';
-my $logfile             = '';
 my $format              = '';
 my $outfile             = '';
 my $outdir              = '';
@@ -93,7 +92,6 @@ $num_sep = ' ' if ($n =~ /,/);
 
 # get the command line parameters
 my $result = GetOptions(
-	"l|logfile=s"         => \$logfile,
 	"f|format=s"          => \$format,
 	"o|outfile=s"         => \$outfile,
 	"h|help!"             => \$help,
@@ -137,9 +135,8 @@ if ($ver) {
 }
 &usage() if ($help);
 
-# If we have command line argument and no -l option assume it's the list
-# of log file to parse.
-if (!$logfile && ($#ARGV >= 0)) {
+# Log file to be parsed are passed as command line argument
+if ($#ARGV >= 0) {
 	foreach my $file (@ARGV) {
 		if ($file ne '-') {
 			die "FATAL: logfile $file must exist!\n" if (!-f $file);
@@ -150,12 +147,6 @@ if (!$logfile && ($#ARGV >= 0)) {
 		}
 		push(@log_files, $file);
 	}
-} elsif ($logfile) {
-	if (!$logfile ne '-') {
-		die "FATAL: logfile $logfile must exist!\n" if (!-f $logfile);
-		die "FATAL: logfile $logfile is empty!\n"   if (-z $logfile);
-	}
-	push(@log_files, $logfile);
 }
 
 # Logfile is a mandatory parameter
@@ -368,7 +359,7 @@ my $nlines          = 0;
 
 my $t0 = Benchmark->new;
 
-foreach $logfile (@log_files) {
+foreach my $logfile (@log_files) {
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
 	# Open log file for reading
@@ -612,11 +603,6 @@ Arguments:
 
 Options:
 
-    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
-			     be a plain text log or a gzip compressed file
-			     with the .gz extension. Note that this option is
-			     DEPRECATED, set logfile as a command line argument
-			     instead. To use stdin set it to character -.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
