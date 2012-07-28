@@ -74,6 +74,7 @@ my $disable_lock        = 0;
 my $disable_temporary   = 0;
 my $disable_checkpoint  = 0;
 my $avg_minutes         = 5;
+my $last_parsed         = '';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -127,6 +128,7 @@ my $result = GetOptions(
 	"disable-lock!"       => \$disable_lock,
 	"disable-temporary!"  => \$disable_temporary,
 	"disable-checkpoint!" => \$disable_checkpoint,
+	"-l|last-parsed=s"  => \$last_parsed,
 );
 
 if ($ver) {
@@ -356,9 +358,23 @@ my %checkpoint_info = ();
 my @graph_values    = ();
 my %cur_info        = ();
 my $nlines          = 0;
+my %last_line       = ();
+my %saved_last_line = ();
 
 my $t0 = Benchmark->new;
 
+# Reading last line parsed
+if ($last_parsed && -e $last_parsed) {
+	if (open(IN, "$last_parsed")) {
+		my $line = <IN>;
+		close(IN);
+		($saved_last_line{datetime}, $saved_last_line{orig}) = split(/\t/, $line, 2);
+	} else {
+		die "FATAL: can't read last parsed line from $last_parsed, $!\n";
+	}
+}
+
+# Main loop reading log files
 foreach my $logfile (@log_files) {
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
@@ -431,6 +447,9 @@ foreach my $logfile (@log_files) {
 				last if ($to   && ($to < $cur_date));
 				$cur_pid = $8;
 
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($cur_date, $line));
+
 				# Process the log line
 				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $12);
 
@@ -477,6 +496,9 @@ foreach my $logfile (@log_files) {
 				last if ($to   && ($to < $cur_date));
 				$cur_pid = $8;
 
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($cur_date, $line));
+
 				# Process the log line
 				&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
@@ -505,12 +527,15 @@ foreach my $logfile (@log_files) {
 
 				# Extract the date
 				$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-				my @date = ($1, $2, $3, $4, $5, $6);
+				my @date = ($1,$2,$3,$4,$5,$6);
+				my $cur_date = join('', @date);
 
 				# Skip unwanted lines
-				my $cur_date = join('', @date);
 				next if ($from && ($from > $cur_date));
 				last if ($to   && ($to < $cur_date));
+
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($cur_date, $line));
 
 				# Process the log line
 				&parse_query(
@@ -549,6 +574,16 @@ foreach my $logfile (@log_files) {
 	}
 	%cur_info = ();
 
+}
+
+# Save last line parsed
+if ($last_parsed && scalar keys %last_line) {
+	if (open(OUT, ">$last_parsed")) {
+		print OUT "$last_line{datetime}\t$last_line{orig}\n";
+		close(OUT);
+	} else {
+		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
+	}
 }
 
 my $t1 = Benchmark->new;
@@ -642,6 +677,10 @@ Options:
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
+    -l | --last-parsed file: allow incremental log parsing by registering the
+			     last datetime and line parsed. Useful if you want
+			     to watch errors since last run or if you want one
+			     report per day with a log rotated each week.
 
 Examples:
 
@@ -662,6 +701,26 @@ This supposes that your log file and HTML report are also rotated every weeks.
 
 	exit 0;
 }
+
+sub check_incremental_position
+{
+	my ($cur_date, $line) = @_;
+
+	if ($last_parsed) {
+		if ($saved_last_line{datetime}) {
+			if ($cur_date < $saved_last_line{datetime}) {
+				return 0;
+			} elsif (!$last_line{datetime} && ($cur_date == $saved_last_line{datetime})) {
+				return 0 if ($line ne $saved_last_line{orig});
+			}
+		}
+		$last_line{datetime} = $cur_date;
+		$last_line{orig} = $line;
+	}
+
+	return 1;
+}
+
 
 # Display message following the log level
 sub logmsg
