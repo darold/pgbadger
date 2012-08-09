@@ -19,6 +19,7 @@ SYNOPSIS
         -b | --begin datetime  : start date/time for the data to be parsed in log.
         -d | --dbname database : only report what concern the given database
         -e | --end datetime    : end date/time for the data to be parsed in log.
+	-ef| --exclude_file    : the file name which contains the queries to be excluded
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
         -g | --graph           : generate graphs using the Flotr2 javascript library
         -h | --help            : show this message and exit.
