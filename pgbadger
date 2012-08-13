@@ -380,187 +380,213 @@ if ($last_parsed && -e $last_parsed) {
 foreach my $logfile (@log_files) {
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
-	# Open log file for reading
-	my $totalsize = (stat("$logfile"))[7] || 0;
-	my $cursize   = 0;
-	my $lfile     = new IO::File;
-	if ($logfile !~ /\.gz/) {
-		$lfile->open($logfile) || die "FATAL: cannot read logfile $logfile. $!\n";
-	} else {
-
-		# Open a pipe to zcat program for compressed log
-		$lfile->open("$zcat $logfile |") || die "FATAL: cannot read from pipe to $zcat $logfile. $!\n";
-
-		# Real size of the file is unknow
-		$totalsize = 0;
-	}
-
 	my $curdate = localtime(time);
 
 	# Syslog do not have year information, so take care of year overlapping
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+	# Get size of the file
+	my $totalsize = (stat("$logfile"))[7] || 0;
+	my $cursize   = 0;
 
-	my $cur_pid = '';
-	my $csv_obj = undef;
 	if ($format eq 'csv') {
 		require Text::CSV;
-		$csv_obj = Text::CSV->new({'binary' => 1});
-	}
+		my $csv = Text::CSV->new ({ binary => 1, eol => $/ });
+		open(my $io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
+		# Parse csvlog lines
+		while (my $row = $csv->getline($io)) {
 
-	while (my $line = <$lfile>) {
-		$cursize += length($line);
-		chomp($line);
-		$line =~ s///;
-		$nlines++;
-		next if (!$line);
-
-		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-			if ($totalsize) {
-				print progress_bar($cursize, $totalsize, 25, '=');
-			} else {
-				print ".";
+			# Set progress statistics
+			$cursize += length(join(',', @$row));
+			$nlines++;
+			if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+				if ($totalsize) {
+					print progress_bar($cursize, $totalsize, 25, '=');
+				} else {
+					print ".";
+				}
 			}
+
+			# Extract the date
+			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
+			my @date = ($1, $2, $3, $4, $5, $6);
+			my $cur_date = join('', @date);
+			my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
+			my $milli = $7 || 0;
+			$row->[8] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
+			my $start_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
+			my $duration = (($end_time - $start_time) * 1000) - $milli;
+			$duration = 0 if ($duration < 0);
+
+			# Skip unwanted lines
+			next if ($from && ($from > $cur_date));
+			last if ($to   && ($to < $cur_date));
+
+			# Jump to the last line parsed if required
+			next if (!&check_incremental_position($cur_date, join(',', @$row)));
+
+			# Set approximative session duration
+			if ($row->[13] && ($row->[13] !~ m/duration: \d+\.\d+ ms/)) {
+				$row->[13] = "duration: $duration ms $row->[13]";
+			}
+
+			# Process the log line
+			&parse_query(
+				@date,
+				$row->[4],    # connection from
+				$row->[3],    # pid
+				$row->[5],    # session
+				'user=' . $row->[1] . ',db=' . $row->[2], # logprefix
+				$row->[11],   # loglevel
+				$row->[13] || $row->[14] || $row->[15],   #  message || detail || hint
+			);
 		}
+		$csv->eof or die "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
+		close $io;
+	} else {
 
-		# Parse syslog lines
-		if ($format eq 'syslog') {
-
-			if ($line =~
-				/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
-			{
-
-				# skip non postgresql lines
-				next if ($7 ne $ident);
-
-				# Syslog do not have year information, so take care of year overlapping
-				my $tmp_year = $gyear;
-				if ("$tmp_year$month_abbr{$1}$2" > $CURRENT_DATE) {
-					$tmp_year = substr($CURRENT_DATE, 1, 4) - 1;
-				}
-
-				# Fix single digit days
-				my $day = sprintf("%02d", $2);
-				my $cur_date = "$tmp_year$month_abbr{$1}$day$3$4$5";
-
-				# Skip unwanted lines
-				next if ($from && ($from > $cur_date));
-				last if ($to   && ($to < $cur_date));
-				$cur_pid = $8;
-
-				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($cur_date, $line));
-
-				# Process the log line
-				&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $12);
-
-			} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*)/) {
-
-				$cur_pid = $8;
-				my $t_query = $10;
-				$t_query =~ s/#011/\t/g;
-				if ($cur_info{$cur_pid}{statement}) {
-					$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
-				} elsif ($cur_info{$cur_pid}{context}) {
-					$cur_info{$cur_pid}{context} .= "\n" . $t_query;
-				} elsif ($cur_info{$cur_pid}{detail}) {
-					$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
-				} else {
-					$cur_info{$cur_pid}{query} .= "\n" . $t_query;
-				}
-
-				# Collect orphans lines of multiline queries
-			} elsif ($line !~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:/) {
-
-				if ($cur_info{$cur_pid}{statement}) {
-					$cur_info{$cur_pid}{statement} .= "\n" . $line;
-				} elsif ($cur_info{$cur_pid}{context}) {
-					$cur_info{$cur_pid}{context} .= "\n" . $line;
-				} elsif ($cur_info{$cur_pid}{detail}) {
-					$cur_info{$cur_pid}{detail} .= "\n" . $line;
-				} else {
-					$cur_info{$cur_pid}{query} .= "\n" . $line;
-				}
-
-			} else {
-				&logmsg('DEBUG', "Unknown syslog line format: $line");
-			}
-
-		} elsif ($format eq 'stderr') {
-
-			# Parse stderr lines
-			if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
-			{
-
-				# Skip unwanted lines
-				my $cur_date = "$1$2$3$4$5$6";
-				next if ($from && ($from > $cur_date));
-				last if ($to   && ($to < $cur_date));
-				$cur_pid = $8;
-
-				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($cur_date, $line));
-
-				# Process the log line
-				&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
-
-				# Collect orphans lines of multiline queries
-			} elsif ($line !~ /^\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:/) {
-
-				if ($cur_info{$cur_pid}{statement}) {
-					$cur_info{$cur_pid}{statement} .= "\n" . $line;
-				} elsif ($cur_info{$cur_pid}{context}) {
-					$cur_info{$cur_pid}{context} .= "\n" . $line;
-				} elsif ($cur_info{$cur_pid}{detail}) {
-					$cur_info{$cur_pid}{detail} .= "\n" . $line;
-				} else {
-					$cur_info{$cur_pid}{query} .= "\n" . $line;
-				}
-
-			} else {
-				$cur_info{$cur_pid}{query} .= "\n" . $line if ($cur_info{$cur_pid}{query});
-			}
-
-		} elsif ($format eq 'csv') {
-
-			# Parse csvlog lines
-			if ($csv_obj->parse($line)) {
-				my @cols = $csv_obj->fields();
-
-				# Extract the date
-				$cols[0] =~ m/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-				my @date = ($1, $2, $3, $4, $5, $6);
-				my $cur_date = join('', @date);
-
-				# Skip unwanted lines
-				next if ($from && ($from > $cur_date));
-				last if ($to   && ($to < $cur_date));
-
-				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($cur_date, $line));
-
-				# Process the log line
-				&parse_query(
-					@date,
-					$cols[4],    # connection from
-					$cols[3],    # pid
-					$cols[5],    # session
-					             # logprefix
-					'user=' . $cols[1] . ',db=' . $cols[2],
-					$cols[11] . ':',    # loglevel
-					$cols[13],          # query
-				);
-			} else {
-				&logmsg('DEBUG', "Unknown csv line format: $line, error: " . $csv_obj->error_input());
-			}
-
+		# Open log file for reading
+		my $lfile     = new IO::File;
+		if ($logfile !~ /\.gz/) {
+			$lfile->open($logfile) || die "FATAL: cannot read log file $logfile. $!\n";
 		} else {
 
-			# unknown format
-			&logmsg('DEBUG', "Unknown line format: $line");
+			# Open a pipe to zcat program for compressed log
+			$lfile->open("$zcat $logfile |") || die "FATAL: cannot read from pipe to $zcat $logfile. $!\n";
+
+			# Real size of the file is unknow
+			$totalsize = 0;
 		}
+
+		my $cur_pid = '';
+		while (my $line = <$lfile>) {
+			$cursize += length($line);
+			chomp($line);
+			$line =~ s///;
+			$nlines++;
+			next if (!$line);
+
+			if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+				if ($totalsize) {
+					print progress_bar($cursize, $totalsize, 25, '=');
+				} else {
+					print ".";
+				}
+			}
+
+			# Parse syslog lines
+			if ($format eq 'syslog') {
+
+				if ($line =~
+					/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+				{
+
+					# skip non postgresql lines
+					next if ($7 ne $ident);
+
+					# Syslog do not have year information, so take care of year overlapping
+					my $tmp_year = $gyear;
+					if ("$tmp_year$month_abbr{$1}$2" > $CURRENT_DATE) {
+						$tmp_year = substr($CURRENT_DATE, 1, 4) - 1;
+					}
+
+					# Fix single digit days
+					my $day = sprintf("%02d", $2);
+					my $cur_date = "$tmp_year$month_abbr{$1}$day$3$4$5";
+
+					# Skip unwanted lines
+					next if ($from && ($from > $cur_date));
+					last if ($to   && ($to < $cur_date));
+					$cur_pid = $8;
+
+					# Jump to the last line parsed if required
+					next if (!&check_incremental_position($cur_date, $line));
+
+					# Process the log line
+					&parse_query($tmp_year, $month_abbr{$1}, $day, $3, $4, $5, $6, $8, $9, $10, $11, $12);
+
+				} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*)/) {
+
+					$cur_pid = $8;
+					my $t_query = $10;
+					$t_query =~ s/#011/\t/g;
+					if ($cur_info{$cur_pid}{statement}) {
+						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
+					} elsif ($cur_info{$cur_pid}{context}) {
+						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
+					} elsif ($cur_info{$cur_pid}{detail}) {
+						$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
+					} else {
+						$cur_info{$cur_pid}{query} .= "\n" . $t_query;
+					}
+
+					# Collect orphans lines of multiline queries
+				} elsif ($line !~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:/) {
+
+					if ($cur_info{$cur_pid}{statement}) {
+						$cur_info{$cur_pid}{statement} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{context}) {
+						$cur_info{$cur_pid}{context} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{detail}) {
+						$cur_info{$cur_pid}{detail} .= "\n" . $line;
+					} else {
+						$cur_info{$cur_pid}{query} .= "\n" . $line;
+					}
+
+				} else {
+					&logmsg('DEBUG', "Unknown syslog line format: $line");
+				}
+
+			} elsif ($format eq 'stderr') {
+
+				# Parse stderr lines
+				if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+				{
+
+					# Skip unwanted lines
+					my $cur_date = "$1$2$3$4$5$6";
+					next if ($from && ($from > $cur_date));
+					last if ($to   && ($to < $cur_date));
+					$cur_pid = $8;
+
+					# Jump to the last line parsed if required
+					next if (!&check_incremental_position($cur_date, $line));
+
+					# Process the log line
+					&parse_query($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+
+					# Collect orphans lines of multiline queries
+				} elsif ($line !~ /^\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:/) {
+
+					if ($cur_info{$cur_pid}{statement}) {
+						$cur_info{$cur_pid}{statement} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{context}) {
+						$cur_info{$cur_pid}{context} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{detail}) {
+						$cur_info{$cur_pid}{detail} .= "\n" . $line;
+					} else {
+						$cur_info{$cur_pid}{query} .= "\n" . $line;
+					}
+
+				} else {
+					$cur_info{$cur_pid}{query} .= "\n" . $line if ($cur_info{$cur_pid}{query});
+				}
+
+			} else {
+
+				# unknown format
+				&logmsg('DEBUG', "Unknown line format: $line");
+			}
+		}
+		$lfile->close();
 	}
+
+	# Get stats from all pending temporary storage
+	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
+		&store_queries($pid);
+	}
+	%cur_info = ();
 
 	if ($progress) {
 		if ($totalsize) {
@@ -568,14 +594,6 @@ foreach my $logfile (@log_files) {
 		}
 		print STDERR "\n";
 	}
-
-	$lfile->close();
-
-	# Get stats from all pending temporary storage
-	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
-		&store_queries($pid);
-	}
-	%cur_info = ();
 
 }
 
@@ -3128,7 +3146,7 @@ sub parse_query
 		# When we are ready to overwrite the last storage, add it to the global stats
 		if (   ($t_loglevel =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/)
 			&& exists $cur_info{$t_pid}
-			&& ($t_session != $cur_info{$t_pid}{session}))
+			&& (($format eq 'csv') || ($t_session != $cur_info{$t_pid}{session})))
 		{
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
