@@ -64,6 +64,7 @@ my $quiet               = 0;
 my $progress            = 0;
 my $error_only          = 0;
 my @exclude_query       = ();
+my $exclude_file        = '';
 my $disable_error       = 0;
 my $disable_hourly      = 0;
 my $disable_type        = 0;
@@ -119,6 +120,7 @@ my $result = GetOptions(
 	"w|watch-mode!"       => \$error_only,
 	"v|verbose!"          => \$debug,
 	"exclude-query=s"     => \@exclude_query,
+	"exclude-file=s"      => \$exclude_file,
 	"disable-error!"      => \$disable_error,
 	"disable-hourly!"     => \$disable_hourly,
 	"disable-type!"       => \$disable_type,
@@ -228,6 +230,19 @@ if ($error_only && $disable_error) {
 # Set default search pattern for database and user name in log_line_prefix
 $regex_prefix_dbname = 'db=([^,]*)'   if (!$regex_prefix_dbname);
 $regex_prefix_dbuser = 'user=([^,]*)' if (!$regex_prefix_dbuser);
+
+# Loading excluded query from file if any
+if ($exclude_file) {
+	open(IN, "$exclude_file") or die "FATAL: can't read file $exclude_file: $!\n";
+	my @exclq = <IN>;
+	close(IN);
+	chomp(@exclq);
+	map { s///; } @exclq;
+	foreach my $r (@exclq) {
+		&check_regex($r, '--exclude-file');
+	}
+	push(@exclude_query, @exclq);
+}
 
 # Testing regex syntaxe
 if ($#exclude_query >= 0) {
@@ -684,7 +699,7 @@ Options:
     -t | --top number      : number of query to store/display. Default: 20
     -u | --dbuser username : only report what concern the given user
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
-    -w | -watch-mode       : only report errors just like logwatch could do.
+    -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
 			     zcat is not on your path or you want to use gzcat.
@@ -692,6 +707,8 @@ Options:
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
 			     you can use this option multiple time.
+    --exclude_file filename: path of the file which contains all the regex to use
+			     to exclude queries from the report. One regex per line.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
     --disable-type         : do not generate query type report.
