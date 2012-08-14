@@ -76,6 +76,7 @@ my $disable_temporary   = 0;
 my $disable_checkpoint  = 0;
 my $avg_minutes         = 5;
 my $last_parsed         = '';
+my $report_title        = 'PgBadger: PostgreSQL log analyzer';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -94,31 +95,33 @@ $num_sep = ' ' if ($n =~ /,/);
 
 # get the command line parameters
 my $result = GetOptions(
-	"f|format=s"          => \$format,
-	"o|outfile=s"         => \$outfile,
-	"h|help!"             => \$help,
-	"v|version!"          => \$ver,
-	"d|dbname=s"          => \$dbname,
-	"u|dbuser=s"          => \$dbuser,
-	"i|ident=s"           => \$ident,
-	"t|top=i"             => \$top,
-	"s|sample=i"          => \$sample,
-	"x|extension=s"       => \$extension,
-	"m|maxlength=i"       => \$maxlength,
-	"g|graph!"            => \$graph,
-	"z|zcat=s"            => \$zcat,
-	"n|nohighlight!"      => \$nohighlight,
+	"a|average=i"         => \$avg_minutes,
 	"b|begin=s"           => \$from,
+	"d|dbname=s"          => \$dbname,
 	"e|end=s"             => \$to,
+	"f|format=s"          => \$format,
+	"g|graph!"            => \$graph,
+	"h|help!"             => \$help,
+	"i|ident=s"           => \$ident,
+	"l|last-parsed=s"     => \$last_parsed,
+	"m|maxlength=i"       => \$maxlength,
+	"n|nohighlight!"      => \$nohighlight,
+	"o|outfile=s"         => \$outfile,
+	"p|progress!"         => \$progress,
+	"q|quiet!"            => \$quiet,
+	"s|sample=i"          => \$sample,
+	"t|top=i"             => \$top,
+	"T|title=s"           => \$report_title,
+	"u|dbuser=s"          => \$dbuser,
+	"v|verbose!"          => \$debug,
+	"V|version!"          => \$ver,
+	"w|watch-mode!"       => \$error_only,
+	"x|extension=s"       => \$extension,
+	"z|zcat=s"            => \$zcat,
 	"regex-db=s"          => \$regex_prefix_dbname,
 	"regex-user=s"        => \$regex_prefix_dbuser,
-	"q|quiet!"            => \$quiet,
-	"p|progress!"         => \$progress,
-	"a|average=i"         => \$avg_minutes,
 	"pie-limit=i"         => \$pie_percentage_limit,
 	"image-format=s"      => \$img_format,
-	"w|watch-mode!"       => \$error_only,
-	"v|verbose!"          => \$debug,
 	"exclude-query=s"     => \@exclude_query,
 	"exclude-file=s"      => \$exclude_file,
 	"disable-error!"      => \$disable_error,
@@ -130,7 +133,6 @@ my $result = GetOptions(
 	"disable-lock!"       => \$disable_lock,
 	"disable-temporary!"  => \$disable_temporary,
 	"disable-checkpoint!" => \$disable_checkpoint,
-	"-l|last-parsed=s"    => \$last_parsed,
 );
 
 if ($ver) {
@@ -237,7 +239,7 @@ if ($exclude_file) {
 	my @exclq = <IN>;
 	close(IN);
 	chomp(@exclq);
-	map { s///; } @exclq;
+	map {s///;} @exclq;
 	foreach my $r (@exclq) {
 		&check_regex($r, '--exclude-file');
 	}
@@ -401,14 +403,16 @@ foreach my $logfile (@log_files) {
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+
 	# Get size of the file
 	my $totalsize = (stat("$logfile"))[7] || 0;
-	my $cursize   = 0;
+	my $cursize = 0;
 
 	if ($format eq 'csv') {
 		require Text::CSV;
-		my $csv = Text::CSV->new ({ binary => 1, eol => $/ });
+		my $csv = Text::CSV->new({binary => 1, eol => $/});
 		open(my $io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
+
 		# Parse csvlog lines
 		while (my $row = $csv->getline($io)) {
 
@@ -449,12 +453,12 @@ foreach my $logfile (@log_files) {
 			# Process the log line
 			&parse_query(
 				@date,
-				$row->[4],    # connection from
-				$row->[3],    # pid
-				$row->[5],    # session
-				'user=' . $row->[1] . ',db=' . $row->[2], # logprefix
-				$row->[11],   # loglevel
-				$row->[13] || $row->[14] || $row->[15],   #  message || detail || hint
+				$row->[4],                                   # connection from
+				$row->[3],                                   # pid
+				$row->[5],                                   # session
+				'user=' . $row->[1] . ',db=' . $row->[2],    # logprefix
+				$row->[11],                                  # loglevel
+				$row->[13] || $row->[14] || $row->[15],      #  message || detail || hint
 			);
 		}
 		$csv->eof or die "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
@@ -462,7 +466,7 @@ foreach my $logfile (@log_files) {
 	} else {
 
 		# Open log file for reading
-		my $lfile     = new IO::File;
+		my $lfile = new IO::File;
 		if ($logfile !~ /\.gz/) {
 			$lfile->open($logfile) || die "FATAL: cannot read log file $logfile. $!\n";
 		} else {
@@ -556,7 +560,8 @@ foreach my $logfile (@log_files) {
 			} elsif ($format eq 'stderr') {
 
 				# Parse stderr lines
-				if ($line =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+				if ($line =~
+					/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
 				{
 
 					# Skip unwanted lines
@@ -697,8 +702,10 @@ Options:
     -q | --quiet           : don't print anything to stdout.
     -s | --sample number   : number of query sample to store/display. Default: 3
     -t | --top number      : number of query to store/display. Default: 20
+    -T | --title string    : change title of the HTML page report.
     -u | --dbuser username : only report what concern the given user
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
+    -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
@@ -899,6 +906,7 @@ sub dump_as_text
 		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
+$report_title
 
 - Global informations --------------------------------------------------
 
@@ -1181,6 +1189,7 @@ sub dump_error_as_text
 		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
 	print $fh qq{
+$report_title
 
 - Global informations --------------------------------------------------
 
@@ -1247,7 +1256,7 @@ sub html_header
 	print $fh qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
-<title>PgBadger: PostgreSQL log analyzer</title>
+<title>$report_title</title>
 <meta NAME="robots" CONTENT="noindex,nofollow">
 <meta HTTP-EQUIV="Expires" CONTENT="$date">
 <meta HTTP-EQUIV="Generator" CONTENT="PgBadger v$VERSION">
@@ -1470,7 +1479,7 @@ EOF
 <body>
 <div id="content">
 
-<h1 id="top">PgBadger</h1>
+<h1 id="top">$report_title</h1>
 };
 	print $fh qq{
 <div class="menu">
