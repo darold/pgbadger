@@ -62,7 +62,7 @@ my $to                  = '';
 my $regex_prefix_dbname = '';
 my $regex_prefix_dbuser = '';
 my $quiet               = 0;
-my $progress            = 0;
+my $progress            = 1;
 my $error_only          = 0;
 my @exclude_query       = ();
 my $exclude_file        = '';
@@ -108,7 +108,6 @@ my $result = GetOptions(
 	"m|maxlength=i"       => \$maxlength,
 	"n|nohighlight!"      => \$nohighlight,
 	"o|outfile=s"         => \$outfile,
-	"p|progress!"         => \$progress,
 	"q|quiet!"            => \$quiet,
 	"s|sample=i"          => \$sample,
 	"t|top=i"             => \$top,
@@ -163,7 +162,7 @@ if ($#log_files < 0) {
 }
 
 # Quiet mode is forced with progress bar
-$quiet = 1 if ($progress);
+$progress = 0 if ($quiet);
 
 # Set the default number minutes for queries and connections average
 $avg_minutes ||= 5;
@@ -699,9 +698,7 @@ Options:
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
 			     output to stdout use - as filename.
-    -p | --progress        : show a progress bar, quiet mode is automaticaly
-			     enabled with this option.
-    -q | --quiet           : don't print anything to stdout.
+    -q | --quiet           : don't print anything to stdout, even not a progress bar.
     -s | --sample number   : number of query sample to store/display. Default: 3
     -t | --top number      : number of query to store/display. Default: 20
     -T | --title string    : change title of the HTML page report.

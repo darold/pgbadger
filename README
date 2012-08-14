@@ -32,9 +32,7 @@ SYNOPSIS
         -o | --outfile filename: define the filename for the output. Default depends
                                  of the output format: out.html or out.txt. To dump
                                  output to stdout use - as filename.
-        -p | --progress        : show a progress bar, quiet mode is automaticaly
-                                 enabled with this option.
-        -q | --quiet           : don't print anything to stdout.
+        -q | --quiet           : don't print anything to stdout, even not a progress bar.
         -s | --sample number   : number of query sample to store/display. Default: 3
         -t | --top number      : number of query to store/display. Default: 20
         -T | --title string    : change title of the HTML page report.
