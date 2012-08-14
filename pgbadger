@@ -24,7 +24,7 @@
 use vars qw($VERSION);
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::File;
 use Benchmark;
 use File::Basename;
