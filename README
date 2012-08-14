@@ -20,7 +20,7 @@ SYNOPSIS
         -d | --dbname database : only report what concern the given database
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
-        -g | --graph           : generate graphs using the Flotr2 javascript library
+        -G | --nograph         : disable graphs on HTML output. Enable by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
         -l | --last-parsed file: allow incremental log parsing by registering the
@@ -37,8 +37,10 @@ SYNOPSIS
         -q | --quiet           : don't print anything to stdout.
         -s | --sample number   : number of query sample to store/display. Default: 3
         -t | --top number      : number of query to store/display. Default: 20
+        -T | --title string    : change title of the HTML page report.
         -u | --dbuser username : only report what concern the given user
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
+        -V | --version         : show pgBadger version and exit.
         -w | --watch-mode      : only report errors just like logwatch could do.
         -x | --extension       : output format. Values: text or html. Default: html
         -z | --zcat exec_path  : set the full path to the zcat program. Use it if

@@ -53,7 +53,8 @@ my $top                 = 0;
 my $sample              = 0;
 my $extension           = '';
 my $maxlength           = 0;
-my $graph               = 0;
+my $graph               = 1;
+my $nograph             = 0;
 my $debug               = 0;
 my $nohighlight         = 0;
 my $from                = '';
@@ -100,7 +101,7 @@ my $result = GetOptions(
 	"d|dbname=s"          => \$dbname,
 	"e|end=s"             => \$to,
 	"f|format=s"          => \$format,
-	"g|graph!"            => \$graph,
+	"G|nograph!"          => \$nograph,
 	"h|help!"             => \$help,
 	"i|ident=s"           => \$ident,
 	"l|last-parsed=s"     => \$last_parsed,
@@ -213,6 +214,7 @@ $outdir = $infs[1] . '/';
 
 # Remove graph support if output is not html
 $graph = 0 if ($extension ne 'html');
+$graph = 0 if ($nograph);
 
 my $end_top = $top - 1;
 
@@ -685,7 +687,7 @@ Options:
     -d | --dbname database : only report what concern the given database
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
-    -g | --graph           : generate graphs using the Flotr2 javascript library
+    -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
     -l | --last-parsed file: allow incremental log parsing by registering the
