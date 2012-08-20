@@ -728,12 +728,12 @@ Options:
 
 Examples:
 
-	pgbadger -p -g /var/log/postgresql.log
-	pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
+	pgbadger /var/log/postgresql.log
+	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
 		       /var/log/postgres.log
-	pgbadger -p -g /var/log/postgresql/postgresql-2012-05-*
-	pgbadger -p -g --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
-	cat /var/log/postgres.log | pgbadger -g -p -
+	pgbadger /var/log/postgresql/postgresql-2012-05-*
+	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+	cat /var/log/postgres.log | pgbadger -
 
 Reporting errors every week by cron job:
 
