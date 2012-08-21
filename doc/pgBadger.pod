@@ -35,6 +35,7 @@ Options:
     -o | --outfile filename: define the filename for the output. Default depends
                              of the output format: out.html or out.txt. To dump
                              output to stdout use - as filename.
+    -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, even not a progress bar.
     -s | --sample number   : number of query sample to store/display. Default: 3
     -t | --top number      : number of query to store/display. Default: 20
@@ -108,7 +109,7 @@ The following reports are also available with hourly charts:
 	Sessions per database/user/client.
 	Connections per database/user/client.
 
-All charts are zoomable and can be saved as PNG images.
+All charts are zoomable and can be saved as PNG images. SQL queries reported are highlighted and beautified automatically.
 
 =head1 REQUIREMENT
 
