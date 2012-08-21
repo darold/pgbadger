@@ -32,7 +32,7 @@ use Time::Local 'timegm_nocheck';
 use POSIX qw(setlocale LC_NUMERIC);
 setlocale LC_NUMERIC, "";
 
-$VERSION = '1.2';
+$VERSION = '2.0';
 
 $| = 1;
 
