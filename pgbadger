@@ -2466,7 +2466,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	# Show connection per host statistics
 	if (!$disable_connection && exists $connection_info{host}) {
 		print $fh qq{
-<h2 id="ConnectionsUserReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
+<h2 id="ConnectionsHostReport">Connections per host <a href="#top" title="Back to top">^</a></h2>
 <table>
 <tr><td width="500" align="left" valign="top">
 <table class="SmallTableList">
