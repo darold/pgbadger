@@ -201,5 +201,5 @@ pgBadger is an original work from Gilles Darold. It is maintained by the good fo
 
 =head1 LICENSE
 
-pgBadger is free software distributed under the simplified BSD License.
+pgBadger is free software distributed under the PostgreSQL Licence.
 

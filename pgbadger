@@ -4,7 +4,7 @@
 # PgBadger - An other PostgreSQL log analyzer that aims to replace and
 #           outperforms pgFouine
 #
-# This program is open source, licensed under the simplified BSD license.
+# This program is open source, licensed under the PostgreSQL Licence.
 # For license terms, see the LICENSE file.
 #------------------------------------------------------------------------------
 #
