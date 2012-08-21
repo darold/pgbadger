@@ -1367,7 +1367,7 @@ table.queryList {
 }
 table.queryList th { background-color: #770818; border:1px solid #FEE3C4; color: white; font-weight: normal;}
 table.queryList td, table.queryList th { padding: 2px;}
-table.queryList div.sql { width: 800px; }
+table.queryList div.sql { width: 800px; overflow: auto; }
 table.queryList div.examples { background-color:#E7E7E7; border:1px solid #FFFFFF; -moz-border-radius:10px; padding:6px; margin:5px;}
 table.queryList div.examples div.example0 { padding:2px; }
 table.queryList div.examples div.example1 { background-color:#FFFFFF; padding:2px; border:1px solid #EBF0FC; -moz-border-radius:5px; }
