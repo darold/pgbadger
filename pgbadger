@@ -3220,7 +3220,7 @@ sub parse_query
 		return if ($t_action !~ /query|statement|execute/);
 	} elsif ($t_loglevel eq 'LOG') {
 		if ($t_query !~
-/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file/
+/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher/
 		   )
 		{
 			&logmsg('WARNING', "Unrecognized line: $t_loglevel: $t_query at line $nlines");
