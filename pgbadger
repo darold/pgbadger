@@ -501,7 +501,7 @@ foreach my $logfile (@log_files) {
 			if ($format eq 'syslog') {
 
 				if ($line =~
-					/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+					/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/)
 				{
 
 					# skip non postgresql lines
@@ -564,7 +564,7 @@ foreach my $logfile (@log_files) {
 
 				# Parse stderr lines
 				if ($line =~
-					/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*([^:]*?)\s*([A-Z]+?):\s+(.*)/)
+					/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/)
 				{
 
 					# Skip unwanted lines
@@ -3487,13 +3487,13 @@ sub autodetect_format
 		$nline++;
 
 		# Is syslog lines ?
-		if ($line =~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:\s\[[0-9\-]+\][^:]+:\s+$duration/) {
+		if ($line =~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
 			$fmt = 'syslog';
 			$nfound++;
 			$ident_name{$1}++;
 
 			# Is stderr lines
-		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\][^:]+:\s+$duration/) {
+		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
 			$fmt = 'stderr';
 			$nfound++;
 		} elsif ($line =~ tr/,/,/ >= 12) {
