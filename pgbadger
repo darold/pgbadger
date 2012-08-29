@@ -229,7 +229,7 @@ unlink($outfile) if (-e $outfile);
 
 # -w and --disable-error can't go together
 if ($error_only && $disable_error) {
-	die "FATAL: please choose between no error report and reporting errors only.\n";
+	die "FATAL: please choose between no event report and reporting events only.\n";
 }
 
 # Set default search pattern for database and user name in log_line_prefix
@@ -708,7 +708,7 @@ Options:
     -u | --dbuser username : only report what concern the given user
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
-    -w | --watch-mode      : only report errors just like logwatch could do.
+    -w | --watch-mode      : only report events/errors just like logwatch could do.
     -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
 			     zcat is not on your path or you want to use gzcat.
@@ -940,8 +940,8 @@ Last query: $overall_stat{'last_query'}
 		my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
 		my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
 		print $fh qq{
-Number of errors: $fmt_errors
-Number of unique normalized errors: $fmt_unique_error
+Number of events: $fmt_errors
+Number of unique normalized events: $fmt_unique_error
 };
 	}
 	if ($tempfile_info{count}) {
@@ -1209,16 +1209,22 @@ Log start from $first_log_date to $last_log_date
 
 sub show_error_as_text
 {
-	print $fh "\n- Most frequent errors (N) ---------------------------------------------\n\n";
+	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
 	my $idx = 1;
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
 		if ($error_info{$k}{count} > 1) {
-			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $k\n";
+			my $msg = $k;
+			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
+				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+					$logs_type{HINT}--;
+					$logs_type{LOG}++;
+				}
 				print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
 				print $fh "\t\tDetail: $error_info{$k}{detail}[$i]\n"       if ($error_info{$k}{detail}[$i]);
 				print $fh "\t\tContext: $error_info{$k}{context}[$i]\n"     if ($error_info{$k}{context}[$i]);
@@ -1247,6 +1253,7 @@ sub show_error_as_text
 		}
 		print $fh "Logs type	Count	Percentage\n";
 		foreach my $d (sort keys %logs_type) {
+			next if (!$logs_type{$d});
 			print $fh "$d\t\t", &comma_numbers($logs_type{$d}), "\t", sprintf("%0.2f", ($logs_type{$d} * 100) / $total_logs), "%\n";
 		}
 	}
@@ -1529,7 +1536,7 @@ EOF
 		}
 	}
 	if (!$disable_error) {
-		print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent errors (N)</a> | };
+		print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent events (N)</a> | };
 		print $fh qq{<a href="#LogsTypeReport">Logs per type</a>};
 	}
 	print $fh "</div>\n";
@@ -1591,7 +1598,7 @@ qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#Normali
 		}
 	}
 	if (!$disable_error) {
-		print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent errors (N)</a></li>\n";
+		print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent events (N)</a></li>\n";
 		print $fh qq{<li><a href="#LogsTypeReport">Logs per type</a></li>\n};
 	}
 	print $fh qq{</ul>
@@ -1657,8 +1664,8 @@ sub dump_as_html
 		my $fmt_errors = &comma_numbers($overall_stat{'errors_number'}) || 0;
 		my $fmt_unique_error = &comma_numbers(scalar keys %{$overall_stat{'unique_normalized_errors'}}) || 0;
 		print $fh qq{
-<li>Number of errors: $fmt_errors</li>
-<li>Number of unique normalized errors: $fmt_unique_error</li>
+<li>Number of events: $fmt_errors</li>
+<li>Number of unique normalized events: $fmt_unique_error</li>
 </ul>
 </td><td valign="top">
 <ul>
@@ -2774,8 +2781,8 @@ sub dump_error_as_html
 <div class="information">
 <table><tr><td valign="top">
 <ul>
-<li>Number of errors: $fmt_errors</li>
-<li>Number of unique normalized errors: $fmt_unique_error</li>
+<li>Number of events: $fmt_errors</li>
+<li>Number of unique normalized events: $fmt_unique_error</li>
 </ul>
 </td></tr></table>
 </div>
@@ -2790,7 +2797,7 @@ sub dump_error_as_html
 sub show_error_as_html
 {
 	print $fh qq{
-<h2 id="NormalizedErrorsMostFrequentReport">Most frequent errors (N) <a href="#top" title="Back to top">^</a></h2>
+<h2 id="NormalizedErrorsMostFrequentReport">Most frequent events (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 <tr>
 	<th>Rank</th>
@@ -2822,10 +2829,16 @@ sub show_error_as_html
 		}
 		print $fh "</table></div></div></td>\n";
 		if ($error_info{$k}{count} > 1) {
-			print $fh "<td><div class=\"error\">$k</div>";
+			my $msg = $k;
+			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
+				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+					$logs_type{HINT}--;
+					$logs_type{LOG}++;
+				}
 				my $c = $i % 2;
 				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
 				print $fh "<div class=\"errorInformation$c\">Detail: $error_info{$k}{detail}[$i]</div>\n"
@@ -2873,6 +2886,7 @@ sub show_error_as_html
 		my $c = 0;
 
 		foreach my $d (sort keys %logs_type) {
+			next if (!$logs_type{$d});
 			my $colb = $c % 2;
 			print $fh "<tr class=\"row$colb\"><td>$d</td><td class=\"right\">", &comma_numbers($logs_type{$d}),
 				"</td><td class=\"right\">", sprintf("%0.2f", ($logs_type{$d} * 100) / $total_logs), "%</td></tr>\n";
@@ -2962,6 +2976,12 @@ sub parse_query
 			&logmsg('DEBUG', "Unrecognized loglevel format: $t_loglevel");
 		}
 		return;
+	}
+
+	# Force parameter change to be a hint message so that it can appear
+	# in the event/error/warning messages report part.
+	if (($t_loglevel eq 'LOG') && ($t_query =~ /parameter "[^"]+" changed to "[^"]+"/)) {
+		$t_loglevel = 'HINT';
 	}
 
 	# Do not parse lines that are not an error like message
