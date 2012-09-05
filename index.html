@@ -1,74 +1,103 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>pgBadger</title>
+	<link rel="stylesheet" href="style.css" type="text/css" media="all" />
+</head>
+<body>
+<div id="header">
+	<h1>pgBadger</h1>
+</div>
+<div id="menu">
+	<table width="100%"><tr><td align="left">
+<cite id="menucite">&laquo; No! I'm not a fouine, I'm a badger! &raquo;</cite>
+	</td><td align="right">
+	<a href="index.html">Home</a> | 
+	<a href="news.html">News</a> | 
+	<a href="https://github.com/dalibo/pgbadger/downloads" target="_new">Download</a> | 
+	<a href="documentation.html">Documentation</a> | 
+	<a href="sample.html">Sample reports</a> | 
+	<a href="support.html">Support</a>
+	</td></tr></table>
+</div>
 
-  <head>
-    <meta charset='utf-8' />
-    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
-    <meta name="description" content="Pgbadger : Small Perl script that aims to replace and outperform pgFouine" />
+<h2>pgBadger - a fast PostgreSQL log analyzer</h2>
+<p>
+pgBadger is a PostgreSQL log analyzer build for speed with fully detailed reports from your PostgreSQL log file. It's a single and small Perl script that aims to replace and outperform the old php script <a href="http://pgfouine.projects.postgresql.org/" target="_new">pgFouine</a>.</p>
 
-    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+<p>By the way, we would like to thank Guillaume Smet for all the work he has done on this really nice tool. We've been using it a long time, it was a really great tool!</p>
 
-    <title>Pgbadger</title>
-  </head>
+<p>pgBadger is written in pure Perl language. It uses a javascript library to draw graphs so that you don't need additional Perl modules or any other package to install. Furthermore, this library gives us more features such as zooming.</p>
 
-  <body>
+<p>pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files as well as gzip compressed file. See a complete list of features below.</p>
 
-    <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-        <header class="inner">
-          <a id="forkme_banner" href="https://github.com/dalibo/pgbadger">View on GitHub</a>
+<table width="100%">
+<tr>
+<td width="40%" valign="top">
 
-          <h1 id="project_title">Pgbadger</h1>
-          <h2 id="project_tagline">Small Perl script that aims to replace and outperform pgFouine</h2>
+<h2>Features</h2>
+<p>
+pgBadger reports everything about your SQL queries:
+</p>
+<ul>
+<li>Overall statistics.</li>
+<li>The slowest queries.</li>
+<li>Queries that took up the most time.</li>
+<li>The most frequent queries.</li>
+<li>The most frequent errors.</li>
+</ul>
+<p>
+The following reports are also available with hourly charts:
+</p>
+<ul>
+<li>Hourly queries statistics.</li>
+<li>Hourly temporary file statistics.</li>
+<li>Hourly checkpoints statistics.</li>
+<li>Locks statistics.</li>
+<li>Queries by type (select/insert/update/delete).</li>
+<li>Sessions per database/user/client.</li>
+<li>Connections per database/user/client.</li>
+</ul>
 
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/dalibo/pgbadger/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/dalibo/pgbadger/tarball/master">Download this project as a tar.gz file</a>
-            </section>
-        </header>
-    </div>
+<p>All charts are zoomable and can be saved as PNG images.</p>
 
-    <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
-        <h3>Welcome to GitHub Pages.</h3>
+<h2>Authors</h2>
+<p>pgBadger is an original work from Gilles Darold. It is maintained by the good folks at <a href="http://www.dalibo.com/">Dalibo</a> and every one who wants to contribute.</p>
+<p>&lt;pgbadger AT dalibo DOT com&gt;</p>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+</td><td width="60%" valign="top" align="right">
+<div id="quotes">
+<h2>Quotes</h2>
+<p>
+Andrew Dunstan was the first to talk about pgBadger after seeing the talk at PGCON 2012: <i>"The biggest thing that piqued my interest yesterday at pgCon was the lightning talk on pgbadger. I'm certainly going to take a look at this as a substitute for pgfouine"</i>. See the whole blog post on <a href="http://people.planetpostgresql.org/andrew/index.php?/archives/274-pgbadger-looks-cool.html">Andrew's blog</a>.
+</p>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
-</code></pre>
+<p>
+Christophe Pettus, another <a href="http://pgexperts.com/">PostgreSQL Experts</a> consultant, says June, 30th, 2012: <i>"It’s written in Perl, at least as fast as pgfouine, and can process log files that pgfouine can’t handle. It can read either CSV or standard log format, and can directly read *.gz files. It also produces a wider range of reports that pgfouine, including some very useful locking reports. I threw 25GB of logs with near 80 million lines at it without it complaining"</i>. Read it all on his <a href="http://thebuild.com/blog/2012/06/30/pgbadger/">blog post</a>.
+</p>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+<p><a href="https://twitter.com/#!/ampajaro">Fidel Ramos</a>' tweet says it all: <i>"pgbadger, an alternative PostgreSQL log analyzer to pgfouine which promises to be both faster and more extensive"</i>.</p>
 
-<h3>Designer Templates</h3>
+<p>
+Vincent Picavet from <a href="http://www.oslandia.com/">Oslandia</a>, says <i>"When we setup a Geographical information system database with PostGIS, we install tools for monitoring its behaviour. This enable us to fine-tune the server and queries. We use PgBadger on various production servers, and it's a real quick and efficient solution to get useful reports. The really dynamic development of this solution has been a big plus in our choice."</i>
+</p>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+<p>
+Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</a> project said in his <a href="http://michael.otacoo.com/postgresql-2/postgres-pgbadger-sneaking-in-log-files-for-you/">article</a>: <i>"It is one of those utilities that you can use not only for production database systems, but for extra things like benchmark or performance analysis. Its installation is easy, will not heavy your system with packages you might not want, so go ahead and use it ... this utility is 100% compatible with Postgres-XC, the only thing you need to do is just to launch pgbadger for each node of your cluster."</i>
+</p>
 
-<h3>Rather Drive Stick?</h3>
+</div>
+</td>
+</tr>
+</table>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<h2>License</h2>
 
-<h3>Authors and Contributors</h3>
+<p>pgBadger is free software distributed under the simplified BSD License.</p>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
-
-<h3>Support or Contact</h3>
-
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
-      </section>
-    </div>
-
-    <!-- FOOTER  -->
-    <div id="footer_wrap" class="outer">
-      <footer class="inner">
-        <p class="copyright">Pgbadger maintained by <a href="https://github.com/dalibo">dalibo</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
-      </footer>
-    </div>
-
-    
-
-  </body>
+<div id="footer">
+&copy; 2012 - <strong><a href="http://www.dalibo.com/">Dalibo</a></strong>
+</div>
+</body>
 </html>

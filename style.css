@@ -1,0 +1,31 @@
+a { color: #007dfc; text-decoration: none; }
+a:hover { color: #6f6e6e; text-decoration: none; }
+a:visited { color: #007dfc; text-decoration: none; }
+body { background-color: #dedede; font-family: Verdana ;font-size: 14px;font-style: normal;font-weight: normal;text-transform: normal;letter-spacing: normal;line-height: 17px;padding: 0px; color: rgb(69,54,37); }
+form { margin: 0px; padding: 0px; }
+h1 { border-left:8px #007DFC solid; color: #007DFC; font: lighter 30px Arial, Helvetica, sans-serif; margin: 0px; padding: 7px;border-top: 1px solid #CCCCCC;}
+h1 a, h1 a:visited { color: #007DFC; text-decoration: none; }
+h1 a:hover { color: #888888; text-decoration: none; }
+h2 { border-bottom: 1px solid #CCCCCC; color: #0c57a3; font: lighter 18px Arial, Helvetica, sans-serif; letter-spacing: -1px; margin: 0px 0px 20px; padding-bottom: 3px; padding-top:7px;}
+h2 a, h2 a:visited { color: #007dfc; text-decoration: none; }
+h2 a:hover { color: #6f6e6e; text-decoration: none; }
+h3 { color: #888888; font: normal 12px Arial, Helvetica, sans-serif; font-weight:bold; margin: 10px 0px 5px;text-transform:uppercase; }
+h4 { color: #888888; font: normal 12px Arial, Helvetica, sans-serif; font-weight:bold; margin: 10px 0px 5px;text-transform:uppercase; }
+h5 { color: #333333; font: normal 14px Arial, Helvetica, sans-serif; font-weight:bold; margin: 10px 0px 5px; }
+h6 { color: #333333; font: normal 12px Arial, Helvetica, sans-serif; font-weight:bold; margin: 10px 0px 5px; }
+p { margin: 0px; padding: 0px 0px 15px; }
+pre {border:1px #AAAAAA dashed;padding:5px;background:#fff;}
+
+#menu {  font-size:13px; background-color:#EFEFEF; margin-bottom:15px; padding:5px; -moz-border-radius:8px; padding-left:10px; color:#8F8F8F; border:1px solid #D8D8D8; text-align: right; }
+
+#content { float: left; padding: 17px 10px 0px 20px; width: 650px; }
+#content img { max-width:640px; }
+
+#footer { font: 14px Helvetica, Arial, sans-serif;clear: both; height:30px; color: #dddddd; padding:13px 0px 0 0;margin-left: auto; margin-right: auto;  text-align: center; background-color: #0c57a3; }
+#footer a strong { color: #eeeeee; font-weight: bold;}
+#footer a, #footer a:visited { color: #eeeeee; }
+#footer a:hover { color: #eeeeee; }
+
+#quotes {background-color:#dedede; margin-bottom:15px; padding:4px; -moz-border-radius:8px; padding-left:10px; color: rgb(69,54,37); border:1px solid #D8D8D8; text-align: left; width: 600px; -moz-box-shadow: 3px 3px 5px #000000; -webkit-box-shadow: 3px 3px 5px #000000; -khtml-box-shadow: 3px 3px 5px #000000; -o-box-shadow: 3px 3px 5px #000000; box-shadow: 3px 3px 5px #000000; border-color: #DBDBCC; }
+
+

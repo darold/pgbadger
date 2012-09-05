@@ -1,0 +1,169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>pgBadger</title>
+	<link rel="stylesheet" href="style.css" type="text/css" media="all" />
+</head>
+<body>
+<div id="header">
+	<h1>pgBadger</h1>
+</div>
+<div id="menu">
+	<table width="100%"><tr><td align="left">
+<cite id="menucite">&laquo; No! I'm not a fouine, I'm a badger! &raquo;</cite>
+	</td><td align="right">
+	<a href="index.html">Home</a> | 
+	<a href="news.html">News</a> | 
+	<a href="https://github.com/dalibo/pgbadger/downloads" target="_new">Download</a> | 
+	<a href="documentation.html">Documentation</a> | 
+	<a href="sample.html">Sample reports</a> | 
+	<a href="support.html">Support</a>
+	</td></tr></table>
+</div>
+
+<h2>Requirement</h2>
+<p>pgBadger comes as a single Perl script, you do not need anything else than a modern Perl distribution. Charts are rendered using a Javascript library so you don't need anything, your browser will do all the work.</p>
+
+<p>If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:</p>
+<ul>
+  <li>Text::CSV - to parse PostgreSQL CSV log files.</li>
+</ul>
+
+<h2>PostgreSQL configuration</h2>
+<p>
+You must enable some configuration directives into your postgresql.conf before starting.
+</p>
+<p>
+You must first enable SQL query logging to have something to parse:
+<pre>
+        log_min_duration_statement = 0
+</pre>
+Note that pgBadger is not compatible with statements logs provided by log_statement and log_duration.
+</p>
+<p>
+With 'stderr' log format, log_line_prefix must be at least:
+<pre>
+        log_line_prefix = '%t [%p]: [%l-1] '
+</pre>
+Log line prefix could add user and database name as follow:
+<pre>
+        log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+</pre>
+or for syslog log file format:
+<pre>
+        log_line_prefix = 'user=%u,db=%d '
+</pre>
+Log line prefix for stderr output could also be:
+<pre>
+        log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+</pre>
+or for syslog output:
+<pre>
+        log_line_prefix = 'db=%d,user=%u '
+</pre>
+You need to enable other parameters in postgresql.conf to get more informations from your log files:
+<pre>
+        log_checkpoints = on
+        log_connections = on
+        log_disconnections = on
+        log_lock_waits = on
+        log_temp_files = 0
+</pre>
+</p>
+<p>
+Do not enable log_statement and log_duration, their log format will not
+be parsed by pgBadger.
+</p>
+<p>
+Of course your log messages should be in english without locale support:
+<pre>
+	lc_messages='C'
+</pre>
+but this is not only recommanded by pgbadger.
+</p>
+
+<h2>Installation</h2>
+<p>Download the tarball from github and unpack the archive as follow:</p>
+<pre>
+	tar xzf pgbadger-1.x.tar.gz
+	cd pgbadger-1.x/
+	perl Makefile.PL
+	make && make install
+</pre>
+
+<p>This will copy the Perl script pgbadger in /usr/local/bin/pgbadger directory by default and the man page into /usr/local/share/man/man1/pgbadger.1. Those are the default installation directory for 'site' install.</p>
+
+<p>If you want to install all under /usr/ location, use INSTALLDIRS='perl' as argument of Makefile.PL. The script will be installed into /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.</p>
+
+<p>For example to install everything just like Debian does, proceed as follow:</p>
+<pre>
+	perl Makefile.PL INSTALLDIRS=vendor
+</pre>
+
+<p>By default INSTALLDIRS is set to site</p>
+
+<h2>Usage</h2>
+
+<pre>
+pgbadger [options] logfile [...]
+
+        PostgreSQL log analyzer with fully detailed reports and graphs.
+
+Arguments:
+
+  logfile can be a single log file, a list of files or a shell command
+  returning a list of file.
+
+Options:
+
+    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
+                             be a plain text log or a gzip compressed file
+                             with the .gz extension. Note that this option is
+                             DEPRECATED, set logfile as a command line argument
+                             instead.
+    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
+    -o | --outfile filename: define the filename for the output. Default depends
+                             of the output format: out.html or out.txt. To dump
+                             output to stdout use - as filename.
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -h | --help            : show this message and exit.
+    -d | --dbname database : only report what concern the given database
+    -u | --dbuser username : only report what concern the given user
+    -t | --top number      : number of query to store/display. Default: 20
+    -s | --sample number   : number of query sample to store/display. Default: 3
+    -x | --extension       : output format. Values: text or html. Default: html
+    -m | --maxlength size  : maximum length of a query, it will be cutted above
+                             the given size. Default: no truncate
+    -g | --graph           : generate graphs, requires GD::Graph perl module
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+                             Format: -b "yyyy-mm-dd hh:mm:ss"
+    -e | --end datetime    : end date/time for the data to be parsed in log.
+                             Format: -e "yyyy-mm-dd hh:mm:ss"
+    -q | --quiet           : disable output to stderr and don't print debug informations.
+    -p | --progress        : show a progress bar, quiet mode is enabled with this option.
+    -v | --version         : show current version
+    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
+    -w | -watch-mode       : only report errors just like logwatch could do.
+
+
+Examples:
+
+        pgbadger -p -g /var/log/postgresql.log
+        pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
+		       /var/log/postgres.log
+        pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
+
+Reporting errors every week by cron job:
+
+    30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
+
+this suppose that your log file and HTML report are also rotated every weeks.
+
+</pre>
+
+<div id="footer">
+&copy; 2012 - <strong><a href="http://www.dalibo.com/">Dalibo</a></strong>
+</div>
+</body>
+</html>
