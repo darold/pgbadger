@@ -3498,7 +3498,7 @@ sub autodetect_format
 		} elsif ($line =~ /\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+\s\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
 			$fmt = 'stderr';
 			$nfound++;
-		} elsif ($line =~ tr/,/,/ >= 12) {
+		} elsif ( ($line =~ /,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/) && ($line =~ tr/,/,/ >= 12) ) {
 			$fmt = 'csv';
 			$nfound++;
 		}
