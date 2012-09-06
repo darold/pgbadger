@@ -1855,55 +1855,57 @@ sub dump_as_html
 			$d2 = '';
 			$d3 = '';
 
-			foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{connection}}) {
-				$tm =~ /(\d{4})(\d{2})(\d{2})/;
-				my $y  = $1 - 1900;
-				my $mo = $2 - 1;
-				my $d  = $3;
-				foreach my $h ("00" .. "23") {
-					my %dataavg = ();
-					foreach my $m ("00" .. "59") {
-						my $rd = &average_per_minutes($m, $avg_minutes);
-						if (exists $per_minute_info{connection}{$tm}{$h}{$m}) {
+			if (exists $per_minute_info{connection}) {
+				foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{connection}}) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y  = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d  = $3;
+					foreach my $h ("00" .. "23") {
+						my %dataavg = ();
+						foreach my $m ("00" .. "59") {
+							my $rd = &average_per_minutes($m, $avg_minutes);
+							if (exists $per_minute_info{connection}{$tm}{$h}{$m}) {
 
-							# Average per minute
-							$dataavg{average}{"$rd"} += $per_minute_info{connection}{$tm}{$h}{$m}{count};
+								# Average per minute
+								$dataavg{average}{"$rd"} += $per_minute_info{connection}{$tm}{$h}{$m}{count};
 
-							# Search minimum and maximum during this minute
-							foreach my $s (keys %{$per_minute_info{connection}{$tm}{$h}{$m}{second}}) {
-								$dataavg{max}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s}
-									if ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
-								$dataavg{min}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s}
-									if (not exists $dataavg{min}{"$rd"}
-									|| ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+								# Search minimum and maximum during this minute
+								foreach my $s (keys %{$per_minute_info{connection}{$tm}{$h}{$m}{second}}) {
+									$dataavg{max}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s}
+										if ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} > $dataavg{max}{"$rd"});
+									$dataavg{min}{"$rd"} = $per_minute_info{connection}{$tm}{$h}{$m}{second}{$s}
+										if (not exists $dataavg{min}{"$rd"}
+										|| ($per_minute_info{connection}{$tm}{$h}{$m}{second}{$s} < $dataavg{min}{"$rd"}));
+								}
 							}
 						}
-					}
-					foreach my $rd (@avgs) {
-						my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+						foreach my $rd (@avgs) {
+							my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 
-						# Average per minutes
-						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+							# Average per minutes
+							$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
-						# Maxi per minute
-						$d1 .= "[$t, " . ($dataavg{max}{"$rd"} || 0) . "],";
+							# Maxi per minute
+							$d1 .= "[$t, " . ($dataavg{max}{"$rd"} || 0) . "],";
 
-						# Mini per minute
-						$d3 .= "[$t, " . ($dataavg{min}{"$rd"} || 0) . "],";
+							# Mini per minute
+							$d3 .= "[$t, " . ($dataavg{min}{"$rd"} || 0) . "],";
+						}
 					}
 				}
+				delete $per_minute_info{connection};
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				$d3 =~ s/,$//;
+				&flotr2_graph(
+					2, 'connectionspersecond_graph', $d1, $d2, $d3, 'Connections per second (' . $avg_minutes . ' minutes average)',
+					'Connections per second', 'Maximum', 'Average', 'Minimum'
+				);
+				$d1 = '';
+				$d2 = '';
+				$d3 = '';
 			}
-			delete $per_minute_info{connection};
-			$d1 =~ s/,$//;
-			$d2 =~ s/,$//;
-			$d3 =~ s/,$//;
-			&flotr2_graph(
-				2, 'connectionspersecond_graph', $d1, $d2, $d3, 'Connections per second (' . $avg_minutes . ' minutes average)',
-				'Connections per second', 'Maximum', 'Average', 'Minimum'
-			);
-			$d1 = '';
-			$d2 = '';
-			$d3 = '';
 
 			# All queries
 			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
