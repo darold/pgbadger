@@ -35,6 +35,11 @@ Options:
     -o | --outfile filename: define the filename for the output. Default depends
                              of the output format: out.html or out.txt. To dump
                              output to stdout use - as filename.
+    -p | --prefix string   : give here the value of your custom log_line_prefix
+                             defined in your postgresql.conf. You may used it only
+                             if don't have the default allowed formats ot to use
+                             other custom variables like client ip or application
+                             name. See examples below.
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, even not a progress bar.
     -s | --sample number   : number of query sample to store/display. Default: 3
@@ -73,11 +78,19 @@ Examples:
         pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 
+	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
+			/pglog/postgresql-2012-08-21*
+
 Reporting errors every week by cron job:
 
     30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
 
-    This suppose that your log file and HTML report are also rotated every week.
+Generate report every week using incremental behavior:
+
+    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
+        -o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
+
+This suppose that your log file and HTML report are also rotated every week.
 
 =head1 DESCRIPTION
 
