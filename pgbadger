@@ -511,6 +511,8 @@ foreach my $logfile (@log_files) {
 			$totalsize = 0;
 		}
 
+		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+
 		my $cur_pid = '';
 		while (my $line = <$lfile>) {
 			$cursize += length($line);
@@ -613,7 +615,7 @@ foreach my $logfile (@log_files) {
 					} elsif ($prefix_vars{'t_session_timestamp'}) {
 						$temp_timestamp = $prefix_vars{'t_session_timestamp'};
 					}
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($temp_timestamp =~ $time_pattern);
 					my $cur_date = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
 
 					# Skip unwanted lines
@@ -636,7 +638,7 @@ foreach my $logfile (@log_files) {
 					}
 				
 				# Collect orphans lines of multiline queries
-				} elsif ($line !~ /[^']*\d+-\d+-\d+\s\d+:\d+:\d+\s[^\s]+[^']*/) {
+				} elsif ($line !~ /[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/) {
 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -649,6 +651,7 @@ foreach my $logfile (@log_files) {
 					}
 
 				} else {
+print STDERR "ZZZZZZZZZZZZZZZZZ $line\n";
 					$cur_info{$cur_pid}{query} .= "\n" . $line if ($cur_info{$cur_pid}{query});
 				}
 
@@ -3815,11 +3818,13 @@ EOF
 
 sub build_log_line_prefix_regex
 {
+#'%m %u@%d %p %r %a : '
+#2012-09-09 10:32:26.810 CEST [unknown]@[unknown] 21111  [unknown] :
 	my %regex_map = (
 		'%a' => [ ('t_appname', '([0-9a-zA-Z\.\-\_\/\[\]]*)') ], # application name
 		'%u' => [ ('t_dbuser', '([0-9a-zA-Z\_\[\]]*)') ], # user name
 		'%d' => [ ('t_dbname', '([0-9a-zA-Z\_\[\]]*)') ], # database name
-		'%r' => [ ('t_hostport', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+') ], # remote host and port
+		'%r' => [ ('t_hostport', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)?') ], # remote host and port
 		'%h' => [ ('t_client', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?') ],     # remote host
 		'%p' => [ ('t_pid', '(\d+)') ], # process ID
 		'%t' => [ ('t_timestamp', '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) [A-Z\d]{3,6}') ], # timestamp without milliseconds
