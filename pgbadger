@@ -1781,7 +1781,7 @@ sub dump_as_html
 <table class="HourStatsTable">
 	<tr>
 		<th rowspan="2">Day</th>
-		<th rowspan="2">Time</th>
+		<th rowspan="2">Hour</th>
 		<th colspan="2">Queries</th>
 		<th colspan="2">SELECT queries</th>
 		<th colspan="4">Write queries</th>
@@ -2066,7 +2066,7 @@ sub dump_as_html
 			$d4 = '';
 
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th><th rowspan="2">Time</th>};
+				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 			}
 			if ($tempfile_info{count}) {
 				print $fh qq{<th colspan="2">Temporary files</th>};
@@ -2641,7 +2641,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				&convert_time($normalyzed_info{$k}{duration}),
 				"</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -2707,7 +2707,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 			print $fh
 "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -2775,7 +2775,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				&convert_time($normalyzed_info{$k}{average}),
 				"</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -2891,7 +2891,7 @@ sub show_error_as_html
 		print $fh
 "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 			&comma_numbers($error_info{$k}{count}), "</span>";
-		print $fh "<div class=\"tooltip\"><table><tr><th>Day</th><th>Time</th><th>Count</th></tr>";
+		print $fh "<div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th></tr>";
 		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
