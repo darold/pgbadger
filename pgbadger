@@ -804,6 +804,7 @@ Examples:
 
 	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
 			/pglog/postgresql-2012-08-21*
+	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 
 Reporting errors every week by cron job:
 
