@@ -49,6 +49,8 @@ my $help                = '';
 my $ver                 = '';
 my $dbname              = '';
 my $dbuser              = '';
+my $dbclient            = '';
+my $dbappname           = '';
 my $ident               = '';
 my $top                 = 0;
 my $sample              = 0;
@@ -103,6 +105,7 @@ $num_sep = ' ' if ($n =~ /,/);
 my $result = GetOptions(
 	"a|average=i"         => \$avg_minutes,
 	"b|begin=s"           => \$from,
+	"c|client=s"          => \$dbclient,
 	"d|dbname=s"          => \$dbname,
 	"e|end=s"             => \$to,
 	"f|format=s"          => \$format,
@@ -111,6 +114,7 @@ my $result = GetOptions(
 	"i|ident=s"           => \$ident,
 	"l|last-parsed=s"     => \$last_parsed,
 	"m|maxlength=i"       => \$maxlength,
+	"N|name=s"            => \$dbappname,
 	"n|nohighlight!"      => \$nohighlight,
 	"o|outfile=s"         => \$outfile,
 	"p|prefix=s"          => \$log_line_prefix,
@@ -743,7 +747,8 @@ Options:
     -a | --average minutes : number of minutes to build the average graphs of
 			     queries and connections.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
-    -d | --dbname database : only report what concern the given database
+    -c | --dbclient host   : only report what concern the given client host.
+    -d | --dbname database : only report what concern the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -G | --nograph         : disable graphs on HTML output. Enable by default.
@@ -755,6 +760,8 @@ Options:
 			     report per day with a log rotated each week.
     -m | --maxlength size  : maximum length of a query, it will be cutted above
 			     the given size. Default: no truncate
+    -n | --nohighlight     : disable SQL code highlighting.
+    -N | --name name       : only report what concern the given application name
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
 			     output to stdout use - as filename.
@@ -3062,7 +3069,22 @@ sub validate_log_line
 			return 0;
 		}
 	}
+	if ($dbclient) {
+		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
+		# Log line do not match the required dbclient
+		if (!$prefix_vars{'t_client'} || ($dbclient ne $prefix_vars{'t_client'})) {
+			delete $cur_info{$t_pid};
+			return 0;
+		}
+	}
+	if ($dbappname) {
 
+		# Log line do not match the required dbname
+		if (!$prefix_vars{'t_appname'} || ($dbappname ne $prefix_vars{'t_appname'})) {
+			delete $cur_info{$t_pid};
+			return 0;
+		}
+	}
 	return 1;
 }
 
@@ -3352,6 +3374,8 @@ sub parse_query
 	$cur_info{$t_pid}{duration} = $t_duration;
 	$cur_info{$t_pid}{dbname}   = $prefix_vars{t_dbname};
 	$cur_info{$t_pid}{dbuser}   = $prefix_vars{t_dbuser};
+	$cur_info{$t_pid}{dbclient} = $prefix_vars{t_client};
+	$cur_info{$t_pid}{dbappname}= $prefix_vars{t_appname};
 
 	return 1;
 }
@@ -3824,7 +3848,7 @@ sub build_log_line_prefix_regex
 		'%a' => [ ('t_appname', '([0-9a-zA-Z\.\-\_\/\[\]]*)') ], # application name
 		'%u' => [ ('t_dbuser', '([0-9a-zA-Z\_\[\]]*)') ], # user name
 		'%d' => [ ('t_dbname', '([0-9a-zA-Z\_\[\]]*)') ], # database name
-		'%r' => [ ('t_hostport', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)?') ], # remote host and port
+		'%r' => [ ('t_hostport', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?[:\d]*') ], # remote host and port
 		'%h' => [ ('t_client', '(\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?') ],     # remote host
 		'%p' => [ ('t_pid', '(\d+)') ], # process ID
 		'%t' => [ ('t_timestamp', '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) [A-Z\d]{3,6}') ], # timestamp without milliseconds
