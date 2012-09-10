@@ -9,17 +9,19 @@
 #------------------------------------------------------------------------------
 #
 # You must enable SQL query logging : log_min_duration_statement = 0
-# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
-# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
-# Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+# With stderr output
+#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
+#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+# With syslog output
+#   Log line prefix should be : log_line_prefix = 'db=%d,user=%u '
 #
 # Additional informations that could be collected and reported
-#
-# log_checkpoints = on
-# log_connections = on
-# log_disconnections = on
-# log_lock_waits = on
-# log_temp_files = 0
+#   log_checkpoints = on
+#   log_connections = on
+#   log_disconnections = on
+#   log_lock_waits = on
+#   log_temp_files = 0
 #------------------------------------------------------------------------------
 use vars qw($VERSION);
 
@@ -63,8 +65,6 @@ my $nohighlight         = 0;
 my $noprettify          = 0;
 my $from                = '';
 my $to                  = '';
-my $regex_prefix_dbname = '';
-my $regex_prefix_dbuser = '';
 my $quiet               = 0;
 my $progress            = 1;
 my $error_only          = 0;
@@ -129,8 +129,6 @@ my $result = GetOptions(
 	"w|watch-mode!"       => \$error_only,
 	"x|extension=s"       => \$extension,
 	"z|zcat=s"            => \$zcat,
-	"regex-db=s"          => \$regex_prefix_dbname,
-	"regex-user=s"        => \$regex_prefix_dbuser,
 	"pie-limit=i"         => \$pie_percentage_limit,
 	"image-format=s"      => \$img_format,
 	"exclude-query=s"     => \@exclude_query,
@@ -243,8 +241,8 @@ if ($error_only && $disable_error) {
 }
 
 # Set default search pattern for database and user name in log_line_prefix
-$regex_prefix_dbname = 'db=([^,]*)'   if (!$regex_prefix_dbname);
-$regex_prefix_dbuser = 'user=([^,]*)' if (!$regex_prefix_dbuser);
+my $regex_prefix_dbname = qr/db=([^,]*)/;
+my $regex_prefix_dbuser = qr/user=([^,]*)/;
 
 # Loading excluded query from file if any
 if ($exclude_file) {
@@ -265,8 +263,6 @@ if ($#exclude_query >= 0) {
 		&check_regex($r, '--exclude-query');
 	}
 }
-&check_regex($regex_prefix_dbname, '--regex-db');
-&check_regex($regex_prefix_dbuser, '--regex-user');
 
 # Compile custom log line prefie prefix
 my @prefix_params = ();
@@ -486,17 +482,17 @@ foreach my $logfile (@log_files) {
 			if ($row->[13] && ($row->[13] !~ m/duration: \d+\.\d+ ms/)) {
 				$row->[13] = "duration: $duration ms $row->[13]";
 			}
-			if (&parse_log_prefix($row->[3], 'user=' . $row->[1] . ',db=' . $row->[2])) {
-				# Process the log line
-				&parse_query(
-					@date,
-					$row->[4],                                   # connection from
-					$row->[3],                                   # pid
-					$row->[5],                                   # session
-					$row->[11],                                  # loglevel
-					$row->[13] || $row->[14] || $row->[15],      #  message || detail || hint
-				);
-			}
+			$prefix_vars{'t_dbuser'} = $row->[1] || '';
+			$prefix_vars{'t_dbname'} = $row->[2] || '';
+			# Process the log line
+			&parse_query(
+				@date,
+				$row->[4],                                   # connection from
+				$row->[3],                                   # pid
+				$row->[5],                                   # session
+				$row->[11],                                  # loglevel
+				$row->[13] || $row->[14] || $row->[15],      #  message || detail || hint
+			);
 		}
 		$csv->eof or die "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		close $io;
@@ -564,7 +560,7 @@ foreach my $logfile (@log_files) {
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
-						&parse_log_prefix($prefix_vars{'t_pid'}, $prefix_vars{'t_logprefix'});
+						&parse_log_prefix($prefix_vars{'t_logprefix'});
 					}
 					# Check if the log line shoud be exclude from the report
 					if (&validate_log_line($cur_pid)) {
@@ -632,7 +628,7 @@ foreach my $logfile (@log_files) {
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
-						&parse_log_prefix($prefix_vars{'t_pid'}, $prefix_vars{'t_logprefix'});
+						&parse_log_prefix($prefix_vars{'t_logprefix'});
 					}
 
 					# Check if the log line shoud be exclude from the report
@@ -807,10 +803,13 @@ Examples:
 	pgbadger /var/log/postgresql/postgresql-2012-05-*
 	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
-
+	# log prefix with stderr log output
 	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
 			/pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+	# Log line prefix with syslog log output
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
+			/pglog/postgresql-2012-08-21*
 
 Reporting errors every week by cron job:
 
@@ -3091,21 +3090,17 @@ sub validate_log_line
 
 sub parse_log_prefix
 {
-	my ($t_pid, $t_logprefix) = @_;
+	my ($t_logprefix) = @_;
 
 	# Extract user and database information from the logprefix part
 	if ($t_logprefix) {
-		# Remove timestamp in log_line_prefix and extra space character
-		$t_logprefix =~ s/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)//;
-		$t_logprefix =~ s/\s+$//;
-		$t_logprefix =~ s/^\s+//;
 		# Search for database user
-		if ($t_logprefix =~ /$regex_prefix_dbuser/) {
+		if ($t_logprefix =~ $regex_prefix_dbuser) {
 			$prefix_vars{'t_dbuser'} = $1;
 		}
 
 		# Search for database name
-		if ($t_logprefix =~ /$regex_prefix_dbname/) {
+		if ($t_logprefix =~ $regex_prefix_dbname) {
 			$prefix_vars{'t_dbname'} = $1;
 		}
 	}
