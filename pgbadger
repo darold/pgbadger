@@ -264,6 +264,10 @@ if ($#exclude_query >= 0) {
 	}
 }
 
+my $other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*)/;
+my $orphan_syslog_line = qr/^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:/;
+my $orphan_stderr_line = qr/[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/;
+
 # Compile custom log line prefie prefix
 my @prefix_params = ();
 if ($log_line_prefix) {
@@ -271,20 +275,20 @@ if ($log_line_prefix) {
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
-		$log_line_prefix = '(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
-		$log_line_prefix = $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		push(@prefix_params, 't_loglevel', 't_query');
 	}
 } elsif ($format eq 'syslog') {
-	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
-	$compiled_prefix = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*\s[^\s]+\s\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	$compiled_prefix = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*\s[^\s]+\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 }
 
@@ -459,40 +463,43 @@ foreach my $logfile (@log_files) {
 					print ".";
 				}
 			}
+			# Process only relevant lines
+			next if ($row->[11] !~ /^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT)$/);
 
 			# Extract the date
 			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
-			my @date = ($1, $2, $3, $4, $5, $6);
-			my $cur_date = join('', @date);
-			my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
 			my $milli = $7 || 0;
+			($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
+			$prefix_vars{'t_date'} = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
+			$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+			my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
 			$row->[8] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
 			my $start_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
 			my $duration = (($end_time - $start_time) * 1000) - $milli;
 			$duration = 0 if ($duration < 0);
 
 			# Skip unwanted lines
-			next if ($from && ($from > $cur_date));
-			last if ($to   && ($to < $cur_date));
+			next if ($from && ($from > $prefix_vars{'t_date'}));
+			last if ($to   && ($to < $prefix_vars{'t_date'}));
 
 			# Jump to the last line parsed if required
-			next if (!&check_incremental_position($cur_date, join(',', @$row)));
+			next if (!&check_incremental_position($prefix_vars{'t_date'}, join(',', @$row)));
 
 			# Set approximative session duration
-			if ($row->[13] && ($row->[13] !~ m/duration: \d+\.\d+ ms/)) {
-				$row->[13] = "duration: $duration ms $row->[13]";
+			$prefix_vars{'t_query'} = $row->[13] || $row->[14] || $row->[15];
+			if ($prefix_vars{'t_query'} && ($prefix_vars{'t_query'} !~ m/duration: \d+\.\d+ ms/)) {
+				$prefix_vars{'t_query'} = "duration: $duration ms  $prefix_vars{'t_query'}";
 			}
 			$prefix_vars{'t_dbuser'} = $row->[1] || '';
 			$prefix_vars{'t_dbname'} = $row->[2] || '';
-			# Process the log line
-			&parse_query(
-				@date,
-				$row->[4],                                   # connection from
-				$row->[3],                                   # pid
-				$row->[5],                                   # session
-				$row->[11],                                  # loglevel
-				$row->[13] || $row->[14] || $row->[15],      #  message || detail || hint
-			);
+			$prefix_vars{'t_appname'} = $row->[2] || '';
+			$prefix_vars{'t_client'} = $row->[2] || '';
+			$prefix_vars{'t_host'} = 'csv';
+			$prefix_vars{'t_pid'} = $row->[3];
+			$prefix_vars{'t_session_line'} = $row->[5];
+			$prefix_vars{'t_session_line'} =~ s/\..*//;
+			$prefix_vars{'t_loglevel'} = $row->[11];
+			&parse_query();
 		}
 		$csv->eof or die "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		close $io;
@@ -533,42 +540,44 @@ foreach my $logfile (@log_files) {
 			if ($format eq 'syslog') {
 
 				my @matches = ($line =~ $compiled_prefix);
-				for (my $i = 0; $i <= $#prefix_params; $i++) {
-					$prefix_vars{$prefix_params[$i]} = $matches[$i];
-				}
 				if ($#matches >= 0) {
 
+					for (my $i = 0; $i <= $#prefix_params; $i++) {
+						$prefix_vars{$prefix_params[$i]} = $matches[$i];
+					}
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
 					# Syslog do not have year information, so take care of year overlapping
-					my $tmp_year = $gyear;
+					$prefix_vars{'t_year'} = $gyear;
 					$prefix_vars{'t_day'} = sprintf("%02d", $prefix_vars{'t_day'});
-					if ("$tmp_year$month_abbr{$prefix_vars{'t_month'}}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
-						$tmp_year = substr($CURRENT_DATE, 1, 4) - 1;
+					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
+					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
+						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 1, 4) - 1;
 					}
 
-					my $cur_date = $tmp_year . $month_abbr{$prefix_vars{'t_month'}} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
+					$prefix_vars{'t_date'} = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
+					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
 					# Skip unwanted lines
-					next if ($from && ($from > $cur_date));
-					last if ($to   && ($to < $cur_date));
-					$cur_pid = $prefix_vars{'t_pid'};
+					next if ($from && ($from > $prefix_vars{'t_date'}));
+					last if ($to   && ($to < $prefix_vars{'t_date'}));
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($cur_date, $line));
+					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
+					$cur_pid = $prefix_vars{'t_pid'};
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
 						&parse_log_prefix($prefix_vars{'t_logprefix'});
 					}
 					# Check if the log line shoud be exclude from the report
-					if (&validate_log_line($cur_pid)) {
+					if (&validate_log_line($prefix_vars{'t_pid'})) {
 						# Process the log line
-						&parse_query($tmp_year, $month_abbr{$prefix_vars{'t_month'}}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}, $prefix_vars{'t_host'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_session_line'}, $prefix_vars{'t_loglevel'}, $prefix_vars{'t_query'});
+						&parse_query();
 					}
 
-				} elsif ($line =~ /^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[([0-9\-]+)\]\s*(.*)/) {
+				} elsif ($line =~ $other_syslog_line) {
 
 					$cur_pid = $8;
 					my $t_query = $10;
@@ -584,7 +593,7 @@ foreach my $logfile (@log_files) {
 					}
 
 					# Collect orphans lines of multiline queries
-				} elsif ($line !~ /^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\[]+\[\d+\]:/) {
+				} elsif ($line !~ $orphan_syslog_line) {
 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -603,28 +612,25 @@ foreach my $logfile (@log_files) {
 			} elsif ($format eq 'stderr') {
 
 				my @matches = ($line =~ $compiled_prefix);
-				for (my $i = 0; $i <= $#prefix_params; $i++) {
-					$prefix_vars{$prefix_params[$i]} = $matches[$i];
-				}
 				if ($#matches >= 0) {
-					my $temp_timestamp = '';
-					if ($prefix_vars{'t_timestamp'}) {
-						$temp_timestamp = $prefix_vars{'t_timestamp'};
-					} elsif ($prefix_vars{'t_mtimestamp'}) {
-						$temp_timestamp = $prefix_vars{'t_mtimestamp'};
-					} elsif ($prefix_vars{'t_session_timestamp'}) {
-						$temp_timestamp = $prefix_vars{'t_session_timestamp'};
+					for (my $i = 0; $i <= $#prefix_params; $i++) {
+						$prefix_vars{$prefix_params[$i]} = $matches[$i];
 					}
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($temp_timestamp =~ $time_pattern);
-					my $cur_date = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
+					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
+						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
+					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
+						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+					}
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+					$prefix_vars{'t_date'} = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
 
 					# Skip unwanted lines
-					next if ($from && ($from > $cur_date));
-					last if ($to   && ($to < $cur_date));
-					$cur_pid = $prefix_vars{'t_pid'};
+					next if ($from && ($from > $prefix_vars{'t_date'}));
+					last if ($to   && ($to < $prefix_vars{'t_date'}));
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($cur_date, $line));
+					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
+					$cur_pid = $prefix_vars{'t_pid'};
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -632,13 +638,14 @@ foreach my $logfile (@log_files) {
 					}
 
 					# Check if the log line shoud be exclude from the report
-					if (&validate_log_line($cur_pid)) {
+					if (&validate_log_line($prefix_vars{'t_pid'})) {
+						$prefix_vars{'t_host'} = 'stderr';
 						# Process the log line
-						&parse_query($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}, 'stderr', $prefix_vars{'t_pid'}, $prefix_vars{'t_session_line'}, $prefix_vars{'t_loglevel'}, $prefix_vars{'t_query'});
+						&parse_query();
 					}
 				
 				# Collect orphans lines of multiline queries
-				} elsif ($line !~ /[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/) {
+				} elsif ($line !~ $orphan_stderr_line) {
 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -732,7 +739,7 @@ Usage: pgbadger [options] logfile [...]
 
 	PostgreSQL log analyzer with fully detailed reports and graphs.
 
-Arguments:²
+Arguments:
 
     logfile can be a single log file, a list of files or a shell command 
     returning a list of file. If you want to pass log content from stdin
@@ -3108,27 +3115,18 @@ sub parse_log_prefix
 
 sub parse_query
 {
-	my ($t_year, $t_month, $t_day, $t_hour, $t_min, $t_sec, $t_host, $t_pid, $t_session, $t_loglevel, $t_query) = @_;
 
-	# Get log level and pass if not supported following the context
-	if ($t_loglevel !~ /^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT)$/) {
-
-		# Unrecognized loglevel format
-		if ($t_loglevel ne 'NOTICE') {
-			&logmsg('DEBUG', "Unrecognized loglevel format: $t_loglevel");
-		}
-		return;
-	}
+	my $t_pid = $prefix_vars{'t_pid'};
 
 	# Force parameter change to be a hint message so that it can appear
 	# in the event/error/warning messages report part.
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /parameter "[^"]+" changed to "[^"]+"/)) {
-		$t_loglevel = 'HINT';
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/)) {
+		$prefix_vars{'t_loglevel'} = 'HINT';
 	}
 
 	# Do not parse lines that are not an error like message
-	if ($error_only && ($t_loglevel !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/)) {
-		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
+	if ($error_only && ($prefix_vars{'t_loglevel'} !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/)) {
+		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
@@ -3136,8 +3134,8 @@ sub parse_query
 	}
 
 	# Do not parse lines that are an error like message
-	if ($disable_error && ($t_loglevel =~ /WARNING|ERROR|FATAL|PANIC|HINT|CONTEXT|DETAIL|STATEMENT/)) {
-		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
+	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ /WARNING|ERROR|FATAL|PANIC|HINT|CONTEXT|DETAIL|STATEMENT/)) {
+		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
@@ -3145,50 +3143,49 @@ sub parse_query
 	}
 
 	# Store the current timestamp of the log line
-	$first_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec" if (!$first_log_date);
-	$last_log_date = "$t_year-$t_month-$t_day $t_hour:$t_min:$t_sec";
+	$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
+	$last_log_date = $prefix_vars{'t_timestamp'};
 
 	# Store a counter of logs type
-	$logs_type{$t_loglevel}++;
+	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
 	# Replace syslog tablulation rewrite
-	$t_query =~ s/#011/\t/g if ($format eq 'syslog');
+	$prefix_vars{'t_query'} =~ s/#011/\t/g if ($format eq 'syslog');
 
-	# Remove line from session number
-	$t_session =~ s/\-\d+//;
+	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
 
 	# Stores lock activity
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/)) {
 		return if ($disable_lock);
 		$lock_info{$1}{count}++;
 		$lock_info{$1}{duration} += $3;
 		$lock_info{$1}{$2}{count}++;
 		$lock_info{$1}{$2}{duration} += $3;
-		$lock_info{$1}{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
-		$lock_info{$1}{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{duration}++;
+		$lock_info{$1}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$lock_info{$1}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{duration}++;
 		return;
 	}
 
 	# Stores temporary files activity
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /temporary file: path .*, size (\d+)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path .*, size (\d+)/)) {
 		return if ($disable_temporary);
 		$tempfile_info{count}++;
 		$tempfile_info{size} += $1;
-		$tempfile_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
-		$tempfile_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{size} += $1;
+		$tempfile_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$tempfile_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{size} += $1;
 		$tempfile_info{maxsize} = $1 if ($tempfile_info{maxsize} < $1);
 		return;
 	}
 
 	# Stores pre connection activity
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection received: host=([^\s]+) port=(\d+)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+) port=(\d+)/)) {
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
 		return;
 	}
 
 	# Stores connection activity
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /connection authorized: user=([^\s]+) database=([^\s]+)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) database=([^\s]+)/)) {
 		return if ($disable_connection);
 		my $usr = $1;
 		my $db  = $2;
@@ -3196,26 +3193,26 @@ sub parse_query
 		$connection_info{user}{$usr}++;
 		$connection_info{database}{$db}++;
 		$connection_info{database_user}{$db}{$usr}++;
-		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
-		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{user}{$usr}++;
-		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database}{$db}++;
-		$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{database_user}{$db}{$usr}++;
+		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{user}{$usr}++;
+		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database}{$db}++;
+		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database_user}{$db}{$usr}++;
 
 		if ($graph) {
-			$per_minute_info{connection}{"$t_year$t_month$t_day"}{"$t_hour"}{"$t_min"}{count}++;
-			$per_minute_info{connection}{"$t_year$t_month$t_day"}{"$t_hour"}{"$t_min"}{second}{$t_sec}++;
+			$per_minute_info{connection}{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{count}++;
+			$per_minute_info{connection}{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{second}{$prefix_vars{'t_sec'}}++;
 		}
 		if (exists $conn_received{$t_pid}) {
 			$connection_info{host}{$conn_received{$t_pid}}++;
-			$connection_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{host}{$conn_received{$t_pid}}++;
+			$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$conn_received{$t_pid}}++;
 			delete $conn_received{$t_pid};
 		}
 		return;
 	}
 
 	# Stores session duration
-	if (   ($t_loglevel eq 'LOG')
-		&& ($t_query =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
+	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
 	{
 		return if ($disable_session);
 		my $time = $1;
@@ -3228,8 +3225,8 @@ sub parse_query
 		$time = ($3 * 1000) + ($2 * 60 * 1000) + ($1 * 60 * 60 * 1000);
 		$session_info{count}++;
 		$session_info{duration} += $time;
-		$session_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{count}++;
-		$session_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{duration} += $time;
+		$session_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$session_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{duration} += $time;
 		$session_info{database}{$db}{count}++;
 		$session_info{database}{$db}{duration} += $time;
 		$session_info{user}{$usr}{count}++;
@@ -3241,8 +3238,8 @@ sub parse_query
 
 	# Store checkpoint information
 	if (
-		($t_loglevel eq 'LOG')
-		&& ($t_query =~
+		($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~
 /checkpoint complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) transaction log file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
 		   )
 	   )
@@ -3258,30 +3255,30 @@ sub parse_query
 		$checkpoint_info{sync}          += $7;
 		$checkpoint_info{total}         += $8;
 
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{wbuffer} += $1;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{wbuffer} += $1;
 
-		#$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{percent_wbuffer} += $2;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_added}    += $3;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_removed}  += $4;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{file_recycled} += $5;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{write}         += $6;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{sync}          += $7;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{total}         += $8;
+		#$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{percent_wbuffer} += $2;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{file_added}    += $3;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{file_removed}  += $4;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{file_recycled} += $5;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{write}         += $6;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{sync}          += $7;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{total}         += $8;
 		return;
 	}
-	if (($t_loglevel eq 'LOG') && ($t_query =~ /checkpoints are occurring too frequently \((\d+) seconds apart\)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /checkpoints are occurring too frequently \((\d+) seconds apart\)/)) {
 		return if ($disable_checkpoint);
 		$checkpoint_info{warning}++;
 		$checkpoint_info{warning_seconds} += $1;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{warning}++;
-		$checkpoint_info{chronos}{"$t_year$t_month$t_day"}{"$t_hour"}{warning_seconds} += $1;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{warning}++;
+		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{warning_seconds} += $1;
 		return;
 	}
 
 	# Store the detail of the error
 	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC/) {
-		if ($t_loglevel =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
-			$cur_info{$t_pid}{"\L$1\E"} .= $t_query;
+		if ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
+			$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
 			return;
 		}
 	}
@@ -3296,7 +3293,7 @@ sub parse_query
 		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 
 			# Apply bind parameters if any
-			if (($t_loglevel eq 'DETAIL') && ($t_query =~ /parameters: (.*)/)) {
+			if (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ /parameters: (.*)/)) {
 				my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $1);
 				shift(@t_res);
 				for (my $i = 0 ; $i < $#t_res ; $i += 2) {
@@ -3308,9 +3305,9 @@ sub parse_query
 		}
 
 		# When we are ready to overwrite the last storage, add it to the global stats
-		if (   ($t_loglevel =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/)
+		if (   ($prefix_vars{'t_loglevel'} =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/)
 			&& exists $cur_info{$t_pid}
-			&& (($format eq 'csv') || ($t_session != $cur_info{$t_pid}{session})))
+			&& (($format eq 'csv') || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})))
 		{
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
@@ -3324,53 +3321,53 @@ sub parse_query
 	}
 	my $t_action   = '';
 	my $t_duration = '';
-	if ($t_query =~ s/duration:\s([0-9\.]+)\sms\s+(query|statement):\s//is) {
+	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 		$t_duration = $1;
 		$t_action   = $2;
-	} elsif ($t_query =~ s/duration:\s([0-9\.]+)\sms\s+(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
 		$t_duration = $1;
 		$t_action   = $2;
 
 		# Skiping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
-	} elsif (!$duration_required && ($t_query =~ s/(query|statement):\s//is)) {
+	} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(query|statement): //is)) {
 		$t_action = $1;
-	} elsif (!$duration_required && ($t_query =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)) {
+	} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)) {
 		$t_action = $1;
 
 		# Skiping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
-	} elsif ($t_loglevel eq 'LOG') {
-		if ($t_query !~
+	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
+		if ($prefix_vars{'t_query'} !~
 /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)/
 		   )
 		{
-			&logmsg('DEBUG', "Unrecognized line: $t_loglevel: $t_query at line $nlines");
+			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
 		}
-		if (exists $cur_info{$t_pid} && ($t_session != $cur_info{$t_pid}{session})) {
+		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
 		return;
 	}
 
-	$cur_info{$t_pid}{year}     = $t_year;
-	$cur_info{$t_pid}{month}    = $t_month;
-	$cur_info{$t_pid}{day}      = $t_day;
-	$cur_info{$t_pid}{hour}     = $t_hour;
-	$cur_info{$t_pid}{min}      = $t_min;
-	$cur_info{$t_pid}{sec}      = $t_sec;
-	$cur_info{$t_pid}{date}     = "$t_year$t_month$t_day$t_hour$t_min$t_sec";
-	$cur_info{$t_pid}{host}     = $t_host;
-	$cur_info{$t_pid}{pid}      = $t_pid;
-	$cur_info{$t_pid}{session}  = $t_session;
-	$cur_info{$t_pid}{loglevel} = $t_loglevel;
-	$cur_info{$t_pid}{query}    = $t_query;
+	$cur_info{$t_pid}{year}     = $prefix_vars{'t_year'};
+	$cur_info{$t_pid}{month}    = $prefix_vars{'t_month'};
+	$cur_info{$t_pid}{day}      = $prefix_vars{'t_day'};
+	$cur_info{$t_pid}{hour}     = $prefix_vars{'t_hour'};
+	$cur_info{$t_pid}{min}      = $prefix_vars{'t_min'};
+	$cur_info{$t_pid}{sec}      = $prefix_vars{'t_sec'};
+	$cur_info{$t_pid}{date}     = $prefix_vars{'t_date'};
+	$cur_info{$t_pid}{ident}    = $prefix_vars{'t_ident'};
+	$cur_info{$t_pid}{query}    = $prefix_vars{'t_query'};
 	$cur_info{$t_pid}{duration} = $t_duration;
-	$cur_info{$t_pid}{dbname}   = $prefix_vars{t_dbname};
-	$cur_info{$t_pid}{dbuser}   = $prefix_vars{t_dbuser};
-	$cur_info{$t_pid}{dbclient} = $prefix_vars{t_client};
-	$cur_info{$t_pid}{dbappname}= $prefix_vars{t_appname};
+	$cur_info{$t_pid}{pid}      = $prefix_vars{'t_pid'};
+	$cur_info{$t_pid}{session}  = $prefix_vars{'t_session_line'};
+	$cur_info{$t_pid}{loglevel} = $prefix_vars{'t_loglevel'};
+	$cur_info{$t_pid}{dbname}   = $prefix_vars{'t_dbname'};
+	$cur_info{$t_pid}{dbuser}   = $prefix_vars{'t_dbuser'};
+	$cur_info{$t_pid}{dbclient} = $prefix_vars{'t_client'};
+	$cur_info{$t_pid}{dbappname}= $prefix_vars{'t_appname'};
 
 	return 1;
 }
