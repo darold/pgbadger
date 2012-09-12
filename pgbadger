@@ -32,8 +32,9 @@ use IO::File;
 use Benchmark;
 use File::Basename;
 use Time::Local 'timegm_nocheck';
-use POSIX qw(setlocale LC_NUMERIC);
-setlocale LC_NUMERIC, "";
+use POSIX qw(locale_h);
+setlocale(LC_NUMERIC, '');
+setlocale(LC_ALL, 'C');
 
 $VERSION = '2.0';
 
@@ -472,12 +473,6 @@ foreach my $logfile (@log_files) {
 			($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
 			$prefix_vars{'t_date'} = $prefix_vars{'t_year'} . $prefix_vars{'t_month'} . $prefix_vars{'t_day'} . $prefix_vars{'t_hour'} . $prefix_vars{'t_min'} . $prefix_vars{'t_sec'};
 			$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-			my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
-			$row->[8] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-			my $start_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
-			my $duration = (($end_time - $start_time) * 1000) - $milli;
-			$duration = 0 if ($duration < 0);
-
 			# Skip unwanted lines
 			next if ($from && ($from > $prefix_vars{'t_date'}));
 			last if ($to   && ($to < $prefix_vars{'t_date'}));
@@ -486,10 +481,15 @@ foreach my $logfile (@log_files) {
 			next if (!&check_incremental_position($prefix_vars{'t_date'}, join(',', @$row)));
 
 			# Set approximative session duration
-			$prefix_vars{'t_query'} = $row->[13] || $row->[14] || $row->[15];
-			if ($prefix_vars{'t_query'} && ($prefix_vars{'t_query'} !~ m/duration: \d+\.\d+ ms/)) {
-				$prefix_vars{'t_query'} = "duration: $duration ms  $prefix_vars{'t_query'}";
+			if (($row->[11] eq 'LOG') && $row->[13] && ($row->[13] !~ m/^duration: \d+\.\d+ ms/)) {
+				my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
+				$row->[8] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
+				my $start_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
+				my $duration = (($end_time - $start_time) * 1000) - $milli;
+				$duration = 0 if ($duration < 0);
+				$row->[13] = "duration: $duration ms  $row->[13]";
 			}
+
 			$prefix_vars{'t_dbuser'} = $row->[1] || '';
 			$prefix_vars{'t_dbname'} = $row->[2] || '';
 			$prefix_vars{'t_appname'} = $row->[2] || '';
@@ -499,9 +499,25 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_session_line'} = $row->[5];
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
+			$prefix_vars{'t_query'} = $row->[13];
 			&parse_query();
+			if ($row->[14]) {
+				if ($row->[11] eq 'LOG') {
+					if ($row->[13] =~ /^(duration: \d+\.\d+ ms)/) {
+						$row->[14] = "$1  $row->[14]";
+					} 
+				}
+				$prefix_vars{'t_loglevel'} = 'DETAIL';
+				$prefix_vars{'t_query'} = $row->[14];
+				&parse_query();
+			}
+			if ($row->[15]) {
+				$prefix_vars{'t_query'} = $row->[15];
+				$prefix_vars{'t_loglevel'} = 'HINT';
+				&parse_query();
+			}
 		}
-		$csv->eof or die "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
+		$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		close $io;
 	} else {
 
