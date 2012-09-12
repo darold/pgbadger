@@ -453,6 +453,7 @@ foreach my $logfile (@log_files) {
 		open(my $io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
 
 		# Parse csvlog lines
+		my $getout = 0;
 		while (my $row = $csv->getline($io)) {
 
 			# Set progress statistics
@@ -467,7 +468,6 @@ foreach my $logfile (@log_files) {
 			}
 			# Process only relevant lines
 			next if ($row->[11] !~ /^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT)$/);
-
 			# Extract the date
 			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
 			my $milli = $7 || 0;
@@ -476,7 +476,7 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 			# Skip unwanted lines
 			next if ($from && ($from > $prefix_vars{'t_date'}));
-			last if ($to   && ($to < $prefix_vars{'t_date'}));
+			$getout = 1, last if ($to && ($to < $prefix_vars{'t_date'}));
 
 			# Jump to the last line parsed if required
 			next if (!&check_incremental_position($prefix_vars{'t_date'}, join(',', @$row)));
@@ -518,7 +518,9 @@ foreach my $logfile (@log_files) {
 				&parse_query();
 			}
 		}
-		$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
+		if (!$getout) {
+			$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
+		}
 		close $io;
 	} else {
 
