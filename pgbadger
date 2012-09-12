@@ -86,6 +86,10 @@ my $report_title        = 'PgBadger: PostgreSQL log analyzer';
 my $log_line_prefix     = '';
 my $compiled_prefix     = '';
 my $project_url         = 'http://dalibo.github.com/pgbadger/';
+my $t_min               = 0;
+my $t_max               = 0;
+my $t_min_hour          = 0;
+my $t_max_hour          = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -1899,6 +1903,14 @@ sub dump_as_html
 		print $fh "</table>\n";
 
 		if ($graph) {
+			$first_log_date =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+			$t_min = timegm_nocheck(0, $5, $4, $3, $2-1, $1) * 1000;
+			$t_min -= ($avg_minutes*60000);
+			$t_min_hour = timegm_nocheck(0, 0, $4, $3, $2-1, $1) * 1000;
+			$last_log_date =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+			$t_max = timegm_nocheck(59, $5, $4, $3, $2-1, $1) * 1000;
+			$t_max += ($avg_minutes*60000);
+			$t_max_hour = timegm_nocheck(0, 0, $4, $3, $2-1, $1) * 1000;
 			my @labels = ();
 			my @data1  = ();
 			my @data2  = ();
@@ -1938,6 +1950,8 @@ sub dump_as_html
 					foreach my $rd (@avgs) {
 						my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 
+						next if ($t < $t_min);
+						last if ($t > $t_max);
 						# Average per minutes
 						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
@@ -1989,6 +2003,8 @@ sub dump_as_html
 						foreach my $rd (@avgs) {
 							my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 
+							next if ($t < $t_min);
+							last if ($t > $t_max);
 							# Average per minutes
 							$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
@@ -2021,6 +2037,8 @@ sub dump_as_html
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
 					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					next if ($t < $t_min_hour);
+					last if ($t > $t_max_hour);
 					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{count} || 0) . "],";
 					$d2 .= "[$t, "
 						. sprintf("%.2f", (($per_hour_info{$tm}{$h}{duration} || 0) / ($per_hour_info{$tm}{$h}{count} || 1)) / 1000)
@@ -2044,6 +2062,8 @@ sub dump_as_html
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
 					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					next if ($t < $t_min_hour);
+					last if ($t > $t_max_hour);
 					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
 					$d2 .= "[$t, "
 						. sprintf(
@@ -2070,6 +2090,8 @@ sub dump_as_html
 				my $d  = $3;
 				foreach my $h ("00" .. "23") {
 					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					next if ($t < $t_min_hour);
+					last if ($t > $t_max_hour);
 					my $wcount =
 						$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
 						$per_hour_info{$tm}{$h}{'DELETE'}{count} +
@@ -2098,7 +2120,7 @@ sub dump_as_html
 			$d4 = '';
 
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
-				print $fh qq{<table class="HourStatsTable" <tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
+				print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 			}
 			if ($tempfile_info{count}) {
 				print $fh qq{<th colspan="2">Temporary files</th>};
@@ -2187,6 +2209,8 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
 						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
 						$d1 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
 					}
 				}
@@ -2204,6 +2228,8 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
 						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
 						$d1 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_added}    || 0) . "],";
 						$d2 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_removed}  || 0) . "],";
 						$d3 .= "[$t, " . ($checkpoint_info{chronos}{$tm}{$h}{file_recycled} || 0) . "],";
@@ -2230,6 +2256,8 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					my $d  = $3;
 					foreach my $h ("00" .. "23") {
 						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
 						$d1 .= "[$t, " . ($tempfile_info{chronos}{$tm}{$h}{size}  || 0) . "],";
 						$d2 .= "[$t, " . ($tempfile_info{chronos}{$tm}{$h}{count} || 0) . "],";
 					}
@@ -3668,6 +3696,12 @@ sub flotr2_graph
 		$yaxis2 = "y2axis: { title: \"$ytitle2\", min: 0, color: \"#4DA74D\" },";
 	}
 
+	my $min = $t_min;
+	my $max = $t_max;
+	if ($divid !~ /persecond/) {
+		$min = $t_min_hour;
+		$max = $t_max_hour;
+	}
 	print $fh <<EOF;
 <div id="$divid"></div>
 <script type="text/javascript">
@@ -3683,6 +3717,10 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
     $data4
     var options = {
         xaxis: {
+            min: $min,
+            max: $max,
+            tickDecimals: 0,
+            noTicks: 20,
             mode: "time",
             labelsAngle: 45
         },
@@ -3726,8 +3764,8 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
     Flotr.EventAdapter.observe(container, "flotr:select", function(area) {
         f = drawGraph({
             xaxis: {
-            mode: "time",
-            labelsAngle: 45,
+                mode: "time",
+                labelsAngle: 45,
                 min: area.x1,
                 max: area.x2
             },
