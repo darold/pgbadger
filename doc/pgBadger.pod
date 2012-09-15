@@ -32,6 +32,8 @@ Options:
                              report per day with a log rotated each week.
     -m | --maxlength size  : maximum length of a query, it will be cutted above
                              the given size. Default: no truncate
+    -n | --nohighlight     : disable SQL code highlighting.
+    -N | --appname name    : only report what concern the given application name
     -o | --outfile filename: define the filename for the output. Default depends
                              of the output format: out.html or out.txt. To dump
                              output to stdout use - as filename.
