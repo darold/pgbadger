@@ -120,7 +120,7 @@ my $result = GetOptions(
 	"i|ident=s"           => \$ident,
 	"l|last-parsed=s"     => \$last_parsed,
 	"m|maxlength=i"       => \$maxlength,
-	"N|name=s"            => \$dbappname,
+	"N|appname=s"         => \$dbappname,
 	"n|nohighlight!"      => \$nohighlight,
 	"o|outfile=s"         => \$outfile,
 	"p|prefix=s"          => \$log_line_prefix,
@@ -787,7 +787,7 @@ Options:
     -m | --maxlength size  : maximum length of a query, it will be cutted above
 			     the given size. Default: no truncate
     -n | --nohighlight     : disable SQL code highlighting.
-    -N | --name name       : only report what concern the given application name
+    -N | --appname name    : only report what concern the given application name
     -o | --outfile filename: define the filename for the output. Default depends
 			     of the output format: out.html or out.txt. To dump
 			     output to stdout use - as filename.
