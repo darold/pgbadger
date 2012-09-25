@@ -1087,7 +1087,7 @@ Report not supported by text format
 
 		# INSERT/DELETE/UPDATE/SELECT repartition
 		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
-		my $total  = $overall_stat{'queries_number'};
+		my $total  = $overall_stat{'queries_number'} || 1;
 		print $fh "\n- Queries by type ------------------------------------------------------\n\n";
 		print $fh "Type     Count     Percentage\n";
 		print $fh "SELECT: ", &comma_numbers($overall_stat{'SELECT'}) || 0, " ",
