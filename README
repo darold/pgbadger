@@ -10,7 +10,7 @@ SYNOPSIS
 
         logfile can be a single log file, a list of files, or a shell command
         returning a list of file. If you want to pass log content from stdin
-        use - as filename.
+        use - as filename. Note that input from stdin will not work with csvlog.
 
     Options:
 
