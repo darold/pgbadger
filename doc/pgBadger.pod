@@ -14,7 +14,6 @@ Arguments:
     returning a list of file. If you want to pass log content from stdin
     use - as filename. Note that input from stdin will not work with csvlog.
 
-
 Options:
 
     -a | --average minutes : number of minutes to build the average graphs of

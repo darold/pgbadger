@@ -454,7 +454,14 @@ foreach my $logfile (@log_files) {
 	if ($format eq 'csv') {
 		require Text::CSV;
 		my $csv = Text::CSV->new({binary => 1, eol => $/});
-		open(my $io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
+		my $io = undef;
+		if ($logfile !~ /\.gz/) {
+			open($io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
+		} else {
+			open($io, "$zcat $logfile |") or die "FATAL: cannot open pipe to $zcat $logfile. $!\n";
+			# Real size of the file is unknow
+			$totalsize = 0;
+		}
 
 		# Parse csvlog lines
 		my $getout = 0;
