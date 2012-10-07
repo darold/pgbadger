@@ -501,7 +501,7 @@ foreach my $logfile (@log_files) {
 				$duration = 0 if ($duration < 0);
 				$row->[13] = "duration: $duration ms  $row->[13]";
 			}
-
+			# Set query parameters as global variables
 			$prefix_vars{'t_dbuser'} = $row->[1] || '';
 			$prefix_vars{'t_dbname'} = $row->[2] || '';
 			$prefix_vars{'t_appname'} = $row->[2] || '';
@@ -512,6 +512,12 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
 			$prefix_vars{'t_query'} = $row->[13];
+
+			# Store the current timestamp of the log line
+			$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
+			$last_log_date = $prefix_vars{'t_timestamp'};
+
+			# Parse the query now
 			&parse_query();
 			if ($row->[14]) {
 				if ($row->[11] eq 'LOG') {
@@ -597,6 +603,10 @@ foreach my $logfile (@log_files) {
 					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 
+					# Store the current timestamp of the log line
+					$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
+					$last_log_date = $prefix_vars{'t_timestamp'};
+
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
 						&parse_log_prefix($prefix_vars{'t_logprefix'});
@@ -640,7 +650,7 @@ foreach my $logfile (@log_files) {
 				}
 
 			} elsif ($format eq 'stderr') {
-
+				%prefix_vars = ();
 				my @matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
 					for (my $i = 0; $i <= $#prefix_params; $i++) {
@@ -661,6 +671,10 @@ foreach my $logfile (@log_files) {
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
+
+					# Store the current timestamp of the log line
+					$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
+					$last_log_date = $prefix_vars{'t_timestamp'};
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -1038,6 +1052,11 @@ Log start from $first_log_date to $last_log_date
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
+	if (($fmt_unique == 1) && ($fmt_queries > 1)) {
+		$fmt_unique = 'none';
+		$overall_stat{'first_query'} = $first_log_date;
+		$overall_stat{'last_query'} = $last_log_date;
+	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
 
@@ -1760,6 +1779,11 @@ sub dump_as_html
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
+	if (($fmt_unique == 1) && ($fmt_queries > 1)) {
+		$fmt_unique = 'unknown';
+		$overall_stat{'first_query'} = $first_log_date;
+		$overall_stat{'last_query'} = $last_log_date;
+	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
 <div class="reports">
@@ -2061,70 +2085,72 @@ sub dump_as_html
 			$d1 = '';
 			$d2 = '';
 
-			# Select queries
-			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-				$tm =~ /(\d{4})(\d{2})(\d{2})/;
-				my $y  = $1 - 1900;
-				my $mo = $2 - 1;
-				my $d  = $3;
-				foreach my $h ("00" .. "23") {
-					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
-					next if ($t < $t_min_hour);
-					last if ($t > $t_max_hour);
-					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
-					$d2 .= "[$t, "
-						. sprintf(
-						"%.2f",
-						(($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) / 1000
-						) . "],";
+			if ($disable_query <= 1) {
+				# Select queries
+				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y  = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d  = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
+						$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 0) . "],";
+						$d2 .= "[$t, "
+							. sprintf(
+							"%.2f",
+							(($per_hour_info{$tm}{$h}{'SELECT'}{duration} || 0) / ($per_hour_info{$tm}{$h}{'SELECT'}{count} || 1)) / 1000
+							) . "],";
+					}
 				}
-			}
-			$d1 =~ s/,$//;
-			$d2 =~ s/,$//;
-			&flotr2_graph(
-				4, 'selectqueries_graph', $d1, '', '', 'SELECT queries',
-				'Queries', 'Number of queries', '', '', 'Duration', $d2, 'Average duration (s)'
-			);
-			$d1 = '';
-			$d2 = '';
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				&flotr2_graph(
+					4, 'selectqueries_graph', $d1, '', '', 'SELECT queries',
+					'Queries', 'Number of queries', '', '', 'Duration', $d2, 'Average duration (s)'
+				);
+				$d1 = '';
+				$d2 = '';
 
-			# Write queries
-			my $d4 = '';
-			foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-				$tm =~ /(\d{4})(\d{2})(\d{2})/;
-				my $y  = $1 - 1900;
-				my $mo = $2 - 1;
-				my $d  = $3;
-				foreach my $h ("00" .. "23") {
-					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
-					next if ($t < $t_min_hour);
-					last if ($t > $t_max_hour);
-					my $wcount =
-						$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
-						$per_hour_info{$tm}{$h}{'DELETE'}{count} +
-						$per_hour_info{$tm}{$h}{'INSERT'}{count};
-					my $wduration =
-						$per_hour_info{$tm}{$h}{'UPDATE'}{duration} +
-						$per_hour_info{$tm}{$h}{'DELETE'}{duration} +
-						$per_hour_info{$tm}{$h}{'INSERT'}{duration};
-					$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
-					$d2 .= "[$t, " . ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
-					$d3 .= "[$t, " . ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
-					$d4 .= "[$t, " . sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) / 1000) . "],";
+				# Write queries
+				my $d4 = '';
+				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y  = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d  = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
+						my $wcount =
+							$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
+							$per_hour_info{$tm}{$h}{'DELETE'}{count} +
+							$per_hour_info{$tm}{$h}{'INSERT'}{count};
+						my $wduration =
+							$per_hour_info{$tm}{$h}{'UPDATE'}{duration} +
+							$per_hour_info{$tm}{$h}{'DELETE'}{duration} +
+							$per_hour_info{$tm}{$h}{'INSERT'}{duration};
+						$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
+						$d2 .= "[$t, " . ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
+						$d3 .= "[$t, " . ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
+						$d4 .= "[$t, " . sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) / 1000) . "],";
+					}
 				}
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				$d3 =~ s/,$//;
+				$d4 =~ s/,$//;
+				&flotr2_graph(
+					5, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
+					'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $d4, 'Average duration (s)'
+				);
+				$d1 = '';
+				$d2 = '';
+				$d3 = '';
+				$d4 = '';
 			}
-			$d1 =~ s/,$//;
-			$d2 =~ s/,$//;
-			$d3 =~ s/,$//;
-			$d4 =~ s/,$//;
-			&flotr2_graph(
-				5, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
-				'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $d4, 'Average duration (s)'
-			);
-			$d1 = '';
-			$d2 = '';
-			$d3 = '';
-			$d4 = '';
 
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
 				print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
@@ -3196,10 +3222,6 @@ sub parse_query
 		return;
 	}
 
-	# Store the current timestamp of the log line
-	$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
-	$last_log_date = $prefix_vars{'t_timestamp'};
-
 	# Store a counter of logs type
 	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
@@ -3375,12 +3397,26 @@ sub parse_query
 	}
 	my $t_action   = '';
 	my $t_duration = '';
-	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
+	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
+		$t_duration = $1;
+		$t_action   = 'statement';
+		$prefix_vars{'t_query'} = 'No log_min_duration';
+		$disable_query += 2 if ($disable_query < 2);
+		$disable_type += 2 if ($disable_type < 2);
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 		$t_duration = $1;
 		$t_action   = $2;
+		$disable_query = 0 if ($disable_query == 2);
+		$disable_query = 1 if ($disable_query == 3);
+		$disable_type = 0 if ($disable_type == 2);
+		$disable_type = 1 if ($disable_type == 3);
 	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
 		$t_duration = $1;
 		$t_action   = $2;
+		$disable_query = 0 if ($disable_query == 2);
+		$disable_query = 1 if ($disable_query == 3);
+		$disable_type = 0 if ($disable_type == 2);
+		$disable_type = 1 if ($disable_type == 3);
 
 		# Skiping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
@@ -3898,8 +3934,6 @@ EOF
 
 sub build_log_line_prefix_regex
 {
-#'%m %u@%d %p %r %a : '
-#2012-09-09 10:32:26.810 CEST [unknown]@[unknown] 21111  [unknown] :
 	my %regex_map = (
 		'%a' => [ ('t_appname', '([0-9a-zA-Z\.\-\_\/\[\]]*)') ], # application name
 		'%u' => [ ('t_dbuser', '([0-9a-zA-Z\_\[\]]*)') ], # user name
