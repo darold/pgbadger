@@ -281,9 +281,9 @@ if ($log_line_prefix) {
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
-		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
-		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
 		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
@@ -291,8 +291,8 @@ if ($log_line_prefix) {
 		push(@prefix_params, 't_loglevel', 't_query');
 	}
 } elsif ($format eq 'syslog') {
-	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
-	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
+	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
 	$compiled_prefix = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*\s[^\s]+\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
