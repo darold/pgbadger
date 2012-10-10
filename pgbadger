@@ -10,18 +10,18 @@
 #
 # You must enable SQL query logging : log_min_duration_statement = 0
 # With stderr output
-#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] '
-#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
-#   Log line prefix should be : log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
 # With syslog output
-#   Log line prefix should be : log_line_prefix = 'db=%d,user=%u '
+#  Log line prefix should be: log_line_prefix = 'db=%d,user=%u '
 #
 # Additional informations that could be collected and reported
-#   log_checkpoints = on
-#   log_connections = on
-#   log_disconnections = on
-#   log_lock_waits = on
-#   log_temp_files = 0
+#  log_checkpoints = on
+#  log_connections = on
+#  log_disconnections = on
+#  log_lock_waits = on
+#  log_temp_files = 0
 #------------------------------------------------------------------------------
 use vars qw($VERSION);
 
@@ -36,7 +36,7 @@ use POSIX qw(locale_h);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL, 'C');
 
-$VERSION = '2.0';
+$VERSION = '2.1';
 
 $| = 1;
 
