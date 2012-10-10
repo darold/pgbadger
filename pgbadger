@@ -45,6 +45,7 @@ my $JQGRAPH = 1;
 
 # Command line options
 my $zcat                = 'zcat';
+my $uncompress_size     = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $format              = '';
 my $outfile             = '';
 my $outdir              = '';
@@ -459,8 +460,12 @@ foreach my $logfile (@log_files) {
 			open($io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
 		} else {
 			open($io, "$zcat $logfile |") or die "FATAL: cannot open pipe to $zcat $logfile. $!\n";
-			# Real size of the file is unknow
-			$totalsize = 0;
+			# Real size of the file is unknow, try to find it
+			my $cmd_file_size = $uncompress_size;
+			$cmd_file_size =~ s/\%f/$logfile/g;
+			$totalsize = `$cmd_file_size`;
+			chomp($totalsize);
+			$totalsize ||= 0;
 		}
 
 		# Parse csvlog lines
@@ -538,11 +543,15 @@ foreach my $logfile (@log_files) {
 			$lfile->open($logfile) || die "FATAL: cannot read log file $logfile. $!\n";
 		} else {
 
+			# Real size of the file is unknow, try to find it
+			my $cmd_file_size = $uncompress_size;
+			$cmd_file_size =~ s/\%f/$logfile/g;
+			$totalsize = `$cmd_file_size`;
+			chomp($totalsize);
+			$totalsize ||= 0;
+
 			# Open a pipe to zcat program for compressed log
 			$lfile->open("$zcat $logfile |") || die "FATAL: cannot read from pipe to $zcat $logfile. $!\n";
-
-			# Real size of the file is unknow
-			$totalsize = 0;
 		}
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
