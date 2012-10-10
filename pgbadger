@@ -90,6 +90,7 @@ my $t_min               = 0;
 my $t_max               = 0;
 my $t_min_hour          = 0;
 my $t_max_hour          = 0;
+my $previous_duration   = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -492,15 +493,6 @@ foreach my $logfile (@log_files) {
 			# Jump to the last line parsed if required
 			next if (!&check_incremental_position($prefix_vars{'t_date'}, join(',', @$row)));
 
-			# Set approximative session duration
-			if (($row->[11] eq 'LOG') && $row->[13] && ($row->[13] !~ m/^duration: \d+\.\d+ ms/)) {
-				my $end_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
-				$row->[8] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/;
-				my $start_time = timegm_nocheck($6, $5, $4, $3, $2, $1);
-				my $duration = (($end_time - $start_time) * 1000) - $milli;
-				$duration = 0 if ($duration < 0);
-				$row->[13] = "duration: $duration ms  $row->[13]";
-			}
 			# Set query parameters as global variables
 			$prefix_vars{'t_dbuser'} = $row->[1] || '';
 			$prefix_vars{'t_dbname'} = $row->[2] || '';
@@ -511,12 +503,18 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_session_line'} = $row->[5];
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
-			$prefix_vars{'t_query'} = $row->[13];
 
 			# Store the current timestamp of the log line
 			$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
 			$last_log_date = $prefix_vars{'t_timestamp'};
-
+			if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($row->[13] !~ /^duration: \d+\.\d+ ms/) && $previous_duration) {
+				$row->[13] = 'duration: ' . $previous_duration . ' ms  ' . $row->[13];
+				$previous_duration = 0;
+			} elsif (($prefix_vars{'t_loglevel'} eq 'LOG') && ($row->[13] =~ /^duration: (\d+\.\d+) ms$/)) {
+				$previous_duration = $1;
+				next;
+			}
+			$prefix_vars{'t_query'} = $row->[13];
 			# Parse the query now
 			&parse_query();
 			if ($row->[14]) {
@@ -539,6 +537,7 @@ foreach my $logfile (@log_files) {
 			$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		}
 		close $io;
+
 	} else {
 
 		# Open log file for reading
@@ -3451,6 +3450,8 @@ sub parse_query
 	$cur_info{$t_pid}{ident}    = $prefix_vars{'t_ident'};
 	$cur_info{$t_pid}{query}    = $prefix_vars{'t_query'};
 	$cur_info{$t_pid}{duration} = $t_duration;
+print SDTERR "3449: $prefix_vars{'t_duration'} = $t_duration\n";
+
 	$cur_info{$t_pid}{pid}      = $prefix_vars{'t_pid'};
 	$cur_info{$t_pid}{session}  = $prefix_vars{'t_session_line'};
 	$cur_info{$t_pid}{loglevel} = $prefix_vars{'t_loglevel'};
