@@ -52,7 +52,7 @@ Options:
     -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
-                             zcat is not on your path or you want to use gzcat.
+                             zcat or bzcat or unzip is not on your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
                              from the report. For example: "^(VACUUM|COMMIT)"
@@ -105,7 +105,7 @@ By the way, we would like to thank Guillaume Smet for all the work he has done o
 
 pgBadger is written in pure Perl language. It uses a javascript library to draw graphs so that you don't need additional Perl modules or any other package to install. Furthermore, this library gives us additional features, such as zooming.
 
-pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files, as well as gzip compressed file. See a complete list of features below.
+pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files, as well as gzip, zip or bzip2 compressed files. See a complete list of features below.
 
 =head1 FEATURE
 
@@ -139,14 +139,19 @@ If you planned to parse PostgreSQL CSV log files you might need some Perl Module
 
 This module is optional, if you don't have PostgreSQL log in the CSV format you don't need to install it.
 
-Under Windows OS you may not be able to use gzipped log files unless you have a
-zcat like utility that could uncompress the log file and send content to stdout.
-If you have such an utility or in other OSes you want to use other compression
-utility like bzip2 or Zip, use the --zcat comand line option as follow:
+Compressed log file format is autodetected following the file exention. If pgbadger find a gz extention
+it will use  the zcat utility, with a bz2 extention it will use bzcat and if the file extention is zip
+then the unzip utility will be used.
 
-	--zcat="unzip -p" or --zcat="gunzip -c" or --zcat="bzip2 -dc"
+If those utilities are not found in the PATH environment variable then use the --zcat command line otption
+to change this path. For exemple:
 
-the last example can also be used like this: --zcat="bzcat"
+	--zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
+	--zcat="C:\tools\unzip -p"
+
+By default pgBadger will use the zcat, bzcat and unzip utilities following the file extension.
+If you use the default autodetection compress format you can mixed gz, bz2 or zip files. Specifying
+a custom value to --zcat option will removed this feature of mixed compressed format.
 
 =head1 POSTGRESQL CONFIGURATION
 

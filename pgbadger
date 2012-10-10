@@ -45,6 +45,8 @@ my $JQGRAPH = 1;
 
 # Command line options
 my $zcat                = 'zcat';
+my $bzcat               = 'bzcat';
+my $ucat                = 'unzip -p';
 my $uncompress_size     = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $format              = '';
 my $outfile             = '';
@@ -456,10 +458,16 @@ foreach my $logfile (@log_files) {
 		require Text::CSV;
 		my $csv = Text::CSV->new({binary => 1, eol => $/});
 		my $io = undef;
-		if ($logfile !~ /\.gz/) {
+		if ($logfile !~ /\.(gz|bz2|zip)/i) {
 			open($io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
 		} else {
-			open($io, "$zcat $logfile |") or die "FATAL: cannot open pipe to $zcat $logfile. $!\n";
+			my $uncompress = $zcat;
+			if (($logfile =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+				$uncompress = $bzcat;
+			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+				$uncompress = $ucat;
+			}
+			open($io, "$uncompress $logfile |") or die "FATAL: cannot open pipe to $uncompress $logfile. $!\n";
 			# Real size of the file is unknow, try to find it
 			my $cmd_file_size = $uncompress_size;
 			$cmd_file_size =~ s/\%f/$logfile/g;
@@ -539,9 +547,19 @@ foreach my $logfile (@log_files) {
 
 		# Open log file for reading
 		my $lfile = new IO::File;
-		if ($logfile !~ /\.gz/) {
+		if ($logfile !~ /\.(gz|bz2|zip)/i) {
 			$lfile->open($logfile) || die "FATAL: cannot read log file $logfile. $!\n";
 		} else {
+
+			my $uncompress = $zcat;
+			if (($logfile =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+				$uncompress = $bzcat;
+			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+				$uncompress = $ucat;
+			}
+
+			# Open a pipe to zcat program for compressed log
+			$lfile->open("$uncompress $logfile |") || die "FATAL: cannot read from pipe to $uncompress $logfile. $!\n";
 
 			# Real size of the file is unknow, try to find it
 			my $cmd_file_size = $uncompress_size;
@@ -549,9 +567,6 @@ foreach my $logfile (@log_files) {
 			$totalsize = `$cmd_file_size`;
 			chomp($totalsize);
 			$totalsize ||= 0;
-
-			# Open a pipe to zcat program for compressed log
-			$lfile->open("$zcat $logfile |") || die "FATAL: cannot read from pipe to $zcat $logfile. $!\n";
 		}
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
@@ -828,7 +843,7 @@ Options:
     -w | --watch-mode      : only report events/errors just like logwatch could do.
     -x | --extension       : output format. Values: text or html. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
-			     zcat is not on your path or you want to use gzcat.
+			     zcat or bzcat or unzip is not on your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
@@ -3455,8 +3470,6 @@ sub parse_query
 	$cur_info{$t_pid}{ident}    = $prefix_vars{'t_ident'};
 	$cur_info{$t_pid}{query}    = $prefix_vars{'t_query'};
 	$cur_info{$t_pid}{duration} = $t_duration;
-print SDTERR "3449: $prefix_vars{'t_duration'} = $t_duration\n";
-
 	$cur_info{$t_pid}{pid}      = $prefix_vars{'t_pid'};
 	$cur_info{$t_pid}{session}  = $prefix_vars{'t_session_line'};
 	$cur_info{$t_pid}{loglevel} = $prefix_vars{'t_loglevel'};
@@ -3665,12 +3678,18 @@ sub autodetect_format
 	my $nline  = 0;
 	my $fmt    = '';
 	my $tfile  = new IO::File;
-	if ($file !~ /\.gz/) {
+	if ($file !~ /\.(gz|bz2|zip)/i) {
 		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
 	} else {
+		my $uncompress = $zcat;
+		if (($file =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $bzcat;
+		} elsif (($file =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $ucat;
+		}
 
 		# Open a pipe to zcat program for compressed log
-		$tfile->open("$zcat $file |") || die "FATAL: cannot read from pipe to $zcat $file. $!\n";
+		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
 	}
 	my $duration = 'duration:';
 	if ($error_only || ($disable_hourly && $disable_query)) {
