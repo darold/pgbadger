@@ -90,7 +90,6 @@ my $t_min               = 0;
 my $t_max               = 0;
 my $t_min_hour          = 0;
 my $t_max_hour          = 0;
-my $previous_duration   = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -503,18 +502,11 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_session_line'} = $row->[5];
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
+			$prefix_vars{'t_query'} = $row->[13];
 
 			# Store the current timestamp of the log line
 			$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
 			$last_log_date = $prefix_vars{'t_timestamp'};
-			if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($row->[13] !~ /^duration: \d+\.\d+ ms/) && $previous_duration) {
-				$row->[13] = 'duration: ' . $previous_duration . ' ms  ' . $row->[13];
-				$previous_duration = 0;
-			} elsif (($prefix_vars{'t_loglevel'} eq 'LOG') && ($row->[13] =~ /^duration: (\d+\.\d+) ms$/)) {
-				$previous_duration = $1;
-				next;
-			}
-			$prefix_vars{'t_query'} = $row->[13];
 			# Parse the query now
 			&parse_query();
 			if ($row->[14]) {
@@ -1051,7 +1043,7 @@ Log start from $first_log_date to $last_log_date
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
-	if (($fmt_unique == 1) && ($fmt_queries > 1)) {
+	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
 		$fmt_unique = 'none';
 		$overall_stat{'first_query'} = $first_log_date;
 		$overall_stat{'last_query'} = $last_log_date;
@@ -1344,6 +1336,8 @@ Log start from $first_log_date to $last_log_date
 
 sub show_error_as_text
 {
+	return if (scalar keys %error_info == 0);
+
 	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
 	my $idx = 1;
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
@@ -1670,7 +1664,7 @@ EOF
 			}
 		}
 	}
-	if (!$disable_error) {
+	if (!$disable_error && (scalar keys %error_info > 0)) {
 		print $fh qq{<a href="#NormalizedErrorsMostFrequentReport">Most frequent events (N)</a> | };
 		print $fh qq{<a href="#LogsTypeReport">Logs per type</a>};
 	}
@@ -1732,7 +1726,7 @@ sub html_footer
 qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
 		}
 	}
-	if (!$disable_error) {
+	if (!$disable_error && (scalar keys %error_info > 0)) {
 		print $fh "<li><a href=\"#NormalizedErrorsMostFrequentReport\">Most frequent events (N)</a></li>\n";
 		print $fh qq{<li><a href="#LogsTypeReport">Logs per type</a></li>\n};
 	}
@@ -1778,8 +1772,8 @@ sub dump_as_html
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
-	if (($fmt_unique == 1) && ($fmt_queries > 1)) {
-		$fmt_unique = 'unknown';
+	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
+		$fmt_unique = 'none';
 		$overall_stat{'first_query'} = $first_log_date;
 		$overall_stat{'last_query'} = $last_log_date;
 	}
@@ -2965,6 +2959,8 @@ sub dump_error_as_html
 
 sub show_error_as_html
 {
+	return if (scalar keys %error_info == 0);
+
 	print $fh qq{
 <h2 id="NormalizedErrorsMostFrequentReport">Most frequent events (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
