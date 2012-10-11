@@ -93,6 +93,7 @@ my $t_min               = 0;
 my $t_max               = 0;
 my $t_min_hour          = 0;
 my $t_max_hour          = 0;
+my $log_duration        = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -190,6 +191,8 @@ $avg_minutes = 1  if ($avg_minutes < 1);
 
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
+
+$log_duration ||= &autodetect_duration($log_files[0]);
 
 # Set default top query
 $top ||= 20;
@@ -665,6 +668,7 @@ foreach my $logfile (@log_files) {
 				}
 
 			} elsif ($format eq 'stderr') {
+
 				%prefix_vars = ();
 				my @matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
@@ -1227,7 +1231,7 @@ Report not supported by text format
 	}
 
 	# Show top informations
-	if (!$disable_query) {
+	if (!$disable_query && !$log_duration) {
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
@@ -1654,7 +1658,7 @@ EOF
 		if (!$disable_type) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 		}
-		if (!$disable_query) {
+		if (!$disable_query && !$log_duration) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
@@ -1745,7 +1749,7 @@ sub html_footer
 				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
 			}
 		}
-		if (!$disable_query) {
+		if (!$disable_query && !$log_duration) {
 			print $fh
 qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
 		}
@@ -2102,7 +2106,7 @@ sub dump_as_html
 			$d1 = '';
 			$d2 = '';
 
-			if ($disable_query <= 1) {
+			if (!$disable_query && !$log_duration) {
 				# Select queries
 				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 					$tm =~ /(\d{4})(\d{2})(\d{2})/;
@@ -2700,7 +2704,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	}
 
 	# Show top informations
-	if (!$disable_query) {
+	if (!$disable_query && !$log_duration) {
 		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
@@ -3380,7 +3384,6 @@ sub parse_query
 
 	# Process current query following context
 	if ($cur_info{$t_pid}{query}) {
-
 		# Remove obsolete connexion storage
 		delete $conn_received{$cur_info{$t_pid}{pid}};
 
@@ -3416,50 +3419,42 @@ sub parse_query
 	}
 	my $t_action   = '';
 	my $t_duration = '';
-	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
-		$t_duration = $1;
-		$t_action   = 'statement';
-		$prefix_vars{'t_query'} = 'No log_min_duration';
-		$disable_query += 2 if ($disable_query < 2);
-		$disable_type += 2 if ($disable_type < 2);
-	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
-		$t_duration = $1;
-		$t_action   = $2;
-		$disable_query = 0 if ($disable_query == 2);
-		$disable_query = 1 if ($disable_query == 3);
-		$disable_type = 0 if ($disable_type == 2);
-		$disable_type = 1 if ($disable_type == 3);
-	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
-		$t_duration = $1;
-		$t_action   = $2;
-		$disable_query = 0 if ($disable_query == 2);
-		$disable_query = 1 if ($disable_query == 3);
-		$disable_type = 0 if ($disable_type == 2);
-		$disable_type = 1 if ($disable_type == 3);
-
-		# Skiping parse and bind logs
-		return if ($t_action !~ /query|statement|execute/);
-	} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(query|statement): //is)) {
-		$t_action = $1;
-	} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)) {
-		$t_action = $1;
-
-		# Skiping parse and bind logs
-		return if ($t_action !~ /query|statement|execute/);
-	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
-		if ($prefix_vars{'t_query'} !~
-/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
-		   )
-		{
-			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
+	if ($log_duration) {
+		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
+			$t_duration = $1;
+			$t_action   = 'statement';
+			$prefix_vars{'t_query'} = 'No log_min_duration';
 		}
-		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
-			&store_queries($t_pid);
-			delete $cur_info{$t_pid};
+	} else {
+		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
+			$t_duration = $1;
+			$t_action   = $2;
+		} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is) {
+			$t_duration = $1;
+			$t_action   = $2;
+			# Skiping parse and bind logs
+			return if ($t_action !~ /query|statement|execute|bind/);
+		} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(query|statement): //is)) {
+			$t_action = $1;
+		} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)) {
+			$t_action = $1;
+
+			# Skiping parse and bind logs
+			return if ($t_action !~ /query|statement|execute|bind/);
+		} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
+			if ($prefix_vars{'t_query'} !~
+	/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+			   )
+			{
+				&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
+			}
+			if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+				&store_queries($t_pid);
+				delete $cur_info{$t_pid};
+			}
+			return;
 		}
-		return;
 	}
-
 	$cur_info{$t_pid}{year}     = $prefix_vars{'t_year'};
 	$cur_info{$t_pid}{month}    = $prefix_vars{'t_month'};
 	$cur_info{$t_pid}{day}      = $prefix_vars{'t_day'};
@@ -3477,6 +3472,7 @@ sub parse_query
 	$cur_info{$t_pid}{dbuser}   = $prefix_vars{'t_dbuser'};
 	$cur_info{$t_pid}{dbclient} = $prefix_vars{'t_client'};
 	$cur_info{$t_pid}{dbappname}= $prefix_vars{'t_appname'};
+	$cur_info{$t_pid}{action}   = $t_action;
 
 	return 1;
 }
@@ -3731,6 +3727,52 @@ sub autodetect_format
 
 	return $fmt;
 }
+
+sub autodetect_duration
+{
+	my $file = shift;
+
+	# Open log file for reading
+	my $nfound = 0;
+	my $nline  = 0;
+	my $tfile  = new IO::File;
+	if ($file !~ /\.(gz|bz2|zip)/i) {
+		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
+	} else {
+		my $uncompress = $zcat;
+		if (($file =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $bzcat;
+		} elsif (($file =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $ucat;
+		}
+
+		# Open a pipe to zcat program for compressed log
+		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
+	}
+	my %ident_name = ();
+	while (my $line = <$tfile>) {
+		chomp($line);
+		$line =~ s///;
+		next if (!$line);
+		$nline++;
+
+		if (($line =~ /\s+duration: \d+\.\d+ ms\s+/) || ($line =~ /,"duration: \d+\.\d+ ms\s+[^"]+"/)) {
+			$nfound++;
+		}
+		last if (($nfound > 10) || ($nline > 25000));
+	}
+	$tfile->close();
+
+	if ($nfound) {
+		&logmsg('DEBUG', "Autodetected log duration format from $file, log_duration is disabled.");
+		return 0;
+	}
+
+	&logmsg('DEBUG', "Autodetected log duration format from $file, log_duration is enabled.");
+
+	return 1;
+}
+
 
 sub progress_bar
 {
