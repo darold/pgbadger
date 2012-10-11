@@ -1119,7 +1119,7 @@ Average duration of sessions: $avg_session_duration
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 	}
-	if (!$disable_hourly) {
+	if (!$disable_hourly && $overall_stat{'queries_number'}) {
 		print $fh qq{
 
 - Hourly statistics ----------------------------------------------------
@@ -1653,7 +1653,7 @@ EOF
 <a href="#OverallStatsReport">Overall statistics</a> | 
 };
 	if (!$error_only) {
-		if (!$disable_hourly) {
+		if (!$disable_hourly && $overall_stat{'queries_number'}) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
 		if (!$disable_type && !$log_duration) {
@@ -1719,7 +1719,7 @@ sub html_footer
 			<li><a href="#top">^ Back to top</a></li><li><a href="#OverallStatsReport">Overall statistics</a></li>
 };
 	if (!$error_only) {
-		if (!$disable_hourly) {
+		if (!$disable_hourly && $overall_stat{'queries_number'}) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
 		if (!$disable_type && !$log_duration) {
@@ -1863,7 +1863,7 @@ sub dump_as_html
 </div>
 };
 
-	if (!$disable_hourly) {
+	if (!$disable_hourly && $overall_stat{'queries_number'}) {
 		print $fh qq{
 <h2 id="HourlyStatsReport">Hourly statistics <a href="#top" title="Back to top">^</a></h2>
 
