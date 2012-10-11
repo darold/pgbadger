@@ -193,6 +193,7 @@ $avg_minutes = 1  if ($avg_minutes < 1);
 $format ||= &autodetect_format($log_files[0]);
 
 $log_duration ||= &autodetect_duration($log_files[0]);
+$log_duration = 1;
 
 # Set default top query
 $top ||= 20;
@@ -1128,7 +1129,7 @@ Report not supported by text format
 };
 	}
 
-	if (!$disable_type) {
+	if (!$disable_type && !$log_duration) {
 
 		# INSERT/DELETE/UPDATE/SELECT repartition
 		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
@@ -1655,7 +1656,7 @@ EOF
 		if (!$disable_hourly) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
-		if (!$disable_type) {
+		if (!$disable_type && !$log_duration) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 		}
 		if (!$disable_query && !$log_duration) {
@@ -1721,7 +1722,7 @@ sub html_footer
 		if (!$disable_hourly) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
-		if (!$disable_type) {
+		if (!$disable_type && !$log_duration) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
@@ -2329,7 +2330,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	if (!$disable_type) {
+	if (!$disable_type && !$log_duration) {
 		print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -3424,6 +3425,12 @@ sub parse_query
 			$t_duration = $1;
 			$t_action   = 'statement';
 			$prefix_vars{'t_query'} = 'No log_min_duration';
+		} else {
+			if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+				&store_queries($t_pid);
+				delete $cur_info{$t_pid};
+			}
+			return;
 		}
 	} else {
 		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
