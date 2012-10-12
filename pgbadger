@@ -94,6 +94,7 @@ my $t_max               = 0;
 my $t_min_hour          = 0;
 my $t_max_hour          = 0;
 my $log_duration        = 0;
+my $enable_log_duration = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -152,6 +153,7 @@ my $result = GetOptions(
 	"disable-lock!"       => \$disable_lock,
 	"disable-temporary!"  => \$disable_temporary,
 	"disable-checkpoint!" => \$disable_checkpoint,
+	"enable-log_duration!" => \$enable_log_duration,
 );
 
 if ($ver) {
@@ -193,7 +195,7 @@ $avg_minutes = 1  if ($avg_minutes < 1);
 $format ||= &autodetect_format($log_files[0]);
 
 $log_duration ||= &autodetect_duration($log_files[0]);
-$log_duration = 1;
+$log_duration = 1 if ($enable_log_duration);
 
 # Set default top query
 $top ||= 20;
@@ -865,6 +867,8 @@ Options:
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
+    --enable-log_duration  : force pgbadger to use log_duration even if
+			     log_min_duration_statement format is autodetected
 
 Examples:
 
