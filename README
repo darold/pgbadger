@@ -19,7 +19,8 @@ SYNOPSIS
         -b | --begin datetime  : start date/time for the data to be parsed in log.
         -d | --dbname database : only report what concern the given database
         -e | --end datetime    : end date/time for the data to be parsed in log.
-        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
+        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+                                 There's also syslog-ng for traces with [ID * local2.info]
         -G | --nograph         : disable graphs on HTML output. Enable by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres

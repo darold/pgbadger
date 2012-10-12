@@ -290,16 +290,25 @@ if ($log_line_prefix) {
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
+		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$compiled_prefix = qr/$log_line_prefix/;
+		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+		push(@prefix_params, 't_loglevel', 't_query');
+	} elsif ($format eq 'syslog-ng') {
+		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\[(\d+)\-\d+\]\s*(.*)/;
 		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line');
-		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
 		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		push(@prefix_params, 't_loglevel', 't_query');
 	}
 } elsif ($format eq 'syslog') {
+	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
+} elsif ($format eq 'syslog-ng') {
+	$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\[(\d+)\-\d+\]\s*(.*)/;
 	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
@@ -594,7 +603,7 @@ foreach my $logfile (@log_files) {
 			}
 
 			# Parse syslog lines
-			if ($format eq 'syslog') {
+			if ($format =~ /syslog/) {
 
 				my @matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
@@ -642,7 +651,9 @@ foreach my $logfile (@log_files) {
 
 					$cur_pid = $8;
 					my $t_query = $10;
+					$t_query = $11 if ($format eq 'syslog-ng');;
 					$t_query =~ s/#011/\t/g;
+					next if ($t_query eq "\t");
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
 					} elsif ($cur_info{$cur_pid}{context}) {
@@ -819,7 +830,8 @@ Options:
     -c | --dbclient host   : only report what concern the given client host.
     -d | --dbname database : only report what concern the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
+    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+			     There's also syslog-ng for traces with [ID * local2.info]
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -3254,7 +3266,7 @@ sub parse_query
 	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
 	# Replace syslog tablulation rewrite
-	$prefix_vars{'t_query'} =~ s/#011/\t/g if ($format eq 'syslog');
+	$prefix_vars{'t_query'} =~ s/#011/\t/g if ($format =~ /syslog/);
 
 	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
 
@@ -3710,8 +3722,14 @@ sub autodetect_format
 		$nline++;
 
 		# Is syslog lines ?
-		if ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:(.*?)\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
+		if ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
 			$fmt = 'syslog';
+			$nfound++;
+			$ident_name{$1}++;
+
+			# Is syslog-ng lines ?
+		} elsif ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\[]+)\[\d+\]:(.*?)\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
+			$fmt = 'syslog-ng';
 			$nfound++;
 			$ident_name{$1}++;
 
@@ -3730,7 +3748,7 @@ sub autodetect_format
 		die "FATAL: unable to detect log file format from $file, please use -f option.\n";
 	}
 
-	if (($fmt eq 'syslog') && !$ident && (scalar keys %ident_name == 1)) {
+	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
 		$ident = (keys %ident_name)[0];
 	}
 
