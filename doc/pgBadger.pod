@@ -72,6 +72,8 @@ Options:
     --disable-checkpoint   : do not generate checkpoint report.
     --enable-log_duration  : force pgbadger to use log_duration even if
                              log_min_duration_statement format is autodetected.
+    --enable-log_min_duration: force pgbadger to use log_min_duration even if
+                             log_duration format is autodetected.
 
 Examples:
 
@@ -165,6 +167,7 @@ You must first enable SQL query logging to have something to parse:
         log_min_duration_statement = 0
 
 Note that pgBadger is not compatible with statements logs provided by log_statement and log_duration.
+See next chapter for more information.
 
 With 'stderr' log format, log_line_prefix must be at least:
 
@@ -202,6 +205,29 @@ Of course your log messages should be in english without locale support:
 
 but this is not only recommanded by pgbadger.
 
+=head1 log_min_duration_statement versus log_duration
+
+If you want full statistics reports from your log file you must set log_min_duration_statement = 0.
+If you just want to report duration and number of queries and don't want all detail about queries,
+set log_min_duration_statement to -1 and enable log_duration. If you want to report only queries that
+tooks more than 5 seconds for example but still want to report all queries duration and number of
+queries you will need to generate 2 reports. One using the log_min_duration_statement and the second
+using the log_duration. Proceed as follow:
+
+	pgbadger --enable-log_duration /var/log/postgresql.log
+
+to generate hourly statistics about the number of queries and duration stats. To generate detailled
+reports about queries use the following command:
+
+	pgbadger --enable-log_min_duration /var/log/postgresql.log
+
+Note that enabling log_statement will not help at all and enabling those two options in the same
+command will report an error.
+
+Use those options if you don't want to log each queries to preserve your I/O but still want to know
+the slowest queries upper a certain time and still have a report on the number of queries and their
+duration. Otherwize if you don't have too much performance lost with a log_min_duration_statement
+set to 0, do not enable log_duration in your postgresql.conf file.
 
 =head1 INSTALLATION
 

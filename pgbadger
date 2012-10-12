@@ -95,6 +95,7 @@ my $t_min_hour          = 0;
 my $t_max_hour          = 0;
 my $log_duration        = 0;
 my $enable_log_duration = 0;
+my $enable_log_min_duration = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -154,6 +155,7 @@ my $result = GetOptions(
 	"disable-temporary!"  => \$disable_temporary,
 	"disable-checkpoint!" => \$disable_checkpoint,
 	"enable-log_duration!" => \$enable_log_duration,
+	"enable-log_min_duration!" => \$enable_log_min_duration,
 );
 
 if ($ver) {
@@ -196,6 +198,12 @@ $format ||= &autodetect_format($log_files[0]);
 
 $log_duration ||= &autodetect_duration($log_files[0]);
 $log_duration = 1 if ($enable_log_duration);
+$log_duration = 0 if ($enable_log_min_duration);
+
+if ($enable_log_min_duration && $enable_log_duration) {
+	print STDERR "FATAL: you must choose between reports based on log_duration or log_min_duration_statement.\n\n";
+	&usage();
+}
 
 # Set default top query
 $top ||= 20;
@@ -881,6 +889,8 @@ Options:
     --disable-checkpoint   : do not generate checkpoint report.
     --enable-log_duration  : force pgbadger to use log_duration even if
 			     log_min_duration_statement format is autodetected
+    --enable-log_min_duration: force pgbadger to use log_min_duration even if
+			     log_duration format is autodetected.
 
 Examples:
 
@@ -1145,7 +1155,7 @@ Report not supported by text format
 };
 	}
 
-	if (!$disable_type && !$log_duration) {
+	if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 
 		# INSERT/DELETE/UPDATE/SELECT repartition
 		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
@@ -1248,7 +1258,7 @@ Report not supported by text format
 	}
 
 	# Show top informations
-	if (!$disable_query && !$log_duration) {
+	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
@@ -1672,10 +1682,10 @@ EOF
 		if (!$disable_hourly && $overall_stat{'queries_number'}) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
-		if (!$disable_type && !$log_duration) {
+		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 		}
-		if (!$disable_query && !$log_duration) {
+		if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
@@ -1738,7 +1748,7 @@ sub html_footer
 		if (!$disable_hourly && $overall_stat{'queries_number'}) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
-		if (!$disable_type && !$log_duration) {
+		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
@@ -1766,7 +1776,7 @@ sub html_footer
 				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
 			}
 		}
-		if (!$disable_query && !$log_duration) {
+		if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 			print $fh
 qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
 		}
@@ -2123,7 +2133,7 @@ sub dump_as_html
 			$d1 = '';
 			$d2 = '';
 
-			if (!$disable_query && !$log_duration) {
+			if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 				# Select queries
 				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
 					$tm =~ /(\d{4})(\d{2})(\d{2})/;
@@ -2346,7 +2356,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	if (!$disable_type && !$log_duration) {
+	if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 		print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -2721,7 +2731,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	}
 
 	# Show top informations
-	if (!$disable_query && !$log_duration) {
+	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
@@ -3441,14 +3451,15 @@ sub parse_query
 			$t_duration = $1;
 			$t_action   = 'statement';
 			$prefix_vars{'t_query'} = 'No log_min_duration';
-		} else {
+		} elsif (!$enable_log_min_duration) {
 			if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
 				&store_queries($t_pid);
 				delete $cur_info{$t_pid};
 			}
 			return;
 		}
-	} else {
+	}
+	if (!$log_duration || $enable_log_min_duration) {
 		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 			$t_duration = $1;
 			$t_action   = $2;
