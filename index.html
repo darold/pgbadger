@@ -62,6 +62,13 @@ The following reports are also available with hourly charts:
 
 <p>All charts are zoomable and can be saved as PNG images.</p>
 
+<p>pgBadger supports any custom format set into log_line_prefix of your postgresql.conf file provide that you use the %t, %p and %l patterns.
+</p>
+
+<p>If you want to save system performance you can also use log_duration instead of log_min_duration_statement to have reports on duration and number of queries only.</p>
+
+<p>You can also use pgBadger to only report errors.</p>
+
 <h2>Authors</h2>
 <p>pgBadger is an original work from Gilles Darold. It is maintained by the good folks at <a href="http://www.dalibo.com/">Dalibo</a> and every one who wants to contribute.</p>
 <p>&lt;pgbadger AT dalibo DOT com&gt;</p>
