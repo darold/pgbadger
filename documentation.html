@@ -29,7 +29,31 @@
 <ul>
   <li>Text::CSV - to parse PostgreSQL CSV log files.</li>
 </ul>
-
+<p>
+This module is optional, if you don't have PostgreSQL log in the CSV
+format you don't need to install it.
+</p>
+<p>
+Compressed log file format is autodetected following the file exention.
+If pgbadger find a gz extention it will use the zcat utility, with a bz2
+extention it will use bzcat and if the file extention is zip then the
+unzip utility will be used.
+</p>
+<p>
+If those utilities are not found in the PATH environment variable then
+use the --zcat command line otption to change this path. For exemple:
+</p>
+<pre>
+	--zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
+	--zcat="C:\tools\unzip -p"
+</pre>
+</p>
+By default pgBadger will use the zcat, bzcat and unzip utilities
+following the file extension. If you use the default autodetection
+compress format you can mixed gz, bz2 or zip files. Specifying a custom
+value to --zcat option will removed this feature of mixed compressed
+format.
+</p>
 <h2>PostgreSQL configuration</h2>
 <p>
 You must enable some configuration directives into your postgresql.conf before starting.
@@ -83,6 +107,40 @@ Of course your log messages should be in english without locale support:
 but this is not only recommanded by pgbadger.
 </p>
 
+<h2>log_min_duration_statement versus log_duration</h2>
+<p>
+If you want full statistics reports from your log file you must set
+log_min_duration_statement = 0. If you just want to report duration and
+number of queries and don't want all detail about queries, set
+log_min_duration_statement to -1 and enable log_duration. If you want to
+report only queries that tooks more than 5 seconds for example but still
+want to report all queries duration and number of queries you will need
+to generate 2 reports. One using the log_min_duration_statement and the
+second using the log_duration. Proceed as follow:
+</p>
+<pre>
+	pgbadger --enable-log_duration /var/log/postgresql.log
+</pre>
+<p>
+to generate hourly statistics about the number of queries and duration
+stats. To generate detailled reports about queries use the following
+command:
+</p>
+<pre>
+	pgbadger --enable-log_min_duration /var/log/postgresql.log
+</pre>
+<p>
+Note that enabling log_statement will not help at all and enabling those
+two options in the same command will report an error.
+</p>
+<p>
+Use those options if you don't want to log each queries to preserve your
+I/O but still want to know the slowest queries upper a certain time and
+still have a report on the number of queries and their duration.
+Otherwize if you don't have too much performance lost with a
+log_min_duration_statement set to 0, do not enable log_duration in your
+postgresql.conf file.
+</p>
 <h2>Installation</h2>
 <p>Download the tarball from github and unpack the archive as follow:</p>
 <pre>
@@ -106,60 +164,104 @@ but this is not only recommanded by pgbadger.
 <h2>Usage</h2>
 
 <pre>
-pgbadger [options] logfile [...]
+    pgbadger [options] logfile [...]
 
-        PostgreSQL log analyzer with fully detailed reports and graphs.
+            PostgreSQL log analyzer with fully detailed reports and charts.
 
-Arguments:
+    Arguments:
 
-  logfile can be a single log file, a list of files or a shell command
-  returning a list of file.
+        logfile can be a single log file, a list of files, or a shell command
+        returning a list of file. If you want to pass log content from stdin
+        use - as filename. Note that input from stdin will not work with csvlog.
 
-Options:
+    Options:
 
-    -l | --logfile filename: path to the PostgreSQL log file to parse. It can
-                             be a plain text log or a gzip compressed file
-                             with the .gz extension. Note that this option is
-                             DEPRECATED, set logfile as a command line argument
-                             instead.
-    -f | --format logtype  : the value can be: syslog, stderr or csv. Default: stderr
-    -o | --outfile filename: define the filename for the output. Default depends
-                             of the output format: out.html or out.txt. To dump
-                             output to stdout use - as filename.
-    -i | --ident name      : programname used as syslog ident. Default: postgres
-    -h | --help            : show this message and exit.
-    -d | --dbname database : only report what concern the given database
-    -u | --dbuser username : only report what concern the given user
-    -t | --top number      : number of query to store/display. Default: 20
-    -s | --sample number   : number of query sample to store/display. Default: 3
-    -x | --extension       : output format. Values: text or html. Default: html
-    -m | --maxlength size  : maximum length of a query, it will be cutted above
-                             the given size. Default: no truncate
-    -g | --graph           : generate graphs, requires GD::Graph perl module
-    -b | --begin datetime  : start date/time for the data to be parsed in log.
-                             Format: -b "yyyy-mm-dd hh:mm:ss"
-    -e | --end datetime    : end date/time for the data to be parsed in log.
-                             Format: -e "yyyy-mm-dd hh:mm:ss"
-    -q | --quiet           : disable output to stderr and don't print debug informations.
-    -p | --progress        : show a progress bar, quiet mode is enabled with this option.
-    -v | --version         : show current version
-    --pie-limit num        : do not show pie data lower that num%, show a sum of them instead.
-    -w | -watch-mode       : only report errors just like logwatch could do.
+        -a | --average minutes : number of minutes to build the average graphs of
+                                 queries and connections.
+        -b | --begin datetime  : start date/time for the data to be parsed in log.
+        -d | --dbname database : only report what concern the given database
+        -e | --end datetime    : end date/time for the data to be parsed in log.
+        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+                                 There's also syslog-ng for traces with [ID * local2.info]
+        -G | --nograph         : disable graphs on HTML output. Enable by default.
+        -h | --help            : show this message and exit.
+        -i | --ident name      : programname used as syslog ident. Default: postgres
+        -l | --last-parsed file: allow incremental log parsing by registering the
+                                 last datetime and line parsed. Useful if you want
+                                 to watch errors since last run or if you want one
+                                 report per day with a log rotated each week.
+        -m | --maxlength size  : maximum length of a query, it will be cutted above
+                                 the given size. Default: no truncate
+        -n | --nohighlight     : disable SQL code highlighting.
+        -N | --appname name    : only report what concern the given application name
+        -o | --outfile filename: define the filename for the output. Default depends
+                                 of the output format: out.html or out.txt. To dump
+                                 output to stdout use - as filename.
+        -p | --prefix string   : give here the value of your custom log_line_prefix
+                                 defined in your postgresql.conf. You may used it only
+                                 if don't have the default allowed formats ot to use
+                                 other custom variables like client ip or application
+                                 name. See examples below.
+        -P | --no-prettify     : disable SQL queries prettify formatter.
+        -q | --quiet           : don't print anything to stdout, even not a progress bar.
+        -s | --sample number   : number of query sample to store/display. Default: 3
+        -t | --top number      : number of query to store/display. Default: 20
+        -T | --title string    : change title of the HTML page report.
+        -u | --dbuser username : only report what concern the given user
+        -v | --verbose         : enable verbose or debug mode. Disabled by default.
+        -V | --version         : show pgBadger version and exit.
+        -w | --watch-mode      : only report errors just like logwatch could do.
+        -x | --extension       : output format. Values: text or html. Default: html
+        -z | --zcat exec_path  : set the full path to the zcat program. Use it if
+                                 zcat or bzcat or unzip is not on your path.
+        --pie-limit num        : pie data lower than num% will show a sum instead.
+        --exclude-query regex  : any query matching the given regex will be excluded
+                                 from the report. For example: "^(VACUUM|COMMIT)"
+                                 you can use this option multiple time.
+        --exclude-file filename: path of the file which contains all the regex to use
+                                 to exclude queries from the report. One regex per line.
+        --disable-error        : do not generate error report.
+        --disable-hourly       : do not generate hourly reports.
+        --disable-type         : do not generate query type report.
+        --disable-query        : do not generate queries reports (slowest, most
+                                 frequent, ...).
+        --disable-session      : do not generate session report.
+        --disable-connection   : do not generate connection report.
+        --disable-lock         : do not generate lock report.
+        --disable-temporary    : do not generate temporary report.
+        --disable-checkpoint   : do not generate checkpoint report.
+        --enable-log_duration  : force pgbadger to use log_duration even if
+                                 log_min_duration_statement format is autodetected.
+        --enable-log_min_duration: force pgbadger to use log_min_duration even if
+                                 log_duration format is autodetected.
 
+    Examples:
 
-Examples:
+            pgbadger /var/log/postgresql.log
+            pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
+            pgbadger /var/log/postgresql/postgresql-2012-05-*
+            pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+            pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
+            cat /var/log/postgres.log | pgbadger -
+            # log prefix with stderr log output
+            perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
+                            /pglog/postgresql-2012-08-21*
+            perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+            # Log line prefix with syslog log output
+            perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
+                            /pglog/postgresql-2012-08-21*
 
-        pgbadger -p -g /var/log/postgresql.log
-        pgbadger -p -g /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
-		       /var/log/postgres.log
-        pgbadger -p -g `ls /var/log/postgresql/postgresql-2012-05-*`
+    Reporting errors every week by cron job:
 
-Reporting errors every week by cron job:
+        30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
 
-    30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
+    Generate report every week using incremental behavior:
 
-this suppose that your log file and HTML report are also rotated every weeks.
+        0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
+            -o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
+    This suppose that your log file and HTML report are also rotated every
+    week.
 </pre>
 
 <div id="footer">
