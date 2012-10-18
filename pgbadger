@@ -294,7 +294,6 @@ my $orphan_stderr_line = qr/[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/;
 # Compile custom log line prefie prefix
 my @prefix_params = ();
 if ($log_line_prefix) {
-        $log_line_prefix =~ s/([\[\]\|\/])/\\$1/g;
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
@@ -4059,6 +4058,7 @@ sub build_log_line_prefix_regex
 		'%e' => [ ('t_sqlstate', '([0-9a-zA-Z]+)') ], # SQL state
 	);
 	my @param_list = ();
+        $log_line_prefix =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
 	$log_line_prefix =~ s/\%l([^\d])\d+/\%l$1\\d\+/;
 	while ($log_line_prefix =~ s/(\%[audrhptmlscvxie])/$regex_map{"$1"}->[1]/) {
 		push(@param_list, $regex_map{"$1"}->[0]);
