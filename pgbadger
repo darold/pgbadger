@@ -95,6 +95,7 @@ my $t_min_hour          = 0;
 my $t_max_hour          = 0;
 my $log_duration        = 0;
 my $enable_log_duration = 0;
+my $remove_comment      = 0;
 my $enable_log_min_duration = 0;
 
 my $NUMPROGRESS = 10000;
@@ -118,6 +119,7 @@ my $result = GetOptions(
 	"a|average=i"         => \$avg_minutes,
 	"b|begin=s"           => \$from,
 	"c|client=s"          => \$dbclient,
+	"C|nocomment!"         => \$remove_comment,
 	"d|dbname=s"          => \$dbname,
 	"e|end=s"             => \$to,
 	"f|format=s"          => \$format,
@@ -835,6 +837,7 @@ Options:
 			     queries and connections.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -c | --dbclient host   : only report what concern the given client host.
+    -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report what concern the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
@@ -3513,6 +3516,11 @@ sub parse_query
 sub store_queries
 {
 	my $t_pid = shift;
+
+	# Remove comments if required
+	if ($remove_comment) {
+		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
+	}
 
 	# Cleanup and normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^[\t\s]+//s;

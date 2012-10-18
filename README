@@ -17,6 +17,8 @@ SYNOPSIS
         -a | --average minutes : number of minutes to build the average graphs of
                                  queries and connections.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
+        -c | --dbclient host   : only report what concern the given client host.
+        -C | --nocomment       : remove comments like /* ... */ from queries.
         -d | --dbname database : only report what concern the given database
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
