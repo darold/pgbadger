@@ -3585,7 +3585,7 @@ sub store_queries
 			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}
 				{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
 		}
-		if ($normalized =~ /delete from/) {
+		if ($normalized =~ /\bdelete from\b/) {
 			$overall_stat{'DELETE'}++;
 			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
 				{'DELETE'}{count}++;
@@ -3597,7 +3597,7 @@ sub store_queries
 				$per_minute_info{delete}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
 					{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
 			}
-		} elsif ($normalized =~ /insert into/) {
+		} elsif ($normalized =~ /\binsert into\b/) {
 			$overall_stat{'INSERT'}++;
 			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
 				{'INSERT'}{count}++;
@@ -3609,7 +3609,7 @@ sub store_queries
 				$per_minute_info{insert}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
 					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration};
 			}
-		} elsif ($normalized =~ /update.*set\b/) {
+		} elsif ($normalized =~ /\bupdate\b.*\bset\b/) {
 			$overall_stat{'UPDATE'}++;
 			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
 				{'UPDATE'}{count}++;
