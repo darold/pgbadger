@@ -3802,8 +3802,7 @@ sub autodetect_duration
 		$line =~ s///;
 		next if (!$line);
 		$nline++;
-
-		if (($line =~ /\s+duration: \d+\.\d+ ms\s+/) || ($line =~ /,"duration: \d+\.\d+ ms\s+[^"]+"/)) {
+		if (($line =~ /\s+duration: \d+\.\d+ ms\s+(query|statement|prepare|parse|bind|execute)/) || ($line =~ /,"duration: \d+\.\d+ ms\s+(query|statement|prepare|parse|bind|execute)[^"]+"/)) {
 			$nfound++;
 		}
 		last if (($nfound > 10) || ($nline > 25000));
