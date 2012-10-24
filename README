@@ -60,6 +60,11 @@ SYNOPSIS
                                  you can use this option multiple time.
         --exclude-file filename: path of the file which contains all the regex to use
                                  to exclude queries from the report. One regex per line.
+        --include-query regex  : any query that do not match the given regex will be
+                                 excluded from the report. For example: "(table_1|table_2)"
+                                 you can use this option multiple time.
+        --include-file filename: path of the file which contains all the regex of the
+                                 queries to include from the report. One regex per line.
         --disable-error        : do not generate error report.
         --disable-hourly       : do not generate hourly reports.
         --disable-type         : do not generate query type report.

@@ -74,6 +74,8 @@ my $progress            = 1;
 my $error_only          = 0;
 my @exclude_query       = ();
 my $exclude_file        = '';
+my @include_query       = ();
+my $include_file        = '';
 my $disable_error       = 0;
 my $disable_hourly      = 0;
 my $disable_type        = 0;
@@ -147,6 +149,8 @@ my $result = GetOptions(
 	"image-format=s"      => \$img_format,
 	"exclude-query=s"     => \@exclude_query,
 	"exclude-file=s"      => \$exclude_file,
+	"include-query=s"     => \@exclude_query,
+	"include-file=s"      => \$exclude_file,
 	"disable-error!"      => \$disable_error,
 	"disable-hourly!"     => \$disable_hourly,
 	"disable-type!"       => \$disable_type,
@@ -286,6 +290,26 @@ if ($exclude_file) {
 if ($#exclude_query >= 0) {
 	foreach my $r (@exclude_query) {
 		&check_regex($r, '--exclude-query');
+	}
+}
+
+# Loading included query from file if any
+if ($include_file) {
+	open(IN, "$include_file") or die "FATAL: can't read file $include_file: $!\n";
+	my @exclq = <IN>;
+	close(IN);
+	chomp(@exclq);
+	map {s///;} @exclq;
+	foreach my $r (@exclq) {
+		&check_regex($r, '--include-file');
+	}
+	push(@include_query, @exclq);
+}
+
+# Testing regex syntaxe
+if ($#include_query >= 0) {
+	foreach my $r (@include_query) {
+		&check_regex($r, '--include-query');
 	}
 }
 
@@ -879,6 +903,11 @@ Options:
 			     you can use this option multiple time.
     --exclude-file filename: path of the file which contains all the regex to use
 			     to exclude queries from the report. One regex per line.
+    --include-query regex  : any query that do not match the given regex will be
+			     excluded from the report. For example: "(table_1|table_2)"
+			     you can use this option multiple time.
+    --include-file filename: path of the file which contains all the regex of the
+			     queries to include from the report. One regex per line.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
     --disable-type         : do not generate query type report.
@@ -3530,6 +3559,16 @@ sub store_queries
 	if ($#exclude_query >= 0) {
 		foreach (@exclude_query) {
 			if ($cur_info{$t_pid}{query} =~ /$_/i) {
+				$cur_info{$t_pid}{query} = '';
+				return;
+			}
+		}
+	}
+
+	# Should we have to include only some queries
+	if ($#include_query >= 0) {
+		foreach (@include_query) {
+			if ($cur_info{$t_pid}{query} !~ /$_/i) {
 				$cur_info{$t_pid}{query} = '';
 				return;
 			}
