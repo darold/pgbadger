@@ -35,8 +35,8 @@ SYNOPSIS
         -n | --nohighlight     : disable SQL code highlighting.
         -N | --appname name    : only report what concern the given application name
         -o | --outfile filename: define the filename for the output. Default depends
-                                 of the output format: out.html or out.txt. To dump
-                                 output to stdout use - as filename.
+                                 of the output format: out.html, out.txt or out.tsung.
+                                 To dump output to stdout use - as filename.
         -p | --prefix string   : give here the value of your custom log_line_prefix
                                  defined in your postgresql.conf. You may used it only
                                  if don't have the default allowed formats ot to use
@@ -45,13 +45,14 @@ SYNOPSIS
         -P | --no-prettify     : disable SQL queries prettify formatter.
         -q | --quiet           : don't print anything to stdout, even not a progress bar.
         -s | --sample number   : number of query sample to store/display. Default: 3
+        -s | --select-only     : use it if you want reports on select queries only.
         -t | --top number      : number of query to store/display. Default: 20
         -T | --title string    : change title of the HTML page report.
         -u | --dbuser username : only report what concern the given user
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
         -V | --version         : show pgBadger version and exit.
         -w | --watch-mode      : only report errors just like logwatch could do.
-        -x | --extension       : output format. Values: text or html. Default: html
+        -x | --extension       : output format. Values: text, html or tsung. Default: html
         -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                                  zcat or bzcat or unzip is not on your path.
         --pie-limit num        : pie data lower than num% will show a sum instead.
@@ -95,6 +96,10 @@ SYNOPSIS
             # Log line prefix with syslog log output
             perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
                             /pglog/postgresql-2012-08-21*
+
+    Generate Tsung sessions XML file with select queries only:
+
+        perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
 
     Reporting errors every week by cron job:
 

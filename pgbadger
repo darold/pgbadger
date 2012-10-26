@@ -98,6 +98,7 @@ my $t_max_hour          = 0;
 my $log_duration        = 0;
 my $enable_log_duration = 0;
 my $remove_comment      = 0;
+my $select_only         = 0;
 my $enable_log_min_duration = 0;
 
 my $NUMPROGRESS = 10000;
@@ -137,6 +138,7 @@ my $result = GetOptions(
 	"P|no-prettify!"      => \$noprettify,
 	"q|quiet!"            => \$quiet,
 	"s|sample=i"          => \$sample,
+	"S|select-only!"      => \$select_only,
 	"t|top=i"             => \$top,
 	"T|title=s"           => \$report_title,
 	"u|dbuser=s"          => \$dbuser,
@@ -219,7 +221,9 @@ $sample ||= 3;
 
 # Set the default extension and output format
 if (!$extension) {
-	if ($outfile =~ /\.htm[l]*/i) {
+	if ($outfile =~ /\.tsung/i) {
+		$extension = 'tsung';
+	} elsif ($outfile =~ /\.htm[l]*/i) {
 		$extension = 'html';
 	} elsif ($outfile) {
 		$extension = 'txt';
@@ -256,13 +260,23 @@ $graph = 0 if ($nograph);
 
 my $end_top = $top - 1;
 
-# Test file creation before going to parse log
-my $tmpfh = new IO::File ">$outfile";
-if (not defined $tmpfh) {
-	die "FATAL: can't write to $outfile, $!\n";
+if ($extension eq 'tsung') {
+	# Open filehandle
+	my $fh = new IO::File ">$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
+	}
+	print $fh "<sessions>\n";
+	$fh->close();
+} else {
+	# Test file creation before going to parse log
+	my $tmpfh = new IO::File ">$outfile";
+	if (not defined $tmpfh) {
+		die "FATAL: can't write to $outfile, $!\n";
+	}
+	$tmpfh->close();
+	unlink($outfile) if (-e $outfile);
 }
-$tmpfh->close();
-unlink($outfile) if (-e $outfile);
 
 # -w and --disable-error can't go together
 if ($error_only && $disable_error) {
@@ -473,6 +487,8 @@ my %cur_info        = ();
 my $nlines          = 0;
 my %last_line       = ();
 my %saved_last_line = ();
+my %tsung_session   = ();
+my $total_tsung_session = 0;
 
 my $t0 = Benchmark->new;
 
@@ -767,8 +783,8 @@ foreach my $logfile (@log_files) {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
 
-				} else {
-					$cur_info{$cur_pid}{query} .= "\n" . $line if ($cur_info{$cur_pid}{query});
+				} elsif ($cur_info{$cur_pid}{query}) {
+					$cur_info{$cur_pid}{query} .= "\n" . $line;
 				}
 
 			} else {
@@ -783,6 +799,9 @@ foreach my $logfile (@log_files) {
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
 		&store_queries($pid);
+		if ($extension eq 'tsung') {
+			&store_tsung_session($pid);
+		}
 	}
 	%cur_info = ();
 
@@ -812,24 +831,35 @@ my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "Ok, generating $extension report...");
 
 # Open filehandle
-my $fh = new IO::File ">$outfile";
-if (not defined $fh) {
-	die "FATAL: can't write to $outfile, $!\n";
-}
-if (($extension eq 'text') || ($extension eq 'txt')) {
-	if ($error_only) {
-		&dump_error_as_text();
-	} else {
-		&dump_as_text();
+my $fh = undef;
+if ($extension ne 'tsung') {
+	$fh = new IO::File ">$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
 	}
+	if (($extension eq 'text') || ($extension eq 'txt')) {
+		if ($error_only) {
+			&dump_error_as_text();
+		} else {
+			&dump_as_text();
+		}
+	} else {
+		if ($error_only) {
+			&dump_error_as_html();
+		} else {
+			&dump_as_html();
+		}
+	}
+	$fh->close;
 } else {
-	if ($error_only) {
-		&dump_error_as_html();
-	} else {
-		&dump_as_html();
+	# Open filehandle
+	$fh = new IO::File ">>$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
 	}
+	print $fh "</sessions>\n";
+	$fh->close();
 }
-$fh->close;
 
 my $t2 = Benchmark->new;
 $td = timediff($t2, $t1);
@@ -878,8 +908,8 @@ Options:
     -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report what concern the given application name
     -o | --outfile filename: define the filename for the output. Default depends
-			     of the output format: out.html or out.txt. To dump
-			     output to stdout use - as filename.
+			     of the output format: out.html, out.txt or out.tsung.
+			     To dump output to stdout use - as filename.
     -p | --prefix string   : give here the value of your custom log_line_prefix
 			     defined in your postgresql.conf. You may used it only
 			     if don't have the default allowed formats ot to use
@@ -888,13 +918,14 @@ Options:
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, even not a progress bar.
     -s | --sample number   : number of query sample to store/display. Default: 3
+    -s | --select-only     : use it if you want reports on select queries only.
     -t | --top number      : number of query to store/display. Default: 20
     -T | --title string    : change title of the HTML page report.
     -u | --dbuser username : only report what concern the given user
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report events/errors just like logwatch could do.
-    -x | --extension       : output format. Values: text or html. Default: html
+    -x | --extension       : output format. Values: text, html or tsung. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
 			     zcat or bzcat or unzip is not on your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
@@ -938,6 +969,10 @@ Examples:
 	# Log line prefix with syslog log output
 	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
 			/pglog/postgresql-2012-08-21*
+
+Generate Tsung sessions XML file with select queries only:
+
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
 
 Reporting errors every week by cron job:
 
@@ -2193,42 +2228,44 @@ sub dump_as_html
 				$d2 = '';
 
 				# Write queries
-				my $d4 = '';
-				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
-					$tm =~ /(\d{4})(\d{2})(\d{2})/;
-					my $y  = $1 - 1900;
-					my $mo = $2 - 1;
-					my $d  = $3;
-					foreach my $h ("00" .. "23") {
-						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
-						next if ($t < $t_min_hour);
-						last if ($t > $t_max_hour);
-						my $wcount =
-							$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
-							$per_hour_info{$tm}{$h}{'DELETE'}{count} +
-							$per_hour_info{$tm}{$h}{'INSERT'}{count};
-						my $wduration =
-							$per_hour_info{$tm}{$h}{'UPDATE'}{duration} +
-							$per_hour_info{$tm}{$h}{'DELETE'}{duration} +
-							$per_hour_info{$tm}{$h}{'INSERT'}{duration};
-						$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
-						$d2 .= "[$t, " . ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
-						$d3 .= "[$t, " . ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
-						$d4 .= "[$t, " . sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) / 1000) . "],";
+				if (!$select_only) {
+					my $d4 = '';
+					foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
+						$tm =~ /(\d{4})(\d{2})(\d{2})/;
+						my $y  = $1 - 1900;
+						my $mo = $2 - 1;
+						my $d  = $3;
+						foreach my $h ("00" .. "23") {
+							my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+							next if ($t < $t_min_hour);
+							last if ($t > $t_max_hour);
+							my $wcount =
+								$per_hour_info{$tm}{$h}{'UPDATE'}{count} +
+								$per_hour_info{$tm}{$h}{'DELETE'}{count} +
+								$per_hour_info{$tm}{$h}{'INSERT'}{count};
+							my $wduration =
+								$per_hour_info{$tm}{$h}{'UPDATE'}{duration} +
+								$per_hour_info{$tm}{$h}{'DELETE'}{duration} +
+								$per_hour_info{$tm}{$h}{'INSERT'}{duration};
+							$d1 .= "[$t, " . ($per_hour_info{$tm}{$h}{'DELETE'}{count} || 0) . "],";
+							$d2 .= "[$t, " . ($per_hour_info{$tm}{$h}{'INSERT'}{count} || 0) . "],";
+							$d3 .= "[$t, " . ($per_hour_info{$tm}{$h}{'UPDATE'}{count} || 0) . "],";
+							$d4 .= "[$t, " . sprintf("%.2f", (($wduration || 0) / ($wcount || 1)) / 1000) . "],";
+						}
 					}
+					$d1 =~ s/,$//;
+					$d2 =~ s/,$//;
+					$d3 =~ s/,$//;
+					$d4 =~ s/,$//;
+					&flotr2_graph(
+						5, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
+						'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $d4, 'Average duration (s)'
+					);
+					$d1 = '';
+					$d2 = '';
+					$d3 = '';
+					$d4 = '';
 				}
-				$d1 =~ s/,$//;
-				$d2 =~ s/,$//;
-				$d3 =~ s/,$//;
-				$d4 =~ s/,$//;
-				&flotr2_graph(
-					5, 'writequeries_graph', $d1, $d2, $d3, 'Write queries',
-					'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $d4, 'Average duration (s)'
-				);
-				$d1 = '';
-				$d2 = '';
-				$d3 = '';
-				$d4 = '';
 			}
 
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
@@ -3346,6 +3383,13 @@ sub parse_query
 		return if ($disable_connection);
 		my $usr = $1;
 		my $db  = $2;
+		if ($extension eq 'tsung') {
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $db;
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user} = $usr;
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date} = $prefix_vars{'t_date'};
+			return;
+
+		}
 		$connection_info{count}++;
 		$connection_info{user}{$usr}++;
 		$connection_info{database}{$db}++;
@@ -3376,6 +3420,11 @@ sub parse_query
 		my $usr  = $2;
 		my $db   = $3;
 		my $host = $4;
+
+		if ($extension eq 'tsung') {
+			&store_tsung_session($prefix_vars{'t_pid'});
+			return;
+		}
 
 		# Store time in millisecond
 		$time =~ /(\d+):(\d+):(\d+\.\d+)/;
@@ -3491,6 +3540,12 @@ sub parse_query
 		}
 	}
 	if (!$log_duration || $enable_log_min_duration) {
+		if (($extension eq 'tsung') && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'}) {
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user} = $prefix_vars{'t_dbuser'};
+			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date} = $prefix_vars{'t_date'};
+
+		}
 		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 			$t_duration = $1;
 			$t_action   = $2;
@@ -3542,9 +3597,61 @@ sub parse_query
 	return 1;
 }
 
+sub store_tsung_session
+{
+	my $pid = shift;
+
+	return if ($#{$tsung_session{$pid}{dates}} < 0);
+
+	# Open filehandle
+	my $fh = new IO::File ">>$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
+	}
+	if ($pid) {
+		$total_tsung_session++;
+		print $fh "  <session probability=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
+		if (exists $tsung_session{$pid}{connection}{database}) {
+			print $fh qq{    <transaction name="connection">
+      <request><pgsql type="connect" database="$tsung_session{$pid}{connection}{database}" username="$tsung_session{$pid}{connection}{user}" /></request>
+    </transaction>
+    <request><pgsql type="authenticate" password="changeme"/></request>
+};
+		}
+		if ($#{$tsung_session{$pid}{dates}} >= 0) {
+			my $sec = 0;
+			if ($tsung_session{$pid}{connection}{date}) {
+				$sec = $tsung_session{$pid}{dates}[0] - $tsung_session{$pid}{connection}{date};
+			}
+			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
+			print $fh "    <transaction name=\"requests\">\n";
+			for (my $i = 0; $i <= $#{$tsung_session{$pid}{queries}}; $i++) {
+				$sec = 0;
+				if ($i > 0) {
+					$sec = $tsung_session{$pid}{dates}[$i] - $tsung_session{$pid}{dates}[$i - 1];
+					print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
+				}
+				print $fh "    <request><pgsql type='sql'><![CDATA[$tsung_session{$pid}{queries}[$i];]]></pgsql></request>\n";
+			}
+			print $fh "    </transaction>\n";
+		}
+		if ($#{$tsung_session{$pid}{dates}} >= 0) {
+			my $sec = $tsung_session{$pid}{dates}[-1] - $cur_info{$pid}{date};
+			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
+		}
+		if (exists $tsung_session{$pid}{connection}{database}) {
+			print $fh "    <request><pgsql type=\"close\"></pgsql></request>\n";
+		}
+		print $fh "  </session>\n\n";
+		delete $tsung_session{$pid};
+	}
+	$fh->close;
+}
+
 sub store_queries
 {
 	my $t_pid = shift;
+
 
 	# Remove comments if required
 	if ($remove_comment) {
@@ -3552,8 +3659,13 @@ sub store_queries
 	}
 
 	# Cleanup and normalize the current query
-	$cur_info{$t_pid}{query} =~ s/^[\t\s]+//s;
-	$cur_info{$t_pid}{query} =~ s/[\t\s]+$//s;
+	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
+	$cur_info{$t_pid}{query} =~ s/[\t\s\r\n;]+$//s;
+
+	# Should we just want select queries
+	if ($select_only) {
+		return if ( ($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} != /FOR UPDATE/is) );
+	}
 
 	# Should we have to exclude some queries
 	if ($#exclude_query >= 0) {
@@ -3578,6 +3690,20 @@ sub store_queries
 	# Truncate the query if requested by the user
 	$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
 		if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
+
+	# Dump queries as tsung request and return
+	if ($extension eq 'tsung') {
+		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
+			push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
+			push(@{$tsung_session{$t_pid}{dates}}, $cur_info{$t_pid}{date});
+			if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{t_dbname}) {
+				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{t_dbname};
+				$tsung_session{$t_pid}{connection}{user} = $cur_info{$t_pid}{t_dbuser};
+				$tsung_session{$t_pid}{connection}{date} = $cur_info{$t_pid}{date};
+			}
+		}
+		return;
+	}
 
 	# Store the collected informations into global statistics
 	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
@@ -3849,11 +3975,11 @@ sub autodetect_duration
 	$tfile->close();
 
 	if ($nfound) {
-		&logmsg('DEBUG', "Autodetected log duration format from $file, log_duration is disabled.");
+		&logmsg('DEBUG', "Autodetecting log duration format from $file: log_duration is disabled.");
 		return 0;
 	}
 
-	&logmsg('DEBUG', "Autodetected log duration format from $file, log_duration is enabled.");
+	&logmsg('DEBUG', "Autodetectin log duration format from $file: log_duration is enabled.");
 
 	return 1;
 }
