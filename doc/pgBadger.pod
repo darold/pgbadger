@@ -51,6 +51,7 @@ Options:
     -t | --top number      : number of query to store/display. Default: 20
     -T | --title string    : change title of the HTML page report.
     -u | --dbuser username : only report what concern the given user
+    -U | --exclude-user username : make report with exclude specified user.
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.

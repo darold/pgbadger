@@ -53,10 +53,11 @@ my $outfile             = '';
 my $outdir              = '';
 my $help                = '';
 my $ver                 = '';
-my $dbname              = '';
-my $dbuser              = '';
-my $dbclient            = '';
-my $dbappname           = '';
+my @dbname              = ();
+my @dbuser              = ();
+my @dbclient            = ();
+my @dbappname           = ();
+my @exclude_user        = ();
 my $ident               = '';
 my $top                 = 0;
 my $sample              = 0;
@@ -121,9 +122,9 @@ $num_sep = ' ' if ($n =~ /,/);
 my $result = GetOptions(
 	"a|average=i"         => \$avg_minutes,
 	"b|begin=s"           => \$from,
-	"c|client=s"          => \$dbclient,
+	"c|client=s"          => \@dbclient,
 	"C|nocomment!"         => \$remove_comment,
-	"d|dbname=s"          => \$dbname,
+	"d|dbname=s"          => \@dbname,
 	"e|end=s"             => \$to,
 	"f|format=s"          => \$format,
 	"G|nograph!"          => \$nograph,
@@ -131,7 +132,7 @@ my $result = GetOptions(
 	"i|ident=s"           => \$ident,
 	"l|last-parsed=s"     => \$last_parsed,
 	"m|maxlength=i"       => \$maxlength,
-	"N|appname=s"         => \$dbappname,
+	"N|appname=s"         => \@dbappname,
 	"n|nohighlight!"      => \$nohighlight,
 	"o|outfile=s"         => \$outfile,
 	"p|prefix=s"          => \$log_line_prefix,
@@ -141,7 +142,8 @@ my $result = GetOptions(
 	"S|select-only!"      => \$select_only,
 	"t|top=i"             => \$top,
 	"T|title=s"           => \$report_title,
-	"u|dbuser=s"          => \$dbuser,
+	"u|dbuser=s"          => \@dbuser,
+	"U|exclude-user=s"    => \@exclude_user,
 	"v|verbose!"          => \$debug,
 	"V|version!"          => \$ver,
 	"w|watch-mode!"       => \$error_only,
@@ -171,6 +173,9 @@ if ($ver) {
 	exit 0;
 }
 &usage() if ($help);
+
+# Rewrite some command line argument as lists
+&compute_arg_list();
 
 # Log file to be parsed are passed as command line argument
 if ($#ARGV >= 0) {
@@ -922,6 +927,7 @@ Options:
     -t | --top number      : number of query to store/display. Default: 20
     -T | --title string    : change title of the HTML page report.
     -u | --dbuser username : only report what concern the given user
+    -U | --exclude-user username : make report with exclude specified user.
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report events/errors just like logwatch could do.
@@ -3252,39 +3258,67 @@ sub highlight_code
 	return $code;
 }
 
+sub compute_arg_list
+{
+
+	# Some command lines arguments can be used multiple time or be written as a coma separated list.
+	# For example: --dbuser=postgres --dbuser=joe or --dbuser=postgres,joe
+	# So we have to aggregate all the possible value
+	foreach my $n ('dbname', 'dbuser', 'dbclient', 'dbappname', 'exclude_user') {
+		if ($#{$n} >= 0) {
+			my @tmp = ();
+			foreach my $v (@{$n}) {
+				push(@tmp, split(/,/, $v));
+			}
+			@{$n} = ();
+			push(@{$n}, @tmp);
+		}
+	}
+}
+
+
 sub validate_log_line
 {
 	my ($t_pid) = @_;
 
 	# Check user and/or database if require
-	if ($dbname) {
+	if ($#dbname >= 0) {
 
 		# Log line do not match the required dbname
-		if (!$prefix_vars{'t_dbname'} || ($dbname ne $prefix_vars{'t_dbname'})) {
+		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
-	if ($dbuser) {
+	if ($#dbuser >= 0) {
 
 		# Log line do not match the required dbuser
-		if (!$prefix_vars{'t_dbuser'} || ($dbuser ne $prefix_vars{'t_dbuser'})) {
+		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
-	if ($dbclient) {
-		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
+	if ($#dbclient >= 0) {
+
 		# Log line do not match the required dbclient
-		if (!$prefix_vars{'t_client'} || ($dbclient ne $prefix_vars{'t_client'})) {
+		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
+		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_dbclient'}$/i, @dbclient)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
-	if ($dbappname) {
+	if ($#dbappname >= 0) {
 
 		# Log line do not match the required dbname
-		if (!$prefix_vars{'t_appname'} || ($dbappname ne $prefix_vars{'t_appname'})) {
+		if (!$prefix_vars{'t_appname'} || !grep(/^$prefix_vars{'t_appname'}$/i, @dbappname)) {
+			delete $cur_info{$t_pid};
+			return 0;
+		}
+	}
+	if ($#exclude_user >= 0) {
+
+		# Log line match the excluded dbuser
+		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
