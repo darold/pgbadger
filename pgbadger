@@ -3648,8 +3648,8 @@ sub store_tsung_session
 		if (exists $tsung_session{$pid}{connection}{database}) {
 			print $fh qq{    <transaction name="connection">
       <request><pgsql type="connect" database="$tsung_session{$pid}{connection}{database}" username="$tsung_session{$pid}{connection}{user}" /></request>
+      <request><pgsql type="authenticate" password="changeme"/></request>
     </transaction>
-    <request><pgsql type="authenticate" password="changeme"/></request>
 };
 		}
 		if ($#{$tsung_session{$pid}{dates}} >= 0) {
