@@ -45,7 +45,7 @@ my $JQGRAPH = 1;
 
 # Command line options
 my $zcat                = 'zcat';
-my $bzcat               = 'bzcat';
+my $bzcat               = 'bunzip2 -c';
 my $ucat                = 'unzip -p';
 my $uncompress_size     = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $format              = '';
@@ -535,7 +535,8 @@ foreach my $logfile (@log_files) {
 				$uncompress = $bzcat;
 			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
 				$uncompress = $ucat;
-			}
+			} 
+		        &logmsg('DEBUG', "Compressed file found, will used command: $uncompress $logfile");
 			open($io, "$uncompress $logfile |") or die "FATAL: cannot open pipe to $uncompress $logfile. $!\n";
 			# Real size of the file is unknow, try to find it
 			my $cmd_file_size = $uncompress_size;
@@ -626,6 +627,7 @@ foreach my $logfile (@log_files) {
 			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
 				$uncompress = $ucat;
 			}
+		        &logmsg('DEBUG', "Compressed log file, will used command: $uncompress $logfile");
 
 			# Open a pipe to zcat program for compressed log
 			$lfile->open("$uncompress $logfile |") || die "FATAL: cannot read from pipe to $uncompress $logfile. $!\n";
@@ -640,6 +642,7 @@ foreach my $logfile (@log_files) {
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
+		&logmsg('DEBUG', "Starting reading file...");
 		my $cur_pid = '';
 		while (my $line = <$lfile>) {
 			$cursize += length($line);
@@ -3924,6 +3927,7 @@ sub autodetect_format
 			$uncompress = $ucat;
 		}
 
+		&logmsg('DEBUG', "Detect compressed file, will used command: $uncompress $file");
 		# Open a pipe to zcat program for compressed log
 		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
 	}
@@ -3992,6 +3996,7 @@ sub autodetect_duration
 			$uncompress = $ucat;
 		}
 
+		&logmsg('DEBUG', "Found compressed file, will used command: $uncompress $file");
 		# Open a pipe to zcat program for compressed log
 		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
 	}
