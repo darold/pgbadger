@@ -493,7 +493,6 @@ my $nlines          = 0;
 my %last_line       = ();
 my %saved_last_line = ();
 my %tsung_session   = ();
-my $total_tsung_session = 0;
 
 my $t0 = Benchmark->new;
 
@@ -3599,7 +3598,6 @@ sub parse_query
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user} = $prefix_vars{'t_dbuser'};
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date} = $prefix_vars{'t_date'};
-
 		}
 		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 			$t_duration = $1;
@@ -3664,7 +3662,6 @@ sub store_tsung_session
 		die "FATAL: can't write to $outfile, $!\n";
 	}
 	if ($pid) {
-		$total_tsung_session++;
 		print $fh "  <session probability=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
 		if (exists $tsung_session{$pid}{connection}{database}) {
 			print $fh qq{    <transaction name="connection">
@@ -3719,7 +3716,7 @@ sub store_queries
 
 	# Should we just want select queries
 	if ($select_only) {
-		return if ( ($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} != /FOR UPDATE/is) );
+		return if ( ($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} =~ /FOR UPDATE/is) );
 	}
 
 	# Should we have to exclude some queries
