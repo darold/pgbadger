@@ -509,6 +509,7 @@ if ($last_parsed && -e $last_parsed) {
 
 # Main loop reading log files
 foreach my $logfile (@log_files) {
+
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
 	my $curdate = localtime(time);
@@ -806,7 +807,9 @@ foreach my $logfile (@log_files) {
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
 		&store_queries($pid);
-		if ($extension eq 'tsung') {
+	}
+	if ($extension eq 'tsung') {
+		foreach my $pid (sort { $a <=> $b } keys %tsung_session) {
 			&store_tsung_session($pid);
 		}
 	}
@@ -3470,6 +3473,9 @@ sub parse_query
 		&& ($prefix_vars{'t_query'} =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
 	{
 		return if ($disable_session);
+		if ($extension eq 'tsung') {
+			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_date'};
+		}
 		my $time = $1;
 		my $usr  = $2;
 		my $db   = $3;
@@ -3688,7 +3694,7 @@ sub store_tsung_session
 			print $fh "    </transaction>\n";
 		}
 		if ($#{$tsung_session{$pid}{dates}} >= 0) {
-			my $sec = $tsung_session{$pid}{dates}[-1] - $cur_info{$pid}{date};
+			my $sec = $tsung_session{$pid}{disconnection}{date} - $tsung_session{$pid}{dates}[-1];
 			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
 		}
 		if (exists $tsung_session{$pid}{connection}{database}) {
