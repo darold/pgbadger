@@ -1476,11 +1476,13 @@ sub show_error_as_text
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
 			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+				if ( ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+					($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
 					$logs_type{HINT}--;
 					$logs_type{LOG}++;
 				}
@@ -1492,6 +1494,11 @@ sub show_error_as_text
 				$j++;
 			}
 		} else {
+			if ( ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+				($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
+				$logs_type{HINT}--;
+				$logs_type{LOG}++;
+			}
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
 			print $fh "--\n";
 			print $fh "\t- Date: $error_info{$k}{date}[0]\n";
@@ -3128,11 +3135,13 @@ sub show_error_as_html
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
 			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+				if ( ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+					($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
 					$logs_type{HINT}--;
 					$logs_type{LOG}++;
 				}
@@ -3148,6 +3157,11 @@ sub show_error_as_html
 			}
 			print $fh "</div>";
 		} else {
+			if ( ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+				($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
+				$logs_type{HINT}--;
+				$logs_type{LOG}++;
+			}
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
 			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n"   if ($error_info{$k}{detail}[0]);
 			print $fh "<div class=\"errorInformation\">Context: $error_info{$k}{context}[0]</div>\n" if ($error_info{$k}{context}[0]);
@@ -3355,8 +3369,12 @@ sub parse_query
 
 	# Force parameter change to be a hint message so that it can appear
 	# in the event/error/warning messages report part.
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/)) {
-		$prefix_vars{'t_loglevel'} = 'HINT';
+	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
+		if ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/) {
+			$prefix_vars{'t_loglevel'} = 'HINT';
+		} elsif ($prefix_vars{'t_query'} =~ /database system was shut down at /) {
+			$prefix_vars{'t_loglevel'} = 'HINT';
+		}
 	}
 
 	# Do not parse lines that are not an error like message
@@ -3600,7 +3618,7 @@ sub parse_query
 			return if ($t_action !~ /query|statement|execute|bind/);
 		} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 			if ($prefix_vars{'t_query'} !~
-	/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+	/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for|database system was shut down/
 			   )
 			{
 				&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
@@ -3879,6 +3897,7 @@ sub normalize_error
 	$orig_query =~ s/"[^"]*"/"..."/g;
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
+	$orig_query =~ s/(database system was shut down at).*/$1 .../;
 
 	# Need more normalization stuff here
 
@@ -4018,7 +4037,7 @@ sub autodetect_duration
 		return 0;
 	}
 
-	&logmsg('DEBUG', "Autodetectin log duration format from $file: log_duration is enabled.");
+	&logmsg('DEBUG', "Autodetecting log duration format from $file: log_duration is enabled.");
 
 	return 1;
 }
