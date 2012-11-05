@@ -3261,19 +3261,44 @@ sub highlight_code
 sub compute_arg_list
 {
 
-	# Some command lines arguments can be used multiple time or be written as a coma separated list.
+	# Some command lines arguments can be used multiple time or be written
+	# as a coma separated list.
 	# For example: --dbuser=postgres --dbuser=joe or --dbuser=postgres,joe
 	# So we have to aggregate all the possible value
-	foreach my $n ('dbname', 'dbuser', 'dbclient', 'dbappname', 'exclude_user') {
-		if ($#{$n} >= 0) {
-			my @tmp = ();
-			foreach my $v (@{$n}) {
-				push(@tmp, split(/,/, $v));
-			}
-			@{$n} = ();
-			push(@{$n}, @tmp);
-		}
+	my @tmp = ();
+	foreach my $v (@exclude_user) {
+		push(@tmp, split(/,/, $v));
 	}
+	@exclude_user = ();
+	push(@exclude_user, @tmp);
+
+	@tmp = ();
+	foreach my $v (@dbname) {
+		push(@tmp, split(/,/, $v));
+	}
+	@dbname = ();
+	push(@dbname, @tmp);
+
+	@tmp = ();
+	foreach my $v (@dbuser) {
+		push(@tmp, split(/,/, $v));
+	}
+	@dbuser = ();
+	push(@dbuser, @tmp);
+
+	@tmp = ();
+	foreach my $v (@dbclient) {
+		push(@tmp, split(/,/, $v));
+	}
+	@dbclient = ();
+	push(@dbclient, @tmp);
+
+	@tmp = ();
+	foreach my $v (@dbappname) {
+		push(@tmp, split(/,/, $v));
+	}
+	@dbappname = ();
+	push(@dbappname, @tmp);
 }
 
 
@@ -3318,7 +3343,7 @@ sub validate_log_line
 	if ($#exclude_user >= 0) {
 
 		# Log line match the excluded dbuser
-		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
+		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
