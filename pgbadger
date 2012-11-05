@@ -45,7 +45,7 @@ my $JQGRAPH = 1;
 
 # Command line options
 my $zcat                = 'zcat';
-my $bzcat               = 'bzcat';
+my $bzcat               = 'bunzip2 -c';
 my $ucat                = 'unzip -p';
 my $uncompress_size     = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $format              = '';
@@ -493,7 +493,6 @@ my $nlines          = 0;
 my %last_line       = ();
 my %saved_last_line = ();
 my %tsung_session   = ();
-my $total_tsung_session = 0;
 
 my $t0 = Benchmark->new;
 
@@ -510,6 +509,7 @@ if ($last_parsed && -e $last_parsed) {
 
 # Main loop reading log files
 foreach my $logfile (@log_files) {
+
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
 	my $curdate = localtime(time);
@@ -535,7 +535,8 @@ foreach my $logfile (@log_files) {
 				$uncompress = $bzcat;
 			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
 				$uncompress = $ucat;
-			}
+			} 
+		        &logmsg('DEBUG', "Compressed file found, will used command: $uncompress $logfile");
 			open($io, "$uncompress $logfile |") or die "FATAL: cannot open pipe to $uncompress $logfile. $!\n";
 			# Real size of the file is unknow, try to find it
 			my $cmd_file_size = $uncompress_size;
@@ -626,6 +627,7 @@ foreach my $logfile (@log_files) {
 			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
 				$uncompress = $ucat;
 			}
+		        &logmsg('DEBUG', "Compressed log file, will used command: $uncompress $logfile");
 
 			# Open a pipe to zcat program for compressed log
 			$lfile->open("$uncompress $logfile |") || die "FATAL: cannot read from pipe to $uncompress $logfile. $!\n";
@@ -640,6 +642,7 @@ foreach my $logfile (@log_files) {
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
+		&logmsg('DEBUG', "Starting reading file...");
 		my $cur_pid = '';
 		while (my $line = <$lfile>) {
 			$cursize += length($line);
@@ -804,7 +807,9 @@ foreach my $logfile (@log_files) {
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
 		&store_queries($pid);
-		if ($extension eq 'tsung') {
+	}
+	if ($extension eq 'tsung') {
+		foreach my $pid (sort { $a <=> $b } keys %tsung_session) {
 			&store_tsung_session($pid);
 		}
 	}
@@ -1473,11 +1478,13 @@ sub show_error_as_text
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
 			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+				if ( ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+					($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
 					$logs_type{HINT}--;
 					$logs_type{LOG}++;
 				}
@@ -1489,6 +1496,11 @@ sub show_error_as_text
 				$j++;
 			}
 		} else {
+			if ( ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+				($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
+				$logs_type{HINT}--;
+				$logs_type{LOG}++;
+			}
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
 			print $fh "--\n";
 			print $fh "\t- Date: $error_info{$k}{date}[0]\n";
@@ -3125,11 +3137,13 @@ sub show_error_as_html
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
 			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) {
+				if ( ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+					($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
 					$logs_type{HINT}--;
 					$logs_type{LOG}++;
 				}
@@ -3145,6 +3159,11 @@ sub show_error_as_html
 			}
 			print $fh "</div>";
 		} else {
+			if ( ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/) ||
+				($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/) ) {
+				$logs_type{HINT}--;
+				$logs_type{LOG}++;
+			}
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
 			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n"   if ($error_info{$k}{detail}[0]);
 			print $fh "<div class=\"errorInformation\">Context: $error_info{$k}{context}[0]</div>\n" if ($error_info{$k}{context}[0]);
@@ -3377,8 +3396,12 @@ sub parse_query
 
 	# Force parameter change to be a hint message so that it can appear
 	# in the event/error/warning messages report part.
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/)) {
-		$prefix_vars{'t_loglevel'} = 'HINT';
+	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
+		if ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/) {
+			$prefix_vars{'t_loglevel'} = 'HINT';
+		} elsif ($prefix_vars{'t_query'} =~ /database system was shut down at /) {
+			$prefix_vars{'t_loglevel'} = 'HINT';
+		}
 	}
 
 	# Do not parse lines that are not an error like message
@@ -3475,6 +3498,9 @@ sub parse_query
 		&& ($prefix_vars{'t_query'} =~ /disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
 	{
 		return if ($disable_session);
+		if ($extension eq 'tsung') {
+			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_date'};
+		}
 		my $time = $1;
 		my $usr  = $2;
 		my $db   = $3;
@@ -3603,7 +3629,6 @@ sub parse_query
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user} = $prefix_vars{'t_dbuser'};
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date} = $prefix_vars{'t_date'};
-
 		}
 		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 			$t_duration = $1;
@@ -3622,7 +3647,7 @@ sub parse_query
 			return if ($t_action !~ /query|statement|execute|bind/);
 		} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 			if ($prefix_vars{'t_query'} !~
-	/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+	/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for|database system was shut down/
 			   )
 			{
 				&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
@@ -3668,13 +3693,12 @@ sub store_tsung_session
 		die "FATAL: can't write to $outfile, $!\n";
 	}
 	if ($pid) {
-		$total_tsung_session++;
 		print $fh "  <session probability=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
 		if (exists $tsung_session{$pid}{connection}{database}) {
 			print $fh qq{    <transaction name="connection">
       <request><pgsql type="connect" database="$tsung_session{$pid}{connection}{database}" username="$tsung_session{$pid}{connection}{user}" /></request>
+      <request><pgsql type="authenticate" password="changeme"/></request>
     </transaction>
-    <request><pgsql type="authenticate" password="changeme"/></request>
 };
 		}
 		if ($#{$tsung_session{$pid}{dates}} >= 0) {
@@ -3695,7 +3719,7 @@ sub store_tsung_session
 			print $fh "    </transaction>\n";
 		}
 		if ($#{$tsung_session{$pid}{dates}} >= 0) {
-			my $sec = $tsung_session{$pid}{dates}[-1] - $cur_info{$pid}{date};
+			my $sec = $tsung_session{$pid}{disconnection}{date} - $tsung_session{$pid}{dates}[-1];
 			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
 		}
 		if (exists $tsung_session{$pid}{connection}{database}) {
@@ -3723,7 +3747,7 @@ sub store_queries
 
 	# Should we just want select queries
 	if ($select_only) {
-		return if ( ($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} != /FOR UPDATE/is) );
+		return if ( ($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} =~ /FOR UPDATE/is) );
 	}
 
 	# Should we have to exclude some queries
@@ -3901,6 +3925,7 @@ sub normalize_error
 	$orig_query =~ s/"[^"]*"/"..."/g;
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
+	$orig_query =~ s/(database system was shut down at).*/$1 .../;
 
 	# Need more normalization stuff here
 
@@ -3949,6 +3974,7 @@ sub autodetect_format
 			$uncompress = $ucat;
 		}
 
+		&logmsg('DEBUG', "Detect compressed file, will used command: $uncompress $file");
 		# Open a pipe to zcat program for compressed log
 		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
 	}
@@ -4017,6 +4043,7 @@ sub autodetect_duration
 			$uncompress = $ucat;
 		}
 
+		&logmsg('DEBUG', "Found compressed file, will used command: $uncompress $file");
 		# Open a pipe to zcat program for compressed log
 		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
 	}
@@ -4038,7 +4065,7 @@ sub autodetect_duration
 		return 0;
 	}
 
-	&logmsg('DEBUG', "Autodetectin log duration format from $file: log_duration is enabled.");
+	&logmsg('DEBUG', "Autodetecting log duration format from $file: log_duration is enabled.");
 
 	return 1;
 }
