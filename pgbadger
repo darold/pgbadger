@@ -4011,7 +4011,6 @@ sub autodetect_format
 
 			# Is syslog lines with log level information ?
 		} elsif ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\s]+\s([^\s\[]+)\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
-print STDERR "ZZZZZZZZZZZZZZZZZZZZZZZZ $1\n";
 			$fmt = 'syslog-ll';
 			$nfound++;
 			$ident_name{$1}++;
