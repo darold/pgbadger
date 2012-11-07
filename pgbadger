@@ -4098,9 +4098,9 @@ sub progress_bar
 	$char  ||= '=';
 	my $num_width = length $total;
 	sprintf(
-		"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%)\r",
+		"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
 		$char x (($width - 1) * $got / $total) . '>',
-		$got, $total, 100 * $got / +$total
+		$got, $total, 100 * $got / +$total, $overall_stat{'queries_number'}, $overall_stat{'errors_number'}
 	);
 }
 
