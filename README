@@ -23,6 +23,8 @@ SYNOPSIS
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
                                  There's also syslog-ng for traces with [ID * local2.info]
+                                 and syslog-ll with syslog for line with <local0.info>.
+                                 Use them only if pgBager is unable to autodetect log format.
         -G | --nograph         : disable graphs on HTML output. Enable by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
