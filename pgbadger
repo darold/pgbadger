@@ -524,8 +524,8 @@ foreach my $logfile (@log_files) {
 	my $cursize = 0;
 
 	if ($format eq 'csv') {
-		require Text::CSV;
-		my $csv = Text::CSV->new({binary => 1, eol => $/});
+		require Text::CSV_XS;
+		my $csv = Text::CSV_XS->new({binary => 1, eol => $/});
 		my $io = undef;
 		if ($logfile !~ /\.(gz|bz2|zip)/i) {
 			open($io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";

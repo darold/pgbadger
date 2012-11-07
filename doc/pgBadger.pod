@@ -153,7 +153,7 @@ PgBadger comes as a single Perl script- you do not need anything else than a mod
 
 If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:
 
-	Text::CSV - to parse PostgreSQL CSV log files.
+	Text::CSV_XS - to parse PostgreSQL CSV log files.
 
 This module is optional, if you don't have PostgreSQL log in the CSV format you don't need to install it.
 
