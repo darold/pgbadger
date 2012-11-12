@@ -332,8 +332,8 @@ if ($#include_query >= 0) {
 	}
 }
 
-my $other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*)/;
-my $orphan_syslog_line = qr/^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\s\[]+\[\d+\]:/;
+my $other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 my $orphan_stderr_line = qr/[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/;
 
 # Compile custom log line prefie prefix
@@ -342,39 +342,18 @@ if ($log_line_prefix) {
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
-		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
-	} elsif ($format eq 'syslog-ll') {
-		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s[^\s]+\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
-		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s[^\s]+\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*)/;
-		$orphan_syslog_line = qr/^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\s]+\s[^\s\[]+\[\d+\]:/;
-		$compiled_prefix = qr/$log_line_prefix/;
-		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
-		push(@prefix_params, 't_loglevel', 't_query');
-	} elsif ($format eq 'syslog-ng') {
-		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(.*?)\[(\d+)\-\d+\]\s*(.*)/;
-		$log_line_prefix = '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
-		$compiled_prefix = qr/$log_line_prefix/;
-		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line');
 	} elsif ($format eq 'stderr') {
 		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		push(@prefix_params, 't_loglevel', 't_query');
 	}
 } elsif ($format eq 'syslog') {
-	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
-} elsif ($format eq 'syslog-ll') {
-	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s[^\s]+\s([^\s]+)\s([^\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
-	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
-	$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s[^\s]+\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*)/;
-	$orphan_syslog_line = qr/^...\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\s]+\s[^\s\[]+\[\d+\]:/;
-} elsif ($format eq 'syslog-ng') {
-	$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\[(\d+)\-\d+\]\s*(.*)/;
-	$compiled_prefix = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)\s([^\s]+)\s([^\[]+)\[(\d+)\]:(.*?)\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
-	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_id', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
 	$compiled_prefix = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
@@ -683,6 +662,7 @@ foreach my $logfile (@log_files) {
 			if ($format =~ /syslog/) {
 
 				my @matches = ($line =~ $compiled_prefix);
+
 				if ($#matches >= 0) {
 
 					for (my $i = 0; $i <= $#prefix_params; $i++) {
@@ -937,9 +917,6 @@ Options:
     -d | --dbname database : only report what concern the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
-			     There's also syslog-ng for traces with [ID * local2.info]
-			     and syslog-ll with syslog for line with <local0.info>.
-			     Use them only if pgBager is unable to autodetect log format.
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -1212,7 +1189,7 @@ Log start from $first_log_timestamp to $last_log_timestamp
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
-	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
+	if ((scalar keys %normalyzed_info == 1) && ($overall_stat{'queries_number'} > 1)) {
 		$fmt_unique = 'none';
 		$overall_stat{'first_query_ts'} = $first_log_timestamp;
 		$overall_stat{'last_query_ts'} = $last_log_timestamp;
@@ -1948,7 +1925,7 @@ sub dump_as_html
 	# Overall statistics
 	my $fmt_unique   = &comma_numbers(scalar keys %normalyzed_info)     || 0;
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
-	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
+	if ((scalar keys %normalyzed_info == 1) && ($overall_stat{'queries_number'} > 1)) {
 		$fmt_unique = 'none';
 		$overall_stat{'first_query_ts'} = $first_log_timestamp;
 		$overall_stat{'last_query_ts'} = $last_log_timestamp;
@@ -4034,20 +4011,8 @@ sub autodetect_format
 		$nline++;
 
 		# Is syslog lines ?
-		if ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\s\[]+)\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
+		if ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
 			$fmt = 'syslog';
-			$nfound++;
-			$ident_name{$1}++;
-
-			# Is syslog lines with log level information ?
-		} elsif ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s[^\s]+\s([^\s\[]+)\[\d+\]:\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
-			$fmt = 'syslog-ll';
-			$nfound++;
-			$ident_name{$1}++;
-
-			# Is syslog-ng lines ?
-		} elsif ($line =~ /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+\s[^\s]+\s([^\s\[]+)\[\d+\]:(.*?)\s\[[0-9\-]+\](.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/) {
-			$fmt = 'syslog-ng';
 			$nfound++;
 			$ident_name{$1}++;
 
