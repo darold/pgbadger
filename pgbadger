@@ -1035,6 +1035,9 @@ This supposes that your log file and HTML report are also rotated every weeks.
 	exit 0;
 }
 
+# Method used to check if we have already reach the last parsing position in incremental mode
+# This position should have been saved in the incremental file and read in the $last_parsed at
+# start up.
 sub check_incremental_position
 {
 	my ($cur_date, $line) = @_;
