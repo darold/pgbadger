@@ -484,6 +484,8 @@ map {$_ = quotemeta($_)} @BRACKETS;
 
 # Where statistic are stored
 my %STATS           = ();
+my $first_log_timestamp  = '';
+my $last_log_timestamp   = '';
 my $first_log_date  = '';
 my $last_log_date   = '';
 my %overall_stat    = ();
@@ -600,8 +602,14 @@ foreach my $logfile (@log_files) {
 			$prefix_vars{'t_query'} = $row->[13];
 
 			# Store the current timestamp of the log line
-			$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
-			$last_log_date = $prefix_vars{'t_timestamp'};
+			if ( !$first_log_date || ($first_log_date > $prefix_vars{'t_date'}) ) {
+				$first_log_timestamp = $prefix_vars{'t_timestamp'};
+				$first_log_date = $prefix_vars{'t_date'};
+			}
+			if ( !$last_log_date || ($last_log_date < $prefix_vars{'t_date'}) ) {
+				$last_log_timestamp = $prefix_vars{'t_timestamp'};
+				$last_log_date = $prefix_vars{'t_date'};
+			}
 			# Parse the query now
 			&parse_query();
 			if ($row->[14]) {
@@ -703,8 +711,14 @@ foreach my $logfile (@log_files) {
 					$cur_pid = $prefix_vars{'t_pid'};
 
 					# Store the current timestamp of the log line
-					$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
-					$last_log_date = $prefix_vars{'t_timestamp'};
+					if ( !$first_log_date || ($first_log_date > $prefix_vars{'t_date'}) ) {
+						$first_log_timestamp = $prefix_vars{'t_timestamp'};
+						$first_log_date = $prefix_vars{'t_date'};
+					}
+					if ( !$last_log_date || ($last_log_date < $prefix_vars{'t_date'}) ) {
+						$last_log_timestamp = $prefix_vars{'t_timestamp'};
+						$last_log_date = $prefix_vars{'t_date'};
+					}
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -775,8 +789,14 @@ foreach my $logfile (@log_files) {
 					$cur_pid = $prefix_vars{'t_pid'};
 
 					# Store the current timestamp of the log line
-					$first_log_date = $prefix_vars{'t_timestamp'} if (!$first_log_date);
-					$last_log_date = $prefix_vars{'t_timestamp'};
+					if ( !$first_log_date || ($first_log_date > $prefix_vars{'t_date'}) ) {
+						$first_log_timestamp = $prefix_vars{'t_timestamp'};
+						$first_log_date = $prefix_vars{'t_date'};
+					}
+					if ( !$last_log_date || ($last_log_date < $prefix_vars{'t_date'}) ) {
+						$last_log_timestamp = $prefix_vars{'t_timestamp'};
+						$last_log_date = $prefix_vars{'t_date'};
+					}
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -1183,7 +1203,7 @@ $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $first_log_date to $last_log_date
+Log start from $first_log_timestamp to $last_log_timestamp
 };
 
 	# Overall statistics
@@ -1191,8 +1211,8 @@ Log start from $first_log_date to $last_log_date
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
 	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
 		$fmt_unique = 'none';
-		$overall_stat{'first_query'} = $first_log_date;
-		$overall_stat{'last_query'} = $last_log_date;
+		$overall_stat{'first_query_ts'} = $first_log_timestamp;
+		$overall_stat{'last_query_ts'} = $last_log_timestamp;
 	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
@@ -1202,8 +1222,8 @@ Log start from $first_log_date to $last_log_date
 Number of unique normalized queries: $fmt_unique
 Number of queries: $fmt_queries
 Total query duration: $fmt_duration
-First query: $overall_stat{'first_query'}
-Last query: $overall_stat{'last_query'}
+First query: $overall_stat{'first_query_ts'}
+Last query: $overall_stat{'last_query_ts'}
 };
 	foreach (sort {$overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a}} keys %{$overall_stat{'query_peak'}}) {
 		print $fh "Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_";
@@ -1471,7 +1491,7 @@ $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $first_log_date to $last_log_date
+Log start from $first_log_timestamp to $last_log_timestamp
 };
 
 	&show_error_as_text();
@@ -1917,7 +1937,7 @@ sub dump_as_html
 <li>Generated on $curdate</li>
 <li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
-<li>Log start from $first_log_date to $last_log_date</li>
+<li>Log start from $first_log_timestamp to $last_log_timestamp</li>
 </ul>
 </div>
 };
@@ -1927,8 +1947,8 @@ sub dump_as_html
 	my $fmt_queries  = &comma_numbers($overall_stat{'queries_number'})  || 0;
 	if (($fmt_unique == 1) && ($overall_stat{'queries_number'} > 1)) {
 		$fmt_unique = 'none';
-		$overall_stat{'first_query'} = $first_log_date;
-		$overall_stat{'last_query'} = $last_log_date;
+		$overall_stat{'first_query_ts'} = $first_log_timestamp;
+		$overall_stat{'last_query_ts'} = $last_log_timestamp;
 	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
@@ -1940,8 +1960,8 @@ sub dump_as_html
 <li>Number of unique normalized queries: $fmt_unique</li>
 <li>Number of queries: $fmt_queries</li>
 <li>Total query duration: $fmt_duration</li>
-<li>First query: $overall_stat{'first_query'}</li>
-<li>Last query: $overall_stat{'last_query'}</li>
+<li>First query: $overall_stat{'first_query_ts'}</li>
+<li>Last query: $overall_stat{'last_query_ts'}</li>
 };
 	foreach (sort {$overall_stat{'query_peak'}{$b} <=> $overall_stat{'query_peak'}{$a}} keys %{$overall_stat{'query_peak'}}) {
 		print $fh "<li>Query peak: ", &comma_numbers($overall_stat{'query_peak'}{$_}), " queries/s at $_</li>";
@@ -2080,11 +2100,11 @@ sub dump_as_html
 		print $fh "</table>\n";
 
 		if ($graph) {
-			$first_log_date =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+			$first_log_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 			$t_min = timegm_nocheck(0, $5, $4, $3, $2-1, $1) * 1000;
 			$t_min -= ($avg_minutes*60000);
 			$t_min_hour = timegm_nocheck(0, 0, $4, $3, $2-1, $1) * 1000;
-			$last_log_date =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+			$last_log_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 			$t_max = timegm_nocheck(59, $5, $4, $3, $2-1, $1) * 1000;
 			$t_max += ($avg_minutes*60000);
 			$t_max_hour = timegm_nocheck(0, 0, $4, $3, $2-1, $1) * 1000;
@@ -3087,7 +3107,7 @@ sub dump_error_as_html
 <li>Generated on $curdate</li>
 <li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
-<li>Log start from $first_log_date to $last_log_date</li>
+<li>Log start from $first_log_timestamp to $last_log_timestamp</li>
 </ul>
 </div>
 };
@@ -3819,10 +3839,10 @@ sub store_queries
 			{"$cur_info{$t_pid}{hour}"}{count}++;
 
 		# Stores normalyzed query samples
-		my $cur_last_log_date =
+		my $cur_last_log_timestamp =
 "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 		&set_top_error_sample(
-			$normalized_error,          $cur_last_log_date,           $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
+			$normalized_error,          $cur_last_log_timestamp,           $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
 			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}
 		);
 
@@ -3835,13 +3855,20 @@ sub store_queries
 		my $normalized = &normalize_query($cur_info{$t_pid}{query});
 
 		# Stores global statistics
-		my $cur_last_log_date =
+		my $cur_last_log_timestamp =
 "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+		my $cur_last_log_date =
+"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}$cur_info{$t_pid}{hour}$cur_info{$t_pid}{min}$cur_info{$t_pid}{sec}";
 		$overall_stat{'queries_number'}++;
 		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration};
-		$overall_stat{'first_query'} = $cur_last_log_date if (!$overall_stat{'first_query'});
-		$overall_stat{'last_query'} = $cur_last_log_date;
-		$overall_stat{'query_peak'}{$cur_last_log_date}++;
+		if ( !$overall_stat{'first_query_date'} || ($overall_stat{'first_query_date'} > $cur_last_log_date) ) {
+			$overall_stat{'first_query_ts'} = $cur_last_log_timestamp;
+			$overall_stat{'first_query_date'} = $cur_last_log_date;
+		}
+		if ( !$overall_stat{'last_query_date'} || ($overall_stat{'last_query_date'} < $cur_last_log_date) ) {
+			$overall_stat{'last_query_ts'} = $cur_last_log_timestamp;
+		}
+		$overall_stat{'query_peak'}{$cur_last_log_timestamp}++;
 		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{count}++;
 		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
 			{duration} += $cur_info{$t_pid}{duration};
@@ -3903,7 +3930,7 @@ sub store_queries
 					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration};
 			}
 		}
-		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_date);
+		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp);
 
 		# Store normalyzed query count
 		$normalyzed_info{$normalized}{count}++;
@@ -3918,7 +3945,7 @@ sub store_queries
 			{"$cur_info{$t_pid}{hour}"}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalyzed query samples
-		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_date);
+		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp);
 	}
 }
 
