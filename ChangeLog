@@ -1,3 +1,54 @@
+2012-11-13 - Version 2.2
+
+This release add some major features like tsung output, speed improvement with
+csvlog, report of shut down events, new command line options to generate report
+excluding some user(s), to build report based on select queries only, to specify
+regex of the queries that must only be included in the report and to remove
+comments from queries. Lot of bug fixes, please upgrade.
+
+	- Update PostgreSQL keywords list for 9.2
+	- Fix number of queries in progress bar with tsung output.
+	- Remove obsolete syslog-ng and temporary syslog-ll log format added to
+	  fix some syslog autodetection issues. There is now just one syslog
+	  format: syslog, differences between syslog formats are detected and
+	  the log parser is adaptive.
+	- Add comment about the check_incremental_position() method
+	- Fix reports with empty graphs when log files were not in chronological
+	  order.
+	- Add report of current total of queries and events parsed in progress
+	  bar. Thanks to Jehan-Guillaume de Rorthais for the patch.
+	- Force pgBadger to use an require the XS version of Text::CSV instead
+	  of the Pure Perl implementation. It is a good bit faster thanks to
+	  David Fetter for the patch. Note that using csvlog is still a bit
+	  slower than syslog or stderr log format.
+	- Fix several issue with tsung output.
+	- Add report of shut down events
+	- Add debug information on command line used to pipe compressed log
+	  file when -v is provide.
+	- Add -U | --exclude-user command line option to generate report
+	  excluded user. Thanks to Birta Levente for the feature request.
+	- Allow some options to be specified multiple time or be written as a
+	  coma separated list of value, here are these options: --dbname,
+	  --dbuser, --dbclient, --dbappname, --exclude_user.
+	- Add -S | --select-only option to build report only on select queries.
+	- Add first support to tsung output, see usage. Thanks to Guillaume
+	  Lelarge for the feature request.
+	- Add --include-query and --include-file to specify regex of the queries
+	  that must only be included in the report. Thanks to Marc Cousin for
+	  the feature request.
+	- Fix auto detection of log_duration and log_min_duration_statement
+	  format.
+	- Fix parser issue with Windows logs without timezone information.
+	  Thanks to Nicolas Thauvin for the report.
+	- Fix bug in %r = remote host and port log line prefix detection.
+	  Thanks to Hubert Depesz Lubaczewski for the report.
+	- Add -C | --nocomment option to remove comment like /* ... */ from
+	  queries. Thanks to Hubert Depesz Lubaczewski for the feature request.
+	- Fix escaping of log_line_prefix. Thanks to Hubert Depesz Lubaczewski
+	  for the patch.
+	- Fix wrong detection of update queries when a query has a object names
+	  containing update and set. Thanks to Vincent Laborie for the report.
+
 2012-10-10 - Version 2.1
 
 This release add a major feature by allowing any custom log_line_prefix to be
