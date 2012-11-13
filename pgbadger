@@ -101,6 +101,7 @@ my $enable_log_duration = 0;
 my $remove_comment      = 0;
 my $select_only         = 0;
 my $enable_log_min_duration = 0;
+my $tsung_queries       = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -3723,6 +3724,7 @@ sub store_tsung_session
 			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
 			print $fh "    <transaction name=\"requests\">\n";
 			for (my $i = 0; $i <= $#{$tsung_session{$pid}{queries}}; $i++) {
+				$tsung_queries++;
 				$sec = 0;
 				if ($i > 0) {
 					$sec = $tsung_session{$pid}{dates}[$i] - $tsung_session{$pid}{dates}[$i - 1];
@@ -4092,11 +4094,19 @@ sub progress_bar
 	$width ||= 25;
 	$char  ||= '=';
 	my $num_width = length $total;
-	sprintf(
-		"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
-		$char x (($width - 1) * $got / $total) . '>',
-		$got, $total, 100 * $got / +$total, $overall_stat{'queries_number'}, $overall_stat{'errors_number'}
-	);
+	if ($extension eq 'tsung') {
+		sprintf(
+			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
+			$char x (($width - 1) * $got / $total) . '>',
+			$got, $total, 100 * $got / +$total, $tsung_queries
+		);
+	} else {
+		sprintf(
+			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
+			$char x (($width - 1) * $got / $total) . '>',
+			$got, $total, 100 * $got / +$total, $overall_stat{'queries_number'}, $overall_stat{'errors_number'}
+		);
+	}
 }
 
 sub flotr2_graph
