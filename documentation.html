@@ -27,21 +27,22 @@
 
 <p>If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:</p>
 <ul>
-  <li>Text::CSV - to parse PostgreSQL CSV log files.</li>
+  <li>Text::CSV_XS - to parse PostgreSQL CSV log files.</li>
 </ul>
 <p>
 This module is optional, if you don't have PostgreSQL log in the CSV
 format you don't need to install it.
 </p>
 <p>
-Compressed log file format is autodetected following the file exention.
+Compressed log file format is autodetected following the file extention.
 If pgbadger find a gz extention it will use the zcat utility, with a bz2
 extention it will use bzcat and if the file extention is zip then the
 unzip utility will be used.
 </p>
 <p>
-If those utilities are not found in the PATH environment variable then
-use the --zcat command line otption to change this path. For exemple:
+Most of the time you don't need to take care of this but if those utilities
+are not found in the PATH environment variable then use the --zcat command
+line otption to change this path. For exemple:
 </p>
 <pre>
 	--zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
@@ -179,10 +180,11 @@ postgresql.conf file.
         -a | --average minutes : number of minutes to build the average graphs of
                                  queries and connections.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
+        -c | --dbclient host   : only report what concern the given client host.
+        -C | --nocomment       : remove comments like /* ... */ from queries.
         -d | --dbname database : only report what concern the given database
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
-                                 There's also syslog-ng for traces with [ID * local2.info]
         -G | --nograph         : disable graphs on HTML output. Enable by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -195,8 +197,8 @@ postgresql.conf file.
         -n | --nohighlight     : disable SQL code highlighting.
         -N | --appname name    : only report what concern the given application name
         -o | --outfile filename: define the filename for the output. Default depends
-                                 of the output format: out.html or out.txt. To dump
-                                 output to stdout use - as filename.
+                                 of the output format: out.html, out.txt or out.tsung.
+                                 To dump output to stdout use - as filename.
         -p | --prefix string   : give here the value of your custom log_line_prefix
                                  defined in your postgresql.conf. You may used it only
                                  if don't have the default allowed formats ot to use
@@ -205,13 +207,15 @@ postgresql.conf file.
         -P | --no-prettify     : disable SQL queries prettify formatter.
         -q | --quiet           : don't print anything to stdout, even not a progress bar.
         -s | --sample number   : number of query sample to store/display. Default: 3
+        -s | --select-only     : use it if you want reports on select queries only.
         -t | --top number      : number of query to store/display. Default: 20
         -T | --title string    : change title of the HTML page report.
         -u | --dbuser username : only report what concern the given user
+        -U | --exclude-user username : make report with exclude specified user.
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
         -V | --version         : show pgBadger version and exit.
         -w | --watch-mode      : only report errors just like logwatch could do.
-        -x | --extension       : output format. Values: text or html. Default: html
+        -x | --extension       : output format. Values: text, html or tsung. Default: html
         -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                                  zcat or bzcat or unzip is not on your path.
         --pie-limit num        : pie data lower than num% will show a sum instead.
@@ -220,6 +224,11 @@ postgresql.conf file.
                                  you can use this option multiple time.
         --exclude-file filename: path of the file which contains all the regex to use
                                  to exclude queries from the report. One regex per line.
+        --include-query regex  : any query that do not match the given regex will be
+                                 excluded from the report. For example: "(table_1|table_2)"
+                                 you can use this option multiple time.
+        --include-file filename: path of the file which contains all the regex of the
+                                 queries to include from the report. One regex per line.
         --disable-error        : do not generate error report.
         --disable-hourly       : do not generate hourly reports.
         --disable-type         : do not generate query type report.
@@ -251,6 +260,10 @@ postgresql.conf file.
             perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
                             /pglog/postgresql-2012-08-21*
 
+    Generate Tsung sessions XML file with select queries only:
+
+        perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
+
     Reporting errors every week by cron job:
 
         30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
@@ -262,6 +275,7 @@ postgresql.conf file.
 
     This suppose that your log file and HTML report are also rotated every
     week.
+
 </pre>
 
 <div id="footer">
