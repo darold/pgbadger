@@ -521,37 +521,20 @@ foreach my $logfile (@log_files) {
 	$gyear += 1900;
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
 
-	# Get size of the file
-	my $totalsize = (stat("$logfile"))[7] || 0;
 	my $cursize = 0;
 
+	# Get file handle and size of the file
+	my ($lfile, $totalsize) = &open_log_file($logfile);
+
+	&logmsg('DEBUG', "Starting reading file...");
+	
 	if ($format eq 'csv') {
 		require Text::CSV_XS;
 		my $csv = Text::CSV_XS->new({binary => 1, eol => $/});
-		my $io = undef;
-		if ($logfile !~ /\.(gz|bz2|zip)/i) {
-			open($io, "<", $logfile) or die "FATAL: cannot read csvlog file $logfile. $!\n";
-		} else {
-			my $uncompress = $zcat;
-			if (($logfile =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
-				$uncompress = $bzcat;
-			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
-				$uncompress = $ucat;
-			}
-			&logmsg('DEBUG', "Compressed file found, will used command: $uncompress $logfile");
-			open($io, "$uncompress $logfile |") or die "FATAL: cannot open pipe to $uncompress $logfile. $!\n";
-
-			# Real size of the file is unknow, try to find it
-			my $cmd_file_size = $uncompress_size;
-			$cmd_file_size =~ s/\%f/$logfile/g;
-			$totalsize = `$cmd_file_size`;
-			chomp($totalsize);
-			$totalsize ||= 0;
-		}
 
 		# Parse csvlog lines
 		my $getout = 0;
-		while (my $row = $csv->getline($io)) {
+		while (my $row = $csv->getline($lfile)) {
 
 			# Set progress statistics
 			$cursize += length(join(',', @$row));
@@ -632,38 +615,11 @@ foreach my $logfile (@log_files) {
 		if (!$getout) {
 			$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		}
-		close $io;
 
-	} else {
-
-		# Open log file for reading
-		my $lfile = new IO::File;
-		if ($logfile !~ /\.(gz|bz2|zip)/i) {
-			$lfile->open($logfile) || die "FATAL: cannot read log file $logfile. $!\n";
-		} else {
-
-			my $uncompress = $zcat;
-			if (($logfile =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
-				$uncompress = $bzcat;
-			} elsif (($logfile =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
-				$uncompress = $ucat;
-			}
-			&logmsg('DEBUG', "Compressed log file, will used command: $uncompress $logfile");
-
-			# Open a pipe to zcat program for compressed log
-			$lfile->open("$uncompress $logfile |") || die "FATAL: cannot read from pipe to $uncompress $logfile. $!\n";
-
-			# Real size of the file is unknow, try to find it
-			my $cmd_file_size = $uncompress_size;
-			$cmd_file_size =~ s/\%f/$logfile/g;
-			$totalsize = `$cmd_file_size`;
-			chomp($totalsize);
-			$totalsize ||= 0;
-		}
+	} else { # Format is not CSV.
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
-		&logmsg('DEBUG', "Starting reading file...");
 		my $cur_pid = '';
 		while (my $line = <$lfile>) {
 			$cursize += length($line);
@@ -853,8 +809,8 @@ foreach my $logfile (@log_files) {
 				&logmsg('DEBUG', "Unknown line format: $line");
 			}
 		}
-		$lfile->close();
 	}
+	close $lfile;
 
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
@@ -874,7 +830,7 @@ foreach my $logfile (@log_files) {
 		print STDERR "\n";
 	}
 
-}
+} # End of main loop
 
 # Save last line parsed
 if ($last_parsed && scalar keys %last_line) {
@@ -4044,22 +4000,7 @@ sub autodetect_format
 	my $nfound = 0;
 	my $nline  = 0;
 	my $fmt    = '';
-	my $tfile  = new IO::File;
-	if ($file !~ /\.(gz|bz2|zip)/i) {
-		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
-	} else {
-		my $uncompress = $zcat;
-		if (($file =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
-			$uncompress = $bzcat;
-		} elsif (($file =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
-			$uncompress = $ucat;
-		}
-
-		&logmsg('DEBUG', "Detect compressed file, will used command: $uncompress $file");
-
-		# Open a pipe to zcat program for compressed log
-		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
-	}
+	my ($tfile, $totalsize) = &open_log_file($file);
 	my $duration = 'duration:';
 	if ($error_only || ($disable_hourly && $disable_query)) {
 		$duration = '';
@@ -4121,22 +4062,7 @@ sub autodetect_duration
 	# Open log file for reading
 	my $nfound = 0;
 	my $nline  = 0;
-	my $tfile  = new IO::File;
-	if ($file !~ /\.(gz|bz2|zip)/i) {
-		$tfile->open($file) || die "FATAL: cannot read logfile $file. $!\n";
-	} else {
-		my $uncompress = $zcat;
-		if (($file =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
-			$uncompress = $bzcat;
-		} elsif (($file =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
-			$uncompress = $ucat;
-		}
-
-		&logmsg('DEBUG', "Found compressed file, will used command: $uncompress $file");
-
-		# Open a pipe to zcat program for compressed log
-		$tfile->open("$uncompress $file |") || die "FATAL: cannot read from pipe to $uncompress $file. $!\n";
-	}
+	my ($tfile, $totalsize) = &open_log_file($file);
 	my %ident_name = ();
 	while (my $line = <$tfile>) {
 		chomp($line);
@@ -4153,11 +4079,11 @@ sub autodetect_duration
 	$tfile->close();
 
 	if ($nfound) {
-		&logmsg('DEBUG', "Autodetecting log duration format from $file: log_duration is disabled.");
+		&logmsg('DEBUG', "Autodetecting log duration format: log_duration is disabled.");
 		return 0;
 	}
 
-	&logmsg('DEBUG', "Autodetecting log duration format from $file: log_duration is enabled.");
+	&logmsg('DEBUG', "Autodetecting log duration format: log_duration is enabled.");
 
 	return 1;
 }
@@ -4841,6 +4767,42 @@ sub build_log_line_prefix_regex
 		return ($token =~ /^[,;.]$/);
 	}
 
+}
+
+sub open_log_file
+{
+	my $logf = shift;
+
+	my $lfile = undef;
+
+	# get file size
+	my $totalsize = (stat("$logf"))[7] || 0;
+
+	# Open a file handle
+	if ($logf !~ /\.(gz|bz2|zip)/i) {
+		open($lfile,"<",$logf) || die "FATAL: cannot read log file $logf. $!\n";
+	} else {
+
+		my $uncompress = $zcat;
+		if (($logf =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $bzcat;
+		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+			$uncompress = $ucat;
+		}
+		&logmsg('DEBUG', "Compressed log file, will used command: $uncompress \"$logf\"");
+
+		# Open a pipe to zcat program for compressed log
+		open($lfile,"$uncompress \"$logf\" |") || die "FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n";
+
+		# Real size of the file is unknow, try to find it
+		my $cmd_file_size = $uncompress_size;
+		$cmd_file_size =~ s/\%f/$logf/g;
+		$totalsize = `$cmd_file_size`;
+		chomp($totalsize);
+		$totalsize ||= 0;
+	}
+
+	return ($lfile, $totalsize);
 }
 
 __DATA__
