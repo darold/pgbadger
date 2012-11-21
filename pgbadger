@@ -813,7 +813,7 @@ foreach my $logfile (@log_files) {
 	close $lfile;
 
 	# Get stats from all pending temporary storage
-	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} %cur_info) {
+	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
 		&store_queries($pid);
 	}
 	if ($extension eq 'tsung') {
