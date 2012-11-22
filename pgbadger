@@ -334,6 +334,12 @@ if ($#include_query >= 0) {
 	}
 }
 
+my @action_regex = (
+	qr/^\s*(delete) from/is,
+	qr/^\s*(insert) into/is,
+	qr/^\s*(update) .*\bset\b/is,
+	qr/^\s*(select) /is
+);
 my $other_syslog_line =
 	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
 my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
@@ -1052,6 +1058,9 @@ sub normalize_query
 	my $orig_query = shift;
 
 	return if (!$orig_query);
+
+	# Remove comments
+	$orig_query =~ s/\/\*(.*?)\*\///gs;
 
 	$orig_query = lc($orig_query);
 
@@ -3818,6 +3827,10 @@ sub store_queries
 		return;
 	}
 
+
+	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
+	my $cur_hour_str = "$cur_info{$t_pid}{hour}";
+
 	# Store the collected informations into global statistics
 	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
 
@@ -3831,12 +3844,11 @@ sub store_queries
 		$error_info{$normalized_error}{count}++;
 
 		# Stores normalyzed error count per time
-		$error_info{$normalized_error}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-			{"$cur_info{$t_pid}{hour}"}{count}++;
+		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 
 		# Stores normalyzed query samples
-		my $cur_last_log_timestamp =
-"$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
+						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 		&set_top_error_sample(
 			$normalized_error,          $cur_last_log_timestamp,      $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
 			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}
@@ -3851,10 +3863,9 @@ sub store_queries
 		my $normalized = &normalize_query($cur_info{$t_pid}{query});
 
 		# Stores global statistics
-		my $cur_last_log_timestamp =
-"$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} $cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-		my $cur_last_log_date =
-"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}$cur_info{$t_pid}{hour}$cur_info{$t_pid}{min}$cur_info{$t_pid}{sec}";
+		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
+						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+		my $cur_last_log_date = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}$cur_info{$t_pid}{hour}$cur_info{$t_pid}{min}$cur_info{$t_pid}{sec}";
 		$overall_stat{'queries_number'}++;
 		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration};
 		if (!$overall_stat{'first_query_date'} || ($overall_stat{'first_query_date'} > $cur_last_log_date)) {
@@ -3865,65 +3876,25 @@ sub store_queries
 			$overall_stat{'last_query_ts'} = $cur_last_log_timestamp;
 		}
 		$overall_stat{'query_peak'}{$cur_last_log_timestamp}++;
-		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}{count}++;
-		$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-			{duration} += $cur_info{$t_pid}{duration};
+		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 		if ($graph) {
-			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}
-				{$cur_info{$t_pid}{min}}{count}++;
-			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}
-				{$cur_info{$t_pid}{min}}{second}{$cur_info{$t_pid}{sec}}++;
-			$per_minute_info{query}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{$cur_info{$t_pid}{hour}}
-				{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
+			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
+			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{second}{$cur_info{$t_pid}{sec}}++;
+			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
 		}
-		if ($normalized =~ /\bdelete from\b/) {
-			$overall_stat{'DELETE'}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'DELETE'}{count}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'DELETE'}{duration} += $cur_info{$t_pid}{duration};
-			if ($graph) {
-				$per_minute_info{delete}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{count}++;
-				$per_minute_info{delete}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{$cur_info{$t_pid}{hour}}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
-			}
-		} elsif ($normalized =~ /\binsert into\b/) {
-			$overall_stat{'INSERT'}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'INSERT'}{count}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'INSERT'}{duration} += $cur_info{$t_pid}{duration};
-			if ($graph) {
-				$per_minute_info{insert}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++;
-				$per_minute_info{insert}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration};
-			}
-		} elsif ($normalized =~ /\bupdate\b.*\bset\b/) {
-			$overall_stat{'UPDATE'}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'UPDATE'}{count}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'UPDATE'}{duration} += $cur_info{$t_pid}{duration};
-			if ($graph) {
-				$per_minute_info{update}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++;
-				$per_minute_info{update}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration};
-			}
-		} elsif ($normalized =~ /\bselect\b/is) {
-			$overall_stat{'SELECT'}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'SELECT'}{count}++;
-			$per_hour_info{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}{"$cur_info{$t_pid}{hour}"}
-				{'SELECT'}{duration} += $cur_info{$t_pid}{duration};
-			if ($graph) {
-				$per_minute_info{select}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{count}++;
-				$per_minute_info{select}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-					{"$cur_info{$t_pid}{hour}"}{"$cur_info{$t_pid}{min}"}{duration} += $cur_info{$t_pid}{duration};
+		foreach my $act (@action_regex) {
+			if ($normalized =~ $act) {
+				my $action = uc($1);
+				$overall_stat{$action}++;
+				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{count}++;
+				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{duration} += $cur_info{$t_pid}{duration};
+				#if ($graph) {
+				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
+				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
+				#}
+				last;
 			}
 		}
 		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp);
@@ -3935,10 +3906,10 @@ sub store_queries
 		$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalyzed query count and duration per time
-		$normalyzed_info{$normalized}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-			{"$cur_info{$t_pid}{hour}"}{count}++;
-		$normalyzed_info{$normalized}{chronos}{"$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}"}
-			{"$cur_info{$t_pid}{hour}"}{duration} += $cur_info{$t_pid}{duration};
+		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}
+			{"$cur_hour_str"}{count}++;
+		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}
+			{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalyzed query samples
 		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp);
