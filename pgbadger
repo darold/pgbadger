@@ -1125,9 +1125,9 @@ sub convert_time
 # Stores the top N slowest queries
 sub set_top_slowest
 {
-	my ($q, $dt, $date) = @_;
+	my ($q, $dt, $date, $db) = @_;
 
-	push(@top_slowest, [($dt, $date, $q)]);
+	push(@top_slowest, [($dt, $date, $q, $db)]);
 
 	@top_slowest = (sort {$b->[0] <=> $a->[0]} @top_slowest)[0 .. $end_top];
 
@@ -1136,10 +1136,11 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($norm, $q, $dt, $date) = @_;
+	my ($norm, $q, $dt, $date, $db) = @_;
 
 	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
 	$normalyzed_info{$norm}{samples}{$dt}{date}  = $date;
+	$normalyzed_info{$norm}{samples}{$dt}{db}  = $db;
 
 	my $i = 1;
 	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
@@ -1153,7 +1154,7 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($q, $date, $real_error, $detail, $context, $statement, $hint) = @_;
+	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db) = @_;
 
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
@@ -1164,6 +1165,7 @@ sub set_top_error_sample
 			push(@{$error_info{$q}{statement}}, $statement);
 			push(@{$error_info{$q}{hint}},      $hint);
 			push(@{$error_info{$q}{error}},     $real_error);
+			push(@{$error_info{$q}{db}},        $db);
 		}
 	}
 }
@@ -1359,7 +1361,8 @@ Report not supported by text format
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
-			print $fh $i + 1, ") " . &convert_time($top_slowest[$i]->[0]) . " - $top_slowest[$i]->[2]\n";
+			my $db = " database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
+			print $fh $i + 1, ") " . &convert_time($top_slowest[$i]->[0]) . "$db - $top_slowest[$i]->[2]\n";
 			print $fh "--\n";
 		}
 		@top_slowest = ();
@@ -1386,7 +1389,8 @@ Report not supported by text format
 			print $fh "--\n";
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "\t- Example $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				print $fh "\t- Example $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
 			$idx++;
@@ -1413,7 +1417,8 @@ Report not supported by text format
 			print $fh "--\n";
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
 			$idx++;
@@ -1440,7 +1445,8 @@ Report not supported by text format
 			print $fh "--\n";
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				print $fh "\tExample $i: ", &convert_time($d), " - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
 			$idx++;
@@ -1514,6 +1520,7 @@ sub show_error_as_text
 				print $fh "\t\tContext: $error_info{$k}{context}[$i]\n"     if ($error_info{$k}{context}[$i]);
 				print $fh "\t\tHint: $error_info{$k}{hint}[$i]\n"           if ($error_info{$k}{hint}[$i]);
 				print $fh "\t\tStatement: $error_info{$k}{statement}[$i]\n" if ($error_info{$k}{statement}[$i]);
+				print $fh "\t\tDatabase: $error_info{$k}{db}[$i]\n" if ($error_info{$k}{db}[$i]);
 				$j++;
 			}
 		} else {
@@ -1530,6 +1537,7 @@ sub show_error_as_text
 			print $fh "\t\tContext: $error_info{$k}{context}[0]\n"     if ($error_info{$k}{context}[0]);
 			print $fh "\t\tHint: $error_info{$k}{hint}[0]\n"           if ($error_info{$k}{hint}[0]);
 			print $fh "\t\tStatement: $error_info{$k}{statement}[0]\n" if ($error_info{$k}{statement}[0]);
+			print $fh "\t\tDatabase: $error_info{$k}{db}[0]\n" if ($error_info{$k}{db}[0]);
 		}
 		$idx++;
 	}
@@ -2858,9 +2866,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
 			my $col = $i % 2;
 			my $ttl = $top_slowest[$i]->[1] || '';
+			my $db = " - database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
 			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
 				&convert_time($top_slowest[$i]->[0]),
-				"</td><td title=\"$ttl\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+				"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 				&highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
 		}
 		print $fh "</table>\n";
@@ -2923,8 +2932,9 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				my $i = 0;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
+					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					print $fh
-"<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+"<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 					$i++;
 				}
@@ -2989,8 +2999,9 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				my $i = 0;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
+					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					print $fh
-"<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+"<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 					$i++;
 				}
@@ -3056,8 +3067,9 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				my $i = 0;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
+					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					print $fh
-"<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+"<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
 					$i++;
 				}
@@ -3184,6 +3196,7 @@ sub show_error_as_html
 				print $fh "<div class=\"errorInformation$c\">Hint: $error_info{$k}{hint}[$i]</div>\n" if ($error_info{$k}{hint}[$i]);
 				print $fh "<div class=\"errorInformation$c\">Statement: $error_info{$k}{statement}[$i]</div>\n"
 					if ($error_info{$k}{statement}[$i]);
+				print $fh "<div class=\"errorInformation$c\">Database: $error_info{$k}{db}[$i]</div>\n" if ($error_info{$k}{db}[$i]);
 			}
 			print $fh "</div>";
 		} else {
@@ -3199,6 +3212,7 @@ sub show_error_as_html
 			print $fh "<div class=\"errorInformation\">Hint: $error_info{$k}{hint}[0]</div>\n"       if ($error_info{$k}{hint}[0]);
 			print $fh "<div class=\"errorInformation\">Statement: $error_info{$k}{statement}[0]</div>\n"
 				if ($error_info{$k}{statement}[0]);
+			print $fh "<div class=\"errorInformation\">Database: $error_info{$k}{db}[0]</div>\n" if ($error_info{$k}{db}[0]);
 		}
 		print $fh "</td></tr>\n";
 		$idx++;
@@ -3818,9 +3832,9 @@ sub store_queries
 		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 			push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
 			push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
-			if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{t_dbname}) {
-				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{t_dbname};
-				$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{t_dbuser};
+			if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{dbname}) {
+				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{_dbname};
+				$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{dbuser};
 				$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
 			}
 		}
@@ -3851,7 +3865,7 @@ sub store_queries
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 		&set_top_error_sample(
 			$normalized_error,          $cur_last_log_timestamp,      $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
-			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}
+			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}, $cur_info{$t_pid}{dbname}
 		);
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
@@ -3897,7 +3911,7 @@ sub store_queries
 				last;
 			}
 		}
-		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp);
+		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname});
 
 		# Store normalyzed query count
 		$normalyzed_info{$normalized}{count}++;
@@ -3906,13 +3920,11 @@ sub store_queries
 		$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalyzed query count and duration per time
-		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}
-			{"$cur_hour_str"}{count}++;
-		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}
-			{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalyzed query samples
-		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp);
+		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname});
 	}
 }
 
