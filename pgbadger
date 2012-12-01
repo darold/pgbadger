@@ -547,9 +547,9 @@ foreach my $logfile (@log_files) {
 			$nlines++;
 			if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
 				if ($totalsize) {
-					print progress_bar($cursize, $totalsize, 25, '=');
+					print STDERR &progress_bar($cursize, $totalsize, 25, '=');
 				} else {
-					print ".";
+					print STDERR ".";
 				}
 			}
 
@@ -636,9 +636,9 @@ foreach my $logfile (@log_files) {
 
 			if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
 				if ($totalsize) {
-					print progress_bar($cursize, $totalsize, 25, '=');
+					print STDERR &progress_bar($cursize, $totalsize, 25, '=');
 				} else {
-					print ".";
+					print STDERR ".";
 				}
 			}
 
@@ -831,7 +831,7 @@ foreach my $logfile (@log_files) {
 
 	if ($progress) {
 		if ($totalsize) {
-			print progress_bar($cursize, $totalsize, 25, '=');
+			print STDERR &progress_bar($cursize, $totalsize, 25, '=');
 		}
 		print STDERR "\n";
 	}
