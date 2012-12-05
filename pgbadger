@@ -56,6 +56,7 @@ my $ver                     = '';
 my @dbname                  = ();
 my @dbuser                  = ();
 my @dbclient                = ();
+my @dbclient2                = ();
 my @dbappname               = ();
 my @exclude_user            = ();
 my $ident                   = '';
@@ -123,7 +124,7 @@ $num_sep = ' ' if ($n =~ /,/);
 my $result = GetOptions(
 	"a|average=i"              => \$avg_minutes,
 	"b|begin=s"                => \$from,
-	"c|dbclient=s"               => \@dbclient,
+	"c|dbclient=s"             => \@dbclient,
 	"C|nocomment!"             => \$remove_comment,
 	"d|dbname=s"               => \@dbname,
 	"e|end=s"                  => \$to,
@@ -167,7 +168,9 @@ my $result = GetOptions(
 	"disable-checkpoint!"      => \$disable_checkpoint,
 	"enable-log_duration!"     => \$enable_log_duration,
 	"enable-log_min_duration!" => \$enable_log_min_duration,
+	"client=s"                 => \@dbclient2, # Backward compatibility
 );
+push(@dbclient, @dbclient2); # Backward compatibility
 
 if ($ver) {
 	print "pgBadger version $VERSION\n";
