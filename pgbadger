@@ -123,7 +123,7 @@ $num_sep = ' ' if ($n =~ /,/);
 my $result = GetOptions(
 	"a|average=i"              => \$avg_minutes,
 	"b|begin=s"                => \$from,
-	"c|client=s"               => \@dbclient,
+	"c|dbclient=s"               => \@dbclient,
 	"C|nocomment!"             => \$remove_comment,
 	"d|dbname=s"               => \@dbname,
 	"e|end=s"                  => \$to,
@@ -3388,7 +3388,7 @@ sub validate_log_line
 
 		# Log line do not match the required dbclient
 		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
-		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_dbclient'}$/i, @dbclient)) {
+		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
 			delete $cur_info{$t_pid};
 			return 0;
 		}
