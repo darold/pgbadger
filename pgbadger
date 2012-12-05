@@ -16,7 +16,7 @@
 # With syslog output
 #  Log line prefix should be: log_line_prefix = 'db=%d,user=%u '
 #
-# Additional informations that could be collected and reported
+# Additional information that could be collected and reported
 #  log_checkpoints = on
 #  log_connections = on
 #  log_disconnections = on
@@ -394,7 +394,7 @@ if ($from) {
 	} elsif ($from =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
 		$from = "$1$2$3" . "000000";
 	} else {
-		die "FATAL: bad format for begin datetime, shoud be yyyy-mm-dd hh:mm:ss\n";
+		die "FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss\n";
 	}
 }
 if ($to) {
@@ -403,7 +403,7 @@ if ($to) {
 	} elsif ($to =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
 		$to = "$1$2$3" . "000000";
 	} else {
-		die "FATAL: bad format for ending datetime, shoud be yyyy-mm-dd hh:mm:ss\n";
+		die "FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss\n";
 	}
 }
 
@@ -479,7 +479,7 @@ my %SYMBOLS = (
 my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
-# Where statistic are stored
+# Where statistics are stored
 my %STATS               = ();
 my $first_log_timestamp = '';
 my $last_log_timestamp  = '';
@@ -525,7 +525,7 @@ foreach my $logfile (@log_files) {
 
 	my $curdate = localtime(time);
 
-	# Syslog do not have year information, so take care of year overlapping
+	# Syslog does not have year information, so take care of year overlapping
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
@@ -659,7 +659,7 @@ foreach my $logfile (@log_files) {
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
-					# Syslog do not have year information, so take care of year overlapping
+					# Syslog does not have year information, so take care of year overlapping
 					$prefix_vars{'t_year'}  = $gyear;
 					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
 					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
@@ -700,7 +700,7 @@ foreach my $logfile (@log_files) {
 						&parse_log_prefix($prefix_vars{'t_logprefix'});
 					}
 
-					# Check if the log line shoud be exclude from the report
+					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
 						# Process the log line
@@ -787,7 +787,7 @@ foreach my $logfile (@log_files) {
 						&parse_log_prefix($prefix_vars{'t_logprefix'});
 					}
 
-					# Check if the log line shoud be exclude from the report
+					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 						$prefix_vars{'t_host'} = 'stderr';
 
@@ -909,78 +909,79 @@ Usage: pgbadger [options] logfile [...]
 
 Arguments:
 
-    logfile can be a single log file, a list of files or a shell command 
-    returning a list of file. If you want to pass log content from stdin
+    logfile can be a single log file, a list of files, or a shell command
+    returning a list of files. If you want to pass log content from stdin
     use - as filename. Note that input from stdin will not work with csvlog.
 
 Options:
 
     -a | --average minutes : number of minutes to build the average graphs of
-			     queries and connections.
+                             queries and connections.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
-    -c | --dbclient host   : only report what concern the given client host.
+    -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
-    -d | --dbname database : only report what concern the given database.
+    -d | --dbname database : only report on entries for the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
     -l | --last-parsed file: allow incremental log parsing by registering the
-			     last datetime and line parsed. Useful if you want
-			     to watch errors since last run or if you want one
-			     report per day with a log rotated each week.
-    -m | --maxlength size  : maximum length of a query, it will be cutted above
-			     the given size. Default: no truncate
+                             last datetime and line parsed. Useful if you want
+                             to watch errors since last run or if you want one
+                             report per day with a log rotated each week.
+    -m | --maxlength size  : maximum length of a query, it will be restricted to
+                             the given size. Default: no truncate
     -n | --nohighlight     : disable SQL code highlighting.
-    -N | --appname name    : only report what concern the given application name
+    -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
-			     of the output format: out.html, out.txt or out.tsung.
-			     To dump output to stdout use - as filename.
+                             on the output format: out.html, out.txt or out.tsung.
+                             To dump output to stdout use - as filename.
     -p | --prefix string   : give here the value of your custom log_line_prefix
-			     defined in your postgresql.conf. You may used it only
-			     if don't have the default allowed formats ot to use
-			     other custom variables like client ip or application
-			     name. See examples below.
+                             defined in your postgresql.conf. Only use it if you
+                             aren't using one of the standard prefixes specified
+                             in the pgBadger documentation, such as if your prefix
+                             includes additional variables like client ip or
+                             application name. See examples below.
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, even not a progress bar.
-    -s | --sample number   : number of query sample to store/display. Default: 3
-    -s | --select-only     : use it if you want reports on select queries only.
-    -t | --top number      : number of query to store/display. Default: 20
+    -s | --sample number   : number of query samples to store/display. Default: 3
+    -S | --select-only     : use it if you want to report select queries only.
+    -t | --top number      : number of queries to store/display. Default: 20
     -T | --title string    : change title of the HTML page report.
-    -u | --dbuser username : only report what concern the given user
-    -U | --exclude-user username : make report with exclude specified user.
+    -u | --dbuser username : only report on entries for the given user.
+    -U | --exclude-user username : exclude entries for the specified user from report.
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
-    -w | --watch-mode      : only report events/errors just like logwatch could do.
+    -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text, html or tsung. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
-			     zcat or bzcat or unzip is not on your path.
+                             zcat or bzcat or unzip is not on your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
-			     from the report. For example: "^(VACUUM|COMMIT)"
-			     you can use this option multiple time.
+			                 from the report. For example: "^(VACUUM|COMMIT)"
+                             You can use this option multiple times.
     --exclude-file filename: path of the file which contains all the regex to use
-			     to exclude queries from the report. One regex per line.
-    --include-query regex  : any query that do not match the given regex will be
-			     excluded from the report. For example: "(table_1|table_2)"
-			     you can use this option multiple time.
+                             to exclude queries from the report. One regex per line.
+    --include-query regex  : any query that does not match the given regex will be
+                             excluded from the report. For example: "(table_1|table_2)"
+                             You can use this option multiple times.
     --include-file filename: path of the file which contains all the regex of the
-			     queries to include from the report. One regex per line.
+                             queries to include from the report. One regex per line.
     --disable-error        : do not generate error report.
     --disable-hourly       : do not generate hourly reports.
     --disable-type         : do not generate query type report.
     --disable-query        : do not generate queries reports (slowest, most
-			     frequent, ...).
+                             frequent, ...).
     --disable-session      : do not generate session report.
     --disable-connection   : do not generate connection report.
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
-    --enable-log_duration  : force pgbadger to use log_duration even if
-			     log_min_duration_statement format is autodetected
-    --enable-log_min_duration: force pgbadger to use log_min_duration even if
-			     log_duration format is autodetected.
+    --enable-log_duration  : force pgBadger to use log_duration even if
+                             log_min_duration_statement format is autodetected.
+    --enable-log_min_duration: force pgBadger to use log_min_duration even if
+                             log_duration format is autodetected.
 
 Examples:
 
@@ -989,6 +990,8 @@ Examples:
 		       /var/log/postgres.log
 	pgbadger /var/log/postgresql/postgresql-2012-05-*
 	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" \
+		       /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 	# log prefix with stderr log output
 	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
@@ -1011,7 +1014,7 @@ Generate report every week using incremental behavior:
     0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
 	-o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
-This supposes that your log file and HTML report are also rotated every weeks.
+This supposes that your log file and HTML report are also rotated every week.
 
 };
 
@@ -1055,7 +1058,7 @@ sub logmsg
 	print STDERR "$level: $str\n";
 }
 
-# Normalyze SQL queries by removing parameters
+# Normalize SQL queries by removing parameters
 sub normalize_query
 {
 	my $orig_query = shift;
@@ -1176,7 +1179,7 @@ sub set_top_error_sample
 sub dump_as_text
 {
 
-	# Global informations
+	# Global information
 	my $curdate    = localtime(time);
 	my $fmt_nlines = &comma_numbers($nlines);
 	my $total_time = timestr($td);
@@ -1189,7 +1192,7 @@ sub dump_as_text
 	print $fh qq{
 $report_title
 
-- Global informations --------------------------------------------------
+- Global information ---------------------------------------------------
 
 Generated on $curdate
 Log file: $logfile_str
@@ -1359,7 +1362,7 @@ Report not supported by text format
 		}
 	}
 
-	# Show top informations
+	# Show top information
 	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
@@ -1468,7 +1471,7 @@ Report not supported by text format
 sub dump_error_as_text
 {
 
-	# Global informations
+	# Global information
 	my $curdate    = localtime(time);
 	my $fmt_nlines = &comma_numbers($nlines);
 	my $total_time = timestr($td);
@@ -1481,7 +1484,7 @@ sub dump_error_as_text
 	print $fh qq{
 $report_title
 
-- Global informations --------------------------------------------------
+- Global information ---------------------------------------------------
 
 Generated on $curdate
 Log file: $logfile_str
@@ -1920,7 +1923,7 @@ sub dump_as_html
 	# Dump the html header
 	&html_header();
 
-	# Global informations
+	# Global information
 	my $curdate    = localtime(time);
 	my $fmt_nlines = &comma_numbers($nlines);
 	my $total_time = timestr($td);
@@ -2150,7 +2153,7 @@ sub dump_as_html
 						next if ($t < $t_min);
 						last if ($t > $t_max);
 
-						# Average per minutes
+						# Average per minute
 						$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
 						# Maxi per minute
@@ -2204,7 +2207,7 @@ sub dump_as_html
 							next if ($t < $t_min);
 							last if ($t > $t_max);
 
-							# Average per minutes
+							# Average per minute
 							$d2 .= "[$t, " . int(($dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
 							# Maxi per minute
@@ -2854,7 +2857,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 		print $fh "</td></tr></table>\n";
 	}
 
-	# Show top informations
+	# Show top information
 	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
@@ -3099,7 +3102,7 @@ sub dump_error_as_html
 	# Dump the html header
 	&html_header();
 
-	# Global informations
+	# Global information
 	my $curdate    = localtime(time);
 	my $fmt_nlines = &comma_numbers($nlines);
 	my $total_time = timestr($td);
@@ -3389,7 +3392,7 @@ sub validate_log_line
 	}
 	if ($#dbclient >= 0) {
 
-		# Log line do not match the required dbclient
+		# Log line does not match the required dbclient
 		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
 		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
 			delete $cur_info{$t_pid};
@@ -3398,7 +3401,7 @@ sub validate_log_line
 	}
 	if ($#dbappname >= 0) {
 
-		# Log line do not match the required dbname
+		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_appname'} || !grep(/^$prefix_vars{'t_appname'}$/i, @dbappname)) {
 			delete $cur_info{$t_pid};
 			return 0;
@@ -3406,7 +3409,7 @@ sub validate_log_line
 	}
 	if ($#exclude_user >= 0) {
 
-		# Log line match the excluded dbuser
+		# Log line matches the excluded dbuser
 		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
 			delete $cur_info{$t_pid};
 			return 0;
@@ -3499,7 +3502,7 @@ sub parse_query
 		return;
 	}
 
-	# Stores pre connection activity
+	# Stores pre-connection activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+) port=(\d+)/)) {
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
@@ -3542,7 +3545,7 @@ sub parse_query
 		return;
 	}
 
-	# Stores session duration
+	# Store session duration
 	if (($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
 			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
@@ -3629,7 +3632,7 @@ sub parse_query
 	# Process current query following context
 	if ($cur_info{$t_pid}{query}) {
 
-		# Remove obsolete connexion storage
+		# Remove obsolete connection storage
 		delete $conn_received{$cur_info{$t_pid}{pid}};
 
 		# The query is complete but we are missing some debug/info/bind parameter logs
@@ -3691,7 +3694,7 @@ sub parse_query
 			$t_duration = $1;
 			$t_action   = $2;
 
-			# Skiping parse and bind logs
+			# Skipping parse and bind logs
 			return if ($t_action !~ /query|statement|execute|bind/);
 		} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(query|statement): //is)) {
 			$t_action = $1;
@@ -3699,7 +3702,7 @@ sub parse_query
 		{
 			$t_action = $1;
 
-			# Skiping parse and bind logs
+			# Skipping parse and bind logs
 			return if ($t_action !~ /query|statement|execute|bind/);
 		} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 			if ($prefix_vars{'t_query'} !~
@@ -3848,22 +3851,22 @@ sub store_queries
 	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
 	my $cur_hour_str = "$cur_info{$t_pid}{hour}";
 
-	# Store the collected informations into global statistics
+	# Store the collected information into global statistics
 	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
 
-		# Add log level at beginning of the query and normalyze it
+		# Add log level at beginning of the query and normalize it
 		$cur_info{$t_pid}{query} = $cur_info{$t_pid}{loglevel} . ":  " . $cur_info{$t_pid}{query};
 		my $normalized_error = &normalize_error($cur_info{$t_pid}{query});
 
-		# Stores total and normalyzed error count
+		# Stores total and normalized error count
 		$overall_stat{'errors_number'}++;
 		$overall_stat{'unique_normalized_errors'}{"$normalized_error"}++;
 		$error_info{$normalized_error}{count}++;
 
-		# Stores normalyzed error count per time
+		# Stores normalized error count per time
 		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 
-		# Stores normalyzed query samples
+		# Stores normalized query samples
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 		&set_top_error_sample(
@@ -3876,7 +3879,7 @@ sub store_queries
 		# Add a semi-colon at end of the query
 		$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
 
-		# Normalyze query
+		# Normalize query
 		my $normalized = &normalize_query($cur_info{$t_pid}{query});
 
 		# Stores global statistics
@@ -3916,22 +3919,22 @@ sub store_queries
 		}
 		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname});
 
-		# Store normalyzed query count
+		# Store normalized query count
 		$normalyzed_info{$normalized}{count}++;
 
-		# Store normalyzed query total duration
+		# Store normalized query total duration
 		$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
 
-		# Store normalyzed query count and duration per time
+		# Store normalized query count and duration per time
 		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
-		# Store normalyzed query samples
+		# Store normalized query samples
 		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname});
 	}
 }
 
-# Normalyze error messages
+# Normalize error messages
 sub normalize_error
 {
 	my $orig_query = shift;
