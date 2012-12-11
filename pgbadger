@@ -424,33 +424,58 @@ my %abbr_month = (
 	'07' => 'Jul', '08' => 'Aug', '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
 );
 
-# Highlight variables
-my @KEYWORDS1 = (
-	'ALL',     'ASC',    'AS',   'ALTER', 'AND',     'ADD', 'AUTO_INCREMENT', 'ANY', 'ANALYZE',
-	'BETWEEN', 'BINARY', 'BOTH', 'BY',    'BOOLEAN', 'BEGIN',
-	'CHANGE', 'CHECK', 'COLLATION', 'COLUMNS', 'COLUMN', 'CONCURRENTLY', 'CROSS', 'CREATE', 'CASE', 'COMMIT', 'COALESCE', 'CLUSTER', 'COPY',
-	'DATABASES', 'DATABASE', 'DATA',    'DELAYED', 'DESCRIBE', 'DESC',   'DISTINCT', 'DELETE', 'DROP',     'DEFAULT',
-	'ENCLOSED',  'ESCAPED',  'EXISTS',  'EXPLAIN', 'ELSE',     'END',    'EXCEPT',
-	'FIELDS', 'FIELD', 'FLUSH', 'FOR', 'FOREIGN', 'FUNCTION', 'FROM', 'FULL',
-	'GROUP',  'GRANT', 'GREATEST',
-	'HAVING',
-	'IGNORE', 'INDEX', 'INFILE', 'INSERT', 'INNER', 'INTO', 'IDENTIFIED', 'IN', 'IS', 'IF', 'INTERSECT', 'INHERIT',
-	'JOIN',
-	'KEYS', 'KILL', 'KEY',
-	'LEADING', 'LIKE', 'LIMIT', 'LINES', 'LOAD', 'LOCAL', 'LOCK', 'LOW_PRIORITY', 'LEFT', 'LANGUAGE', 'LEAST', 'LOGIN',
-	'MODIFY',
-	'NATURAL', 'NOT', 'NULL', 'NEXTVAL', 'NULLIF', 'NOSUPERUSER', 'NOCREATEDB', 'NOCREATEROLE',
-	'OPTIMIZE',  'OPTION',     'OPTIONALLY', 'ORDER', 'OUTFILE', 'OR', 'OUTER', 'ON', 'OVERLAPS', 'OWNER',
-	'PROCEDURE', 'PROCEDURAL', 'PRIMARY',
-	'READ', 'REFERENCES', 'REGEXP', 'RENAME',        'REPLACE', 'RETURN', 'REVOKE', 'RLIKE', 'RIGHT', 'ROLE', 'ROLLBACK',
-	'SHOW', 'SONAME',     'STATUS', 'STRAIGHT_JOIN', 'SELECT',  'SETVAL', 'SET',    'SOME',  'SEQUENCE',
-	'TABLES', 'TEMINATED', 'TO',    'TRAILING', 'TRUNCATE', 'TABLE',    'TEMPORARY', 'TRIGGER', 'TRUSTED', 'THEN',
-	'UNIQUE', 'UNLOCK',    'USE',   'USING',    'UPDATE',   'UNSIGNED', 'UNION',
-	'VALUES', 'VARIABLES', 'VIEW',  'VACUUM',   'VERBOSE',
-	'WITH',   'WRITE',     'WHERE', 'WHEN',
-	'ZEROFILL',
-	'XOR',
+# Keywords variable
+my @pg_keywords = qw(
+        ALL ANALYSE ANALYZE AND ANY ARRAY AS ASC ASYMMETRIC AUTHORIZATION BINARY BOTH CASE
+        CAST CHECK COLLATE COLLATION COLUMN CONCURRENTLY CONSTRAINT CREATE CROSS
+        CURRENT_DATE CURRENT_ROLE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER
+        DEFAULT DEFERRABLE DESC DISTINCT DO ELSE END EXCEPT FALSE FETCH FOR FOREIGN FREEZE FROM
+        FULL GRANT GROUP HAVING ILIKE IN INITIALLY INNER INTERSECT INTO IS ISNULL JOIN LEADING
+        LEFT LIKE LIMIT LOCALTIME LOCALTIMESTAMP NATURAL NOT NOTNULL NULL ON ONLY OPEN OR
+        ORDER OUTER OVER OVERLAPS PLACING PRIMARY REFERENCES RETURNING RIGHT SELECT SESSION_USER
+        SIMILAR SOME SYMMETRIC TABLE THEN TO TRAILING TRUE UNION UNIQUE USER USING VARIADIC
+        VERBOSE WHEN WHERE WINDOW WITH
 );
+
+
+# Highlight variables
+# Highlight variables
+my @KEYWORDS1 = qw(
+        ALTER ADD AUTO_INCREMENT BETWEEN BY BOOLEAN BEGIN CHANGE COLUMNS COMMIT COALESCE CLUSTER
+        COPY DATABASES DATABASE DATA DELAYED DESCRIBE DELETE DROP ENCLOSED ESCAPED EXISTS EXPLAIN
+        FIELDS FIELD FLUSH FUNCTION GREATEST IGNORE INDEX INFILE INSERT IDENTIFIED IF INHERIT
+        KEYS KILL KEY LINES LOAD LOCAL LOCK LOW_PRIORITY LANGUAGE LEAST LOGIN MODIFY
+        NULLIF NOSUPERUSER NOCREATEDB NOCREATEROLE OPTIMIZE OPTION OPTIONALLY OUTFILE OWNER PROCEDURE
+        PROCEDURAL READ REGEXP RENAME RETURN REVOKE RLIKE ROLE ROLLBACK SHOW SONAME STATUS
+        STRAIGHT_JOIN SET SEQUENCE TABLES TEMINATED TRUNCATE TEMPORARY TRIGGER TRUSTED UNLOCK
+        USE UPDATE UNSIGNED VALUES VARIABLES VIEW VACUUM WRITE ZEROFILL XOR
+        ABORT ABSOLUTE ACCESS ACTION ADMIN AFTER AGGREGATE ALSO ALWAYS ASSERTION ASSIGNMENT AT ATTRIBUTE
+        BACKWARD BEFORE BIGINT CACHE CALLED CASCADE CASCADED CATALOG CHAIN CHARACTER CHARACTERISTICS
+        CHECKPOINT CLOSE COMMENT COMMENTS COMMITTED CONFIGURATION CONNECTION CONSTRAINTS CONTENT
+        CONTINUE CONVERSION COST CSV CURRENT CURSOR CYCLE DAY DEALLOCATE DEC DECIMAL DECLARE DEFAULTS
+        DEFERRED DEFINER DELIMITER DELIMITERS DICTIONARY DISABLE DISCARD DOCUMENT DOMAIN DOUBLE EACH
+        ENABLE ENCODING ENCRYPTED ENUM ESCAPE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXTENSION EXTERNAL
+        FIRST FLOAT FOLLOWING FORCE FORWARD FUNCTIONS GLOBAL GRANTED HANDLER HEADER HOLD
+        HOUR IDENTITY IMMEDIATE IMMUTABLE IMPLICIT INCLUDING INCREMENT INDEXES INHERITS INLINE INOUT INPUT
+        INSENSITIVE INSTEAD INT INTEGER INVOKER ISOLATION LABEL LARGE LAST LC_COLLATE LC_CTYPE
+        LEAKPROOF LEVEL LISTEN LOCATION LOOP MAPPING MATCH MAXVALUE MINUTE MINVALUE MODE MONTH MOVE NAMES
+        NATIONAL NCHAR NEXT NO NONE NOTHING NOTIFY NOWAIT NULLS OBJECT OF OFF OIDS OPERATOR OPTIONS
+        OUT OWNED PARSER PARTIAL PARTITION PASSING PASSWORD PLANS PRECEDING PRECISION PREPARE
+        PREPARED PRESERVE PRIOR PRIVILEGES QUOTE RANGE REAL REASSIGN RECHECK RECURSIVE REF REINDEX RELATIVE
+        RELEASE REPEATABLE REPLICA RESET RESTART RESTRICT RETURNS ROW ROWS RULE SAVEPOINT SCHEMA SCROLL SEARCH
+        SECOND SECURITY SEQUENCES SERIALIZABLE SERVER SESSION SETOF SHARE SIMPLE SMALLINT SNAPSHOT STABLE
+        STANDALONE START STATEMENT STATISTICS STORAGE STRICT SYSID SYSTEM TABLESPACE TEMP
+        TEMPLATE TRANSACTION TREAT TYPE TYPES UNBOUNDED UNCOMMITTED UNENCRYPTED
+        UNKNOWN UNLISTEN UNLOGGED UNTIL VALID VALIDATE VALIDATOR VALUE VARYING VOLATILE
+        WHITESPACE WITHOUT WORK WRAPPER XMLATTRIBUTES XMLCONCAT XMLELEMENT XMLEXISTS XMLFOREST XMLPARSE
+        XMLPI XMLROOT XMLSERIALIZE YEAR YES ZONE
+);
+
+foreach my $k (@pg_keywords) {
+        push(@KEYWORDS1, $k) if (!grep(/^$k$/i, @KEYWORDS1));
+}
+
+
 my @KEYWORDS2 = (
 	'ascii',      'age',
 	'bit_length', 'btrim',
@@ -3286,42 +3311,57 @@ sub highlight_code
 
 	# prettify SQL query
 	if (!$noprettify) {
-		my $sql = SQL::Beautify->new;
+		my $sql = SQL::Beautify->new(keywords => \@pg_keywords);
 		$sql->query($code);
 		$code = $sql->beautify;
 	}
 
 	return $code if ($nohighlight);
 
+	my $i = 0;
+	my @qqcode = ();
+	while ($code =~ s/("[^\"]*")/QQCODEY${i}A/s) {
+		push(@qqcode, $1);
+		$i++;
+	}
+	$i = 0;
+	my @qcode = ();
+	while ($code =~ s/('[^\']*')/QCODEY${i}B/s) {
+		push(@qcode, $1);
+		$i++;
+	}
+
 	foreach my $x (keys %SYMBOLS) {
 		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/gs;
 	}
-
-	#$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
-	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/gs;
-	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/gs;
-
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
-
-		#$code =~ s/\b($KEYWORDS1[$x])\b/<span class="kw1">$1<\/span>/igs;
 		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+		$code =~ s/(?<!CLASSSY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS2 ; $x++) {
-
-		#$code =~ s/\b($KEYWORDS2[$x])\b/<span class="kw2">$1<\/span>/igs;
-		$code =~ s/\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
+		$code =~ s/(?<!:)\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS3 ; $x++) {
-
-		#$code =~ s/\b($KEYWORDS3[$x])\b/<span class="kw3">$1<\/span>/igs;
 		$code =~ s/\b$KEYWORDS3[$x]\b/<span class="kw3">$KEYWORDS3[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#BRACKETS ; $x++) {
 		$code =~ s/($BRACKETS[$x])/<span class="br0">$1<\/span>/igs;
 	}
+
 	$code =~ s/\$\$CLASSSY0A\$\$([^\$]+)\$\$CLASSSY0B\$\$/<span class="sy0">$1<\/span>/gs;
 
 	$code =~ s/\b(\d+)\b/<span class="nu0">$1<\/span>/igs;
+
+	for (my $x = 0; $x <= $#qqcode; $x++) {
+		$code =~ s/QQCODEY${x}A/$qqcode[$x]/s;
+	}
+	for (my $x = 0; $x <= $#qcode; $x++) {
+		$code =~ s/QCODEY${x}B/$qcode[$x]/s;
+	}
+
+	#$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
+	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/gs;
+	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/gs;
 
 	return $code;
 }
@@ -4492,7 +4532,7 @@ sub build_log_line_prefix_regex
 		$self->{_level_stack} = [];
 		$self->{_new_line}    = 1;
 
-		my $last;
+		my $last = '';
 		$self->{_tokens} = [tokenize_sql($self->query, 1)];
 
 		while (defined(my $token = $self->_token)) {
@@ -4511,10 +4551,15 @@ sub build_log_line_prefix_regex
 			}
 
 			elsif ($token eq ')') {
-				$self->_new_line;
+#				$self->_new_line;
 				$self->{_level} = pop(@{$self->{_level_stack}}) || 0;
 				$self->_add_token($token);
-				$self->_new_line;
+				$self->_new_line if ($self->_next_token
+							and $self->_next_token !~ /^AS$/i
+							and $self->_next_token ne ')'
+							and $self->_next_token !~ /::/
+							and $self->_next_token ne ';'
+					);
 			}
 
 			elsif ($token eq ',') {
@@ -4531,11 +4576,11 @@ sub build_log_line_prefix_regex
 				$self->{_level} = 0;
 			}
 
-			elsif ($token =~ /^(?:SELECT|FROM|WHERE|HAVING)$/i) {
-				$self->_back unless $last and $last eq '(';
+			elsif ($token =~ /^(?:SELECT|FROM|WHERE|HAVING|BEGIN)$/i) {
+				$self->_back if (!$last and $last ne '(' and $last ne 'FOR');
 				$self->_new_line;
 				$self->_add_token($token);
-				$self->_new_line if ($self->_next_token and $self->_next_token ne '(');
+				$self->_new_line if ($self->_next_token and $self->_next_token ne '(' and $self->_next_token ne ';');
 				$self->_over;
 			}
 
@@ -4551,10 +4596,33 @@ sub build_log_line_prefix_regex
 				$self->_over;
 			}
 
-			elsif ($token =~ /^(?:UNION|INTERSECT|EXCEPT)$/i) {
+			elsif ($token =~ /^(?:CASE)$/i) {
+				$self->_add_token($token);
+				$self->_over;
+			}
+
+			elsif ($token =~ /^(?:WHEN)$/i) {
 				$self->_new_line;
 				$self->_add_token($token);
+			}
+
+			elsif ($token =~ /^(?:ELSE)$/i) {
 				$self->_new_line;
+				$self->_add_token($token);
+			}
+
+			elsif ($token =~ /^(?:END)$/i) {
+				$self->_back;
+				$self->_new_line;
+				$self->_add_token($token);
+			}
+
+			elsif ($token =~ /^(?:UNION|INTERSECT|EXCEPT)$/i) {
+				$self->_back unless $last and $last eq '(';
+				$self->_new_line;
+				$self->_add_token($token);
+				$self->_new_line if ($self->_next_token and $self->_next_token ne '(');
+				$self->_over;
 			}
 
 			elsif ($token =~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS)$/i) {
@@ -4575,7 +4643,23 @@ sub build_log_line_prefix_regex
 			elsif ($token =~ /^(?:AND|OR)$/i) {
 				$self->_new_line;
 				$self->_add_token($token);
-				$self->_new_line;
+#				$self->_new_line;
+			}
+
+			elsif ($token =~ /^--/) {
+				if (!$self->{no_comments}) {
+					$self->_add_token($token);
+					$self->_new_line;
+				}
+			}
+
+			elsif ($token =~ /^\/\*.*\*\/$/s) {
+				if (!$self->{no_comments}) {
+					$token =~ s/\n[\s\t]+\*/\n\*/gs;
+					$self->_new_line;
+					$self->_add_token($token);
+					$self->_new_line;
+				}
 			}
 
 			else {
