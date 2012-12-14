@@ -40,7 +40,7 @@ $VERSION = '2.2';
 
 $| = 1;
 
-# Global variables overriden during install
+# Global variables overridden during install
 my $JQGRAPH = 1;
 
 # Command line options
@@ -112,7 +112,7 @@ my @log_files   = ();
 my %prefix_vars = ();
 
 # Do not display data in pie where percentage is lower than this value
-# to avoid label overlaping.
+# to avoid label overlapping.
 my $pie_percentage_limit = 2;
 
 # Get the decimal separator
@@ -258,7 +258,7 @@ $img_format = 'jpeg' if ($img_format eq 'jpg');
 $img_format = 'png' if ($img_format ne 'jpeg');
 
 # Extract the output directory from outfile so that graphs will
-# be created in the same directoty
+# be created in the same directory
 my @infs = fileparse($outfile);
 $outdir = $infs[1] . '/';
 
@@ -310,7 +310,7 @@ if ($exclude_file) {
 	push(@exclude_query, @exclq);
 }
 
-# Testing regex syntaxe
+# Testing regex syntax
 if ($#exclude_query >= 0) {
 	foreach my $r (@exclude_query) {
 		&check_regex($r, '--exclude-query');
@@ -330,7 +330,7 @@ if ($include_file) {
 	push(@include_query, @exclq);
 }
 
-# Testing regex syntaxe
+# Testing regex syntax
 if ($#include_query >= 0) {
 	foreach my $r (@include_query) {
 		&check_regex($r, '--include-query');
@@ -348,7 +348,7 @@ my $other_syslog_line =
 my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 my $orphan_stderr_line = qr/[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/;
 
-# Compile custom log line prefie prefix
+# Compile custom log line prefix prefix
 my @prefix_params = ();
 if ($log_line_prefix) {
 	@prefix_params = &build_log_line_prefix_regex();
@@ -878,7 +878,7 @@ if ($last_parsed && scalar keys %last_line) {
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
-&logmsg('DEBUG', "the log statistics gathering tooks:" . timestr($td));
+&logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
 
 &logmsg('DEBUG', "Ok, generating $extension report...");
 
@@ -916,9 +916,9 @@ if ($extension ne 'tsung') {
 
 my $t2 = Benchmark->new;
 $td = timediff($t2, $t1);
-&logmsg('DEBUG', "the generating of reports tooks:" . timestr($td));
+&logmsg('DEBUG', "the report generating took:" . timestr($td));
 $td = timediff($t2, $t0);
-&logmsg('DEBUG', "the total execution time tooks:" . timestr($td));
+&logmsg('DEBUG', "the total execution time took:" . timestr($td));
 
 exit 0;
 
@@ -994,9 +994,9 @@ Options:
     --include-file filename: path of the file which contains all the regex of the
                              queries to include from the report. One regex per line.
     --disable-error        : do not generate error report.
-    --disable-hourly       : do not generate hourly reports.
+    --disable-hourly       : do not generate hourly report.
     --disable-type         : do not generate query type report.
-    --disable-query        : do not generate queries reports (slowest, most
+    --disable-query        : do not generate query reports (slowest, most
                              frequent, ...).
     --disable-session      : do not generate session report.
     --disable-connection   : do not generate connection report.
@@ -1095,7 +1095,7 @@ sub normalize_query
 
 	$orig_query = lc($orig_query);
 
-	# Remove extra space, new line and tab caracters by a single space
+	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/[\t\s\r\n]+/ /gs;
 
 	# Remove string content
@@ -3252,7 +3252,7 @@ sub show_error_as_html
 
 	if (scalar keys %logs_type > 0) {
 
-		# Show log' types
+		# Show log types
 		print $fh qq{
 	<h2 id="LogsTypeReport">Logs per type <a href="#top" title="Back to top">^</a></h2>
 	<table>
@@ -3513,7 +3513,7 @@ sub parse_query
 	# Store a counter of logs type
 	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
-	# Replace syslog tablulation rewrite
+	# Replace syslog tabulation rewrite
 	$prefix_vars{'t_query'} =~ s/#011/\t/g if ($format =~ /syslog/);
 
 	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
@@ -4041,7 +4041,7 @@ sub autodetect_format
 		next if (!$line);
 		$nline++;
 
-		# Is syslog lines ?
+		# Are syslog lines ?
 		if ($line =~
 /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
 		   )
@@ -4050,7 +4050,7 @@ sub autodetect_format
 			$nfound++;
 			$ident_name{$1}++;
 
-			# Is stderr lines
+			# Are stderr lines ?
 		} elsif (
 			(
 				$line =~
@@ -4862,12 +4862,12 @@ sub open_log_file
 		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
 			$uncompress = $ucat;
 		}
-		&logmsg('DEBUG', "Compressed log file, will used command: $uncompress \"$logf\"");
+		&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 
 		# Open a pipe to zcat program for compressed log
 		open($lfile,"$uncompress \"$logf\" |") || die "FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n";
 
-		# Real size of the file is unknow, try to find it
+		# Real size of the file is unknown, try to find it
 		my $cmd_file_size = $uncompress_size;
 		$cmd_file_size =~ s/\%f/$logf/g;
 		$totalsize = `$cmd_file_size`;

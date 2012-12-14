@@ -70,9 +70,9 @@ Options:
     --include-file filename: path of the file which contains all the regex of the
                              queries to include from the report. One regex per line.
     --disable-error        : do not generate error report.
-    --disable-hourly       : do not generate hourly reports.
+    --disable-hourly       : do not generate hourly report.
     --disable-type         : do not generate query type report.
-    --disable-query        : do not generate queries reports (slowest, most
+    --disable-query        : do not generate query reports (slowest, most
                              frequent, ...).
     --disable-session      : do not generate session report.
     --disable-connection   : do not generate connection report.
