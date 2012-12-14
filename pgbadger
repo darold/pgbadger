@@ -47,7 +47,8 @@ my $JQGRAPH = 1;
 my $zcat                    = 'zcat';
 my $bzcat                   = 'bunzip2 -c';
 my $ucat                    = 'unzip -p';
-my $uncompress_size         = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
+my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
+my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
 my $format                  = '';
 my $outfile                 = '';
 my $outdir                  = '';
@@ -4868,11 +4869,17 @@ sub open_log_file
 		open($lfile,"$uncompress \"$logf\" |") || die "FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n";
 
 		# Real size of the file is unknown, try to find it
-		my $cmd_file_size = $uncompress_size;
-		$cmd_file_size =~ s/\%f/$logf/g;
-		$totalsize = `$cmd_file_size`;
-		chomp($totalsize);
-		$totalsize ||= 0;
+		# bz2 does not report real size
+		$totalsize = 0;
+		if ($logf =~ /\.(gz|zip)/i) {
+			my $cmd_file_size = $gzip_uncompress_size;
+			if ($logf =~ /\.zip/i) {
+				$cmd_file_size = $zip_uncompress_size;
+			}
+			$cmd_file_size =~ s/\%f/$logf/g;
+			$totalsize = `$cmd_file_size`;
+			chomp($totalsize);
+		}
 	}
 
 	return ($lfile, $totalsize);
