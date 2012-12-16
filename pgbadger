@@ -3589,7 +3589,7 @@ sub parse_query
 	# Store session duration
 	if (($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
-			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+) port=(\d+)/))
+			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+)/))
 	{
 		return if ($disable_session);
 		if ($extension eq 'tsung') {
