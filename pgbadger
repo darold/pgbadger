@@ -31,6 +31,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::File;
 use Benchmark;
 use File::Basename;
+use Storable qw(store_fd fd_retrieve);
 use Time::Local 'timegm_nocheck';
 use POSIX qw(locale_h);
 setlocale(LC_NUMERIC, '');
@@ -186,7 +187,7 @@ if ($ver) {
 if ($#ARGV >= 0) {
 	foreach my $file (@ARGV) {
 		if ($file ne '-') {
-			die "FATAL: logfile $file must exist!\n" if (!-f $file);
+			die "FATAL: logfile $file must exist!\n" if not -f $file;
 			if (-z $file) {
 				print "WARNING: file $file is empty\n";
 				next;
@@ -213,7 +214,9 @@ $avg_minutes = 1  if ($avg_minutes < 1);
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
 
-$log_duration ||= &autodetect_duration($log_files[0]);
+$log_duration ||= &autodetect_duration($log_files[0])
+	unless $format eq 'binary'; # do not try to autodetect w/ binary format
+
 $log_duration = 1 if ($enable_log_duration);
 $log_duration = 0 if ($enable_log_min_duration);
 
@@ -230,7 +233,9 @@ $sample ||= 3;
 
 # Set the default extension and output format
 if (!$extension) {
-	if ($outfile =~ /\.tsung/i) {
+	if ($outfile =~ /\.bin/i) {
+		$extension = 'binary';
+	} elsif ($outfile =~ /\.tsung/i) {
 		$extension = 'tsung';
 	} elsif ($outfile =~ /\.htm[l]*/i) {
 		$extension = 'html';
@@ -264,7 +269,7 @@ my @infs = fileparse($outfile);
 $outdir = $infs[1] . '/';
 
 # Remove graph support if output is not html
-$graph = 0 if ($extension ne 'html');
+$graph = 0 unless ($extension eq 'html' or $extension eq 'binary' );
 $graph = 0 if ($nograph);
 
 my $end_top = $top - 1;
@@ -545,7 +550,12 @@ if ($last_parsed && -e $last_parsed) {
 }
 
 # Main loop reading log files
-foreach my $logfile (@log_files) {
+my @given_log_files = ( @log_files );
+
+# log files must be erase when loading stats from binary format
+@log_files = () if $format eq 'binary';
+
+foreach my $logfile ( @given_log_files ) {
 
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
 
@@ -561,7 +571,7 @@ foreach my $logfile (@log_files) {
 	# Get file handle and size of the file
 	my ($lfile, $totalsize) = &open_log_file($logfile);
 
-	&logmsg('DEBUG', "Starting reading file...");
+	&logmsg('DEBUG', "Starting reading file $logfile...");
 	
 	if ($format eq 'csv') {
 		require Text::CSV_XS;
@@ -651,7 +661,11 @@ foreach my $logfile (@log_files) {
 			$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
 		}
 
-	} else { # Format is not CSV.
+	}
+	elsif ($format eq 'binary') {
+		&load_stats($lfile);
+	}
+	else { # Format is not CSV.
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
@@ -860,7 +874,7 @@ foreach my $logfile (@log_files) {
 
 	if ($progress) {
 		if ($totalsize) {
-			print STDERR &progress_bar($cursize, $totalsize, 25, '=');
+			print STDERR &progress_bar($cursize, $totalsize, 25, '=', $logfile);
 		}
 		print STDERR "\n";
 	}
@@ -896,6 +910,8 @@ if ($extension ne 'tsung') {
 		} else {
 			&dump_as_text();
 		}
+	} elsif ($extension eq 'binary') {
+		&dump_as_binary();
 	} else {
 		if ($error_only) {
 			&dump_error_as_html();
@@ -3305,6 +3321,376 @@ sub show_error_as_html
 
 }
 
+sub load_stats
+{
+	my $fd = shift;
+	my %stats = %{ fd_retrieve($fd) };
+	my %_overall_stat = %{$stats{overall_stat}};
+	my %_normalyzed_info = %{$stats{normalyzed_info}};
+	my %_error_info = %{$stats{error_info}};
+	my %_connection_info = %{$stats{connection_info}};
+	my %_checkpoint_info = %{$stats{checkpoint_info}};
+	my %_session_info = %{$stats{session_info}};
+	my %_tempfile_info = %{$stats{tempfile_info}};
+	my %_error_info = %{$stats{error_info}};
+	my %_logs_type = %{$stats{logs_type}};
+	my %_lock_info = %{$stats{lock_info}};
+	my %_per_hour_info = %{$stats{per_hour_info}};
+	my %_per_minute_info = %{$stats{per_minute_info}};
+	my @_top_slowest = @{$stats{top_slowest}};
+	my $_nlines = $stats{nlines};
+	my $_first_log_timestamp = $stats{first_log_timestamp};
+	my $_last_log_timestamp = $stats{last_log_timestamp};
+	my @_log_files = @{$stats{log_files}};
+
+	### overall_stat ###
+
+	$overall_stat{queries_number} += $_overall_stat{queries_number};
+	$first_log_timestamp = $_first_log_timestamp
+		if not $first_log_timestamp
+			or $first_log_timestamp gt $_first_log_timestamp;
+
+	$last_log_timestamp = $_last_log_timestamp
+		if not $last_log_timestamp
+			or $last_log_timestamp lt $_last_log_timestamp;
+
+	$overall_stat{first_query_ts} = $_overall_stat{first_query_ts}
+		if not defined $overall_stat{first_query_ts}
+			or $overall_stat{first_query_ts} gt $_overall_stat{first_query_ts};
+
+	$overall_stat{last_query_ts} = $_overall_stat{last_query_ts}
+		if not defined $overall_stat{last_query_ts}
+			or $overall_stat{last_query_ts} lt $_overall_stat{last_query_ts};
+
+	$overall_stat{errors_number} += $_overall_stat{errors_number};
+	$overall_stat{queries_duration} += $_overall_stat{queries_duration};
+
+	$overall_stat{DELETE} += $_overall_stat{DELETE}
+		if exists $_overall_stat{DELETE};
+	$overall_stat{UPDATE} += $_overall_stat{UPDATE}
+		if exists $_overall_stat{UPDATE};
+	$overall_stat{INSERT} += $_overall_stat{INSERT}
+		if exists $_overall_stat{INSERT};
+	$overall_stat{SELECT} += $_overall_stat{SELECT}
+		if exists $_overall_stat{SELECT};
+
+	foreach my $k (keys $_overall_stat{query_peak}) {
+		$overall_stat{query_peak}{$k} += $_overall_stat{query_peak}{$k};
+	}
+
+	# FIXME == $overall_stat{first_query_ts} ??
+	$overall_stat{first_query_date} = $_overall_stat{first_query_date}
+		if not defined $overall_stat{first_query_date}
+			or $overall_stat{first_query_date} > $_overall_stat{first_query_date};
+
+	# FIXME == $error_info ??
+	foreach my $k (keys $_overall_stat{unique_normalized_errors}) {
+		$overall_stat{unique_normalized_errors}{$k} += $_overall_stat{unique_normalized_errors}{$k};
+	}
+
+	### logs_type ###
+
+	$logs_type{ERROR} += $_logs_type{ERROR} if exists $_logs_type{ERROR};
+	$logs_type{LOG} += $_logs_type{LOG} if exists $_logs_type{LOG};
+	$logs_type{DETAIL} += $_logs_type{DETAIL} if exists $_logs_type{DETAIL};
+	$logs_type{STATEMENT} += $_logs_type{STATEMENT} if exists $_logs_type{STATEMENT};
+
+	### connection_info ###
+
+	foreach my $db (keys %{ $_connection_info{database} }) {
+		$connection_info{database}{$db} += $_connection_info{database}{$db};
+	}
+
+	foreach my $db (keys %{ $_connection_info{database_user} }) {
+		foreach my $user (keys %{ $_connection_info{database_user}{$db} }) {
+			$connection_info{database_user}{$db}{$user} += $_connection_info{database_user}{$db}{$user};
+		}
+	}
+
+	foreach my $user (keys %{ $_connection_info{user} }) {
+		$connection_info{user}{$user} += $_connection_info{user}{$user};
+	}
+
+	foreach my $host (keys %{ $_connection_info{host} }) {
+		$connection_info{host}{$host} += $_connection_info{host}{$host};
+	}
+
+	$connection_info{count} += $_connection_info{count};
+
+	foreach my $day (keys %{ $_connection_info{chronos} }) {
+		foreach my $hour (keys %{ $_connection_info{chronos}{$day} }) {
+
+			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database} }) {
+				$connection_info{chronos}{$day}{$hour}{database}{$db} += $_connection_info{chronos}{$day}{$hour}{database}{$db};
+			}
+
+			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user} }) {
+				foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user}{$db} }) {
+					$connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user} +=
+						$_connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user};
+				}
+			}
+
+			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count};
+
+			foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{user} }) {
+				$connection_info{chronos}{$day}{$hour}{user}{$user} +=
+					$_connection_info{chronos}{$day}{$hour}{user}{$user};
+			}
+
+			foreach my $host (keys %{ $_connection_info{chronos}{$day}{$hour}{host} }) {
+				$connection_info{chronos}{$day}{$hour}{host}{$host} +=
+					$_connection_info{chronos}{$day}{$hour}{host}{$host};
+			}
+		}
+	}
+
+	### log_files ###
+
+	@log_files = (@log_files, @_log_files);
+
+	### per_hour_info ###
+
+	foreach my $day (keys %_per_hour_info) {
+		foreach my $hour (keys %{ $_per_hour_info{$day} }) {
+			$per_hour_info{$day}{$hour}{count} += $_per_hour_info{$day}{$hour}{count};
+			$per_hour_info{$day}{$hour}{duration} += $_per_hour_info{$day}{$hour}{duration};
+
+			if (exists $_per_hour_info{$day}{$hour}{DELETE}) {
+				$per_hour_info{$day}{$hour}{DELETE}{count} += $_per_hour_info{$day}{$hour}{DELETE}{count};
+				$per_hour_info{$day}{$hour}{DELETE}{duration} += $_per_hour_info{$day}{$hour}{DELETE}{duration};
+			}
+
+			if (exists $_per_hour_info{$day}{$hour}{SELECT}) {
+				$per_hour_info{$day}{$hour}{SELECT}{count} += $_per_hour_info{$day}{$hour}{SELECT}{count};
+				$per_hour_info{$day}{$hour}{SELECT}{duration} += $_per_hour_info{$day}{$hour}{SELECT}{duration};
+			}
+
+			if (exists $_per_hour_info{$day}{$hour}{INSERT}) {
+				$per_hour_info{$day}{$hour}{INSERT}{count} += $_per_hour_info{$day}{$hour}{INSERT}{count};
+				$per_hour_info{$day}{$hour}{INSERT}{duration} += $_per_hour_info{$day}{$hour}{INSERT}{duration};
+			}
+
+			if (exists $_per_hour_info{$day}{$hour}{UPDATE}) {
+				$per_hour_info{$day}{$hour}{UPDATE}{count} += $_per_hour_info{$day}{$hour}{UPDATE}{count};
+				$per_hour_info{$day}{$hour}{UPDATE}{duration} += $_per_hour_info{$day}{$hour}{UPDATE}{duration};
+			}
+		}
+	}
+
+	### error_info ###
+
+	foreach my $msg (keys %_error_info) {
+		$error_info{$msg}{count} += $_error_info{$msg}{count};
+
+		$error_info{$msg}{db} = ($error_info{$msg}{db}, $_error_info{$msg}{db});
+
+		$error_info{$msg}{date} = ($error_info{$msg}{date}, $_error_info{$msg}{date});
+
+		$error_info{$msg}{detail} = ($error_info{$msg}{detail}, $_error_info{$msg}{detail});
+
+		foreach my $day (keys %{ $_error_info{$msg}{chronos} }) {
+			foreach my $hour (keys %{$_error_info{$msg}{chronos}{$day}}) {
+				$error_info{$msg}{chronos}{$day}{$hour}{count} += $_error_info{$msg}{chronos}{$day}{$hour}{count};
+			}
+		}
+
+		$error_info{$msg}{statement} = ($error_info{$msg}{statement}, $_error_info{$msg}{statement});
+
+		$error_info{$msg}{hint} = ($error_info{$msg}{hint}, $_error_info{$msg}{hint});
+
+		$error_info{$msg}{context} = ($error_info{$msg}{context}, $_error_info{$msg}{context});
+
+		$error_info{$msg}{error} = ($error_info{$msg}{error}, $_error_info{$msg}{error});
+	}
+
+	### per_minute_info ###
+
+	foreach my $day (keys %{ $_per_minute_info{connection} }) {
+		foreach my $hour (keys %{ $_per_minute_info{connection}{$day} }) {
+			foreach my $min (keys %{ $_per_minute_info{connection}{$day}{$hour} }) {
+				$per_minute_info{connection}{$day}{$hour}{$min}{count} +=
+					$_per_minute_info{connection}{$day}{$hour}{$min}{count};
+
+				foreach my $sec (keys %{ $_per_minute_info{connection}{$day}{$hour}{$min}{second} }) {
+					$per_minute_info{connection}{$day}{$hour}{$min}{second}{$sec} +=
+						$_per_minute_info{connection}{$day}{$hour}{$min}{second}{$sec};
+				}
+			}
+		}
+	}
+
+	foreach my $day (keys %{ $_per_minute_info{query} }) {
+		foreach my $hour (keys %{ $_per_minute_info{query}{$day} }) {
+			foreach my $min (keys %{ $_per_minute_info{query}{$day}{$hour} }) {
+				$per_minute_info{query}{$day}{$hour}{$min}{count} +=
+					$_per_minute_info{query}{$day}{$hour}{$min}{count};
+
+				$per_minute_info{query}{$day}{$hour}{$min}{duration} +=
+					$_per_minute_info{query}{$day}{$hour}{$min}{duration};
+
+				foreach my $sec (keys %{ $_per_minute_info{query}{$day}{$hour}{$min}{second} }) {
+					$per_minute_info{query}{$day}{$hour}{$min}{second}{$sec} +=
+						$_per_minute_info{query}{$day}{$hour}{$min}{second}{$sec};
+				}
+			}
+		}
+	}
+
+	### lock_info ###
+
+	foreach my $lock (keys %_lock_info) {
+		$lock_info{$lock}{count} += $_lock_info{$lock}{count};
+
+		foreach my $day (keys %{ $_lock_info{chronos} }) {
+			foreach my $hour (keys %{ $_lock_info{chronos}{$day} }) {
+				$lock_info{chronos}{$day}{$hour}{count} += $_lock_info{chronos}{$day}{$hour}{count};
+				$lock_info{chronos}{$day}{$hour}{duration} += $_lock_info{chronos}{$day}{$hour}{duration};
+			}
+		}
+
+		$lock_info{$lock}{duration} += $_lock_info{$lock}{duration};
+
+		foreach my $type (keys %{$_lock_info{$lock}}) {
+			next if $type =~ /^(count|chronos|duration)$/;
+
+			$lock_info{$lock}{$type}{count} += $_lock_info{$lock}{$type}{count};
+			$lock_info{$lock}{$type}{duration} += $_lock_info{$lock}{$type}{duration};
+		}
+	}
+
+	### nlines ###
+
+	$nlines += $_nlines;
+
+	### normalyzed_info ###
+
+	foreach my $stmt (keys %_normalyzed_info) {
+		# if we have at least one key, so we have at least one stmt
+		# so disable $log_duration.
+		$log_duration = 0;
+		foreach my $dt (keys %{$_normalyzed_info{$stmt}{samples}} ) {
+			$normalyzed_info{$stmt}{samples}{$dt} = $_normalyzed_info{$stmt}{samples}{$dt};
+		}
+
+		$normalyzed_info{$stmt}{count} += $_normalyzed_info{$stmt}{count};
+
+		foreach my $day (keys %{$_normalyzed_info{$stmt}{chronos}} ) {
+			foreach my $hour (keys %{$_normalyzed_info{$stmt}{chronos}{$day}} ) {
+				$normalyzed_info{$stmt}{chronos}{$day}{$hour}{count} +=
+					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{count};
+				$normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration} +=
+					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration};
+			}
+		}
+
+		$normalyzed_info{$stmt}{duration} += $_normalyzed_info{$stmt}{duration};
+	}
+
+	### session_info ###
+
+	foreach my $db (keys %{ $_session_info{database}}) {
+		$session_info{database}{$db}{count} += $_session_info{database}{$db}{count};
+		$session_info{database}{$db}{duration} += $_session_info{database}{$db}{duration};
+	}
+
+	$session_info{count} += $_session_info{count};
+
+	foreach my $day (keys %{ $_session_info{chronos}}) {
+		foreach my $hour (keys %{ $_session_info{chronos}{$day}}) {
+			$session_info{chronos}{$day}{$hour}{count} += $_session_info{chronos}{$day}{$hour}{count};
+			$session_info{chronos}{$day}{$hour}{duration} += $_session_info{chronos}{$day}{$hour}{duration};
+		}
+	}
+
+	foreach my $user (keys %{ $_session_info{user}}) {
+		$session_info{user}{$user}{count}    += $_session_info{user}{$user}{count};
+		$session_info{user}{$user}{duration} += $_session_info{user}{$user}{duration};
+	}
+
+	$session_info{duration} += $_session_info{duration};
+
+	foreach my $host (keys %{ $_session_info{host}}) {
+		$session_info{host}{$host}{count}    += $_session_info{host}{$host}{count};
+		$session_info{host}{$host}{duration} += $_session_info{host}{$host}{duration};
+	}
+
+	### tempfile_info ###
+
+	$tempfile_info{count} += $_tempfile_info{count}
+		if defined $_tempfile_info{count};
+	$tempfile_info{size} += $_tempfile_info{size}
+		if defined $_tempfile_info{size};
+	$tempfile_info{maxsize} = $_tempfile_info{maxsize}
+		if defined $_tempfile_info{maxsize} and ( not defined $tempfile_info{maxsize}
+			or $tempfile_info{maxsize} < $_tempfile_info{maxsize} );
+
+	foreach my $day ( %{ $_tempfile_info{chronos} } ) {
+		foreach my $hour ( %{ $_tempfile_info{chronos}{$day} } ) {
+
+			$tempfile_info{chronos}{$day}{$hour}{count} +=
+				$_tempfile_info{chronos}{$day}{$hour}{count}
+					if defined $_tempfile_info{chronos}{$day}{$hour}{count};
+
+			$tempfile_info{chronos}{$day}{$hour}{size} +=
+				$_tempfile_info{chronos}{$day}{$hour}{size}
+					if defined $_tempfile_info{chronos}{$day}{$hour}{size};
+		}
+	}
+
+	### top_slowest ###
+	@top_slowest = (sort {$b->[0] <=> $a->[0]} (@top_slowest, @_top_slowest))[0 .. $end_top];
+
+	# disable log_duration if we have a query
+	$log_duration = 0 if $#top_slowest > -1;
+
+	### checkpoint_info ###
+	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
+	$checkpoint_info{sync} += $_checkpoint_info{sync};
+	$checkpoint_info{wbuffer} += $_checkpoint_info{wbuffer};
+	$checkpoint_info{file_recycled} += $_checkpoint_info{file_recycled};
+	$checkpoint_info{total} += $_checkpoint_info{total};
+	$checkpoint_info{file_added} += $_checkpoint_info{file_added};
+	$checkpoint_info{write} += $_checkpoint_info{write};
+
+	foreach my $day (keys %{ $_checkpoint_info{chronos} }) {
+		foreach my $hour (keys %{ $_checkpoint_info{chronos}{$day} }) {
+			$checkpoint_info{chronos}{$day}{$hour}{file_removed} += $_checkpoint_info{chronos}{$day}{$hour}{file_removed};
+			$checkpoint_info{chronos}{$day}{$hour}{sync} += $_checkpoint_info{chronos}{$day}{$hour}{sync};
+			$checkpoint_info{chronos}{$day}{$hour}{wbuffer} += $_checkpoint_info{chronos}{$day}{$hour}{wbuffer};
+			$checkpoint_info{chronos}{$day}{$hour}{file_recycled} += $_checkpoint_info{chronos}{$day}{$hour}{file_recycled};
+			$checkpoint_info{chronos}{$day}{$hour}{total} += $_checkpoint_info{chronos}{$day}{$hour}{total};
+			$checkpoint_info{chronos}{$day}{$hour}{file_added} += $_checkpoint_info{chronos}{$day}{$hour}{file_added};
+			$checkpoint_info{chronos}{$day}{$hour}{write} += $_checkpoint_info{chronos}{$day}{$hour}{write};
+		}
+	}
+
+	return;
+}
+
+sub dump_as_binary
+{
+	store_fd({
+		'overall_stat' => \%overall_stat,
+		'normalyzed_info' => \%normalyzed_info,
+		'error_info' => \%error_info,
+		'connection_info' => \%connection_info,
+		'checkpoint_info' => \%checkpoint_info,
+		'session_info' => \%session_info,
+		'tempfile_info' => \%tempfile_info,
+		'error_info' => \%error_info,
+		'logs_type' => \%logs_type,
+		'lock_info' => \%lock_info,
+		'per_hour_info' => \%per_hour_info,
+		'per_minute_info' => \%per_minute_info,
+		'top_slowest' => \@top_slowest,
+		'nlines' => $nlines,
+		'first_log_timestamp' => $first_log_timestamp,
+		'last_log_timestamp' => $last_log_timestamp,
+		'log_files' => \@log_files
+	}, $fh) || die ("Couldn't save binary data to «$outfile»!\n");
+}
+
 # Highlight SQL code
 sub highlight_code
 {
@@ -4030,54 +4416,61 @@ sub autodetect_format
 	my $nfound = 0;
 	my $nline  = 0;
 	my $fmt    = '';
-	my ($tfile, $totalsize) = &open_log_file($file);
-	my $duration = 'duration:';
-	if ($error_only || ($disable_hourly && $disable_query)) {
-		$duration = '';
+
+	# is file in binary format ?
+	if ( defined Storable::file_magic($file) ) {
+		$fmt = 'binary';
 	}
-	my %ident_name = ();
-	while (my $line = <$tfile>) {
-		chomp($line);
-		$line =~ s/\r//;
-		next if (!$line);
-		$nline++;
-
-		# Are syslog lines ?
-		if ($line =~
-/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
-		   )
-		{
-			$fmt = 'syslog';
-			$nfound++;
-			$ident_name{$1}++;
-
-			# Are stderr lines ?
-		} elsif (
-			(
-				$line =~
-				/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
-			)
-			&& ($line =~ tr/,/,/ >= 12)
-			)
-		{
-			$fmt = 'csv';
-			$nfound++;
-		} elsif ($line =~
-/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
-			)
-		{
-			$fmt = 'stderr';
-			$nfound++;
+	else { # try to detect syslogs or csv
+		my ($tfile, $totalsize) = &open_log_file($file);
+		my $duration = 'duration:';
+		if ($error_only || ($disable_hourly && $disable_query)) {
+			$duration = '';
 		}
-		last if (($nfound > 10) || ($nline > 5000));
-	}
-	$tfile->close();
-	if (!$fmt || ($nfound < 10)) {
-		die "FATAL: unable to detect log file format from $file, please use -f option.\n";
-	}
+		my %ident_name = ();
+		while (my $line = <$tfile>) {
+			chomp($line);
+			$line =~ s/\r//;
+			next if (!$line);
+			$nline++;
 
-	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
-		$ident = (keys %ident_name)[0];
+			# Are syslog lines ?
+			if ($line =~
+	/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
+			   )
+			{
+				$fmt = 'syslog';
+				$nfound++;
+				$ident_name{$1}++;
+
+				# Are stderr lines ?
+			} elsif (
+				(
+					$line =~
+					/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
+				)
+				&& ($line =~ tr/,/,/ >= 12)
+				)
+			{
+				$fmt = 'csv';
+				$nfound++;
+			} elsif ($line =~
+	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
+				)
+			{
+				$fmt = 'stderr';
+				$nfound++;
+			}
+			last if (($nfound > 10) || ($nline > 5000));
+		}
+		$tfile->close();
+		if (!$fmt || ($nfound < 10)) {
+			die "FATAL: unable to detect log file format from $file, please use -f option.\n";
+		}
+
+		if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
+			$ident = (keys %ident_name)[0];
+		}
 	}
 
 	&logmsg('DEBUG', "Autodetected log format '$fmt' from $file");
@@ -4129,6 +4522,12 @@ sub progress_bar
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
 			$char x (($width - 1) * $got / $total) . '>',
 			$got, $total, 100 * $got / +$total, $tsung_queries
+		);
+	} elsif($format eq 'binary') {
+		my $file = $_[-1];
+		sprintf(
+			"Loaded %d queries and %d events from binary file %s...\r",
+			$overall_stat{'queries_number'}, $overall_stat{'errors_number'}, $file
 		);
 	} else {
 		sprintf(
