@@ -445,7 +445,6 @@ my @pg_keywords = qw(
 
 
 # Highlight variables
-# Highlight variables
 my @KEYWORDS1 = qw(
         ALTER ADD AUTO_INCREMENT BETWEEN BY BOOLEAN BEGIN CHANGE COLUMNS COMMIT COALESCE CLUSTER
         COPY DATABASES DATABASE DATA DELAYED DESCRIBE DELETE DROP ENCLOSED ESCAPED EXISTS EXPLAIN
@@ -3332,7 +3331,6 @@ sub load_stats
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
 	my %_session_info = %{$stats{session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
-	my %_error_info = %{$stats{error_info}};
 	my %_logs_type = %{$stats{logs_type}};
 	my %_lock_info = %{$stats{lock_info}};
 	my %_per_hour_info = %{$stats{per_hour_info}};
@@ -3374,7 +3372,7 @@ sub load_stats
 	$overall_stat{SELECT} += $_overall_stat{SELECT}
 		if exists $_overall_stat{SELECT};
 
-	foreach my $k (keys $_overall_stat{query_peak}) {
+	foreach my $k (keys %{$_overall_stat{query_peak}}) {
 		$overall_stat{query_peak}{$k} += $_overall_stat{query_peak}{$k};
 	}
 
@@ -3384,7 +3382,7 @@ sub load_stats
 			or $overall_stat{first_query_date} > $_overall_stat{first_query_date};
 
 	# FIXME == $error_info ??
-	foreach my $k (keys $_overall_stat{unique_normalized_errors}) {
+	foreach my $k (keys %{$_overall_stat{unique_normalized_errors}}) {
 		$overall_stat{unique_normalized_errors}{$k} += $_overall_stat{unique_normalized_errors}{$k};
 	}
 
@@ -3480,28 +3478,21 @@ sub load_stats
 
 	### error_info ###
 
-	foreach my $msg (keys %_error_info) {
-		$error_info{$msg}{count} += $_error_info{$msg}{count};
-
-		$error_info{$msg}{db} = ($error_info{$msg}{db}, $_error_info{$msg}{db});
-
-		$error_info{$msg}{date} = ($error_info{$msg}{date}, $_error_info{$msg}{date});
-
-		$error_info{$msg}{detail} = ($error_info{$msg}{detail}, $_error_info{$msg}{detail});
-
-		foreach my $day (keys %{ $_error_info{$msg}{chronos} }) {
-			foreach my $hour (keys %{$_error_info{$msg}{chronos}{$day}}) {
-				$error_info{$msg}{chronos}{$day}{$hour}{count} += $_error_info{$msg}{chronos}{$day}{$hour}{count};
+	foreach my $q (keys %_error_info) {
+		$error_info{$q}{count} += $_error_info{$q}{count};
+		push(@{$error_info{$q}{date}},      $_error_info{$q}{date});
+		push(@{$error_info{$q}{detail}},    $_error_info{$q}{detail});
+		push(@{$error_info{$q}{context}},   $_error_info{$q}{context});
+		push(@{$error_info{$q}{statement}}, $_error_info{$q}{statement});
+		push(@{$error_info{$q}{hint}},      $_error_info{$q}{hint});
+		push(@{$error_info{$q}{error}},     $_error_info{$q}{error});
+		push(@{$error_info{$q}{db}},        $_error_info{$q}{db});
+		foreach my $day (keys %{ $_error_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_error_info{$q}{chronos}{$day}}) {
+				$error_info{$q}{chronos}{$day}{$hour}{count} += $_error_info{$q}{chronos}{$day}{$hour}{count};
 			}
 		}
 
-		$error_info{$msg}{statement} = ($error_info{$msg}{statement}, $_error_info{$msg}{statement});
-
-		$error_info{$msg}{hint} = ($error_info{$msg}{hint}, $_error_info{$msg}{hint});
-
-		$error_info{$msg}{context} = ($error_info{$msg}{context}, $_error_info{$msg}{context});
-
-		$error_info{$msg}{error} = ($error_info{$msg}{error}, $_error_info{$msg}{error});
 	}
 
 	### per_minute_info ###
