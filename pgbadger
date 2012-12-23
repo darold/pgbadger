@@ -112,6 +112,7 @@ my $RESRC_URL   = '';
 my $img_format  = 'png';
 my @log_files   = ();
 my %prefix_vars = ();
+my $sql_prettified;
 
 # Do not display data in pie where percentage is lower than this value
 # to avoid label overlapping.
@@ -912,6 +913,10 @@ if ($extension ne 'tsung') {
 	} elsif ($extension eq 'binary') {
 		&dump_as_binary();
 	} else {
+		# Create instance to prettify SQL query
+		if (!$noprettify) {
+			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+		}
 		if ($error_only) {
 			&dump_error_as_html();
 		} else {
@@ -3689,9 +3694,8 @@ sub highlight_code
 
 	# prettify SQL query
 	if (!$noprettify) {
-		my $sql = SQL::Beautify->new(keywords => \@pg_keywords);
-		$sql->query($code);
-		$code = $sql->beautify;
+		$sql_prettified->query($code);
+		$code = $sql_prettified->beautify;
 	}
 
 	return $code if ($nohighlight);
