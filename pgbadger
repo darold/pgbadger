@@ -4418,10 +4418,6 @@ sub autodetect_format
 	}
 	else { # try to detect syslogs or csv
 		my ($tfile, $totalsize) = &open_log_file($file);
-		my $duration = 'duration:';
-		if ($error_only || ($disable_hourly && $disable_query)) {
-			$duration = '';
-		}
 		my %ident_name = ();
 		while (my $line = <$tfile>) {
 			chomp($line);
@@ -4431,7 +4427,7 @@ sub autodetect_format
 
 			# Are syslog lines ?
 			if ($line =~
-	/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
+	/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 			   )
 			{
 				$fmt = 'syslog';
@@ -4450,7 +4446,7 @@ sub autodetect_format
 				$fmt = 'csv';
 				$nfound++;
 			} elsif ($line =~
-	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+$duration/
+	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 				)
 			{
 				$fmt = 'stderr';
