@@ -670,6 +670,8 @@ foreach my $logfile ( @given_log_files ) {
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
 		my $cur_pid = '';
+		my @matches = ();
+		my $goon = 0;
 		while (my $line = <$lfile>) {
 			$cursize += length($line);
 			chomp($line);
@@ -685,10 +687,12 @@ foreach my $logfile ( @given_log_files ) {
 				}
 			}
 
+			%prefix_vars = ();
+
 			# Parse syslog lines
 			if ($format =~ /syslog/) {
 
-				my @matches = ($line =~ $compiled_prefix);
+				@matches = ($line =~ $compiled_prefix);
 
 				if ($#matches >= 0) {
 
@@ -724,6 +728,7 @@ foreach my $logfile ( @given_log_files ) {
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
+					$goon = 1;
 
 					# Store the current timestamp of the log line
 					if (!$first_log_date || ($first_log_date > $prefix_vars{'t_date'})) {
@@ -747,7 +752,7 @@ foreach my $logfile ( @given_log_files ) {
 						&parse_query();
 					}
 
-				} elsif ($line =~ $other_syslog_line) {
+				} elsif ($goon && ($line =~ $other_syslog_line)) {
 
 					$cur_pid = $8;
 					my $t_query = $10;
@@ -765,7 +770,7 @@ foreach my $logfile ( @given_log_files ) {
 					}
 
 					# Collect orphans lines of multiline queries
-				} elsif ($line !~ $orphan_syslog_line) {
+				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -783,8 +788,7 @@ foreach my $logfile ( @given_log_files ) {
 
 			} elsif ($format eq 'stderr') {
 
-				%prefix_vars = ();
-				my @matches = ($line =~ $compiled_prefix);
+				@matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
 					for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 						$prefix_vars{$prefix_params[$i]} = $matches[$i];
@@ -836,7 +840,7 @@ foreach my $logfile ( @given_log_files ) {
 					}
 
 					# Collect orphans lines of multiline queries
-				} elsif ($line !~ $orphan_stderr_line) {
+				} elsif ($cur_pid && ($line !~ $orphan_stderr_line)) {
 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -848,7 +852,7 @@ foreach my $logfile ( @given_log_files ) {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
 
-				} elsif ($cur_info{$cur_pid}{query}) {
+				} elsif ($cur_pid && ($cur_info{$cur_pid}{query})) {
 					$cur_info{$cur_pid}{query} .= "\n" . $line;
 				}
 
