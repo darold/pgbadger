@@ -1181,9 +1181,9 @@ sub convert_time
 # Stores the top N slowest queries
 sub set_top_slowest
 {
-	my ($q, $dt, $date, $db) = @_;
+	my ($q, $dt, $date, $db, $user, $remote, $app) = @_;
 
-	push(@top_slowest, [($dt, $date, $q, $db)]);
+	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app)]);
 
 	@top_slowest = (sort {$b->[0] <=> $a->[0]} @top_slowest)[0 .. $end_top];
 
@@ -1192,11 +1192,14 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($norm, $q, $dt, $date, $db) = @_;
+	my ($norm, $q, $dt, $date, $db, $user, $remote, $app) = @_;
 
 	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
 	$normalyzed_info{$norm}{samples}{$dt}{date}  = $date;
 	$normalyzed_info{$norm}{samples}{$dt}{db}  = $db;
+	$normalyzed_info{$norm}{samples}{$dt}{user}  = $user;
+	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
+	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
 
 	my $i = 1;
 	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
@@ -1418,6 +1421,10 @@ Report not supported by text format
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
 			my $db = " database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
+			$db .= ", user: $top_slowest[$i]->[4]" if ($top_slowest[$i]->[4]);
+			$db .= ", remote: $top_slowest[$i]->[5]" if ($top_slowest[$i]->[5]);
+			$db .= ", app: $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
+			$db =~ s/^, //;
 			print $fh $i + 1, ") " . &convert_time($top_slowest[$i]->[0]) . "$db - $top_slowest[$i]->[2]\n";
 			print $fh "--\n";
 		}
@@ -1446,6 +1453,10 @@ Report not supported by text format
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db =~ s/^, / - /;
 				print $fh "\t- Example $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
@@ -1474,6 +1485,10 @@ Report not supported by text format
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
@@ -1502,6 +1517,10 @@ Report not supported by text format
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
 			}
@@ -2923,6 +2942,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 			my $col = $i % 2;
 			my $ttl = $top_slowest[$i]->[1] || '';
 			my $db = " - database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
+			$db .= ", user: $top_slowest[$i]->[4]" if ($top_slowest[$i]->[4]);
+			$db .= ", remote: $top_slowest[$i]->[5]" if ($top_slowest[$i]->[5]);
+			$db .= ", app: $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
+			$db =~ s/^, / - /;
 			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
 				&convert_time($top_slowest[$i]->[0]),
 				"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
@@ -2989,6 +3012,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
 					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
 					print $fh
 "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
@@ -3056,6 +3083,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
 					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
 					print $fh
 "<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
@@ -3124,6 +3155,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $colb = $i % 2;
 					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
 					print $fh
 "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
 						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
@@ -4265,7 +4300,7 @@ sub store_queries
 			push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
 			push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
 			if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{dbname}) {
-				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{_dbname};
+				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{dbname};
 				$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{dbuser};
 				$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
 			}
@@ -4343,7 +4378,7 @@ sub store_queries
 				last;
 			}
 		}
-		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname});
+		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 
 		# Store normalized query count
 		$normalyzed_info{$normalized}{count}++;
@@ -4356,7 +4391,7 @@ sub store_queries
 		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 		# Store normalized query samples
-		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname});
+		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 	}
 }
 
