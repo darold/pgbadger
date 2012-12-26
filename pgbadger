@@ -526,6 +526,7 @@ my %per_minute_info     = ();
 my %lock_info           = ();
 my %tempfile_info       = ();
 my %connection_info     = ();
+my %database_info       = ();
 my %session_info        = ();
 my %conn_received       = ();
 my %checkpoint_info     = ();
@@ -1303,6 +1304,9 @@ Average duration of sessions: $avg_session_duration
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 	}
+	if ($database_info{count}) {
+		print $fh "Total number of databases: $database_info{count}\n";
+	}
 	if (!$disable_hourly && $overall_stat{'queries_number'}) {
 		print $fh qq{
 
@@ -1381,6 +1385,19 @@ Report not supported by text format
 		foreach my $d (sort keys %{$session_info{host}}) {
 			print $fh "$d - ", &comma_numbers($session_info{host}{$d}{count}), " ", &convert_time($session_info{host}{$d}{duration}),
 				" ", &convert_time($session_info{host}{$d}{duration} / $session_info{host}{$d}{count}), "\n";
+		}
+	}
+
+	# Show request per database statistics
+	if (exists $database_info{database}) {
+		print $fh "\n- Request per database ------------------------------------------------------\n\n";
+		print $fh "Database     Request type     Count\n";
+		foreach my $d (sort keys %{$database_info{database}}) {
+			print $fh "$d - ", &comma_numbers($database_info{database}{$d}{count}), "\n";
+			foreach my $r (sort keys %{$database_info{database}{$d}}) {
+				next if ($r eq 'count');
+				print $fh "\t$r ", &comma_numbers($database_info{database}{$d}{$r}), "\n";
+			}
 		}
 	}
 
@@ -1815,7 +1832,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
 	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #requestsdatabases_graph {
 	width : 500px;
 	height: 250px;
 	background:#F3F2ED;
@@ -1956,6 +1973,7 @@ sub html_footer
 		}
 		if (!$disable_connection) {
 			if (exists $connection_info{database}) {
+				print $fh qq{<li><a href="#RequestsDatabaseReport">Requests per database</a></li>} if ($database_info{database});
 				print $fh qq{<li><a href="#ConnectionsDatabaseReport">Connections per database</a></li>};
 			}
 			if (exists $connection_info{user}) {
@@ -2070,8 +2088,13 @@ sub dump_as_html
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh qq{
 <li>Total number of connections: $connection_info{count}</li>
-}
+};
 	}
+	if ($database_info{count}) {
+		print $fh qq{
+<li>Total number of databases: $database_info{count}</li>
+	}
+}
 	print $fh qq{
 </ul>
 </td></tr></table>
@@ -2795,6 +2818,51 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 		print $fh "</td></tr></table>\n";
 	}
 
+	# Show request per database statistics
+	if (exists $database_info{database}) {
+		print $fh qq{
+<h2 id="RequestsDatabaseReport">Requests per database <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="500" align="left" valign="top">
+<table class="SmallTableList">
+	<tr>
+		<th>Database</th>
+		<th>Request type</th>
+		<th>Count</th>
+	</tr>
+};
+		my $total_count = 0;
+		foreach my $d (sort keys %{$database_info{database}}) {
+			print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">",
+				&comma_numbers($database_info{database}{$d}{count}), "</td></tr>\n";
+			$total_count += $database_info{database}{$d}{count};
+			foreach my $r (sort keys %{$database_info{database}{$d}}) {
+				next if ($r eq 'count');
+				print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$r</td><td class=\"right\">",
+					&comma_numbers($database_info{database}{$d}{$r}), "</td></tr>\n";
+			}
+		}
+		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
+		if ($graph && $total_count) {
+			my %infos = ();
+			my @small = ();
+			foreach my $d (sort keys %{$database_info{database}}) {
+				if ((($database_info{database}{$d}{count} * 100) / $total_count) > $pie_percentage_limit) {
+					$infos{$d} = $database_info{database}{$d}{count} || 0;
+				} else {
+					$infos{"Sum databases < $pie_percentage_limit%"} += $database_info{database}{$d}{count} || 0;
+					push(@small, $d);
+				}
+			}
+			if ($#small == 0) {
+				$infos{$small[0]} = $infos{"Sum databases < $pie_percentage_limit%"};
+				delete $infos{"Sum databases < $pie_percentage_limit%"};
+			}
+			&flotr2_piegraph(20, 'requestsdatabases_graph', 'Requests per database', %infos);
+		}
+		print $fh "</td></tr></table>\n";
+	}
+
 	# Show connection per database statistics
 	if (!$disable_connection && exists $connection_info{database}) {
 		print $fh qq{
@@ -3372,6 +3440,7 @@ sub load_stats
 	my %_normalyzed_info = %{$stats{normalyzed_info}};
 	my %_error_info = %{$stats{error_info}};
 	my %_connection_info = %{$stats{connection_info}};
+	my %_database_info = %{$stats{database_info}};
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
 	my %_session_info = %{$stats{session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
@@ -3436,6 +3505,15 @@ sub load_stats
 	$logs_type{LOG} += $_logs_type{LOG} if exists $_logs_type{LOG};
 	$logs_type{DETAIL} += $_logs_type{DETAIL} if exists $_logs_type{DETAIL};
 	$logs_type{STATEMENT} += $_logs_type{STATEMENT} if exists $_logs_type{STATEMENT};
+
+	### database_info ###
+
+	foreach my $db (keys %{ $_database_info{database} }) {
+		foreach my $k (keys %{ $_database_info{database}{$db} }) {
+			$database_info{database}{$db}{$k} += $_database_info{database}{$db}{$k};
+		}
+	}
+	$database_info{count} += $_database_info{count};
 
 	### connection_info ###
 
@@ -3710,6 +3788,7 @@ sub dump_as_binary
 		'normalyzed_info' => \%normalyzed_info,
 		'error_info' => \%error_info,
 		'connection_info' => \%connection_info,
+		'database_info' => \%database_info,
 		'checkpoint_info' => \%checkpoint_info,
 		'session_info' => \%session_info,
 		'tempfile_info' => \%tempfile_info,
@@ -4371,6 +4450,9 @@ sub store_queries
 				$overall_stat{$action}++;
 				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{count}++;
 				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{duration} += $cur_info{$t_pid}{duration};
+				$database_info{database}{$cur_info{$t_pid}{dbname}}{count}++;
+				$database_info{database}{$cur_info{$t_pid}{dbname}}{$action}++;
+				$database_info{count}++;
 				#if ($graph) {
 				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
 				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
