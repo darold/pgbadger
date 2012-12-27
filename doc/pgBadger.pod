@@ -141,6 +141,7 @@ The following reports are also available with hourly charts:
 	Hourly checkpoints statistics.
 	Locks statistics.
 	Queries by type (select/insert/update/delete).
+	Distribution of queries type per database/application
 	Sessions per database/user/client.
 	Connections per database/user/client.
 

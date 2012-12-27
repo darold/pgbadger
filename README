@@ -68,9 +68,9 @@ SYNOPSIS
         --include-file filename: path of the file which contains all the regex of the
                                  queries to include from the report. One regex per line.
         --disable-error        : do not generate error report.
-        --disable-hourly       : do not generate hourly reports.
+        --disable-hourly       : do not generate hourly report.
         --disable-type         : do not generate query type report.
-        --disable-query        : do not generate queries reports (slowest, most
+        --disable-query        : do not generate query reports (slowest, most
                                  frequent, ...).
         --disable-session      : do not generate session report.
         --disable-connection   : do not generate connection report.
@@ -115,11 +115,7 @@ SYNOPSIS
     week.
 
 DESCRIPTION
-    pgBadger is a PostgreSQL log analyzer built for speed with fully
-    detailed reports from your PostgreSQL log file. It's a single and small
-    Perl script that aims to replace and out-perform the old PHP script
-    pgFouine.
-
+pgBadger is a PostgreSQL log analyzer built for speed with fully detailed reports from your PostgreSQL log file. It's a single and small Perl script that aims to replace and out-perform the old PHP script pgFouine.
     By the way, we would like to thank Guillaume Smet for all the work he
     has done on this really nice tool. We've been using it a long time, it
     is a really great tool!
@@ -149,6 +145,7 @@ FEATURE
             Hourly checkpoints statistics.
             Locks statistics.
             Queries by type (select/insert/update/delete).
+            Distribution of queries type per database/application
             Sessions per database/user/client.
             Connections per database/user/client.
 
@@ -156,7 +153,7 @@ FEATURE
     reported are highlighted and beautified automatically.
 
 REQUIREMENT
-    PgBadger comes as a single Perl script- you do not need anything other
+    PgBadger comes as a single Perl script - you do not need anything other
     than a modern Perl distribution. Charts are rendered using a Javascript
     library so you don't need anything. Your browser will do all the work.
 
@@ -168,8 +165,8 @@ REQUIREMENT
     This module is optional, if you don't have PostgreSQL log in the CSV
     format you don't need to install it.
 
-    Compressed log file format is autodetected from the file extension.
-    If pgBadger find a gz extension it will use the zcat utility, with a bz2
+    Compressed log file format is autodetected from the file exension. If
+    pgBadger find a gz extension it will use the zcat utility, with a bz2
     extension it will use bzcat and if the file extension is zip then the
     unzip utility will be used.
 
@@ -225,8 +222,8 @@ POSTGRESQL CONFIGURATION
             log_lock_waits = on
             log_temp_files = 0
 
-    Do not enable log_statement and log_duration as their log format will not
-    be parsed by pgBadger.
+    Do not enable log_statement and log_duration as their log format will
+    not be parsed by pgBadger.
 
     Of course your log messages should be in English without locale support:
 
@@ -256,22 +253,22 @@ log_min_duration_statement versus log_duration
     two options in the same command will report an error.
 
     Use those options if you don't want to log every query to preserve your
-    I/O but still want to know the slowest queries over a certain duration and
-    still have a report on the number of queries and their duration.
+    I/O but still want to know the slowest queries over a certain duration
+    and still have a report on the number of queries and their duration.
     Otherwise if you don't have too much of a performance hit with
     log_min_duration_statement set to 0, do not enable log_duration in your
     postgresql.conf file.
 
 INSTALLATION
-    Download the tarball from github and unpack the archive as follows:
+    Download the tarball from github and unpack the archive as follow:
 
             tar xzf pgbadger-1.x.tar.gz
             cd pgbadger-1.x/
             perl Makefile.PL
             make && sudo make install
 
-    This will copy the Perl script pgbadger to /usr/local/bin/pgbadger
-    by default and the man page into /usr/local/share/man/man1/pgbadger.1.
+    This will copy the Perl script pgbadger to /usr/local/bin/pgbadger by
+    default and the man page into /usr/local/share/man/man1/pgbadger.1.
     Those are the default installation directories for 'site' install.
 
     If you want to install all under /usr/ location, use INSTALLDIRS='perl'
