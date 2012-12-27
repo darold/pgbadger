@@ -1304,8 +1304,8 @@ Average duration of sessions: $avg_session_duration
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 	}
-	if ($database_info{count}) {
-		print $fh "Total number of databases: $database_info{count}\n";
+	if (exists $database_info{database}) {
+		print $fh "Total number of databases: ", scalar keys %{$database_info{database}}, "\n";
 	}
 	if (!$disable_hourly && $overall_stat{'queries_number'}) {
 		print $fh qq{
@@ -1335,6 +1335,21 @@ Report not supported by text format
 		print $fh "OTHERS: ", &comma_numbers($total - $totala) || 0, " ", sprintf("%0.2f", (($total - $totala) * 100) / $total), "%\n"
 			if (($total - $totala) > 0);
 		print $fh "\n";
+
+		# Show request per database statistics
+		if (scalar keys %{$database_info{database}} > 1) {
+			print $fh "\n- Request per database ------------------------------------------------------\n\n";
+			print $fh "Database     Request type     Count\n";
+			foreach my $d (sort keys %{$database_info{database}}) {
+				print $fh "$d - ", &comma_numbers($database_info{database}{$d}{count}), "\n";
+				foreach my $r (sort keys %{$database_info{database}{$d}}) {
+					next if ($r eq 'count');
+					print $fh "\t$r ", &comma_numbers($database_info{database}{$d}{$r}), "\n";
+				}
+			}
+		}
+
+
 	}
 
 	if (!$disable_lock && scalar keys %lock_info > 0) {
@@ -1355,6 +1370,7 @@ Report not supported by text format
 		}
 		print $fh "Total:\t\t\t", &comma_numbers($total_count), " ", &convert_time($total_duration), " ",
 			&convert_time($total_duration / ($total_count || 1)), "\n";
+
 	}
 
 	# Show session per database statistics
@@ -1385,19 +1401,6 @@ Report not supported by text format
 		foreach my $d (sort keys %{$session_info{host}}) {
 			print $fh "$d - ", &comma_numbers($session_info{host}{$d}{count}), " ", &convert_time($session_info{host}{$d}{duration}),
 				" ", &convert_time($session_info{host}{$d}{duration} / $session_info{host}{$d}{count}), "\n";
-		}
-	}
-
-	# Show request per database statistics
-	if (exists $database_info{database}) {
-		print $fh "\n- Request per database ------------------------------------------------------\n\n";
-		print $fh "Database     Request type     Count\n";
-		foreach my $d (sort keys %{$database_info{database}}) {
-			print $fh "$d - ", &comma_numbers($database_info{database}{$d}{count}), "\n";
-			foreach my $r (sort keys %{$database_info{database}{$d}}) {
-				next if ($r eq 'count');
-				print $fh "\t$r ", &comma_numbers($database_info{database}{$d}{$r}), "\n";
-			}
 		}
 	}
 
@@ -1890,13 +1893,14 @@ EOF
 		}
 		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
+			print $fh qq{<a href="#RequestsDatabaseReport">Requests per database</a> | } if (scalar keys %{$database_info{database}} > 1);
 		}
 		if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
-<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a> |
-<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a><br />
+<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a><br />
+<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> |
 		}
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
@@ -1956,6 +1960,7 @@ sub html_footer
 		}
 		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
+			print $fh qq{<li><a href="#RequestsDatabaseReport">Requests per database</a></li>} if (scalar keys %{$database_info{database}} > 1);
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
 			print $fh qq{<li><a href="#LocksByTypeReport">Locks by type</a></li>};
@@ -1973,7 +1978,6 @@ sub html_footer
 		}
 		if (!$disable_connection) {
 			if (exists $connection_info{database}) {
-				print $fh qq{<li><a href="#RequestsDatabaseReport">Requests per database</a></li>} if ($database_info{database});
 				print $fh qq{<li><a href="#ConnectionsDatabaseReport">Connections per database</a></li>};
 			}
 			if (exists $connection_info{user}) {
@@ -2090,9 +2094,10 @@ sub dump_as_html
 <li>Total number of connections: $connection_info{count}</li>
 };
 	}
-	if ($database_info{count}) {
+	if (exists $database_info{database}) {
+		my $db_count = scalar keys %{$database_info{database}};
 		print $fh qq{
-<li>Total number of databases: $database_info{count}</li>
+<li>Total number of databases: $db_count</li>
 	}
 }
 	print $fh qq{
@@ -2625,6 +2630,53 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 			&flotr2_piegraph(9, 'queriesbytype_graph', 'Type of queries', %data);
 		}
 		print $fh "</td></tr></table>\n";
+
+		# Show request per database statistics
+		if (scalar keys %{$database_info{database}} > 1) {
+			print $fh qq{
+<h2 id="RequestsDatabaseReport">Requests per database <a href="#top" title="Back to top">^</a></h2>
+<table>
+<tr><td width="500" align="left" valign="top">
+<table class="SmallTableList">
+	<tr>
+		<th>Database</th>
+		<th>Request type</th>
+		<th>Count</th>
+	</tr>
+};
+			my $total_count = 0;
+			foreach my $d (sort keys %{$database_info{database}}) {
+				print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">",
+					&comma_numbers($database_info{database}{$d}{count}), "</td></tr>\n";
+				$total_count += $database_info{database}{$d}{count};
+				foreach my $r (sort keys %{$database_info{database}{$d}}) {
+					next if ($r eq 'count');
+					print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$r</td><td class=\"right\">",
+						&comma_numbers($database_info{database}{$d}{$r}), "</td></tr>\n";
+				}
+			}
+			print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
+			if ($graph && $total_count) {
+				my %infos = ();
+				my @small = ();
+				foreach my $d (sort keys %{$database_info{database}}) {
+					if ((($database_info{database}{$d}{count} * 100) / $total_count) > $pie_percentage_limit) {
+						$infos{$d} = $database_info{database}{$d}{count} || 0;
+					} else {
+						$infos{"Sum databases < $pie_percentage_limit%"} += $database_info{database}{$d}{count} || 0;
+						push(@small, $d);
+					}
+				}
+				if ($#small == 0) {
+					$infos{$small[0]} = $infos{"Sum databases < $pie_percentage_limit%"};
+					delete $infos{"Sum databases < $pie_percentage_limit%"};
+				}
+				&flotr2_piegraph(20, 'requestsdatabases_graph', 'Requests per database', %infos);
+			}
+			print $fh "</td></tr></table>\n";
+		}
+
+
 	}
 
 	# Lock stats per type
@@ -2814,51 +2866,6 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
 			&flotr2_piegraph(13, 'hostsessions_graph', 'Sessions per host', %infos);
-		}
-		print $fh "</td></tr></table>\n";
-	}
-
-	# Show request per database statistics
-	if (exists $database_info{database}) {
-		print $fh qq{
-<h2 id="RequestsDatabaseReport">Requests per database <a href="#top" title="Back to top">^</a></h2>
-<table>
-<tr><td width="500" align="left" valign="top">
-<table class="SmallTableList">
-	<tr>
-		<th>Database</th>
-		<th>Request type</th>
-		<th>Count</th>
-	</tr>
-};
-		my $total_count = 0;
-		foreach my $d (sort keys %{$database_info{database}}) {
-			print $fh "<tr class=\"row1\"><td colspan=\"2\">$d</td><td class=\"right\">",
-				&comma_numbers($database_info{database}{$d}{count}), "</td></tr>\n";
-			$total_count += $database_info{database}{$d}{count};
-			foreach my $r (sort keys %{$database_info{database}{$d}}) {
-				next if ($r eq 'count');
-				print $fh "<tr class=\"row0\"><td colspan=\"2\" class=\"right\">$r</td><td class=\"right\">",
-					&comma_numbers($database_info{database}{$d}{$r}), "</td></tr>\n";
-			}
-		}
-		print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
-		if ($graph && $total_count) {
-			my %infos = ();
-			my @small = ();
-			foreach my $d (sort keys %{$database_info{database}}) {
-				if ((($database_info{database}{$d}{count} * 100) / $total_count) > $pie_percentage_limit) {
-					$infos{$d} = $database_info{database}{$d}{count} || 0;
-				} else {
-					$infos{"Sum databases < $pie_percentage_limit%"} += $database_info{database}{$d}{count} || 0;
-					push(@small, $d);
-				}
-			}
-			if ($#small == 0) {
-				$infos{$small[0]} = $infos{"Sum databases < $pie_percentage_limit%"};
-				delete $infos{"Sum databases < $pie_percentage_limit%"};
-			}
-			&flotr2_piegraph(20, 'requestsdatabases_graph', 'Requests per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3513,7 +3520,6 @@ sub load_stats
 			$database_info{database}{$db}{$k} += $_database_info{database}{$db}{$k};
 		}
 	}
-	$database_info{count} += $_database_info{count};
 
 	### connection_info ###
 
@@ -4452,7 +4458,6 @@ sub store_queries
 				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{duration} += $cur_info{$t_pid}{duration};
 				$database_info{database}{$cur_info{$t_pid}{dbname}}{count}++;
 				$database_info{database}{$cur_info{$t_pid}{dbname}}{$action}++;
-				$database_info{count}++;
 				#if ($graph) {
 				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
 				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
