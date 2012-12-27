@@ -4530,6 +4530,9 @@ sub store_queries
 				if ($cur_info{$t_pid}{dbappname}) {
 					$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
 					$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
+				} else {
+					$application_info{others}{count}++;
+					$application_info{others}{$action}++;
 				}
 				#if ($graph) {
 				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
