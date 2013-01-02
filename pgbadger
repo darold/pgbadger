@@ -1170,7 +1170,7 @@ sub convert_time
 	$time -= ($hours * 3600000);
 	my $minutes = int($time / 60000);
 	$time -= ($minutes * 60000);
-	my $seconds = sprintf("%0.2f", $time / 1000);
+	my $seconds = sprintf("%0.3f", $time / 1000);
 
 	$days    = $days < 1    ? '' : $days . 'd';
 	$hours   = $hours < 1   ? '' : $hours . 'h';
