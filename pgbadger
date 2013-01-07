@@ -4971,7 +4971,9 @@ sub build_log_line_prefix_regex
 	return @param_list;
 }
 
-# Inclusion of package SQL::Beautify
+# Inclusion of Perl package SQL::Beautify
+# Copyright (C) 2009 by Jonas Kramer
+# Published under the terms of the Artistic License 2.0.
 {
 
 	package SQL::Beautify;
