@@ -622,8 +622,8 @@ foreach my $logfile ( @given_log_files ) {
 			# Set query parameters as global variables
 			$prefix_vars{'t_dbuser'}  = $row->[1] || '';
 			$prefix_vars{'t_dbname'}  = $row->[2] || '';
-			$prefix_vars{'t_appname'} = $row->[2] || '';
-			$prefix_vars{'t_client'}  = $row->[2] || '';
+			$prefix_vars{'t_appname'} = $row->[22] || '';
+			$prefix_vars{'t_client'}  = $row->[4] || '';
 			$prefix_vars{'t_host'}    = 'csv';
 			$prefix_vars{'t_pid'}     = $row->[3];
 			$prefix_vars{'t_session_line'} = $row->[5];
@@ -641,22 +641,25 @@ foreach my $logfile ( @given_log_files ) {
 				$last_log_date      = $prefix_vars{'t_date'};
 			}
 
-			# Parse the query now
-			&parse_query();
-			if ($row->[14]) {
-				if ($row->[11] eq 'LOG') {
-					if ($row->[13] =~ /^(duration: \d+\.\d+ ms)/) {
-						$row->[14] = "$1  $row->[14]";
+			# Check if the log line should be excluded from the report
+			if (&validate_log_line($prefix_vars{'t_pid'})) {
+				# Parse the query now
+				&parse_query();
+				if ($row->[14]) {
+					if ($row->[11] eq 'LOG') {
+						if ($row->[13] =~ /^(duration: \d+\.\d+ ms)/) {
+							$row->[14] = "$1  $row->[14]";
+						}
 					}
+					$prefix_vars{'t_loglevel'} = 'DETAIL';
+					$prefix_vars{'t_query'}    = $row->[14];
+					&parse_query();
 				}
-				$prefix_vars{'t_loglevel'} = 'DETAIL';
-				$prefix_vars{'t_query'}    = $row->[14];
-				&parse_query();
-			}
-			if ($row->[15]) {
-				$prefix_vars{'t_query'}    = $row->[15];
-				$prefix_vars{'t_loglevel'} = 'HINT';
-				&parse_query();
+				if ($row->[15]) {
+					$prefix_vars{'t_query'}    = $row->[15];
+					$prefix_vars{'t_loglevel'} = 'HINT';
+					&parse_query();
+				}
 			}
 		}
 		if (!$getout) {
