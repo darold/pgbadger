@@ -210,7 +210,7 @@ You need to enable other parameters in postgresql.conf to get more information f
         log_lock_waits = on
         log_temp_files = 0
 
-Do not enable log_statement and log_duration as their log format will not be parsed by pgBadger.
+Do not enable log_statement as their log format will not be parsed by pgBadger.
 
 Of course your log messages should be in English without locale support:
 

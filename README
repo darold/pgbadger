@@ -222,7 +222,7 @@ POSTGRESQL CONFIGURATION
             log_lock_waits = on
             log_temp_files = 0
 
-    Do not enable log_statement, as the log format will not be parsed by
+    Do not enable log_statement as their log format will not be parsed by
     pgBadger.
 
     Of course your log messages should be in English without locale support:
