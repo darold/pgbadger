@@ -22,6 +22,7 @@
 #  log_disconnections = on
 #  log_lock_waits = on
 #  log_temp_files = 0
+#  log_autovacuum_min_duration = 0
 #------------------------------------------------------------------------------
 use vars qw($VERSION);
 
@@ -89,6 +90,7 @@ my $disable_connection      = 0;
 my $disable_lock            = 0;
 my $disable_temporary       = 0;
 my $disable_checkpoint      = 0;
+my $disable_autovacuum      = 0;
 my $avg_minutes             = 5;
 my $last_parsed             = '';
 my $report_title            = 'PgBadger: PostgreSQL log analyzer';
@@ -169,6 +171,7 @@ my $result = GetOptions(
 	"disable-lock!"            => \$disable_lock,
 	"disable-temporary!"       => \$disable_temporary,
 	"disable-checkpoint!"      => \$disable_checkpoint,
+	"disable-autovacuum!"      => \$disable_autovacuum,
 	"enable-log_duration!"     => \$enable_log_duration,
 	"enable-log_min_duration!" => \$enable_log_min_duration,
 	"client=s"                 => \@dbclient2, # Backward compatibility
@@ -531,6 +534,8 @@ my %application_info    = ();
 my %session_info        = ();
 my %conn_received       = ();
 my %checkpoint_info     = ();
+my %autovacuum_info     = ();
+my %autoanalyze_info    = ();
 my @graph_values        = ();
 my %cur_info            = ();
 my $nlines              = 0;
@@ -1033,6 +1038,7 @@ Options:
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
+    --disable-autovacuum   : do not generate autovacuum report.
     --enable-log_duration  : force pgBadger to use log_duration even if
                              log_min_duration_statement format is autodetected.
     --enable-log_min_duration: force pgBadger to use log_min_duration even if
@@ -1836,7 +1842,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #connectionspersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
 	width : 1025px;
 	height: 400px;
 	background:#F3F2ED;
@@ -2115,8 +2121,19 @@ sub dump_as_html
 		my $db_count = scalar keys %database_info;
 		print $fh qq{
 <li>Total number of databases: $db_count</li>
+};
 	}
-}
+	if ($autovacuum_info{count}) {
+		print $fh qq{
+<li>Total number of automatic vacuums: $autovacuum_info{count}</li>
+};
+	}
+	if ($autoanalyze_info{count}) {
+		print $fh qq{
+<li>Total number of automatic analyzes: $autoanalyze_info{count}</li>
+};
+	}
+
 	print $fh qq{
 </ul>
 </td></tr></table>
@@ -2453,6 +2470,9 @@ sub dump_as_html
 			if (exists $checkpoint_info{warning}) {
 				print $fh qq{<th colspan="2">Checkpoint warning</th>};
 			}
+			if (exists $autovacuum_info{chronos}) {
+				print $fh "		<th colspan=\"2\">Autovacuum</th>\n";
+			}
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
 				print $fh qq{</tr><tr>};
 			}
@@ -2465,6 +2485,9 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 			}
 			if (exists $checkpoint_info{warning}) {
 				print $fh qq{<th>Count</th><th>Av. time (sec)</th>};
+			}
+			if (exists $autovacuum_info{chronos}) {
+				print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
 			}
 			if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
 				print $fh qq{</tr>};
@@ -2514,6 +2537,10 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 									print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
 								}
 							}
+						}
+						if (exists $autovacuum_info{chronos}) {
+							print $fh "<td class=\"right\">", &comma_numbers($autovacuum_info{chronos}{"$d"}{"$h"}{count} || 0), "</td>",
+							          "<td class=\"right\">", &comma_numbers($autoanalyze_info{chronos}{"$d"}{"$h"}{count} || 0), "</td>";
 						}
 						print $fh "</tr>\n";
 						$c++;
@@ -2592,6 +2619,84 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				);
 				$d1 = '';
 				$d2 = '';
+			}
+
+			# VACUUMs and ANALYZEs
+			if (exists $autovacuum_info{chronos}) {
+				foreach my $tm (sort {$a <=> $b} keys %{$autovacuum_info{chronos}}) {
+					$tm =~ /(\d{4})(\d{2})(\d{2})/;
+					my $y  = $1 - 1900;
+					my $mo = $2 - 1;
+					my $d  = $3;
+					foreach my $h ("00" .. "23") {
+						my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+						next if ($t < $t_min_hour);
+						last if ($t > $t_max_hour);
+						$d1 .= "[$t, " . ($autovacuum_info{chronos}{$tm}{$h}{count}  || 0) . "],";
+						$d2 .= "[$t, " . ($autoanalyze_info{chronos}{$tm}{$h}{count} || 0) . "],";
+					}
+				}
+				$d1 =~ s/,$//;
+				$d2 =~ s/,$//;
+				&flotr2_graph(
+					9, 'autovacuum_graph', $d1, $d2, '', 'Autovacuum actions',
+					'', 'VACUUMs', 'ANALYZEs'
+				);
+				$d1 = '';
+				$d2 = '';
+			}
+
+			# VACUUM stats per table
+			if ($autovacuum_info{count} > 0) {
+				print $fh qq{
+		<h2 id="VacuumByTableReport">VACUUMs by table <a href="#top" title="Back to top">^</a></h2>
+		<table>
+		<tr><td width="500" align="left" valign="top">
+		<table class="SmallTableList">
+			<tr>
+				<th>Table</th>
+				<th>VACUUMs</th>
+				<th>Index scans</th>
+			</tr>
+		};
+				my $total_count   = 0;
+				my $total_idxscan = 0;
+				foreach my $t (sort keys %{$autovacuum_info{tables}}) {
+					print $fh "<tr class=\"row1\"><td>", $t,
+					    "</td><td class=\"right\">", $autovacuum_info{tables}{$t}{vacuums},
+						"</td><td class=\"right\">", $autovacuum_info{tables}{$t}{idxscans},
+						"</td></tr>\n";
+					$total_count   += $autovacuum_info{tables}{$t}{vacuums};
+					$total_idxscan += $autovacuum_info{tables}{$t}{idxscans};
+				}
+				print $fh "<tr class=\"row1\"><td><b>Total</b></td><td class=\"right\">", $total_count,
+					"</td><td class=\"right\">", $total_idxscan, "</td></tr>\n";
+				print $fh "</table></td></tr></table>\n";
+			}
+
+			# ANALYZE stats per table
+			if ($autoanalyze_info{count} > 0) {
+				print $fh qq{
+		<h2 id="AnalyzeByTableReport">ANALYZEs by table <a href="#top" title="Back to top">^</a></h2>
+		<table>
+		<tr><td width="500" align="left" valign="top">
+		<table class="SmallTableList">
+			<tr>
+				<th>Table</th>
+				<th>ANALYZEs</th>
+			</tr>
+		};
+				my $total_count   = 0;
+				my $total_idxscan = 0;
+				foreach my $t (sort keys %{$autoanalyze_info{tables}}) {
+					print $fh "<tr class=\"row1\"><td>", $t,
+					    "</td><td class=\"right\">", $autoanalyze_info{tables}{$t}{analyzes},
+						"</td></tr>\n";
+					$total_count   += $autoanalyze_info{tables}{$t}{analyzes};
+				}
+				print $fh "<tr class=\"row1\"><td><b>Total</b></td><td class=\"right\">", $total_count,
+					"</td></tr>\n";
+				print $fh "</table></td></tr></table>\n";
 			}
 		}
 	}
@@ -4194,6 +4299,33 @@ sub parse_query
 		$session_info{host}{$host}{count}++;
 		$session_info{host}{$host}{duration} += $time;
 		return;
+	}
+
+	# Store autovacuum information
+	if (
+		($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~
+/automatic vacuum of table "([^\s]+)": index scans: (\d+)/
+		   )
+	   )
+	{
+		return if ($disable_autovacuum);
+		$autovacuum_info{count}++;
+		$autovacuum_info{tables}{$1}{vacuums} += 1;
+		$autovacuum_info{tables}{$1}{idxscans} += $2;
+		$autovacuum_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+	}
+	if (
+		($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~
+/automatic analyze of table "([^\s]+)"/
+		   )
+	   )
+	{
+		return if ($disable_autovacuum);
+		$autoanalyze_info{count}++;
+		$autoanalyze_info{tables}{$1}{analyzes} += 1;
+		$autoanalyze_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 	}
 
 	# Store checkpoint information
