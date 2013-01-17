@@ -3908,11 +3908,11 @@ sub highlight_code
 	}
 
 	foreach my $x (keys %SYMBOLS) {
-		$code =~ s/$x/\$\$CLASSSY0A\$\$$SYMBOLS{$x}\$\$CLASSSY0B\$\$/gs;
+		$code =~ s/$x/\$\$STYLESY0A\$\$$SYMBOLS{$x}\$\$STYLESY0B\$\$/gs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
 		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
-		$code =~ s/(?<!CLASSSY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+		$code =~ s/(?<!STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS2 ; $x++) {
 		$code =~ s/(?<!:)\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
@@ -3924,7 +3924,7 @@ sub highlight_code
 		$code =~ s/($BRACKETS[$x])/<span class="br0">$1<\/span>/igs;
 	}
 
-	$code =~ s/\$\$CLASSSY0A\$\$([^\$]+)\$\$CLASSSY0B\$\$/<span class="sy0">$1<\/span>/gs;
+	$code =~ s/\$\$STYLESY0A\$\$([^\$]+)\$\$STYLESY0B\$\$/<span class="sy0">$1<\/span>/gs;
 
 	$code =~ s/\b(\d+)\b/<span class="nu0">$1<\/span>/igs;
 
