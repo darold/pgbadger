@@ -269,6 +269,8 @@ pgBadger is an original work from Gilles Darold. It is maintained by the good fo
 
 pgBadger is free software distributed under the PostgreSQL Licence.
 
+Copyright (c) 2012-2013, Dalibo
+
 A modified version of the SQL::Beautify Perl Module is embedded in pgBadger
 with copyright (C) 2009 by Jonas Kramer and is published under the terms of
 the Artistic License 2.0.
