@@ -37,7 +37,7 @@ use POSIX qw(locale_h);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
 
-$VERSION = '2.2';
+$VERSION = '2.3';
 
 $| = 1;
 
