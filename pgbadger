@@ -768,6 +768,12 @@ foreach my $logfile ( @given_log_files ) {
 					$t_query = $11 if ($format eq 'syslog-ng');
 					$t_query =~ s/#011/\t/g;
 					next if ($t_query eq "\t");
+					if ($cur_info{$cur_pid}{vacuum} && ($t_query =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+						if ($t_query =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
+							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
+						}
+						next;
+					} 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
 					} elsif ($cur_info{$cur_pid}{context}) {
@@ -2658,20 +2664,30 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 				<th>Table</th>
 				<th>VACUUMs</th>
 				<th>Index scans</th>
+				<th>Tuples removed</th>
+				<th>Pages removed</th>
 			</tr>
 		};
 				my $total_count   = 0;
 				my $total_idxscan = 0;
+				my $total_tuples = 0;
+				my $total_pages = 0;
 				foreach my $t (sort keys %{$autovacuum_info{tables}}) {
 					print $fh "<tr class=\"row1\"><td>", $t,
 					    "</td><td class=\"right\">", $autovacuum_info{tables}{$t}{vacuums},
 						"</td><td class=\"right\">", $autovacuum_info{tables}{$t}{idxscans},
+						"</td><td class=\"right\">", $autovacuum_info{tables}{$t}{tuples}{removed},
+						"</td><td class=\"right\">", $autovacuum_info{tables}{$t}{pages}{removed},
 						"</td></tr>\n";
 					$total_count   += $autovacuum_info{tables}{$t}{vacuums};
 					$total_idxscan += $autovacuum_info{tables}{$t}{idxscans};
+					$total_tuples += $autovacuum_info{tables}{$t}{tuples}{removed};
+					$total_pages += $autovacuum_info{tables}{$t}{pages}{removed};
 				}
 				print $fh "<tr class=\"row1\"><td><b>Total</b></td><td class=\"right\">", $total_count,
-					"</td><td class=\"right\">", $total_idxscan, "</td></tr>\n";
+					"</td><td class=\"right\">", $total_idxscan,
+					"</td><td class=\"right\">", $total_tuples,
+					"</td><td class=\"right\">", $total_pages, "</td></tr>\n";
 				print $fh "</table></td></tr></table>\n";
 			}
 
@@ -4315,6 +4331,8 @@ sub parse_query
 		$autovacuum_info{tables}{$1}{vacuums} += 1;
 		$autovacuum_info{tables}{$1}{idxscans} += $2;
 		$autovacuum_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$cur_info{$t_pid}{vacuum} = $1;
+		return;
 	}
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
