@@ -718,9 +718,8 @@ foreach my $logfile ( @given_log_files ) {
 					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
 					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
 					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
-						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 1, 4) - 1;
+						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
 					}
-
 					$prefix_vars{'t_date'} =
 						  $prefix_vars{'t_year'}
 						. $prefix_vars{'t_month'}
@@ -2089,11 +2088,23 @@ sub dump_as_html
 		print $fh qq{
 <li>Number of events: $fmt_errors</li>
 <li>Number of unique normalized events: $fmt_unique_error</li>
+};
+	}
+	if ($autovacuum_info{count}) {
+		print $fh qq{
+<li>Total number of automatic vacuums: $autovacuum_info{count}</li>
+};
+	}
+	if ($autoanalyze_info{count}) {
+		print $fh qq{
+<li>Total number of automatic analyzes: $autoanalyze_info{count}</li>
+};
+	}
+	print $fh qq{
 </ul>
 </td><td valign="top">
 <ul>
 };
-	}
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", $tempfile_info{maxsize} / $tempfile_info{count}));
@@ -2121,16 +2132,6 @@ sub dump_as_html
 		my $db_count = scalar keys %database_info;
 		print $fh qq{
 <li>Total number of databases: $db_count</li>
-};
-	}
-	if ($autovacuum_info{count}) {
-		print $fh qq{
-<li>Total number of automatic vacuums: $autovacuum_info{count}</li>
-};
-	}
-	if ($autoanalyze_info{count}) {
-		print $fh qq{
-<li>Total number of automatic analyzes: $autoanalyze_info{count}</li>
 };
 	}
 
