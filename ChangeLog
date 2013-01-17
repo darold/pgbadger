@@ -1,3 +1,87 @@
+2013-01-17 - Version 2.3
+
+This release fixes several major issues especially with csvlog and a memory leak
+with log parsing using a start date. There's also several improvement like new
+reports of number of queries by database and application. Mouse over reported
+queries will show database, user, remote client and application name where they
+are executed.
+
+A new binary input/output format have been introduced to allow saving or reading
+precomputed statistics. This will allow incremental reports based on periodical
+runs of pgbader. This is a work in progress fully available with next coming
+major release.
+
+Several SQL code beautifier improvement from pgFormatter have also been merged.
+
+	- Clarify misleading statement about log_duration: log_duration may be
+	  turned on depending on desired information. Only log_statement must
+	  not be on. Thanks to Matt Romaine for the patch.
+	- Fix --dbname and --dbuser not working with csvlog format. Thanks to
+	  Luke Cyca for the report.
+	- Fix issue in SQL formatting that prevent left back indentation when
+	  major keywords were found. Thanks to Kevin Brannen for the report.
+	- Display 3 decimals in time report so that ms can be seen. Thanks to
+	  Adam Schroder for the request.
+	- Force the parser to not insert a new line after the SET keyword when
+	  the query begin with it. This is to preserve the single line with
+	  queries like SET client_encoding TO "utf8";
+	- Add better SQL formatting of update queries by adding a new line
+	  after the SET keyword. Thanks to pilat66 for the report.
+	- Update copyright and documentation.
+	- Queries without application name are now stored under others
+	  application name.
+	- Add report of number of queries by application if %a is specified in
+	  the log_line_prefix.
+	- Add link menu to the request per database and limit the display of
+	  this information when there is more than one database.
+	- Add report of requests per database.
+	- Add report of user,remote client and application name to all request
+	  info.
+	- Fix memory leak with option -b (--begin) and in incremental log
+	  parsing mode.
+	- Remove duration part from log format auto-detection. Thanks to
+	  Guillaume Lelarge for the report.
+	- Fix a performance issue on prettifying SQL queries that makes pgBagder
+	  several time slower that usual to generate the HTML output. Thanks to
+	  Vincent Laborie for the report.
+	- Add missing SQL::Beautify paternity.
+	- Add 'binary' format as input/output format. The binary output format
+	  allows to save log statistics in a non human readable file instead of
+	  an HTML or text file. These binary files might then be used as regular
+	  input files, combined or not, to produce a html or txt report. Thanks
+	  to Jehan Guillaume de Rorthais for the patch.
+	- Remove port from the session regex pattern to match all lines.
+	- Fix the progress bar. It was trying to use gunzip to get real file
+	  size for all formats (by default). Unbreak the bz2 format (that does
+	  not report real size) and add support for zip format. Thanks to Euler
+	  Taveira de Oliveira fort the patch.
+	- Fix some typos and grammatical issues. Thanks to Euler Taveira de
+	  Oliveira fort the patch.
+	- Improve SQL code highlighting and keywords detection merging change
+	  from pgFormatter project.
+	- Add support to hostname or ip address in the client detection. Thanks
+	  to stuntmunkee for the report.
+	- pgbadger will now only reports execute statement of the extended
+	  protocol (parse/bind/execute). Thanks to pierrestroh for the report.
+	- Fix numerous typos as well as formatting and grammatical issues.
+	  Thanks to Thom Brown for the patch.
+	- Add backward compatibility to obsolete --client command line option.
+	  If you were using the short option -c nothing is changed.
+	- Fix issue with --dbclient and %h in log_line_prefix. Thanks to Julien
+	  Rouhaud for the patch.
+	- Fix multiline progress bar output.
+	- Allow usage of a dash into database, user and application names when
+	  prefix is used. Thanks to Vipul for the report.
+	- Mouse over queries will now show in which database they are executed
+	  in the overviews (Slowest queries, Most frequent queries, etc. ).
+	  Thank to Dirk-Jan Bulsink for the feature request.
+	- Fix missing keys on %cur_info hash. Thanks to Marc Cousin for the
+	  report.
+	- Move opening file handle to log file into a dedicated function.
+	  Thanks to Marc Cousin for the patch.
+	- Replace Ctrl+M by printable \r. Thanks to Marc Cousin for the report.
+
+
 2012-11-13 - Version 2.2
 
 This release add some major features like tsung output, speed improvement with
