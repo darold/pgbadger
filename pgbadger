@@ -228,6 +228,11 @@ if ($enable_log_min_duration && $enable_log_duration) {
 	print STDERR "FATAL: you must choose between reports based on log_duration or log_min_duration_statement.\n\n";
 	&usage();
 }
+if ($log_duration) {
+	&logmsg('DEBUG', "Enabling log duration format.");
+} else {
+	&logmsg('DEBUG', "Enabling log min duration format.");
+}
 
 # Set default top query
 $top ||= 20;
