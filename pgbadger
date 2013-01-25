@@ -59,7 +59,7 @@ my $ver                     = '';
 my @dbname                  = ();
 my @dbuser                  = ();
 my @dbclient                = ();
-my @dbclient2                = ();
+my @dbclient2               = ();
 my @dbappname               = ();
 my @exclude_user            = ();
 my $ident                   = '';
@@ -1866,7 +1866,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
 	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #requestsdatabases_graph, #requestsapplications_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #requestsdatabases_graph, #requestsapplications_graph #autovacuumbytable #autovacuumtuplesremoved {
 	width : 500px;
 	height: 250px;
 	background:#F3F2ED;
@@ -2693,7 +2693,31 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 					"</td><td class=\"right\">", $total_idxscan,
 					"</td><td class=\"right\">", $total_tuples,
 					"</td><td class=\"right\">", $total_pages, "</td></tr>\n";
-				print $fh "</table></td></tr></table>\n";
+				print $fh "</table></td><td width=\"500\" align=\"center\" valign=\"top\">\n";
+				if ($graph && $total_count) {
+					my %data = ();
+					foreach my $t (sort keys %{$autovacuum_info{tables}}) {
+						if ((($autovacuum_info{tables}{$t}{vacuums} * 100) / $total_count) > $pie_percentage_limit) {
+							$data{$t} = $autovacuum_info{tables}{$t}{vacuums} || 0;
+						} else {
+							$data{"Others"} += $autovacuum_info{tables}{$t}{vacuums} || 0;
+						}
+					}
+					&flotr2_piegraph(9, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
+					%data = ();
+					if ($total_tuples) {
+						print $fh "<br />\n";
+						foreach my $t (sort keys %{$autovacuum_info{tables}}) {
+							if ((($autovacuum_info{tables}{$t}{tuples}{removed} * 100) / $total_tuples) > $pie_percentage_limit) {
+								$data{$t} = $autovacuum_info{tables}{$t}{tuples}{removed} || 0;
+							} else {
+								$data{"Others"} += $autovacuum_info{tables}{$t}{tuples}{removed} || 0;
+							}
+						}
+						&flotr2_piegraph(9, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
+					}
+				}
+				print $fh "</td></tr></table>\n";
 			}
 
 			# ANALYZE stats per table
@@ -2702,7 +2726,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 		<h2 id="AnalyzeByTableReport">ANALYZEs by table <a href="#top" title="Back to top">^</a></h2>
 		<table>
 		<tr><td width="500" align="left" valign="top">
-		<table class="SmallTableList">
+		<table class="SmallTableList"Autov>
 			<tr>
 				<th>Table</th>
 				<th>ANALYZEs</th>
