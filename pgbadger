@@ -1866,7 +1866,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 	-moz-box-shadow:3px 3px 6px 2px #A9A9A9;
 	-webkit-box-shadow:3px 3px 6px #A9A9A9;
 }
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #requestsdatabases_graph, #requestsapplications_graph #autovacuumbytable #autovacuumtuplesremoved {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #requestsdatabases_graph, #requestsapplications_graph, #autovacuumbytable_graph, #autovacuumtuplesremoved_graph {
 	width : 500px;
 	height: 250px;
 	background:#F3F2ED;
@@ -4973,7 +4973,8 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
         title: "$title",
         legend: {
             position: "nw",
-            backgroundColor: "#D2E8FF"
+            backgroundColor: "#D2E8FF",
+	    backgroundOpacity: 0.4
         },
 	mouse: {
             track: true,
@@ -5094,7 +5095,8 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
         },
         legend: {
             position: "sw",
-            backgroundColor: "#D2E8FF"
+            backgroundColor: "#D2E8FF",
+	    backgroundOpacity: 0.4
         }
     });
     document.getElementById('reset$buttonid').onclick = function() {
