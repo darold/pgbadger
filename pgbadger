@@ -4079,14 +4079,13 @@ sub highlight_code
 
 	$code =~ s/\b(\d+)\b/<span class="nu0">$1<\/span>/igs;
 
-	for (my $x = 0; $x <= $#qqcode; $x++) {
-		$code =~ s/QQCODEY${x}A/$qqcode[$x]/s;
-	}
 	for (my $x = 0; $x <= $#qcode; $x++) {
 		$code =~ s/QCODEY${x}B/$qcode[$x]/s;
 	}
+	for (my $x = 0; $x <= $#qqcode; $x++) {
+		$code =~ s/QQCODEY${x}A/$qqcode[$x]/s;
+	}
 
-	#$code =~ s/("[^"]*")/<span class="st0">$1<\/span>/igs;
 	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/gs;
 	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/gs;
 
