@@ -3672,6 +3672,8 @@ sub load_stats
 	my $_first_log_timestamp = $stats{first_log_timestamp};
 	my $_last_log_timestamp = $stats{last_log_timestamp};
 	my @_log_files = @{$stats{log_files}};
+	my %_autovacuum_info = @{$stats{autovacuum_info}};
+	my %_autoanalyze_info = @{$stats{autoanalyze_info}};
 
 	### overall_stat ###
 
@@ -4004,6 +4006,35 @@ sub load_stats
 		}
 	}
 
+	#### Autovacuum infos ####
+
+	$autovacuum_info{count} += $_autovacuum_info{count};
+
+	foreach my $day (keys %{ $_autovacuum_info{chronos} }) {
+		foreach my $hour (keys %{ $_autovacuum_info{chronos}{$day} }) {
+			$autovacuum_info{chronos}{$day}{$hour}{count} += $_autovacuum_info{chronos}{$day}{$hour}{count};
+		}
+	}
+	foreach my $table (keys %{ $_autovacuum_info{tables} }) {
+		$autovacuum_info{tables}{$table}{vacuums} += $_autovacuum_info{tables}{$table}{vacuums};
+		$autovacuum_info{tables}{$table}{idxscans} += $_autovacuum_info{tables}{$table}{idxscans};
+		$autovacuum_info{tables}{$table}{tuples}{removed} += $_autovacuum_info{tables}{$table}{tuples}{removed};
+		$autovacuum_info{tables}{$table}{pages}{removed} += $_autovacuum_info{tables}{$table}{pages}{removed};
+	}
+
+	#### Autoanalyze infos ####
+
+	$autoanalyze_info{count} += $_autoanalyze_info{count};
+
+	foreach my $day (keys %{ $_autoanalyze_info{chronos} }) {
+		foreach my $hour (keys %{ $_autoanalyze_info{chronos}{$day} }) {
+			$autoanalyze_info{chronos}{$day}{$hour}{count} += $_autoanalyze_info{chronos}{$day}{$hour}{count};
+		}
+	}
+	foreach my $table (keys %{ $_autoanalyze_info{tables} }) {
+		$autoanalyze_info{tables}{$table}{analyzes} += $_autoanalyze_info{tables}{$table}{analyzes};
+	}
+
 	return;
 }
 
@@ -4028,7 +4059,9 @@ sub dump_as_binary
 		'nlines' => $nlines,
 		'first_log_timestamp' => $first_log_timestamp,
 		'last_log_timestamp' => $last_log_timestamp,
-		'log_files' => \@log_files
+		'log_files' => \@log_files,
+		'autovacuum_info' => \%autovacuum_info,
+		'autoanalyze_info' => \%autoanalyze_info
 	}, $fh) || die ("Couldn't save binary data to «$outfile»!\n");
 }
 
