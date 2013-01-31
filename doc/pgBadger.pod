@@ -27,6 +27,8 @@ Options:
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : program name used as syslog ident. Default: postgres
+    -j | --jobs number     : number of jobs to run at same time. Default is 1,
+			     run as single process.
     -l | --last-parsed file: allow incremental log parsing by registering the
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
@@ -170,6 +172,8 @@ to change this path. For example:
 By default pgBadger will use the zcat, bzcat and unzip utilities following the file extension.
 If you use the default autodetection compress format you can mixed gz, bz2 or zip files. Specifying
 a custom value to --zcat option will remove this feature of mixed compressed format.
+
+Note that multiprocessing can not be used with compressed files nor CSV files.
 
 =head1 POSTGRESQL CONFIGURATION
 
