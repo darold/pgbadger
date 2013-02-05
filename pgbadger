@@ -73,7 +73,6 @@ sub spawn
 # With multiprocess we need to wait all childs
 sub wait_child
 {
-
         1 while wait != -1;
         $SIG{INT} = \&wait_child;
         $SIG{TERM} = \&wait_child;
@@ -408,7 +407,7 @@ my @action_regex = (
 my $other_syslog_line =
 	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
 my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
-my $orphan_stderr_line = qr/[^']*\d+-\d+-\d+\s\d+:\d+:\d+[\.\d]*\s[^\s]+[^']*/;
+my $orphan_stderr_line = '';
 
 # Compile custom log line prefix prefix
 my @prefix_params = ();
@@ -424,6 +423,7 @@ if ($log_line_prefix) {
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
+		$orphan_stderr_line = qr/$log_line_prefix/;
 		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		push(@prefix_params, 't_loglevel', 't_query');
@@ -437,6 +437,7 @@ qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]
 	$compiled_prefix =
 qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
+	$orphan_stderr_line = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*/;
 }
 
 sub check_regex
@@ -619,39 +620,22 @@ if ($queue_size > 1) {
 	Proc::Queue::size($queue_size);
 
 	my @tempfiles = ();
-	if ( ($#given_log_files > 0) || ($format eq 'csv') ) {
-		my $ix = 0;
-		foreach my $logfile ( @given_log_files ) {
-			push(@tempfiles, File::Temp->new( TEMPLATE => 'tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ));
-			#push(@tempfiles, "tmp_pgbadger$ix.bin");
-			spawn sub {
-				#&process_file($logfile, "tmp_pgbadger$ix.bin");
-				&process_file($logfile, $tempfiles[-1]);
-			};
-			$ix++;
-
-		}
-	} else {
-		my @chunks = &split_logfile($given_log_files[0]);
+	foreach my $logfile ( @given_log_files ) {
+		my @chunks = &split_logfile($logfile);
 		for (my $i = 0; $i < $#chunks; $i++) {
-			push(@tempfiles, File::Temp->new( TEMPLATE => 'tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ));
+			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ) ]);
 			spawn sub {
-				&process_file($given_log_files[0], $tempfiles[-1], $chunks[$i], $chunks[$i+1]);
+				&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1]);
 			};
 		} 
 	}
 	1 while wait != -1;
 
 	# Load all data gathered by the differents processes
-	my $bfile = undef;
 	foreach my $f (@tempfiles) {
-		#open($bfile,"<",$f) || die "FATAL: cannot read temporary binary file $f. $!\n";
-		#&load_stats($bfile);
-		$f->seek( 0, 0 );
-		&load_stats($f);
-		$f->close();
-		#$bfile->close();
-		#unlink($f);
+		open($fh, $f->[1]) or die "FATAL: can't open file $f->[1], $!\n";
+		&load_stats($fh);
+		$fh->close();
 	}
 
 } else {
@@ -678,7 +662,7 @@ sub process_file
 
 	# Get file handle and size of the file
 	my ($lfile, $totalsize) = &open_log_file($logfile);
-	if ($stop_offset) {
+	if ($stop_offset > 0) {
 		$totalsize = $stop_offset - $start_offset;
 	}
 
@@ -799,7 +783,7 @@ sub process_file
 
 			if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
 				if ($totalsize) {
-					if ($stop_offset) {
+					if ($stop_offset > 0) {
 						print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=');
 					} else {
 						print STDERR &progress_bar($cursize, $totalsize, 25, '=');
@@ -966,21 +950,30 @@ sub process_file
 						&parse_query();
 					}
 
-					# Collect orphans lines of multiline queries
+				# Collect additional query information
 				} elsif ($cur_pid && ($line !~ $orphan_stderr_line)) {
 
-					if ($cur_info{$cur_pid}{statement}) {
+					if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+						if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
+							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
+						}
+						next;
+					} 
+					if (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{context}) {
+					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{detail}) {
+					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
 					} else {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
 
+				# Collect orphans lines of multiline queries
 				} elsif ($cur_pid && ($cur_info{$cur_pid}{query})) {
+
 					$cur_info{$cur_pid}{query} .= "\n" . $line;
+
 				}
 
 			} else {
@@ -988,7 +981,7 @@ sub process_file
 				# unknown format
 				&logmsg('DEBUG', "Unknown line format: $line");
 			}
-			last if ($stop_offset && ($cursize > $stop_offset));
+			last if (($stop_offset > 0) && ($cursize > $stop_offset));
 		}
 	}
 	close $lfile;
@@ -1006,7 +999,7 @@ sub process_file
 
 	if ($progress) {
 		if ($totalsize) {
-			if ($stop_offset && ($format ne 'csv')) {
+			if (($stop_offset > 0) && ($format ne 'csv')) {
 				print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=', $logfile);
 			} else {
 				print STDERR &progress_bar($cursize, $totalsize, 25, '=', $logfile);
@@ -1015,10 +1008,8 @@ sub process_file
 		print STDERR "\n";
 	}
 	if ($tmpoutfile) {
-		#my $tfh = new IO::File ">$tmpoutfile";
-		#&dump_as_binary($tfh);
 		&dump_as_binary($tmpoutfile);
-		#$tfh->close();
+		$tmpoutfile->close();
 	}
 }
 
@@ -4374,7 +4365,7 @@ sub parse_query
 
 	# Do not parse lines that are not an error like message
 	if ($error_only && ($prefix_vars{'t_loglevel'} !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/)) {
-		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
@@ -4383,7 +4374,7 @@ sub parse_query
 
 	# Do not parse lines that are an error like message
 	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ /WARNING|ERROR|FATAL|PANIC|HINT|CONTEXT|DETAIL|STATEMENT/)) {
-		if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
@@ -4602,8 +4593,8 @@ sub parse_query
 		# When we are ready to overwrite the last storage, add it to the global stats
 		if (   ($prefix_vars{'t_loglevel'} =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/)
 			&& exists $cur_info{$t_pid}
-			&& (($format eq 'csv') || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})))
-		{
+			&& (($format eq 'csv') || (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})))
+		) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
@@ -4622,7 +4613,7 @@ sub parse_query
 			$t_action               = 'statement';
 			$prefix_vars{'t_query'} = 'No log_min_duration';
 		} elsif (!$enable_log_min_duration) {
-			if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+			if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
 				&store_queries($t_pid);
 				delete $cur_info{$t_pid};
 			}
@@ -4660,7 +4651,7 @@ sub parse_query
 			{
 				&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
 			}
-			if (exists $cur_info{$t_pid} && ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})) {
+			if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
 				&store_queries($t_pid);
 				delete $cur_info{$t_pid};
 			}
@@ -5821,6 +5812,9 @@ sub split_logfile
 {
 	my $logf = shift;
 
+	# CSV file can't be parsed using multiprocessing
+	return (0, -1) if ( $format eq 'csv' );
+
 	# get file size
 	my $totalsize = (stat("$logf"))[7] || 0;
 
@@ -5839,7 +5833,7 @@ sub split_logfile
 		$totalsize = 0;
 	}
 
-	return if (!$totalsize);
+	return (0, -1) if (!$totalsize);
 
 	my @chunks = (0);
 	my $i = 1;
