@@ -34,11 +34,10 @@ use Benchmark;
 use File::Basename;
 use Storable qw(store_fd fd_retrieve);
 use Time::Local 'timegm_nocheck';
-use POSIX qw(locale_h sys_wait_h);
+use POSIX qw(locale_h sys_wait_h _exit);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
 use File::Temp qw/ :seekable tempfile /;
-use Proc::Queue size => 1, ':all';
 
 $VERSION = '2.3';
 
@@ -621,26 +620,32 @@ my @given_log_files = ( @log_files );
 # log files must be erase when loading stats from binary format
 @log_files = () if $format eq 'binary';
 
+# Start parsing all given files using multiprocess
 if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
-	if ($queue_size > 1) {
-		Proc::Queue::size($queue_size);
-	} else {
-		Proc::Queue::size($job_per_file);
+	# Number of running process
+	my $child_count = 0;
+	# Set max number of parallel process
+	my $parallel_process = $queue_size;
+	if ($job_per_file > 1) {
+		$parallel_process = $job_per_file;
 	}
 
 	my @tempfiles = ();
 	foreach my $logfile ( @given_log_files ) {
+		while ($child_count >= $parallel_process) { $child_count-- if (wait); }
 		last if ($abort);
 		if ($queue_size > 1) {
 			# Create multiple process to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			for (my $i = 0; $i < $#chunks; $i++) {
+				while ($child_count >= $parallel_process) { $child_count-- if (wait); }
 				last if ($abort);
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ) ]);
 				spawn sub {
 					&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1]);
 				};
+				$child_count++;
 			} 
 		} else {
 			# Create on process per log files to parse
@@ -648,6 +653,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 			spawn sub {
 				&process_file($logfile, $tempfiles[-1]->[0]);
 			};
+			$child_count++;
 		}
 	}
 
@@ -655,11 +661,13 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 	1 while wait != -1;
 
 	# Load all data gathered by all the differents processes
-	foreach my $f (@tempfiles) {
-		my $fht = new IO::File;
-		$fht->open("< $f->[1]") or die "FATAL: can't open file $f->[1], $!\n";
-		&load_stats($fht);
-		$fht->close();
+	if (!$abort) {
+		foreach my $f (@tempfiles) {
+			my $fht = new IO::File;
+			$fht->open("< $f->[1]") or die "FATAL: can't open file $f->[1], $!\n";
+			&load_stats($fht);
+			$fht->close();
+		}
 	}
 
 } else {
@@ -668,7 +676,201 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 	}
 }
 
- # End of main loop
+# A terminate signal has been received.
+exit 1 if ($abort);
+
+# Save last line parsed
+if ($last_parsed && scalar keys %last_line) {
+	if (open(OUT, ">$last_parsed")) {
+		print OUT "$last_line{datetime}\t$last_line{orig}\n";
+		close(OUT);
+	} else {
+		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
+	}
+}
+
+my $t1 = Benchmark->new;
+my $td = timediff($t1, $t0);
+&logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
+
+&logmsg('DEBUG', "Ok, generating $extension report...");
+
+# Open filehandle
+my $fh = undef;
+if ($extension ne 'tsung') {
+	$fh = new IO::File ">$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
+	}
+	if (($extension eq 'text') || ($extension eq 'txt')) {
+		if ($error_only) {
+			&dump_error_as_text();
+		} else {
+			&dump_as_text();
+		}
+	} elsif ($extension eq 'binary') {
+		&dump_as_binary($fh);
+	} else {
+		# Create instance to prettify SQL query
+		if (!$noprettify) {
+			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+		}
+		if ($error_only) {
+			&dump_error_as_html();
+		} else {
+			&dump_as_html();
+		}
+	}
+	$fh->close;
+} else {
+
+	# Open filehandle
+	$fh = new IO::File ">>$outfile";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outfile, $!\n";
+	}
+	print $fh "</sessions>\n";
+	$fh->close();
+}
+
+my $t2 = Benchmark->new;
+$td = timediff($t2, $t1);
+&logmsg('DEBUG', "the report generating took:" . timestr($td));
+$td = timediff($t2, $t0);
+&logmsg('DEBUG', "the total execution time took:" . timestr($td));
+
+exit 0;
+
+#-------------------------------------------------------------------------------
+
+# Show PgBadger command line usage
+sub usage
+{
+	print qq{
+Usage: pgbadger [options] logfile [...]
+
+	PostgreSQL log analyzer with fully detailed reports and graphs.
+
+Arguments:
+
+    logfile can be a single log file, a list of files, or a shell command
+    returning a list of files. If you want to pass log content from stdin
+    use - as filename. Note that input from stdin will not work with csvlog.
+
+Options:
+
+    -a | --average minutes : number of minutes to build the average graphs of
+                             queries and connections.
+    -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -c | --dbclient host   : only report on entries for the given client host.
+    -C | --nocomment       : remove comments like /* ... */ from queries.
+    -d | --dbname database : only report on entries for the given database.
+    -e | --end datetime    : end date/time for the data to be parsed in log.
+    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+    -G | --nograph         : disable graphs on HTML output. Enable by default.
+    -h | --help            : show this message and exit.
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -j | --jobs number     : number of jobs to run at same time. Default is 1,
+			     run as single process.
+    -l | --last-parsed file: allow incremental log parsing by registering the
+                             last datetime and line parsed. Useful if you want
+                             to watch errors since last run or if you want one
+                             report per day with a log rotated each week.
+    -m | --maxlength size  : maximum length of a query, it will be restricted to
+                             the given size. Default: no truncate
+    -n | --nohighlight     : disable SQL code highlighting.
+    -N | --appname name    : only report on entries for given application name
+    -o | --outfile filename: define the filename for the output. Default depends
+                             on the output format: out.html, out.txt or out.tsung.
+                             To dump output to stdout use - as filename.
+    -p | --prefix string   : give here the value of your custom log_line_prefix
+                             defined in your postgresql.conf. Only use it if you
+                             aren't using one of the standard prefixes specified
+                             in the pgBadger documentation, such as if your prefix
+                             includes additional variables like client ip or
+                             application name. See examples below.
+    -P | --no-prettify     : disable SQL queries prettify formatter.
+    -q | --quiet           : don't print anything to stdout, even not a progress bar.
+    -s | --sample number   : number of query samples to store/display. Default: 3
+    -S | --select-only     : use it if you want to report select queries only.
+    -t | --top number      : number of queries to store/display. Default: 20
+    -T | --title string    : change title of the HTML page report.
+    -u | --dbuser username : only report on entries for the given user.
+    -U | --exclude-user username : exclude entries for the specified user from report.
+    -v | --verbose         : enable verbose or debug mode. Disabled by default.
+    -V | --version         : show pgBadger version and exit.
+    -w | --watch-mode      : only report errors just like logwatch could do.
+    -x | --extension       : output format. Values: text, html or tsung. Default: html
+    -z | --zcat exec_path  : set the full path to the zcat program. Use it if
+                             zcat or bzcat or unzip is not on your path.
+    --pie-limit num        : pie data lower than num% will show a sum instead.
+    --exclude-query regex  : any query matching the given regex will be excluded
+			                 from the report. For example: "^(VACUUM|COMMIT)"
+                             You can use this option multiple times.
+    --exclude-file filename: path of the file which contains all the regex to use
+                             to exclude queries from the report. One regex per line.
+    --include-query regex  : any query that does not match the given regex will be
+                             excluded from the report. For example: "(table_1|table_2)"
+                             You can use this option multiple times.
+    --include-file filename: path of the file which contains all the regex of the
+                             queries to include from the report. One regex per line.
+    --disable-error        : do not generate error report.
+    --disable-hourly       : do not generate hourly report.
+    --disable-type         : do not generate query type report.
+    --disable-query        : do not generate query reports (slowest, most
+                             frequent, ...).
+    --disable-session      : do not generate session report.
+    --disable-connection   : do not generate connection report.
+    --disable-lock         : do not generate lock report.
+    --disable-temporary    : do not generate temporary report.
+    --disable-checkpoint   : do not generate checkpoint report.
+    --disable-autovacuum   : do not generate autovacuum report.
+    --enable-log_duration  : force pgBadger to use log_duration even if
+                             log_min_duration_statement format is autodetected.
+    --enable-log_min_duration: force pgBadger to use log_min_duration even if
+                             log_duration format is autodetected.
+
+Examples:
+
+	pgbadger /var/log/postgresql.log
+	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
+		       /var/log/postgres.log
+	pgbadger /var/log/postgresql/postgresql-2012-05-*
+	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" \
+		       /var/log/postgresql.log
+	cat /var/log/postgres.log | pgbadger -
+	# log prefix with stderr log output
+	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
+			/pglog/postgresql-2012-08-21*
+	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+	# Log line prefix with syslog log output
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
+			/pglog/postgresql-2012-08-21*
+
+Generate Tsung sessions XML file with select queries only:
+
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
+
+Reporting errors every week by cron job:
+
+    30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
+
+Generate report every week using incremental behavior:
+
+    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
+	-o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
+
+This supposes that your log file and HTML report are also rotated every week.
+
+};
+
+	exit 0;
+}
+
+####
+# Main function called per each parser process
+####
 sub process_file
 {
 	my ($logfile, $tmpoutfile, $start_offset, $stop_offset) = @_;
@@ -1050,194 +1252,6 @@ sub process_file
 	return 0;
 }
 
-# Save last line parsed
-if ($last_parsed && scalar keys %last_line) {
-	if (open(OUT, ">$last_parsed")) {
-		print OUT "$last_line{datetime}\t$last_line{orig}\n";
-		close(OUT);
-	} else {
-		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
-	}
-}
-
-my $t1 = Benchmark->new;
-my $td = timediff($t1, $t0);
-&logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
-
-&logmsg('DEBUG', "Ok, generating $extension report...");
-
-# Open filehandle
-my $fh = undef;
-if ($extension ne 'tsung') {
-	$fh = new IO::File ">$outfile";
-	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
-	}
-	if (($extension eq 'text') || ($extension eq 'txt')) {
-		if ($error_only) {
-			&dump_error_as_text();
-		} else {
-			&dump_as_text();
-		}
-	} elsif ($extension eq 'binary') {
-		&dump_as_binary($fh);
-	} else {
-		# Create instance to prettify SQL query
-		if (!$noprettify) {
-			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
-		}
-		if ($error_only) {
-			&dump_error_as_html();
-		} else {
-			&dump_as_html();
-		}
-	}
-	$fh->close;
-} else {
-
-	# Open filehandle
-	$fh = new IO::File ">>$outfile";
-	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
-	}
-	print $fh "</sessions>\n";
-	$fh->close();
-}
-
-my $t2 = Benchmark->new;
-$td = timediff($t2, $t1);
-&logmsg('DEBUG', "the report generating took:" . timestr($td));
-$td = timediff($t2, $t0);
-&logmsg('DEBUG', "the total execution time took:" . timestr($td));
-
-exit 0;
-
-#-------------------------------------------------------------------------------
-
-# Show PgBadger command line usage
-sub usage
-{
-	print qq{
-Usage: pgbadger [options] logfile [...]
-
-	PostgreSQL log analyzer with fully detailed reports and graphs.
-
-Arguments:
-
-    logfile can be a single log file, a list of files, or a shell command
-    returning a list of files. If you want to pass log content from stdin
-    use - as filename. Note that input from stdin will not work with csvlog.
-
-Options:
-
-    -a | --average minutes : number of minutes to build the average graphs of
-                             queries and connections.
-    -b | --begin datetime  : start date/time for the data to be parsed in log.
-    -c | --dbclient host   : only report on entries for the given client host.
-    -C | --nocomment       : remove comments like /* ... */ from queries.
-    -d | --dbname database : only report on entries for the given database.
-    -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
-    -G | --nograph         : disable graphs on HTML output. Enable by default.
-    -h | --help            : show this message and exit.
-    -i | --ident name      : programname used as syslog ident. Default: postgres
-    -j | --jobs number     : number of jobs to run at same time. Default is 1,
-			     run as single process.
-    -l | --last-parsed file: allow incremental log parsing by registering the
-                             last datetime and line parsed. Useful if you want
-                             to watch errors since last run or if you want one
-                             report per day with a log rotated each week.
-    -m | --maxlength size  : maximum length of a query, it will be restricted to
-                             the given size. Default: no truncate
-    -n | --nohighlight     : disable SQL code highlighting.
-    -N | --appname name    : only report on entries for given application name
-    -o | --outfile filename: define the filename for the output. Default depends
-                             on the output format: out.html, out.txt or out.tsung.
-                             To dump output to stdout use - as filename.
-    -p | --prefix string   : give here the value of your custom log_line_prefix
-                             defined in your postgresql.conf. Only use it if you
-                             aren't using one of the standard prefixes specified
-                             in the pgBadger documentation, such as if your prefix
-                             includes additional variables like client ip or
-                             application name. See examples below.
-    -P | --no-prettify     : disable SQL queries prettify formatter.
-    -q | --quiet           : don't print anything to stdout, even not a progress bar.
-    -s | --sample number   : number of query samples to store/display. Default: 3
-    -S | --select-only     : use it if you want to report select queries only.
-    -t | --top number      : number of queries to store/display. Default: 20
-    -T | --title string    : change title of the HTML page report.
-    -u | --dbuser username : only report on entries for the given user.
-    -U | --exclude-user username : exclude entries for the specified user from report.
-    -v | --verbose         : enable verbose or debug mode. Disabled by default.
-    -V | --version         : show pgBadger version and exit.
-    -w | --watch-mode      : only report errors just like logwatch could do.
-    -x | --extension       : output format. Values: text, html or tsung. Default: html
-    -z | --zcat exec_path  : set the full path to the zcat program. Use it if
-                             zcat or bzcat or unzip is not on your path.
-    --pie-limit num        : pie data lower than num% will show a sum instead.
-    --exclude-query regex  : any query matching the given regex will be excluded
-			                 from the report. For example: "^(VACUUM|COMMIT)"
-                             You can use this option multiple times.
-    --exclude-file filename: path of the file which contains all the regex to use
-                             to exclude queries from the report. One regex per line.
-    --include-query regex  : any query that does not match the given regex will be
-                             excluded from the report. For example: "(table_1|table_2)"
-                             You can use this option multiple times.
-    --include-file filename: path of the file which contains all the regex of the
-                             queries to include from the report. One regex per line.
-    --disable-error        : do not generate error report.
-    --disable-hourly       : do not generate hourly report.
-    --disable-type         : do not generate query type report.
-    --disable-query        : do not generate query reports (slowest, most
-                             frequent, ...).
-    --disable-session      : do not generate session report.
-    --disable-connection   : do not generate connection report.
-    --disable-lock         : do not generate lock report.
-    --disable-temporary    : do not generate temporary report.
-    --disable-checkpoint   : do not generate checkpoint report.
-    --disable-autovacuum   : do not generate autovacuum report.
-    --enable-log_duration  : force pgBadger to use log_duration even if
-                             log_min_duration_statement format is autodetected.
-    --enable-log_min_duration: force pgBadger to use log_min_duration even if
-                             log_duration format is autodetected.
-
-Examples:
-
-	pgbadger /var/log/postgresql.log
-	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz \
-		       /var/log/postgres.log
-	pgbadger /var/log/postgresql/postgresql-2012-05-*
-	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
-	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" \
-		       /var/log/postgresql.log
-	cat /var/log/postgres.log | pgbadger -
-	# log prefix with stderr log output
-	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' \
-			/pglog/postgresql-2012-08-21*
-	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
-	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
-			/pglog/postgresql-2012-08-21*
-
-Generate Tsung sessions XML file with select queries only:
-
-    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
-
-Reporting errors every week by cron job:
-
-    30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
-
-Generate report every week using incremental behavior:
-
-    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
-	-o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
-
-This supposes that your log file and HTML report are also rotated every week.
-
-};
-
-	exit 0;
-}
 
 # Method used to check if we have already reach the last parsing position in incremental mode
 # This position should have been saved in the incremental file and read in the $last_parsed at
@@ -5881,15 +5895,6 @@ sub split_logfile
 	push(@chunks, $totalsize);
 
 	return @chunks;
-}
-
-
-# Inclusion of Perl package Proc::Queue
-# Copyright (C) 2001, 2002, 2003, 2005 Salvador Fandino Garcia
-# This library is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself.
-{
-	print "Proc::Queue should be inserted here\n";
 }
 
 __DATA__
