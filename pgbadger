@@ -150,6 +150,7 @@ my $select_only             = 0;
 my $enable_log_min_duration = 0;
 my $tsung_queries           = 0;
 my $queue_size              = 0;
+my $job_per_file            = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -181,6 +182,7 @@ my $result = GetOptions(
 	"h|help!"                  => \$help,
 	"i|ident=s"                => \$ident,
 	"j|jobs=s"                 => \$queue_size,
+	"J!job_per_file"           => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
 	"m|maxlength=i"            => \$maxlength,
 	"N|appname=s"              => \@dbappname,
@@ -328,6 +330,7 @@ $graph = 0 if ($nograph);
 # Set some default values
 my $end_top = $top - 1;
 $queue_size ||= 1;
+$job_per_file ||= 1;
 
 if ($extension eq 'tsung') {
 
@@ -615,27 +618,42 @@ my @given_log_files = ( @log_files );
 # log files must be erase when loading stats from binary format
 @log_files = () if $format eq 'binary';
 
-if ($queue_size > 1) {
+if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
-	Proc::Queue::size($queue_size);
+	if ($queue_size > 1) {
+		Proc::Queue::size($queue_size);
+	} else {
+		Proc::Queue::size($job_per_file);
+	}
 
 	my @tempfiles = ();
 	foreach my $logfile ( @given_log_files ) {
-		my @chunks = &split_logfile($logfile);
-		for (my $i = 0; $i < $#chunks; $i++) {
+		if ($queue_size > 1) {
+			# Create multiple process to parse one log file by chunks of data
+			my @chunks = &split_logfile($logfile);
+			for (my $i = 0; $i < $#chunks; $i++) {
+				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ) ]);
+				spawn sub {
+					&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1]);
+				};
+			} 
+		} else {
+			# Create on process per log files to parse
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ) ]);
 			spawn sub {
-				&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1]);
+				&process_file($logfile, $tempfiles[-1]->[0]);
 			};
-		} 
+		}
 	}
+	# Wait for all child dies
 	1 while wait != -1;
 
-	# Load all data gathered by the differents processes
+	# Load all data gathered by all the differents processes
 	foreach my $f (@tempfiles) {
-		open($fh, $f->[1]) or die "FATAL: can't open file $f->[1], $!\n";
-		&load_stats($fh);
-		$fh->close();
+		my $fht = new IO::File;
+		$fht->open("< $f->[1]") or die "FATAL: can't open file $f->[1], $!\n";
+		&load_stats($fht);
+		$fht->close();
 	}
 
 } else {
