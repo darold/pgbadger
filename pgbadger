@@ -37,15 +37,16 @@ use Time::Local 'timegm_nocheck';
 use POSIX qw(locale_h sys_wait_h);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
-use File::Temp qw/ :seekable /;
+use File::Temp qw/ :seekable tempfile /;
 use Proc::Queue size => 1, ':all';
 
 $VERSION = '2.3';
 
+$SIG{'CHLD'} = 'DEFAULT';
+
 ####
 # method used to fork as many child as wanted
 ##
-my @global_pids = ();
 sub spawn
 {
 	my $coderef = shift;
@@ -60,7 +61,6 @@ sub spawn
 		print STDERR "Error: cannot fork: $!\n";
 		return;
 	} elsif ($pid) {
-		push(@global_pids, $pid);
 		return; # the parent
 	}
 	# the child -- go spawn
@@ -71,16 +71,19 @@ sub spawn
 }
 
 # With multiprocess we need to wait all childs
+my $abort = 0;
 sub wait_child
 {
+        my $sig = shift;
+	$abort = 1;
+        print STDERR "Received terminating signal ($sig).\n";
         1 while wait != -1;
         $SIG{INT} = \&wait_child;
         $SIG{TERM} = \&wait_child;
 }
 $SIG{INT} = \&wait_child;
 $SIG{TERM} = \&wait_child;
-$SIG{QUIT} = \&wait_child;
-$SIG{'CHLD'} = 'DEFAULT';
+
 
 $| = 1;
 
@@ -181,8 +184,8 @@ my $result = GetOptions(
 	"G|nograph!"               => \$nograph,
 	"h|help!"                  => \$help,
 	"i|ident=s"                => \$ident,
-	"j|jobs=s"                 => \$queue_size,
-	"J!job_per_file"           => \$job_per_file,
+	"j|jobs=i"                 => \$queue_size,
+	"J|job_per_file=i"         => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
 	"m|maxlength=i"            => \$maxlength,
 	"N|appname=s"              => \@dbappname,
@@ -628,10 +631,12 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
 	my @tempfiles = ();
 	foreach my $logfile ( @given_log_files ) {
+		last if ($abort);
 		if ($queue_size > 1) {
 			# Create multiple process to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			for (my $i = 0; $i < $#chunks; $i++) {
+				last if ($abort);
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', TMPDIR => 1, UNLINK => 1 ) ]);
 				spawn sub {
 					&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1]);
@@ -645,6 +650,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 			};
 		}
 	}
+
 	# Wait for all child dies
 	1 while wait != -1;
 
@@ -668,6 +674,10 @@ sub process_file
 	my ($logfile, $tmpoutfile, $start_offset, $stop_offset) = @_;
 
 	&logmsg('DEBUG', "Starting to parse log file: $logfile");
+
+	my $terminate = 0;
+	local $SIG{INT} = sub { $terminate = 1 };
+	local $SIG{TERM} = sub { $terminate = 1 };
 
 	my $curdate = localtime(time);
 
@@ -693,6 +703,9 @@ sub process_file
 		# Parse csvlog lines
 		my $getout = 0;
 		while (my $row = $csv->getline($lfile)) {
+
+			# We received a signal
+			last if ($terminate);
 
 			# Set progress statistics
 			$cursize += length(join(',', @$row));
@@ -793,6 +806,10 @@ sub process_file
 			$cursize += $start_offset;
 		}
 		while (my $line = <$lfile>) {
+
+			# We received a signal
+			last if ($terminate);
+
 			$cursize += length($line);
 			chomp($line);
 			$line =~ s/\r//;
@@ -1029,6 +1046,8 @@ sub process_file
 		&dump_as_binary($tmpoutfile);
 		$tmpoutfile->close();
 	}
+
+	return 0;
 }
 
 # Save last line parsed
