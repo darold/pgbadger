@@ -4022,13 +4022,13 @@ sub load_stats
 
 	foreach my $q (keys %_error_info) {
 		$error_info{$q}{count} += $_error_info{$q}{count};
-		push(@{$error_info{$q}{date}},      $_error_info{$q}{date});
-		push(@{$error_info{$q}{detail}},    $_error_info{$q}{detail});
-		push(@{$error_info{$q}{context}},   $_error_info{$q}{context});
-		push(@{$error_info{$q}{statement}}, $_error_info{$q}{statement});
-		push(@{$error_info{$q}{hint}},      $_error_info{$q}{hint});
-		push(@{$error_info{$q}{error}},     $_error_info{$q}{error});
-		push(@{$error_info{$q}{db}},        $_error_info{$q}{db});
+		push(@{$error_info{$q}{date}},      @{$_error_info{$q}{date}});
+		push(@{$error_info{$q}{detail}},    @{$_error_info{$q}{detail}});
+		push(@{$error_info{$q}{context}},   @{$_error_info{$q}{context}});
+		push(@{$error_info{$q}{statement}}, @{$_error_info{$q}{statement}});
+		push(@{$error_info{$q}{hint}},      @{$_error_info{$q}{hint}});
+		push(@{$error_info{$q}{error}},     @{$_error_info{$q}{error}});
+		push(@{$error_info{$q}{db}},        @{$_error_info{$q}{db}});
 		foreach my $day (keys %{ $_error_info{$q}{chronos} }) {
 			foreach my $hour (keys %{$_error_info{$q}{chronos}{$day}}) {
 				$error_info{$q}{chronos}{$day}{$hour}{count} += $_error_info{$q}{chronos}{$day}{$hour}{count};
