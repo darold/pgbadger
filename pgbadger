@@ -1507,7 +1507,7 @@ Report not supported by text format
 };
 	}
 
-	if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
+	if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 
 		# INSERT/DELETE/UPDATE/SELECT repartition
 		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
@@ -2092,12 +2092,12 @@ EOF
 		if (!$disable_hourly && ($overall_stat{'queries_number'} || exists $connection_info{chronos})) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
-		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
+		if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 			print $fh qq{<a href="#RequestsDatabaseReport">Queries per database</a> | } if (scalar keys %database_info > 1);
 			print $fh qq{<a href="#RequestsApplicationReport">Queries per application</a> | } if (scalar keys %application_info > 1);
 		}
-		if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
+		if (!$disable_query && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
@@ -2160,7 +2160,7 @@ sub html_footer
 		if (!$disable_hourly && ($overall_stat{'queries_number'} || exists $connection_info{chronos})) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
-		if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
+		if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 			print $fh qq{<li><a href="#RequestsDatabaseReport">Queries per database</a></li>} if (scalar keys %database_info > 1);
 			print $fh qq{<li><a href="#RequestsApplicationReport">Queries per application</a></li>} if (scalar keys %application_info > 1);
@@ -2656,7 +2656,7 @@ sub dump_as_html
 		}
 	}
 
-	if (!$disable_hourly) {
+	if (!$disable_hourly && (scalar keys %per_hour_info > 0)) {
 		if ($tempfile_info{count} || exists $checkpoint_info{chronos} || exists $autovacuum_info{chronos} ) {
 			print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 		}
@@ -2680,7 +2680,7 @@ sub dump_as_html
 		if ($tempfile_info{count}) {
 			print $fh qq{<th>Count</th><th>Av.&nbsp;size</th>};
 		}
-		if (exists $checkpoint_info{chronos} && $checkpoint_info{wbuffer}) {
+		if ($checkpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
@@ -2940,7 +2940,7 @@ sub dump_as_html
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	if (!$disable_type && (!$log_duration || $enable_log_min_duration)) {
+	if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 		print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -3405,7 +3405,7 @@ sub dump_as_html
 	}
 
 	# Show top information
-	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
+	if (!$disable_query && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
 		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
