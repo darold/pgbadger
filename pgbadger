@@ -2663,8 +2663,10 @@ sub dump_as_html
 		if ($tempfile_info{count}) {
 			print $fh qq{<th colspan="2">Temporary files</th>};
 		}
-		if (exists $checkpoint_info{chronos}) {
-			print $fh qq{<th colspan="7">Checkpoints</th>};
+		if ($checkpoint_info{wbuffer}) {
+			if (exists $checkpoint_info{chronos}) {
+				print $fh qq{<th colspan="7">Checkpoints</th>};
+			}
 		}
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th colspan="2">Checkpoint warning</th>};
@@ -2678,9 +2680,9 @@ sub dump_as_html
 		if ($tempfile_info{count}) {
 			print $fh qq{<th>Count</th><th>Av.&nbsp;size</th>};
 		}
-		if (exists $checkpoint_info{chronos}) {
+		if (exists $checkpoint_info{chronos} && $checkpoint_info{wbuffer}) {
 			print $fh
-qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+	qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th>Count</th><th>Av. time (sec)</th>};
@@ -2707,7 +2709,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 						print $fh "<td class=\"right\">", &comma_numbers($tempfile_info{chronos}{$d}{$h}{count} || 0),
 							"</td><td class=\"right\">$temp_average</td>";
 					}
-					if (exists $checkpoint_info{chronos}) {
+					if (exists $checkpoint_info{chronos} && $checkpoint_info{wbuffer}) {
 						if (exists $checkpoint_info{chronos}{$d}{$h}) {
 							print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{wbuffer}) || 0,
 								"</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{file_added})   || 0,
@@ -2718,23 +2720,24 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 								"</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{sync})  || 0,
 								"</td><td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{total}) || 0,
 								"</td>";
-							if ($checkpoint_info{warning}) {
-								print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{warning}) || 0,
-									"</td><td class=\"right\">",
-									&comma_numbers(
-									sprintf(
-										"%.2f",
-										($checkpoint_info{chronos}{$d}{$h}{warning_seconds} || 0) /
-											($checkpoint_info{chronos}{$d}{$h}{warning} || 1)
-										   )
-									) || 0, "</td>";
-							}
 						} else {
 							print $fh
 "<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
-							if ($checkpoint_info{warning}) {
-								print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
-							}
+						}
+					}
+					if (exists $checkpoint_info{chronos} && $checkpoint_info{warning}) {
+						if (exists $checkpoint_info{chronos}{$d}{$h}{warning}) {
+							print $fh "<td class=\"right\">", &comma_numbers($checkpoint_info{chronos}{$d}{$h}{warning}) || 0,
+								"</td><td class=\"right\">",
+								&comma_numbers(
+								sprintf(
+									"%.2f",
+									($checkpoint_info{chronos}{$d}{$h}{warning_seconds} || 0) /
+										($checkpoint_info{chronos}{$d}{$h}{warning} || 1)
+									   )
+								) || 0, "</td>";
+						} else {
+							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
 						}
 					}
 					if (exists $autovacuum_info{chronos}) {
@@ -2750,7 +2753,7 @@ qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Writ
 	}
 	if (!$disable_hourly && $graph) {
 		# checkpoint size
-		if (exists $checkpoint_info{chronos}) {
+		if (exists $checkpoint_info{chronos} && $checkpoint_info{wbuffer}) {
 			foreach my $tm (sort {$a <=> $b} keys %{$checkpoint_info{chronos}}) {
 				$tm =~ /(\d{4})(\d{2})(\d{2})/;
 				my $y  = $1 - 1900;
