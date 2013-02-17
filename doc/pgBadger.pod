@@ -23,12 +23,14 @@ Options:
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
     -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+    -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
-    -i | --ident name      : program name used as syslog ident. Default: postgres
-    -j | --jobs number     : number of jobs to run at same time. Default is 1,
-			     run as single process.
+    -i | --ident name      : programname used as syslog ident. Default: postgres
+    -j | --jobs number     : number of jobs to run on parallel on each log file.
+                             Default is 1, run as single process.
+    -J | --Jobs number     : number of log file to parse in parallel. Default
+                             is 1, run as single process.
     -l | --last-parsed file: allow incremental log parsing by registering the
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
@@ -37,8 +39,8 @@ Options:
                              the given size. Default: no truncate
     -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
-    -o | --outfile filename: define the filename for the output. Default depends
-                             on the output format: out.html, out.txt or out.tsung.
+    -o | --outfile filename: define the filename for output. Default depends on
+                             the output format: out.html, out.txt or out.tsung.
                              To dump output to stdout use - as filename.
     -p | --prefix string   : give here the value of your custom log_line_prefix
                              defined in your postgresql.conf. Only use it if you
@@ -118,6 +120,7 @@ Generate report every week using incremental behavior:
 This supposes that your log file and HTML report are also rotated every week.
 
 =head1 DESCRIPTION
+
 pgBadger is a PostgreSQL log analyzer built for speed with fully detailed reports from your PostgreSQL log file. It's a single and small Perl script that aims to replace and out-perform the old PHP script pgFouine.
 
 By the way, we would like to thank Guillaume Smet for all the work he has done on this really nice tool. We've been using it a long time, it is a really great tool!
@@ -146,6 +149,7 @@ The following reports are also available with hourly charts:
 	Distribution of queries type per database/application
 	Sessions per database/user/client.
 	Connections per database/user/client.
+	Autovacuum and autoanalyze per table.
 
 All charts are zoomable and can be saved as PNG images. SQL queries reported are highlighted and beautified automatically.
 
@@ -221,6 +225,34 @@ Of course your log messages should be in English without locale support:
 	lc_messages='C'
 
 but this is not only recommended by pgBadger.
+
+=head1 Parallel processing
+
+To enable parallel processing you just have to use the -j N option where N is
+the number of cores you want to use.
+
+pgbadger will then proceed as follow:
+
+	for each log file
+	    chunk size = int(file size / N)
+	    look at start/end offsets of these chunks
+	    fork N processes and seek to the start offset of each chunk
+		each process will terminate when the parser reach the end offset
+		of its chunk
+		each process write stats into a binary temporary file
+	   wait for all children has terminated
+	All binary temporary files generated will then be read and loaded into
+	memory to build the html output.
+
+The problem with that method is that start/end of chunks may truncate or omit a
+maximum of N queries perl log file which is an insignificant gap if you have
+millions of queries in your log file. The chance that the query that you were
+looking for is loose is near 0, this is why I think this gap is livable.
+
+When you have lot of small log files and lot of CPUs it is speedier to dedicate
+one core to one log file at a time. To enable this behavior you have to use
+option -J N instead. With 200 log files of 10MB each the use of the -J option
+start being really interesting with 8 Cores.
 
 =head1 log_min_duration_statement versus log_duration
 
