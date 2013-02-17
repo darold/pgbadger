@@ -8,7 +8,9 @@
 # For license terms, see the LICENSE file.
 #------------------------------------------------------------------------------
 #
-# You must enable SQL query logging : log_min_duration_statement = 0
+# Settings in postgresql.conf
+#
+# You should enable SQL query logging with log_min_duration_statement >= 0
 # With stderr output
 #  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] '
 #  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
@@ -149,11 +151,8 @@ my $t_min                   = 0;
 my $t_max                   = 0;
 my $t_min_hour              = 0;
 my $t_max_hour              = 0;
-my $log_duration            = 0;
-my $enable_log_duration     = 0;
 my $remove_comment          = 0;
 my $select_only             = 0;
-my $enable_log_min_duration = 0;
 my $tsung_queries           = 0;
 my $queue_size              = 0;
 my $job_per_file            = 0;
@@ -224,8 +223,6 @@ my $result = GetOptions(
 	"disable-temporary!"       => \$disable_temporary,
 	"disable-checkpoint!"      => \$disable_checkpoint,
 	"disable-autovacuum!"      => \$disable_autovacuum,
-	"enable-log_duration!"     => \$enable_log_duration,
-	"enable-log_min_duration!" => \$enable_log_min_duration,
 	"client=s"                 => \@dbclient2, # Backward compatibility
 );
 push(@dbclient, @dbclient2); # Backward compatibility
@@ -269,22 +266,6 @@ $avg_minutes = 1  if ($avg_minutes < 1);
 
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
-
-$log_duration ||= &autodetect_duration($log_files[0])
-	unless $format eq 'binary'; # do not try to autodetect w/ binary format
-
-$log_duration = 1 if ($enable_log_duration);
-$log_duration = 0 if ($enable_log_min_duration);
-
-if ($enable_log_min_duration && $enable_log_duration) {
-	print STDERR "FATAL: you must choose between reports based on log_duration or log_min_duration_statement.\n\n";
-	&usage();
-}
-if ($log_duration) {
-	&logmsg('DEBUG', "Enabling log duration format.");
-} else {
-	&logmsg('DEBUG', "Enabling log min duration format.");
-}
 
 # Set default top query
 $top ||= 20;
@@ -850,10 +831,6 @@ Options:
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
     --disable-autovacuum   : do not generate autovacuum report.
-    --enable-log_duration  : force pgBadger to use log_duration even if
-                             log_min_duration_statement format is autodetected.
-    --enable-log_min_duration: force pgBadger to use log_min_duration even if
-                             log_duration format is autodetected.
 
 Examples:
 
@@ -1622,10 +1599,10 @@ Report not supported by text format
 };
 	}
 
-	if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+	# INSERT/DELETE/UPDATE/SELECT repartition
+	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+	if (!$disable_type && $totala) {
 
-		# INSERT/DELETE/UPDATE/SELECT repartition
-		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
 		my $total = $overall_stat{'queries_number'} || 1;
 		print $fh "\n- Queries by type ------------------------------------------------------\n\n";
 		print $fh "Type     Count     Percentage\n";
@@ -1752,7 +1729,7 @@ Report not supported by text format
 	}
 
 	# Show top information
-	if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
+	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
@@ -1798,10 +1775,11 @@ Report not supported by text format
 			}
 			$idx++;
 		}
-
+	}
+	if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
 		print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
 		print $fh "Rank     Times executed     Total duration     Av. duration (s)     Query\n";
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
 			last if ($idx > $top);
@@ -1830,10 +1808,12 @@ Report not supported by text format
 			}
 			$idx++;
 		}
+	}
 
+	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
 		print $fh "Rank     Av. duration (s)     Times executed     Total duration     Query\n";
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
 			last if ($idx > $top);
@@ -2207,18 +2187,21 @@ EOF
 		if (!$disable_hourly && ($overall_stat{'queries_number'} || exists $connection_info{chronos})) {
 			print $fh qq{<a href="#HourlyStatsReport">Hourly statistics</a> | };
 		}
-		if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+		my $totype = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+		if (!$disable_type && $totype) {
 			print $fh qq{<a href="#QueriesByTypeReport">Queries by type</a> | };
 			print $fh qq{<a href="#RequestsDatabaseReport">Queries per database</a> | } if (scalar keys %database_info > 1);
 			print $fh qq{<a href="#RequestsApplicationReport">Queries per application</a> | } if (scalar keys %application_info > 1);
 		}
-		if (!$disable_query && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+		if (!$disable_query && ($#top_slowest >= 0)) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
 <a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
-<a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a><br />
 <a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> |
-		}
+};
+		} 
+		if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
+			print $fh "<a href=\"#NormalizedQueriesMostFrequentReport\">Most frequent queries (N)</a> <br />";
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
 			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
@@ -2275,7 +2258,8 @@ sub html_footer
 		if (!$disable_hourly && ($overall_stat{'queries_number'} || exists $connection_info{chronos})) {
 			print $fh qq{<li><a href="#HourlyStatsReport">Hourly statistics</a></li>};
 		}
-		if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+		my $totype = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+		if (!$disable_type && $totype) {
 			print $fh qq{<li><a href="#QueriesByTypeReport">Queries by type</a></li>};
 			print $fh qq{<li><a href="#RequestsDatabaseReport">Queries per database</a></li>} if (scalar keys %database_info > 1);
 			print $fh qq{<li><a href="#RequestsApplicationReport">Queries per application</a></li>} if (scalar keys %application_info > 1);
@@ -2305,9 +2289,12 @@ sub html_footer
 				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
 			}
 		}
-		if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
+		if (!$disable_query && ($#top_slowest >= 0)) {
 			print $fh
-qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
+qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
+		}
+		if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
+			print $fh qq{<li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li></li>};
 		}
 	}
 	if (!$disable_error && (scalar keys %error_info > 0)) {
@@ -2698,7 +2685,7 @@ sub dump_as_html
 			$d1 = '';
 			$d2 = '';
 
-			if (!$disable_query && (!$log_duration || $enable_log_min_duration)) {
+			if (!$disable_query) {
 
 				# Select queries
 				foreach my $tm (sort {$a <=> $b} keys %per_hour_info) {
@@ -3055,7 +3042,12 @@ sub dump_as_html
 	}
 
 	# INSERT/DELETE/UPDATE/SELECT repartition
-	if (!$disable_type && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+	$overall_stat{'SELECT'} ||= 0;
+	$overall_stat{'INSERT'} ||= 0;
+	$overall_stat{'UPDATE'} ||= 0;
+	$overall_stat{'DELETE'} ||= 0;
+	my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
+	if (!$disable_type && $totala) {
 		print $fh qq{
 <h2 id="QueriesByTypeReport">Queries by type <a href="#top" title="Back to top">^</a></h2>
 <table>
@@ -3068,11 +3060,6 @@ sub dump_as_html
 		<th>Percentage</th>
 	</tr>
 };
-		$overall_stat{'SELECT'} ||= 0;
-		$overall_stat{'INSERT'} ||= 0;
-		$overall_stat{'UPDATE'} ||= 0;
-		$overall_stat{'DELETE'} ||= 0;
-		my $totala = $overall_stat{'SELECT'} + $overall_stat{'INSERT'} + $overall_stat{'UPDATE'} + $overall_stat{'DELETE'};
 		my $total = $overall_stat{'queries_number'} || 1;
 
 		print $fh "<tr class=\"row0\"><td>SELECT</td><td class=\"right\">", &comma_numbers($overall_stat{'SELECT'}),
@@ -3520,7 +3507,7 @@ sub dump_as_html
 	}
 
 	# Show top information
-	if (!$disable_query && $overall_stat{'queries_number'} && (!$log_duration || $enable_log_min_duration)) {
+	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh qq{
 <h2 id="SlowestQueriesReport">Slowest queries <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
@@ -3620,6 +3607,9 @@ sub dump_as_html
 			$idx++;
 		}
 		print $fh "</table>\n";
+	}
+
+	if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
 
 		print $fh qq{
 <h2 id="NormalizedQueriesMostFrequentReport">Most frequent queries (N) <a href="#top" title="Back to top">^</a></h2>
@@ -3632,7 +3622,7 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
 			last if ($idx > $top);
@@ -3691,7 +3681,9 @@ sub dump_as_html
 			$idx++;
 		}
 		print $fh "</table>\n";
+	}
 
+	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh qq{
 <h2 id="NormalizedQueriesSlowestAverageReport">Slowest queries (N) <a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
@@ -3704,7 +3696,7 @@ sub dump_as_html
 		<th>Query</th>
 	</tr>
 };
-		$idx = 1;
+		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 			next if (!$k || !$normalyzed_info{$k}{count});
 			last if ($idx > $top);
@@ -4218,9 +4210,7 @@ sub load_stats
 	### normalyzed_info ###
 
 	foreach my $stmt (keys %_normalyzed_info) {
-		# if we have at least one key, so we have at least one stmt
-		# so disable $log_duration.
-		$log_duration = 0;
+
 		foreach my $dt (keys %{$_normalyzed_info{$stmt}{samples}} ) {
 			$normalyzed_info{$stmt}{samples}{$dt} = $_normalyzed_info{$stmt}{samples}{$dt};
 		}
@@ -4301,9 +4291,6 @@ sub load_stats
 
 	### top_slowest ###
 	@top_slowest = (sort {$b->[0] <=> $a->[0]} (@top_slowest, @_top_slowest))[0 .. $end_top];
-
-	# disable log_duration if we have a query
-	$log_duration = 0 if $#top_slowest > -1;
 
 	### checkpoint_info ###
 	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
@@ -4810,64 +4797,72 @@ sub parse_query
 		}
 	}
 
-	# Extract the duration and the query parts from the entry
-	my $duration_required = 1;
-	if ($error_only || ($disable_hourly && $disable_query)) {
-		$duration_required = 0;
+	# Registrer previous query storage into global statistics before starting to store current query 
+	if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
+		&store_queries($t_pid);
+		delete $cur_info{$t_pid};
 	}
-	my $t_action   = '';
-	my $t_duration = '';
-	if ($log_duration) {
-		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
-			$t_duration             = $1;
-			$t_action               = 'statement';
-			$prefix_vars{'t_query'} = 'No log_min_duration';
-		} elsif (!$enable_log_min_duration) {
-			if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-				&store_queries($t_pid);
-				delete $cur_info{$t_pid};
-			}
-			return;
-		}
+
+	# Log lines with duration only, generated by log_duration = on in postgresql.conf
+	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
+		$prefix_vars{'t_duration'} = $1;
+		$prefix_vars{'t_query'} = '';
+		&set_current_infos($t_pid);
+		return;
 	}
-	if (!$log_duration || $enable_log_min_duration) {
-		if (($extension eq 'tsung') && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'}) {
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $prefix_vars{'t_dbuser'};
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
-		}
-		if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
-			$t_duration = $1;
-			$t_action   = $2;
-		} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)
-		{
-			$t_duration = $1;
-			$t_action   = $2;
 
-			# Skipping parse and bind logs
-			return if ($t_action !~ /query|statement|execute/);
-		} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(query|statement): //is)) {
-			$t_action = $1;
-		} elsif (!$duration_required && ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is))
-		{
-			$t_action = $1;
+	# Store info as tsung session following the output file extension
+	if (($extension eq 'tsung') && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'}) {
+		$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
+		$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $prefix_vars{'t_dbuser'};
+		$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
+	}
 
-			# Skipping parse and bind logs
-			return if ($t_action !~ /query|statement|execute/);
-		} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
-			if ($prefix_vars{'t_query'} !~
+	my $t_action = '';
+	# Store query duration generated by log_min_duration >= 0 in postgresql.conf
+	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
+		$prefix_vars{'t_duration'} = $1;
+		$t_action   = $2;
+	# Log line with duration and statement from prepared queries
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)
+	{
+		$prefix_vars{'t_duration'} = $1;
+		$t_action   = $2;
+	# Log line without duration at all
+	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
+		$t_action = $1;
+	# Log line without duration at all from prepared queries
+	} elsif ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)
+	{
+		$t_action = $1;
+	# Log line that should not be parse
+	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
+		if ($prefix_vars{'t_query'} !~
 /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for|database system was shut down/
-			   )
-			{
-				&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
-			}
-			if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-				&store_queries($t_pid);
-				delete $cur_info{$t_pid};
-			}
-			return;
+		   )
+		{
+			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
 		}
+		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
+			&store_queries($t_pid);
+			delete $cur_info{$t_pid};
+		}
+		return;
 	}
+
+	# Skipping parse and bind logs
+	return if ($t_action !~ /query|statement|execute/);
+
+	&set_current_infos($t_pid);
+
+	return 1;
+}
+
+sub set_current_infos
+{
+
+	my $t_pid = shift;
+
 	$cur_info{$t_pid}{year}      = $prefix_vars{'t_year'};
 	$cur_info{$t_pid}{month}     = $prefix_vars{'t_month'};
 	$cur_info{$t_pid}{day}       = $prefix_vars{'t_day'};
@@ -4877,7 +4872,7 @@ sub parse_query
 	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
 	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'};
 	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-	$cur_info{$t_pid}{duration}  = $t_duration;
+	$cur_info{$t_pid}{duration}  = $prefix_vars{'t_duration'};
 	$cur_info{$t_pid}{pid}       = $prefix_vars{'t_pid'};
 	$cur_info{$t_pid}{session}   = $prefix_vars{'t_session_line'};
 	$cur_info{$t_pid}{loglevel}  = $prefix_vars{'t_loglevel'};
@@ -4885,9 +4880,6 @@ sub parse_query
 	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-	$cur_info{$t_pid}{action}    = $t_action;
-
-	return 1;
 }
 
 sub store_tsung_session
@@ -4954,49 +4946,50 @@ sub store_queries
 	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
 	$cur_info{$t_pid}{query} =~ s/[\t\s\r\n;]+$//s;
 
-	# Should we just want select queries
-	if ($select_only) {
-		return if (($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} =~ /FOR UPDATE/is));
-	}
+	if ($cur_info{$t_pid}{query}) {
+		# Should we just want select queries
+		if ($select_only) {
+			return if (($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} =~ /FOR UPDATE/is));
+		}
 
-	# Should we have to exclude some queries
-	if ($#exclude_query >= 0) {
-		foreach (@exclude_query) {
-			if ($cur_info{$t_pid}{query} =~ /$_/i) {
-				$cur_info{$t_pid}{query} = '';
-				return;
+		# Should we have to exclude some queries
+		if ($#exclude_query >= 0) {
+			foreach (@exclude_query) {
+				if ($cur_info{$t_pid}{query} =~ /$_/i) {
+					$cur_info{$t_pid}{query} = '';
+					return;
+				}
 			}
 		}
-	}
 
-	# Should we have to include only some queries
-	if ($#include_query >= 0) {
-		foreach (@include_query) {
-			if ($cur_info{$t_pid}{query} !~ /$_/i) {
-				$cur_info{$t_pid}{query} = '';
-				return;
+		# Should we have to include only some queries
+		if ($#include_query >= 0) {
+			foreach (@include_query) {
+				if ($cur_info{$t_pid}{query} !~ /$_/i) {
+					$cur_info{$t_pid}{query} = '';
+					return;
+				}
 			}
 		}
-	}
 
-	# Truncate the query if requested by the user
-	$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-		if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
+		# Truncate the query if requested by the user
+		$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
 
-	# Dump queries as tsung request and return
-	if ($extension eq 'tsung') {
-		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
-			push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
-			push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
-			if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{dbname}) {
-				$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{dbname};
-				$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{dbuser};
-				$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
+		# Dump queries as tsung request and return
+		if ($extension eq 'tsung') {
+			if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
+				push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
+				push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
+				if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{dbname}) {
+					$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{dbname};
+					$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{dbuser};
+					$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
+				}
 			}
+			return;
 		}
-		return;
 	}
-
 
 	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
 	my $cur_hour_str = "$cur_info{$t_pid}{hour}";
@@ -5026,18 +5019,13 @@ sub store_queries
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 
-		# Add a semi-colon at end of the query
-		$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
-
-		# Normalize query
-		my $normalized = &normalize_query($cur_info{$t_pid}{query});
+		$overall_stat{'queries_number'}++;
+		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 
 		# Stores global statistics
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 		my $cur_last_log_date = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}$cur_info{$t_pid}{hour}$cur_info{$t_pid}{min}$cur_info{$t_pid}{sec}";
-		$overall_stat{'queries_number'}++;
-		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration};
 		if (!$overall_stat{'first_query_date'} || ($overall_stat{'first_query_date'} > $cur_last_log_date)) {
 			$overall_stat{'first_query_ts'}   = $cur_last_log_timestamp;
 			$overall_stat{'first_query_date'} = $cur_last_log_date;
@@ -5047,51 +5035,69 @@ sub store_queries
 		}
 		$overall_stat{'query_peak'}{$cur_last_log_timestamp}++;
 		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{count}++;
-		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 
 		if ($graph) {
 			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
 			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{second}{$cur_info{$t_pid}{sec}}++;
-			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
+			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
-		foreach my $act (@action_regex) {
-			if ($normalized =~ $act) {
-				my $action = uc($1);
-				$overall_stat{$action}++;
-				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{count}++;
-				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{duration} += $cur_info{$t_pid}{duration};
-				if ($cur_info{$t_pid}{dbname}) {
-					$database_info{$cur_info{$t_pid}{dbname}}{count}++;
-					$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
+
+		# Counter per database and application name
+		if ($cur_info{$t_pid}{dbname}) {
+			$database_info{$cur_info{$t_pid}{dbname}}{count}++;
+		}
+		if ($cur_info{$t_pid}{dbappname}) {
+			$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
+		} else {
+			$application_info{others}{count}++;
+		}
+
+		if ($cur_info{$t_pid}{query}) {
+			# Add a semi-colon at end of the query
+			$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
+
+			# Normalize query
+			my $normalized = &normalize_query($cur_info{$t_pid}{query});
+
+			foreach my $act (@action_regex) {
+				if ($normalized =~ $act) {
+					my $action = uc($1);
+					$overall_stat{$action}++;
+					$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{count}++;
+					$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+					if ($cur_info{$t_pid}{dbname}) {
+						$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
+					}
+					if ($cur_info{$t_pid}{dbappname}) {
+						$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
+					} else {
+						$application_info{others}{$action}++;
+					}
+					last;
 				}
-				if ($cur_info{$t_pid}{dbappname}) {
-					$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
-					$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
-				} else {
-					$application_info{others}{count}++;
-					$application_info{others}{$action}++;
-				}
-				#if ($graph) {
-				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
-				#	$per_minute_info{"\L$1\E"}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{duration} += $cur_info{$t_pid}{duration};
-				#}
-				last;
+			}
+
+			# Store normalized query count
+			$normalyzed_info{$normalized}{count}++;
+
+			# Store normalized query count and duration per time
+			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+
+			if ($cur_info{$t_pid}{duration}) {
+				# Updtate top slowest queries statistics
+				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+
+				# Store normalized query total duration
+				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
+
+				# Store normalized query count and duration per time
+				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+
+				# Store normalized query samples
+				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 			}
 		}
-		&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
-
-		# Store normalized query count
-		$normalyzed_info{$normalized}{count}++;
-
-		# Store normalized query total duration
-		$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
-
-		# Store normalized query count and duration per time
-		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
-		$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
-
-		# Store normalized query samples
-		&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 	}
 }
 
@@ -5210,39 +5216,6 @@ sub autodetect_format
 	&logmsg('DEBUG', "Autodetected log format '$fmt' from $file");
 
 	return $fmt;
-}
-
-sub autodetect_duration
-{
-	my $file = shift;
-
-	# Open log file for reading
-	my $nfound = 0;
-	my $nline  = 0;
-	my ($tfile, $totalsize) = &get_log_file($file);
-	my %ident_name = ();
-	while (my $line = <$tfile>) {
-		chomp($line);
-		$line =~ s/\r//;
-		next if (!$line);
-		$nline++;
-		if (   ($line =~ /\s+duration: \d+\.\d+ ms\s+(query|statement|prepare|parse|bind|execute)/)
-			|| ($line =~ /,"duration: \d+\.\d+ ms\s+(query|statement|prepare|parse|bind|execute)[^"]+"/))
-		{
-			$nfound++;
-		}
-		last if (($nfound > 10) || ($nline > 25000));
-	}
-	$tfile->close();
-
-	if ($nfound) {
-		&logmsg('DEBUG', "Autodetecting log duration format: log_duration is disabled.");
-		return 0;
-	}
-
-	&logmsg('DEBUG', "Autodetecting log duration format: log_duration is enabled.");
-
-	return 1;
 }
 
 sub progress_bar
