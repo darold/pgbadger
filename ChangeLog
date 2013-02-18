@@ -1,10 +1,18 @@
-2013-02-17 - Version 3.0
+2013-02-18 - Version 3.0
 
 This new major release adds parallel log processing by using as many cores as
 wanted to parse log files, the performances gain is directly related to the
 number of cores specified. There's also new reports about autovacuum/autoanalyze
-informationa and many bugs have been fixed.
+informations and many bugs have been fixed.
 
+	- Update documentation about log_duration, log_min_duration_statement
+	  and log_statement.
+	- Rewrite dirty code around log timestamp comparison to find timestamp
+	  of the specified begin or ending date.
+	- Remove distinction between logs with duration enabled from variables
+	  log_min_duration_statement and log_duration. Commands line options
+	  --enable-log_duration and --enable-log_duration have been removed.
+	- Update documentation about parallel processing.
 	- Remove usage of Storable::file_magic to autodetect binary format file,
 	  it is not include in core perl 5.8. Thanks to Marc Cousin for the
 	  report.
