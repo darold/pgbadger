@@ -83,10 +83,6 @@ Options:
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint report.
-    --enable-log_duration  : force pgBadger to use log_duration even if
-                             log_min_duration_statement format is autodetected.
-    --enable-log_min_duration: force pgBadger to use log_min_duration even if
-                             log_duration format is autodetected.
 
 Examples:
 
@@ -181,14 +177,16 @@ Note that multiprocessing can not be used with compressed files nor CSV files.
 
 =head1 POSTGRESQL CONFIGURATION
 
-You must enable some configuration directives in your postgresql.conf before starting.
+You must enable and set some configuration directives in your postgresql.conf
+before starting.
 
 You must first enable SQL query logging to have something to parse:
 
         log_min_duration_statement = 0
 
-Note that pgBadger is not compatible with statement logs provided by log_statement and log_duration.
-See next chapter for more information.
+Here every statement will be logged, on busy server you may want to increase
+this value to only log queries with higher duration time. See next chapter for
+more information.
 
 With 'stderr' log format, log_line_prefix must be at least:
 
@@ -226,6 +224,20 @@ Of course your log messages should be in English without locale support:
 
 but this is not only recommended by pgBadger.
 
+=head1 log_min_duration_statement, log_duration and log_statement
+
+If you want full statistics reports you must set log_min_duration_statement to
+0i or more milliseconds.
+
+If you just want to report duration and number of queries and don't want all
+details about queries, set log_min_duration_statement to -1 to disable it and
+enable log_duration in your postgresql.conf file. If you want to add the most
+common request report you can either choose to set log_min_duration_statement
+to a higher value or choose to enable log_statement.
+
+Enabling log_min_duration_statement will add reports about slowest queries and
+queries that took up the most time.
+
 =head1 Parallel processing
 
 To enable parallel processing you just have to use the -j N option where N is
@@ -253,30 +265,6 @@ When you have lot of small log files and lot of CPUs it is speedier to dedicate
 one core to one log file at a time. To enable this behavior you have to use
 option -J N instead. With 200 log files of 10MB each the use of the -J option
 start being really interesting with 8 Cores.
-
-=head1 log_min_duration_statement versus log_duration
-
-If you want full statistics reports from your log file you must set log_min_duration_statement = 0.
-If you just want to report duration and number of queries and don't want all details about queries,
-set log_min_duration_statement to -1 and enable log_duration. If you want to report only queries that
-took more than 5 seconds for example but still want to report all query durations and number of
-queries you will need to generate 2 reports. One using the log_min_duration_statement and the second
-using the log_duration. Proceed as follow:
-
-	pgbadger --enable-log_duration /var/log/postgresql.log
-
-to generate hourly statistics about the number of queries and duration stats. To generate detailed
-reports about queries use the following command:
-
-	pgbadger --enable-log_min_duration /var/log/postgresql.log
-
-Note that enabling log_statement will not help at all and enabling those two options in the same
-command will report an error.
-
-Use those options if you don't want to log every query to preserve your I/O but still want to know
-the slowest queries over a certain duration and still have a report on the number of queries and their
-duration. Otherwise if you don't have too much of a performance hit with log_min_duration_statement
-set to 0, do not enable log_duration in your postgresql.conf file.
 
 =head1 INSTALLATION
 
