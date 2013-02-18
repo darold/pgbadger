@@ -442,20 +442,12 @@ sub check_regex
 
 # Check start/end date time
 if ($from) {
-	if ($from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
-		$from = "$1$2$3$4$5$6";
-	} elsif ($from =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
-		$from = "$1$2$3" . "000000";
-	} else {
+	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
 		die "FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss\n";
 	}
 }
 if ($to) {
-	if ($to =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
-		$to = "$1$2$3$4$5$6";
-	} elsif ($to =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
-		$to = "$1$2$3" . "000000";
-	} else {
+	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
 		die "FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss\n";
 	}
 }
@@ -557,10 +549,6 @@ my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
 # Where statistics are stored
-my $first_log_timestamp = '';
-my $last_log_timestamp  = '';
-my $first_log_date      = '';
-my $last_log_date       = '';
 my %overall_stat        = ();
 my @top_slowest         = ();
 my %normalyzed_info     = ();
@@ -873,10 +861,6 @@ This supposes that your log file and HTML report are also rotated every week.
 sub init_stats_vars
 {
 	# Empty where statistics are stored
-	$first_log_timestamp = '';
-	$last_log_timestamp  = '';
-	$first_log_date      = '';
-	$last_log_date       = '';
 	%overall_stat        = ();
 	@top_slowest         = ();
 	%normalyzed_info     = ();
@@ -913,20 +897,22 @@ sub multiprocess_progressbar
 
 	$0 = 'pgbadger logger';
 
-	my $timeout = 3;
-	my $cursize = 0;
+	my $timeout  = 3;
+	my $cursize  = 0;
 	my $nqueries = 0;
 	my $nerrors  = 0;
+	my $exit     = 0;
 	$pipe->reader();
 	while (my $r = <$pipe>) {
 		chomp($r);
 		my @infos = split(/\s+/, $r);
-		$cursize += $infos[0];
+		$cursize  += $infos[0];
 		$nqueries += $infos[1];
 		$nerrors  += $infos[2];
+		$exit     =  $infos[3] if ($#infos == 3);
 		$cursize = $totalsize if ($cursize > $totalsize);
 		print STDERR &progress_bar($cursize, $totalsize, 25, '=', $nqueries, $nerrors);
-		last if ($cursize >= $totalsize);
+		last if ($exit || ($cursize >= $totalsize));
 	}
 	print STDERR "\n";
 
@@ -973,13 +959,13 @@ sub process_file
 
 	&logmsg('DEBUG', "Starting reading file $logfile...");
 
+	my $getout = 0;
 	if ($format eq 'csv') {
 
 		require Text::CSV_XS;
 		my $csv = Text::CSV_XS->new({binary => 1, eol => $/});
 
 		# Parse csvlog lines
-		my $getout = 0;
 		while (my $row = $csv->getline($lfile)) {
 
 			# We received a signal
@@ -1011,24 +997,27 @@ sub process_file
 			# Extract the date
 			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
 			my $milli = $7 || 0;
-			($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'},
-				$prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
-			$prefix_vars{'t_date'} =
-				  $prefix_vars{'t_year'}
-				. $prefix_vars{'t_month'}
-				. $prefix_vars{'t_day'}
-				. $prefix_vars{'t_hour'}
-				. $prefix_vars{'t_min'}
-				. $prefix_vars{'t_sec'};
-			$prefix_vars{'t_timestamp'} =
-"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+			($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
+			$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
 
 			# Skip unwanted lines
-			next if ($from && ($from > $prefix_vars{'t_date'}));
-			$getout = 1, last if ($to && ($to < $prefix_vars{'t_date'}));
+			next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+			if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
+				if ($tmpoutfile) {
+					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . " exit\n");
+					$old_queries_count = $overall_stat{'queries_number'};
+					$old_errors_count = $overall_stat{'errors_number'};
+					$cursize = 0;
+				}
+				$getout = 1;
+				last;
+			}
 
 			# Jump to the last line parsed if required
-			next if (!&check_incremental_position($prefix_vars{'t_date'}, join(',', @$row)));
+			next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
+
+			# Store the current timestamp of the log line
+			&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 			# Set query parameters as global variables
 			$prefix_vars{'t_dbuser'}  = $row->[1] || '';
@@ -1041,16 +1030,6 @@ sub process_file
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
 			$prefix_vars{'t_query'}    = $row->[13];
-
-			# Store the current timestamp of the log line
-			if (!$first_log_date || ($first_log_date > $prefix_vars{'t_date'})) {
-				$first_log_timestamp = $prefix_vars{'t_timestamp'};
-				$first_log_date      = $prefix_vars{'t_date'};
-			}
-			if (!$last_log_date || ($last_log_date < $prefix_vars{'t_date'})) {
-				$last_log_timestamp = $prefix_vars{'t_timestamp'};
-				$last_log_date      = $prefix_vars{'t_date'};
-			}
 
 			# Check if the log line should be excluded from the report
 			if (&validate_log_line($prefix_vars{'t_pid'})) {
@@ -1084,7 +1063,6 @@ sub process_file
 	else { # Format is not CSV.
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
-
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
@@ -1147,34 +1125,29 @@ sub process_file
 					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
 						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
 					}
-					$prefix_vars{'t_date'} =
-						  $prefix_vars{'t_year'}
-						. $prefix_vars{'t_month'}
-						. $prefix_vars{'t_day'}
-						. $prefix_vars{'t_hour'}
-						. $prefix_vars{'t_min'}
-						. $prefix_vars{'t_sec'};
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
 					# Skip unwanted lines
-					next if ($from && ($from > $prefix_vars{'t_date'}));
-					last if ($to   && ($to < $prefix_vars{'t_date'}));
+					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+					if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
+						if ($tmpoutfile) {
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . " exit\n");
+							$old_queries_count = $overall_stat{'queries_number'};
+							$old_errors_count = $overall_stat{'errors_number'};
+							$cursize = 0;
+						}
+						$getout = 1;
+						last;
+					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
+					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 					$goon = 1;
 
 					# Store the current timestamp of the log line
-					if (!$first_log_date || ($first_log_date > $prefix_vars{'t_date'})) {
-						$first_log_timestamp = $prefix_vars{'t_timestamp'};
-						$first_log_date      = $prefix_vars{'t_date'};
-					}
-					if (!$last_log_date || ($last_log_date < $prefix_vars{'t_date'})) {
-						$last_log_timestamp = $prefix_vars{'t_timestamp'};
-						$last_log_date      = $prefix_vars{'t_date'};
-					}
+					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -1242,31 +1215,26 @@ sub process_file
 					}
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
-					$prefix_vars{'t_date'} =
-						  $prefix_vars{'t_year'}
-						. $prefix_vars{'t_month'}
-						. $prefix_vars{'t_day'}
-						. $prefix_vars{'t_hour'}
-						. $prefix_vars{'t_min'}
-						. $prefix_vars{'t_sec'};
 
 					# Skip unwanted lines
-					next if ($from && ($from > $prefix_vars{'t_date'}));
-					last if ($to   && ($to < $prefix_vars{'t_date'}));
+					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+					if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
+						if ($tmpoutfile) {
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . " exit\n");
+							$old_queries_count = $overall_stat{'queries_number'};
+							$old_errors_count = $overall_stat{'errors_number'};
+							$cursize = 0;
+						}
+						$getout = 1;
+						last;
+					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($prefix_vars{'t_date'}, $line));
+					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 
 					# Store the current timestamp of the log line
-					if (!$first_log_date || ($first_log_date > $prefix_vars{'t_date'})) {
-						$first_log_timestamp = $prefix_vars{'t_timestamp'};
-						$first_log_date      = $prefix_vars{'t_date'};
-					}
-					if (!$last_log_date || ($last_log_date < $prefix_vars{'t_date'})) {
-						$last_log_timestamp = $prefix_vars{'t_timestamp'};
-						$last_log_date      = $prefix_vars{'t_date'};
-					}
+					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -1326,9 +1294,8 @@ sub process_file
 			&store_tsung_session($pid);
 		}
 	}
-	%cur_info = ();
 
-	if ($progress) {
+	if ($progress && !$getout) {
 		if (!$tmpoutfile) {
 			if ($totalsize) {
 				if (($stop_offset > 0) && ($format ne 'csv')) {
@@ -1339,12 +1306,14 @@ sub process_file
 				print STDERR "\n";
 			}
 		} else {
-			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . " exit\n");
 			$old_queries_count = $overall_stat{'queries_number'};
 			$old_errors_count = $overall_stat{'errors_number'};
 			$cursize = 0;
 		}
 	}
+	%cur_info = ();
+
 	if ($tmpoutfile) {
 		&dump_as_binary($tmpoutfile);
 		$tmpoutfile->close();
@@ -1353,6 +1322,21 @@ sub process_file
 	return 0;
 }
 
+# Store the current timestamp of the log line
+sub store_current_timestamp
+{
+	my $t_timestamp = shift;
+
+	$prefix_vars{'t_date'} = $t_timestamp;
+	$prefix_vars{'t_date'} =~ s/\D+//g;
+
+	if (!$overall_stat{'first_log_ts'} || ($overall_stat{'first_log_ts'} gt $t_timestamp)) {
+		$overall_stat{'first_log_ts'} = $t_timestamp;
+	}
+	if (!$overall_stat{'last_log_ts'} || ($overall_stat{'last_log_ts'} lt $t_timestamp)) {
+		$overall_stat{'last_log_ts'} = $t_timestamp;
+	}
+}
 
 # Method used to check if we have already reach the last parsing position in incremental mode
 # This position should have been saved in the incremental file and read in the $last_parsed at
@@ -1533,17 +1517,12 @@ $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $first_log_timestamp to $last_log_timestamp
+Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
 };
 
 	# Overall statistics
 	my $fmt_unique  = &comma_numbers(scalar keys %normalyzed_info)    || 0;
 	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
-	if ((scalar keys %normalyzed_info == 1) && ($overall_stat{'queries_number'} > 1)) {
-		$fmt_unique                     = 'none';
-		$overall_stat{'first_query_ts'} = $first_log_timestamp;
-		$overall_stat{'last_query_ts'}  = $last_log_timestamp;
-	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
 
@@ -1874,7 +1853,7 @@ $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $first_log_timestamp to $last_log_timestamp
+Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
 };
 
 	&show_error_as_text();
@@ -2335,7 +2314,7 @@ sub dump_as_html
 <li>Generated on $curdate</li>
 <li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
-<li>Log start from $first_log_timestamp to $last_log_timestamp</li>
+<li>Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}</li>
 </ul>
 </div>
 };
@@ -2343,11 +2322,6 @@ sub dump_as_html
 	# Overall statistics
 	my $fmt_unique  = &comma_numbers(scalar keys %normalyzed_info)    || 0;
 	my $fmt_queries = &comma_numbers($overall_stat{'queries_number'}) || 0;
-	if ((scalar keys %normalyzed_info == 1) && ($overall_stat{'queries_number'} > 1)) {
-		$fmt_unique                     = 'none';
-		$overall_stat{'first_query_ts'} = $first_log_timestamp;
-		$overall_stat{'last_query_ts'}  = $last_log_timestamp;
-	}
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'}) || 0;
 	print $fh qq{
 <div class="reports">
@@ -2438,11 +2412,11 @@ sub dump_as_html
 	}
 	push(@avgs, 59);
 	# Set graphs limits
-	$first_log_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+	$overall_stat{'first_log_ts'} =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 	$t_min = timegm_nocheck(0, $5, $4, $3, $2 - 1, $1) * 1000;
 	$t_min -= ($avg_minutes * 60000);
 	$t_min_hour = timegm_nocheck(0, 0, $4, $3, $2 - 1, $1) * 1000;
-	$last_log_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+	$overall_stat{'last_log_ts'} =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 	$t_max = timegm_nocheck(59, $5, $4, $3, $2 - 1, $1) * 1000;
 	$t_max += ($avg_minutes * 60000);
 	$t_max_hour = timegm_nocheck(0, 0, $4, $3, $2 - 1, $1) * 1000;
@@ -3788,7 +3762,7 @@ sub dump_error_as_html
 <li>Generated on $curdate</li>
 <li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
-<li>Log start from $first_log_timestamp to $last_log_timestamp</li>
+<li>Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}</li>
 </ul>
 </div>
 };
@@ -3977,13 +3951,13 @@ sub load_stats
 	### overall_stat ###
 
 	$overall_stat{queries_number} += $_overall_stat{queries_number};
-	$first_log_timestamp = $_first_log_timestamp
-		if not $first_log_timestamp
-			or $first_log_timestamp gt $_first_log_timestamp;
+	$overall_stat{'first_log_ts'} = $_overall_stat{'first_log_ts'}
+		if not $overall_stat{'first_log_ts'}
+			or $overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'};
 
-	$last_log_timestamp = $_last_log_timestamp
-		if not $last_log_timestamp
-			or $last_log_timestamp lt $_last_log_timestamp;
+	$overall_stat{'last_log_ts'} = $_overall_stat{'last_log_ts'}
+		if not $overall_stat{'last_log_ts'}
+			or $overall_stat{'last_log_ts'} lt $_overall_stat{'last_log_ts'};
 
 	$overall_stat{first_query_ts} = $_overall_stat{first_query_ts}
 		if not defined $overall_stat{first_query_ts}
@@ -4009,17 +3983,11 @@ sub load_stats
 		$overall_stat{query_peak}{$k} += $_overall_stat{query_peak}{$k};
 	}
 
-	# FIXME == $overall_stat{first_query_ts} ??
-	$overall_stat{first_query_date} = $_overall_stat{first_query_date}
-		if not defined $overall_stat{first_query_date}
-			or $overall_stat{first_query_date} > $_overall_stat{first_query_date};
-
 	# FIXME == $error_info ??
 	foreach my $k (keys %{$_overall_stat{unique_normalized_errors}}) {
 		$overall_stat{unique_normalized_errors}{$k} += $_overall_stat{unique_normalized_errors}{$k};
 	}
 
-	### logs_type ###
 
 	$logs_type{ERROR} += $_logs_type{ERROR} if exists $_logs_type{ERROR};
 	$logs_type{LOG} += $_logs_type{LOG} if exists $_logs_type{LOG};
@@ -4366,8 +4334,6 @@ sub dump_as_binary
 		'per_minute_info' => \%per_minute_info,
 		'top_slowest' => \@top_slowest,
 		'nlines' => $nlines,
-		'first_log_timestamp' => $first_log_timestamp,
-		'last_log_timestamp' => $last_log_timestamp,
 		'log_files' => \@log_files,
 		'autovacuum_info' => \%autovacuum_info,
 		'autoanalyze_info' => \%autoanalyze_info
@@ -4660,7 +4626,7 @@ sub parse_query
 	{
 		return if ($disable_session);
 		if ($extension eq 'tsung') {
-			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_date'};
+			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
 		}
 		my $time = $1;
 		my $usr  = $2;
@@ -4869,7 +4835,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{hour}      = $prefix_vars{'t_hour'};
 	$cur_info{$t_pid}{min}       = $prefix_vars{'t_min'};
 	$cur_info{$t_pid}{sec}       = $prefix_vars{'t_sec'};
-	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
+	$cur_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'};
 	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'};
 	$cur_info{$t_pid}{duration}  = $prefix_vars{'t_duration'};
@@ -4880,6 +4846,8 @@ sub set_current_infos
 	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
+
 }
 
 sub store_tsung_session
@@ -5019,18 +4987,17 @@ sub store_queries
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 
+		# Stores global statistics
+
 		$overall_stat{'queries_number'}++;
 		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 
-		# Stores global statistics
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-		my $cur_last_log_date = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}$cur_info{$t_pid}{hour}$cur_info{$t_pid}{min}$cur_info{$t_pid}{sec}";
-		if (!$overall_stat{'first_query_date'} || ($overall_stat{'first_query_date'} > $cur_last_log_date)) {
+		if (!$overall_stat{'first_query_ts'} || ($overall_stat{'first_query_ts'} gt $cur_last_log_timestamp)) {
 			$overall_stat{'first_query_ts'}   = $cur_last_log_timestamp;
-			$overall_stat{'first_query_date'} = $cur_last_log_date;
 		}
-		if (!$overall_stat{'last_query_date'} || ($overall_stat{'last_query_date'} < $cur_last_log_date)) {
+		if (!$overall_stat{'last_query_ts'} || ($overall_stat{'last_query_ts'} lt $cur_last_log_timestamp)) {
 			$overall_stat{'last_query_ts'} = $cur_last_log_timestamp;
 		}
 		$overall_stat{'query_peak'}{$cur_last_log_timestamp}++;
@@ -5095,7 +5062,7 @@ sub store_queries
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 				# Store normalized query samples
-				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $last_log_timestamp,$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $overall_stat{'last_log_ts'},$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 			}
 		}
 	}
