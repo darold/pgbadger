@@ -1306,7 +1306,7 @@ sub process_file
 				print STDERR "\n";
 			}
 		} else {
-			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . " exit\n");
+			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
 			$old_queries_count = $overall_stat{'queries_number'};
 			$old_errors_count = $overall_stat{'errors_number'};
 			$cursize = 0;
