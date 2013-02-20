@@ -98,6 +98,10 @@ SYNOPSIS
             perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
                             /pglog/postgresql-2012-08-21*
 
+    Use my 8 CPUs to parse my 10GB file faster, really faster
+
+            perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
+
     Generate Tsung sessions XML file with select queries only:
 
         perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
@@ -199,7 +203,7 @@ POSTGRESQL CONFIGURATION
             log_min_duration_statement = 0
 
     Here every statement will be logged, on busy server you may want to
-    increase this value to only log queries with higher duration time. See
+    increase this value to only log queries with a higher duration time. See
     next chapter for more information.
 
     With 'stderr' log format, log_line_prefix must be at least:
@@ -242,7 +246,7 @@ POSTGRESQL CONFIGURATION
 
 log_min_duration_statement, log_duration and log_statement
     If you want full statistics reports you must set
-    log_min_duration_statement to 0i or more milliseconds.
+    log_min_duration_statement to 0 or more milliseconds.
 
     If you just want to report duration and number of queries and don't want
     all details about queries, set log_min_duration_statement to -1 to
@@ -271,22 +275,49 @@ Parallel processing
             All binary temporary files generated will then be read and loaded into
             memory to build the html output.
 
-    The problem with that method is that start/end of chunks may truncate or
-    omit a maximum of N queries perl log file which is an insignificant gap
-    if you have millions of queries in your log file. The chance that the
-    query that you were looking for is loose is near 0, this is why I think
-    this gap is livable.
+    With that method, at start/end of chunks pgbadger may truncate or omit a
+    maximum of N queries perl log file which is an insignificant gap if you
+    have millions of queries in your log file. The chance that the query
+    that you were looking for is loose is near 0, this is why I think this
+    gap is livable. Most of the time the query is counted twice but
+    truncated.
 
     When you have lot of small log files and lot of CPUs it is speedier to
     dedicate one core to one log file at a time. To enable this behavior you
     have to use option -J N instead. With 200 log files of 10MB each the use
-    of the -J option start being really interesting with 8 Cores.
+    of the -J option start being really interesting with 8 Cores. Using this
+    method you will be sure to not loose any queries in the reports.
+
+    He are a benchmarck done on a server with 8 CPUs and a single file of
+    9.5GB.
+
+             Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
+            --------+---------+-------+-------+------
+               -j   | 1h41m18 | 50m25 | 25m39 | 15m58
+               -J   | 1h41m18 | 54m28 | 41m16 | 34m45
+
+    With 200 log files of 10MB each and a total og 2GB the results are
+    slightly different:
+
+             Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
+            --------+-------+-------+-------+------
+               -j   | 20m15 |  9m56 |  5m20 | 4m20
+               -J   | 20m15 |  9m49 |  5m00 | 2m40
+
+    So it is recommanded to use -j unless you have hundred of small log file
+    and can use at least 8 CPUs.
+
+    IMPORTANT: when you are using parallel parsing pgbadger will generate a
+    lot of temporary files in the /tmp directory and will remove them at
+    end, so do not remove those files unless pgbadger is not running. They
+    are all named with the following template tmp_pgbadgerXXXX.bin so they
+    can be easily identified.
 
 INSTALLATION
     Download the tarball from github and unpack the archive as follow:
 
-            tar xzf pgbadger-1.x.tar.gz
-            cd pgbadger-1.x/
+            tar xzf pgbadger-3.x.tar.gz
+            cd pgbadger-3.x/
             perl Makefile.PL
             make && sudo make install
 
