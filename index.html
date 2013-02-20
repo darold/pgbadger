@@ -58,12 +58,15 @@ The following reports are also available with hourly charts:
 <li>Queries by type (select/insert/update/delete).</li>
 <li>Sessions per database/user/client.</li>
 <li>Connections per database/user/client.</li>
+<li>Reports about autovacuum and autoanalyze</li>
 </ul>
 
 <p>All charts are zoomable and can be saved as PNG images.</p>
 
 <p>pgBadger supports any custom format set into log_line_prefix of your postgresql.conf file provide that you use the %t, %p and %l patterns.
 </p>
+
+<p>pgBadger allow parallel processing on a single log file and multiple files through the use of the -j option and the number of CPUs as value.</p>
 
 <p>If you want to save system performance you can also use log_duration instead of log_min_duration_statement to have reports on duration and number of queries only.</p>
 
