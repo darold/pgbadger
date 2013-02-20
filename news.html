@@ -26,6 +26,62 @@
 <p>Latest news about pgBadger</p>
 
 <blockquote>
+<h3>Version 3.0 - Feb 20, 2013</h3>
+<p>
+This new major release adds parallel log processing by using as many cores as wanted to parse log files, the performances gain is directly related to the number of cores specified. There's also new reports about autovacuum/autoanalyze informations and many bugs have been fixed. No more needs to enable log_duration or log_min_duration log format all is handle in the same report at a time.
+</p>
+<pre>
+	- Update documentation about log_duration, log_min_duration_statement
+	  and log_statement.
+	- Rewrite dirty code around log timestamp comparison to find timestamp
+	  of the specified begin or ending date.
+	- Remove distinction between logs with duration enabled from variables
+	  log_min_duration_statement and log_duration. Commands line options
+	  --enable-log_duration and --enable-log_min_duration have been removed.
+	- Update documentation about parallel processing.
+	- Remove usage of Storable::file_magic to autodetect binary format file,
+	  it is not include in core perl 5.8. Thanks to Marc Cousin for the
+	  report.
+	- Force multiprocess per file when files are compressed. Thanks to
+	  Julien Rouhaud for the report.
+	- Add progress bar logger for multiprocess by forking a dedicated
+	  process and using pipe. Also fix some bugs in using binary format
+	  that duplicate query/error samples per process.
+	- chmod 755 pgbadger
+	- Fix checkpoint reports when there is no checkpoint warnings.
+	- Fix non report of hourly connections/checkpoint/autovacuum when not
+	  query is found in log file. Thanks to Guillaume Lelarge for the
+	  report.
+	- Add better handling of signals in multiprocess mode.
+	- Add -J|--job_per_file command line option to force pgbadger to use
+	  one process per file instead of using all to parse one file. Useful
+	  to have better performances with lot of small log file.
+	- Fix parsing of orphan lines with stderr logs and log_line_prefix
+	  without session information into the prefix (%l).
+	- Update documentation about -j | --jobs option.
+	- Allow pgbadger to use several cores, aka multiprocessing. Add options
+	  -j | --jobs option to specify the number of core to use.
+	- Add autovacuum and autoanalyze infos to binary format.
+	- Fix case in SQL code highlighting where QQCODE temp keyword was not
+	  replaced. Thanks to Julien Ruhaud for the report.
+	- Fix CSS to draw autovacuum graph and change legend opacity.
+	- Add pie graph to show repartition of number of autovacuum per table
+	  and number of tuples removed by autovacuum per table.
+	- Add debug information about selected type of log duration format.
+	- Add report of tuples/pages removed in report of Vacuums by table.
+	- Fix major bug on syslog parser where years part of the date was
+	  wrongly extracted from current date with logs generated in 2012.
+	- Fix issue with Perl 5.16 that do not allow "ss" inside look-behind
+	  assertions. Thanks to Cedric for the report.
+	- New vacuum and analyze hourly reports and graphs. Thanks to Guillaume
+	  Lelarge for the patch.
+</pre>
+<p>
+UPGRADE: if you are running pgbadger by cron take care if you were using one of
+the following option: --enable-log_min_duration  and --enable-log_duration, they
+have been removed and pgbadger will refuse to start.
+</p>
+
 <h3>Version 2.3 - Jan 17, 2013</h3>
 <p>
 This release fixes several major issues especially with csvlog and a memory leak
