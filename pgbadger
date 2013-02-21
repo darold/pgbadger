@@ -239,6 +239,8 @@ my $result = GetOptions(
 	"disable-autovacuum!"      => \$disable_autovacuum,
 	"client=s"                 => \@dbclient2, # Backward compatibility
 );
+die "FATAL: use pgbadger --help\n" if (not $result);
+
 push(@dbclient, @dbclient2); # Backward compatibility
 
 if ($ver) {
