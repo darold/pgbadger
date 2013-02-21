@@ -631,9 +631,11 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 	$writer->autoflush(1);
 
 	# Fork the logger process
-	spawn sub {
-		&multiprocess_progressbar($global_totalsize);
-	};
+	if ($progress) {
+		spawn sub {
+			&multiprocess_progressbar($global_totalsize);
+		};
+	}
 
 	# Parse each log file following the multiprocess mode chosen (-j or -J)
 	foreach my $logfile ( @given_log_files ) {
@@ -675,8 +677,10 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		last if ($interrupt);
 	}
 
+	my $minproc = 1;
+	$minproc = 0 if (!$progress);
 	# Wait for all child dies less the logger
-	while (scalar keys %RUNNING_PIDS > 1) {
+	while (scalar keys %RUNNING_PIDS > $minproc) {
 		my $kid = waitpid(-1, WNOHANG);
 		if ($kid > 0) {
 			delete $RUNNING_PIDS{$kid};
