@@ -1,3 +1,15 @@
+2013-02-21 - Version 3.1
+
+This is a quick release to fix missing reports of most frequent errors and slowest
+normalized queries in previous version published yesterday.
+
+	- Force immediat die on command line options error.
+	- Fix missing report of most frequent events/errors report. Thanks to
+	  Vincent Laborie for the report.
+	- Fix missing report of slowest normalized queries.  Thanks to Vincent
+	  Laborie for the report.
+	- Fix display of last print of progress bar when quiet mode is enabled.
+
 2013-02-20 - Version 3.0
 
 This new major release adds parallel log processing by using as many cores as
