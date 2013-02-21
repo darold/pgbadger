@@ -1768,7 +1768,6 @@ Report not supported by text format
 			print $fh $i + 1, ") " . &convert_time($top_slowest[$i]->[0]) . "$db - $top_slowest[$i]->[2]\n";
 			print $fh "--\n";
 		}
-		@top_slowest = ();
 
 		print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
 		print $fh "Rank     Total duration      Times executed     Av. duration (s)     Query\n";
@@ -1870,6 +1869,7 @@ Report not supported by text format
 			$idx++;
 		}
 	}
+	@top_slowest = ();
 
 	if (!$disable_error) {
 		&show_error_as_text();
@@ -3554,7 +3554,6 @@ sub dump_as_html
 				&highlight_code($top_slowest[$i]->[2]), "</div></td></tr>\n";
 		}
 		print $fh "</table>\n";
-		@top_slowest = ();
 
 		print $fh qq{
 <h2 id="NormalizedQueriesMostTimeReport">Queries that took up the most time (N) <a href="#top" title="Back to top">^</a></h2>
@@ -3778,6 +3777,7 @@ sub dump_as_html
 		}
 		print $fh "</table>\n";
 	}
+	@top_slowest = ();
 
 	if (!$disable_error) {
 		&show_error_as_html();
