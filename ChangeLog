@@ -3,6 +3,7 @@
 This is a quick release to fix missing reports of most frequent errors and slowest
 normalized queries in previous version published yesterday.
 
+	- Fix empty report in watchlog mode (-w option).
 	- Force immediat die on command line options error.
 	- Fix missing report of most frequent events/errors report. Thanks to
 	  Vincent Laborie for the report.
