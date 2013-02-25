@@ -26,6 +26,21 @@
 <p>Latest news about pgBadger</p>
 
 <blockquote>
+<h3>Version 3.1 - Feb 21, 2013</h3>
+<p>
+This is a quick release to fix missing reports of most frequent errors and slowest
+normalized queries in previous version published yesterday.
+</p>
+<pre>
+        - Fix empty report in watchlog mode (-w option).
+        - Force immediat die on command line options error.
+        - Fix missing report of most frequent events/errors report. Thanks to
+          Vincent Laborie for the report.
+        - Fix missing report of slowest normalized queries.  Thanks to Vincent
+          Laborie for the report.
+        - Fix display of last print of progress bar when quiet mode is enabled.
+</pre>
+
 <h3>Version 3.0 - Feb 20, 2013</h3>
 <p>
 This new major release adds parallel log processing by using as many cores as wanted, the performances gain is directly related to the number of cores specified. There's also new reports about autovacuum/autoanalyze and many bugs have been fixed. No more needs to enable log_duration or log_min_duration log format all is handle in the same report at a time.
