@@ -1069,6 +1069,7 @@ sub process_file
 			$prefix_vars{'t_dbname'}  = $row->[2] || '';
 			$prefix_vars{'t_appname'} = $row->[22] || '';
 			$prefix_vars{'t_client'}  = $row->[4] || '';
+			$prefix_vars{'t_client'}  =~ s/:.*//;
 			$prefix_vars{'t_host'}    = 'csv';
 			$prefix_vars{'t_pid'}     = $row->[3];
 			$prefix_vars{'t_session_line'} = $row->[5];
