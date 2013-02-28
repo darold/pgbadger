@@ -280,8 +280,20 @@ $avg_minutes ||= 5;
 $avg_minutes = 60 if ($avg_minutes > 60);
 $avg_minutes = 1  if ($avg_minutes < 1);
 
+# Set syslog prefix regex
+my $other_syslog_line =
+	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+my $orphan_stderr_line = '';
+
 # Set default format
 $format ||= &autodetect_format($log_files[0]);
+
+if ($format eq 'syslog2') {
+	$other_syslog_line =
+		qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+	$orphan_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+}
 
 # Set default top query
 $top ||= 20;
@@ -410,10 +422,6 @@ my @action_regex = (
 	qr/^\s*(update) .*\bset\b/is,
 	qr/^\s*(select) /is
 );
-my $other_syslog_line =
-	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
-my $orphan_stderr_line = '';
 
 # Compile custom log line prefix prefix
 my @prefix_params = ();
@@ -428,6 +436,15 @@ if ($log_line_prefix) {
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
+	} elsif ($format eq 'syslog2') {
+		$format = 'syslog';
+		$log_line_prefix =
+			  '^(\d+)-(\d+)-(\d+)T\d+:\d+:\d+(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
+			. $log_line_prefix
+			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
+		$compiled_prefix = qr/$log_line_prefix/;
+		unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
 		$orphan_stderr_line = qr/$log_line_prefix/;
 		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
@@ -438,6 +455,12 @@ if ($log_line_prefix) {
 	$compiled_prefix =
 qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
+		't_logprefix', 't_loglevel', 't_query');
+} elsif ($format eq 'syslog2') {
+	$format = 'syslog';
+	$compiled_prefix =
+qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+	push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 		't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
 	$compiled_prefix =
@@ -1164,12 +1187,16 @@ sub process_file
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
-					# Syslog does not have year information, so take care of year overlapping
-					$prefix_vars{'t_year'}  = $gyear;
-					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
-					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
-					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
-						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
+					# Standard syslog format does not have year information, months are
+					# three letters and day are not always with 2 digit.
+					if ($prefix_vars{'t_month'} !~ /\d/) {
+						$prefix_vars{'t_year'}  = $gyear;
+						$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
+						$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
+						# Take care of year overlapping
+						if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
+							$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
+						}
 					}
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
@@ -5203,6 +5230,14 @@ sub autodetect_format
 			   )
 			{
 				$fmt = 'syslog';
+				$nfound++;
+				$ident_name{$1}++;
+
+			} elsif ($line =~
+	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+			   )
+			{
+				$fmt = 'syslog2';
 				$nfound++;
 				$ident_name{$1}++;
 
