@@ -1247,11 +1247,8 @@ sub process_file
 						}
 						next;
 					} elsif ($line =~ /[,\s]*\$(\d+)\s=\s/) {
-						my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $line);
-						shift(@t_res);
-						for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-							$cur_info{$cur_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
-						}
+						# stores bind parameters if any
+						$cur_info{$cur_pid}{parameters} .= " $t_query";
 						next;
 					} 
 					if ($cur_info{$cur_pid}{statement}) {
@@ -1337,6 +1334,10 @@ sub process_file
 							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 						}
 						next;
+					} elsif ($line =~ /[,\s]*\$(\d+)\s=\s/) {
+						# stores bind parameters if any
+						$cur_info{$cur_pid}{parameters} .= " $line";
+						next;
 					} 
 					if (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
@@ -1344,13 +1345,6 @@ sub process_file
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
-						# Apply bind parameters if any
-					} elsif ($line =~ /[,\s]*\$(\d+)\s=\s/) {
-						my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $line);
-						shift(@t_res);
-						for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-							$cur_info{$cur_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
-						}
 					} else {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
@@ -1544,7 +1538,12 @@ sub set_top_slowest
 
 	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app)]);
 
-	@top_slowest = (sort {$b->[0] <=> $a->[0]} @top_slowest)[0 .. $end_top];
+	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} @top_slowest;
+	@top_slowest = ();
+	for (my $i = 0; $i <= $#tmp_top_slowest; $i++) {
+		last if ($i == $end_top);
+		push(@top_slowest, $tmp_top_slowest[$i]);
+	}
 
 }
 
@@ -4840,19 +4839,9 @@ sub parse_query
 
 			# Apply bind parameters if any
 			if (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ /parameters: (.*)/)) {
-				my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $1);
-				shift(@t_res);
-				for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-					$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
-				}
-				# Store the query if there is no more parameters to replace
-				if ($cur_info{$t_pid}{query} !~ /\$(\d+)/s) {
-					&store_queries($t_pid);
-					delete $cur_info{$t_pid};
-				} else {
-					# go look at other params
-					return;
-				}
+				$cur_info{$t_pid}{parameters} = "$1";
+				# go look at other params
+				return;
 			}
 		}
 		# When we are ready to overwrite the last storage, add it to the global stats
@@ -5017,6 +5006,16 @@ sub store_queries
 	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
 	$cur_info{$t_pid}{query} =~ s/[\t\s\r\n;]+$//s;
 
+	# Replace bind parameters values in the query if any
+	if (exists $cur_info{$t_pid}{parameters}) {
+		my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
+		shift(@t_res);
+		for (my $i = 0 ; $i < $#t_res ; $i += 2) {
+			$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+		}
+	}
+
+	# We only process stored object with query here
 	if ($cur_info{$t_pid}{query}) {
 		# Should we just want select queries
 		if ($select_only) {
@@ -5155,6 +5154,7 @@ sub store_queries
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 
 			if ($cur_info{$t_pid}{duration}) {
+
 				# Updtate top slowest queries statistics
 				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 
