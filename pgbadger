@@ -4354,7 +4354,12 @@ sub load_stats
 	}
 
 	### top_slowest ###
-	@top_slowest = (sort {$b->[0] <=> $a->[0]} (@top_slowest, @_top_slowest))[0 .. $end_top];
+	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} (@top_slowest, @_top_slowest);
+	@top_slowest = ();
+	for (my $i = 0; $i <= $#tmp_top_slowest; $i++) {
+		last if ($i == $end_top);
+		push(@top_slowest, $tmp_top_slowest[$i]);
+	}
 
 	### checkpoint_info ###
 	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
