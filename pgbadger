@@ -39,7 +39,7 @@ use Time::Local 'timegm_nocheck';
 use POSIX qw(locale_h sys_wait_h _exit);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
-use File::Temp qw/ :seekable tempfile /;
+use File::Temp qw/ tempfile /;
 use IO::Handle;
 use IO::Pipe;
 use Time::HiRes qw/usleep/;
