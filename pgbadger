@@ -1541,8 +1541,8 @@ sub set_top_slowest
 	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} @top_slowest;
 	@top_slowest = ();
 	for (my $i = 0; $i <= $#tmp_top_slowest; $i++) {
-		last if ($i == $end_top);
 		push(@top_slowest, $tmp_top_slowest[$i]);
+		last if ($i == $end_top);
 	}
 
 }
@@ -1813,7 +1813,7 @@ Report not supported by text format
 		}
 
 		print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
-		print $fh "Rank     Total duration      Times executed     Av. duration (s)     Query\n";
+		print $fh "Rank     Total duration      Times executed     Min/Max/Av. duration (s)     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1829,6 +1829,8 @@ Report not supported by text format
 			print $fh "$idx) "
 				. &convert_time($normalyzed_info{$k}{duration}) . " - "
 				. &comma_numbers($normalyzed_info{$k}{count}) . " - "
+				. &convert_time($normalyzed_info{$k}{min}) . "/"
+				. &convert_time($normalyzed_info{$k}{max}) . "/"
 				. &convert_time($normalyzed_info{$k}{average})
 				. " - $q\n";
 			print $fh "--\n";
@@ -1847,7 +1849,7 @@ Report not supported by text format
 	}
 	if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
 		print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
-		print $fh "Rank     Times executed     Total duration     Av. duration (s)     Query\n";
+		print $fh "Rank     Times executed     Total duration     Min/Max/Av. duration (s)     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1862,6 +1864,8 @@ Report not supported by text format
 			print $fh "$idx) "
 				. &comma_numbers($normalyzed_info{$k}{count}) . " - "
 				. &convert_time($normalyzed_info{$k}{duration}) . " - "
+				. &convert_time($normalyzed_info{$k}{min}) . "/"
+				. &convert_time($normalyzed_info{$k}{max}) . "/"
 				. &convert_time($normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count})
 				. " - $q\n";
 			print $fh "--\n";
@@ -1881,7 +1885,7 @@ Report not supported by text format
 
 	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
-		print $fh "Rank     Av. duration (s)     Times executed     Total duration     Query\n";
+		print $fh "Rank     Min/Max/Av. duration (s)     Times executed     Total duration     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1894,6 +1898,8 @@ Report not supported by text format
 				}
 			}
 			print $fh "$idx) "
+				. &convert_time($normalyzed_info{$k}{min}) . "/"
+				. &convert_time($normalyzed_info{$k}{max}) . "/"
 				. &convert_time($normalyzed_info{$k}{average}) . " - "
 				. &comma_numbers($normalyzed_info{$k}{count}) . " - "
 				. &convert_time($normalyzed_info{$k}{duration})
@@ -2538,7 +2544,7 @@ sub dump_as_html
 	</tr>
 	<tr>
 		<th>Count</th>
-		<th>Av.&nbsp;duration&nbsp;</th>
+		<th>Min/Max/Av.&nbsp;duration&nbsp;</th>
 		<th>Count</th>
 		<th>Av.&nbsp;duration&nbsp;</th>
 		<th>INSERT</th>
@@ -2583,7 +2589,7 @@ sub dump_as_html
 					);
 				print $fh "<tr class=\"row$colb\"><td>$zday</td><td>$h</td><td class=\"right\">",
 					&comma_numbers($per_hour_info{$d}{$h}{count}),  "</td><td class=\"right\">",
-					&convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",
+					&convert_time($per_hour_info{$d}{$h}{min}),"/",&convert_time($per_hour_info{$d}{$h}{max}),"/",&convert_time($per_hour_info{$d}{$h}{average}), "</td><td class=\"right\">",
 					&comma_numbers($per_hour_info{$d}{$h}{'SELECT'}{count}  || 0), "</td><td class=\"right\">",
 					&convert_time($per_hour_info{$d}{$h}{'SELECT'}{average} || 0), "</td><td class=\"right\">",
 					&comma_numbers($per_hour_info{$d}{$h}{'INSERT'}{count}  || 0), "</td><td class=\"right\">",
@@ -3606,7 +3612,7 @@ sub dump_as_html
 		<th>Total duration</th>
 		<th>Times executed</th>
 
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
 		<th>Query</th>
 	</tr>
 };
@@ -3645,7 +3651,7 @@ sub dump_as_html
 				}
 			}
 			print $fh "</table></div></div></td>";
-			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{average}),
+			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{min}),"/", &convert_time($normalyzed_info{$k}{max}),"/", &convert_time($normalyzed_info{$k}{average}),
 				"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
 				&highlight_code($q), "</div>";
 
@@ -3682,7 +3688,7 @@ sub dump_as_html
 		<th>Rank</th>
 		<th>Times executed</th>
 		<th>Total duration</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
 		<th>Query</th>
 	</tr>
 };
@@ -3719,7 +3725,7 @@ sub dump_as_html
 				}
 			}
 			print $fh "</table></div></div></td>";
-			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">",
+			print $fh "<td class=\"top center\">", &convert_time($normalyzed_info{$k}{duration}), "</td><td class=\"top center\">",&convert_time($normalyzed_info{$k}{min}),"/",&convert_time($normalyzed_info{$k}{max}),"/",
 				&convert_time($normalyzed_info{$k}{average}), "</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
 				&highlight_code($q), "</div>";
 
@@ -3753,7 +3759,7 @@ sub dump_as_html
 <table class="queryList">
 	<tr>
 		<th>Rank</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
 
 		<th>Times executed</th>
 		<th>Total duration</th>
@@ -3773,6 +3779,8 @@ sub dump_as_html
 			}
 			my $col = $idx % 2;
 			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">",
+				&convert_time($normalyzed_info{$k}{min}), "/",
+				&convert_time($normalyzed_info{$k}{max}), "/",
 				&convert_time($normalyzed_info{$k}{average}),
 				"</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
@@ -4168,6 +4176,13 @@ sub load_stats
 		foreach my $hour (keys %{ $_per_hour_info{$day} }) {
 			$per_hour_info{$day}{$hour}{count} += $_per_hour_info{$day}{$hour}{count};
 			$per_hour_info{$day}{$hour}{duration} += $_per_hour_info{$day}{$hour}{duration};
+			# Set min / max duration for this query
+			if (!exists $per_hour_info{$day}{$hour}{min} || ($per_hour_info{$day}{$hour}{min} > $_per_hour_info{$day}{$hour}{min})) { 
+				$per_hour_info{$day}{$hour}{min} = $_per_hour_info{$day}{$hour}{min};
+			}
+			if (!exists $per_hour_info{$day}{$hour}{max} || ($per_hour_info{$day}{$hour}{max} < $_per_hour_info{$day}{$hour}{max})) { 
+				$per_hour_info{$day}{$hour}{max} = $_per_hour_info{$day}{$hour}{max};
+			}
 
 			if (exists $_per_hour_info{$day}{$hour}{DELETE}) {
 				$per_hour_info{$day}{$hour}{DELETE}{count} += $_per_hour_info{$day}{$hour}{DELETE}{count};
@@ -4289,6 +4304,14 @@ sub load_stats
 		}
 
 		$normalyzed_info{$stmt}{count} += $_normalyzed_info{$stmt}{count};
+
+		# Set min / max duration for this query
+		if (!exists $normalyzed_info{$stmt}{min} || ($normalyzed_info{$stmt}{min} > $_normalyzed_info{$stmt}{min})) { 
+			$normalyzed_info{$stmt}{min} = $_normalyzed_info{$stmt}{min};
+		}
+		if (!exists $normalyzed_info{$stmt}{max} || ($normalyzed_info{$stmt}{max} < $_normalyzed_info{$stmt}{max})) { 
+			$normalyzed_info{$stmt}{max} = $_normalyzed_info{$stmt}{max};
+		}
 
 		foreach my $day (keys %{$_normalyzed_info{$stmt}{chronos}} ) {
 			foreach my $hour (keys %{$_normalyzed_info{$stmt}{chronos}{$day}} ) {
@@ -5109,7 +5132,16 @@ sub store_queries
 		}
 		$overall_stat{'query_peak'}{$cur_last_log_timestamp}++;
 		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{count}++;
-		$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+		if ($cur_info{$t_pid}{duration}) { 
+			$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+			# Store min / max duration
+			if (!exists $per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{min} || ($per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{min} > $cur_info{$t_pid}{duration})) {
+				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{min} = $cur_info{$t_pid}{duration};
+			}
+			if (!exists $per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{max} || ($per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{max} < $cur_info{$t_pid}{duration})) {
+				$per_hour_info{"$cur_day_str"}{"$cur_hour_str"}{max} = $cur_info{$t_pid}{duration};
+			}
+		}
 
 		if ($graph) {
 			$per_minute_info{query}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{count}++;
@@ -5165,6 +5197,13 @@ sub store_queries
 
 				# Store normalized query total duration
 				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
+				# Store min / max duration
+				if (!exists $normalyzed_info{$normalized}{min} || ($normalyzed_info{$normalized}{min} > $cur_info{$t_pid}{duration})) {
+					$normalyzed_info{$normalized}{min} = $cur_info{$t_pid}{duration};
+				}
+				if (!exists $normalyzed_info{$normalized}{max} || ($normalyzed_info{$normalized}{max} < $cur_info{$t_pid}{duration})) {
+					$normalyzed_info{$normalized}{max} = $cur_info{$t_pid}{duration};
+				}
 
 				# Store normalized query count and duration per time
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
