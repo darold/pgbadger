@@ -1246,6 +1246,13 @@ sub process_file
 							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 						}
 						next;
+					} elsif ($line =~ /[,\s]*\$(\d+)\s=\s/) {
+						my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $line);
+						shift(@t_res);
+						for (my $i = 0 ; $i < $#t_res ; $i += 2) {
+							$cur_info{$cur_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+						}
+						next;
 					} 
 					if ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
@@ -1337,6 +1344,13 @@ sub process_file
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
+						# Apply bind parameters if any
+					} elsif ($line =~ /[,\s]*\$(\d+)\s=\s/) {
+						my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $line);
+						shift(@t_res);
+						for (my $i = 0 ; $i < $#t_res ; $i += 2) {
+							$cur_info{$cur_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+						}
 					} else {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
@@ -1344,7 +1358,7 @@ sub process_file
 				# Collect orphans lines of multiline queries
 				} elsif ($cur_pid && ($cur_info{$cur_pid}{query})) {
 
-					$cur_info{$cur_pid}{query} .= "\n" . $line;
+					$cur_info{$cur_pid}{detail} .= "\n" . $line;
 
 				}
 
@@ -4831,8 +4845,14 @@ sub parse_query
 				for (my $i = 0 ; $i < $#t_res ; $i += 2) {
 					$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
 				}
-				&store_queries($t_pid);
-				delete $cur_info{$t_pid};
+				# Store the query if there is no more parameters to replace
+				if ($cur_info{$t_pid}{query} !~ /\$(\d+)/s) {
+					&store_queries($t_pid);
+					delete $cur_info{$t_pid};
+				} else {
+					# go look at other params
+					return;
+				}
 			}
 		}
 		# When we are ready to overwrite the last storage, add it to the global stats
