@@ -1250,7 +1250,7 @@ sub process_file
 							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 						}
 						next;
-					} elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) ) {
+					} elsif ( $cur_info{$cur_pid}{parameters} && (($t_query =~ /[,\s]*\$(\d+)\s=\s/) || ($t_query =~ /^('[^']*')$/)) ) {
 						# stores bind parameters if any
 						$cur_info{$cur_pid}{parameters} .= " $t_query";
 						next;
