@@ -4469,6 +4469,9 @@ sub highlight_code
 {
 	my $code = shift;
 
+	# Try to escape HTML code
+	$code =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
+
 	# prettify SQL query
 	if (!$noprettify) {
 		$sql_prettified->query($code);
