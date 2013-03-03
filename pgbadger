@@ -673,7 +673,8 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 			}
 			usleep(500000);
 		}
-		if ($queue_size > 1) {
+		# Do not use split method with compressed files
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip)/i) ) {
 			# Create multiple process to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			for (my $i = 0; $i < $#chunks; $i++) {
@@ -691,14 +692,16 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 				};
 				$child_count++;
 			} 
+
 		} else {
 
-			# Create on process per log files to parse
+			# Start parsing one file per parallel process
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 			spawn sub {
 				&process_file($logfile, $tempfiles[-1]->[0]);
 			};
 			$child_count++;
+
 		}
 		last if ($interrupt);
 	}
@@ -6092,7 +6095,6 @@ sub get_log_file
 	if ($logf !~ /\.(gz|bz2|zip)/i) {
 		open($lfile,"<",$logf) || die "FATAL: cannot read log file $logf. $!\n";
 	} else {
-
 		my $uncompress = $zcat;
 		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $bzcat;
