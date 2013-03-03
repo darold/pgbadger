@@ -110,7 +110,8 @@ $| = 1;
 my $JQGRAPH = 1;
 
 # Command line options
-my $zcat                    = 'gunzip -c';
+my $zcat_cmd                = 'gunzip -c';
+my $zcat                    = $zcat_cmd;
 my $bzcat                   = 'bunzip2 -c';
 my $ucat                    = 'unzip -p';
 my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
@@ -6093,9 +6094,9 @@ sub get_log_file
 	} else {
 
 		my $uncompress = $zcat;
-		if (($logf =~ /\.bz2/i) && ($zcat =~ /^zcat$/)) {
+		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $bzcat;
-		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^zcat$/)) {
+		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $ucat;
 		}
 		&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
