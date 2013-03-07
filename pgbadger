@@ -4476,6 +4476,10 @@ sub highlight_code
 	# Try to escape HTML code
 	$code =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
 
+	# Do not try to prettify queries longuer
+	# than 10KB this will take too much time
+	return $code if (length($code) > 10240);
+
 	# prettify SQL query
 	if (!$noprettify) {
 		$sql_prettified->query($code);
