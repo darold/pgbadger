@@ -6097,7 +6097,8 @@ sub get_log_file
 
 	# Open a file handle
 	if ($logf !~ /\.(gz|bz2|zip)/i) {
-		open($lfile,"<",$logf) || die "FATAL: cannot read log file $logf. $!\n";
+		open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
+		$totalsize = 0 if ($lfile eq '-');
 	} else {
 		my $uncompress = $zcat;
 		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
