@@ -1,4 +1,4 @@
-# PLEASE READ THIS FIRST
+# How to contribute #
 
 ##Before Submitting an issue##
 
