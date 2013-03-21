@@ -631,7 +631,11 @@ my $global_totalsize = 0;
 my @given_log_files = ( @log_files );
 
 # log files must be erase when loading stats from binary format
-@log_files = () if $format eq 'binary';
+if ($format eq 'binary') {
+	$queue_size = 1;
+	$job_per_file = 1;
+	@log_files = ();
+}
 
 my $pipe;
 
