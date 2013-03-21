@@ -203,8 +203,9 @@ POSTGRESQL CONFIGURATION
             log_min_duration_statement = 0
 
     Here every statement will be logged, on busy server you may want to
-    increase this value to only log queries with a higher duration time. See
-    next chapter for more information.
+    increase this value to only log queries with a higher duration time.
+    Note that if you have log_statement set to 'all' nothing will be logged
+    with log_line_prefix. See next chapter for more information.
 
     With 'stderr' log format, log_line_prefix must be at least:
 
@@ -256,7 +257,9 @@ log_min_duration_statement, log_duration and log_statement
     log_statement.
 
     Enabling log_min_duration_statement will add reports about slowest
-    queries and queries that took up the most time.
+    queries and queries that took up the most time. Take care that if you
+    have log_statement set to 'all' nothing will be logged with
+    log_line_prefix.
 
 Parallel processing
     To enable parallel processing you just have to use the -j N option where
