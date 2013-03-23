@@ -3073,7 +3073,7 @@ sub dump_as_html
 						$data{"Others"} += $autovacuum_info{tables}{$t}{vacuums} || 0;
 					}
 				}
-				&flotr2_piegraph(9, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
+				&flotr2_piegraph(18, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
 				%data = ();
 				if ($total_tuples) {
 					print $fh "<br />\n";
@@ -3084,7 +3084,7 @@ sub dump_as_html
 							$data{"Others"} += $autovacuum_info{tables}{$t}{tuples}{removed} || 0;
 						}
 					}
-					&flotr2_piegraph(9, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
+					&flotr2_piegraph(19, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
 				}
 			}
 			print $fh "</td></tr></table>\n";
@@ -3164,7 +3164,7 @@ sub dump_as_html
 			} else {
 				$data{"Sum types < $pie_percentage_limit%"} += $total - $totala;
 			}
-			&flotr2_piegraph(9, 'queriesbytype_graph', 'Type of queries', %data);
+			&flotr2_piegraph(22, 'queriesbytype_graph', 'Type of queries', %data);
 		}
 		print $fh "</td></tr></table>\n";
 
@@ -3253,7 +3253,7 @@ sub dump_as_html
 					$infos{$small[0]} = $infos{"Sum applications < $pie_percentage_limit%"};
 					delete $infos{"Sum applications < $pie_percentage_limit%"};
 				}
-				&flotr2_piegraph(20, 'requestsapplications_graph', 'Queries per application', %infos);
+				&flotr2_piegraph(21, 'requestsapplications_graph', 'Queries per application', %infos);
 			}
 			print $fh "</td></tr></table>\n";
 		}
