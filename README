@@ -162,7 +162,7 @@ FEATURE
     reported are highlighted and beautified automatically.
 
 REQUIREMENT
-    PgBadger comes as a single Perl script - you do not need anything other
+    pgBadger comes as a single Perl script - you do not need anything other
     than a modern Perl distribution. Charts are rendered using a Javascript
     library so you don't need anything. Your browser will do all the work.
 
