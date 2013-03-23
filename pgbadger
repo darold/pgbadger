@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #------------------------------------------------------------------------------
 #
-# PgBadger - An other PostgreSQL log analyzer that aims to replace and
+# pgBadger - An other PostgreSQL log analyzer that aims to replace and
 #           outperforms pgFouine
 #
 # This program is open source, licensed under the PostgreSQL Licence.
@@ -158,7 +158,7 @@ my $disable_checkpoint      = 0;
 my $disable_autovacuum      = 0;
 my $avg_minutes             = 5;
 my $last_parsed             = '';
-my $report_title            = 'PgBadger: PostgreSQL log analyzer';
+my $report_title            = 'pgBadger: PostgreSQL log analyzer';
 my $log_line_prefix         = '';
 my $compiled_prefix         = '';
 my $project_url             = 'http://dalibo.github.com/pgbadger/';
@@ -803,7 +803,7 @@ exit 0;
 
 #-------------------------------------------------------------------------------
 
-# Show PgBadger command line usage
+# Show pgBadger command line usage
 sub usage
 {
 	print qq{
@@ -1721,7 +1721,7 @@ Report not supported by text format
 
 	if (!$disable_lock && scalar keys %lock_info > 0) {
 		print $fh "\n- Locks by type ------------------------------------------------------\n\n";
-		print $fh "Type     Object     Count     Total Duration     Av. duration (s)\n";
+		print $fh "Type     Object     Count     Total Duration     Avg duration (s)\n";
 		my $total_count    = 0;
 		my $total_duration = 0;
 		foreach my $t (sort keys %lock_info) {
@@ -1743,7 +1743,7 @@ Report not supported by text format
 	# Show session per database statistics
 	if (!$disable_session && exists $session_info{database}) {
 		print $fh "\n- Sessions per database ------------------------------------------------------\n\n";
-		print $fh "Database     Count     Total Duration     Av. duration (s)\n";
+		print $fh "Database     Count     Total Duration     Avg duration (s)\n";
 		foreach my $d (sort keys %{$session_info{database}}) {
 			print $fh "$d - ", &comma_numbers($session_info{database}{$d}{count}), " ",
 				&convert_time($session_info{database}{$d}{duration}), " ",
@@ -1754,7 +1754,7 @@ Report not supported by text format
 	# Show session per user statistics
 	if (!$disable_session && exists $session_info{user}) {
 		print $fh "\n- Sessions per user ------------------------------------------------------\n\n";
-		print $fh "User     Count     Total Duration     Av. duration (s)\n";
+		print $fh "User     Count     Total Duration     Avg duration (s)\n";
 		foreach my $d (sort keys %{$session_info{user}}) {
 			print $fh "$d - ", &comma_numbers($session_info{user}{$d}{count}), " ", &convert_time($session_info{user}{$d}{duration}),
 				" ", &convert_time($session_info{user}{$d}{duration} / $session_info{user}{$d}{count}), "\n";
@@ -1764,7 +1764,7 @@ Report not supported by text format
 	# Show session per host statistics
 	if (!$disable_session && exists $session_info{host}) {
 		print $fh "\n- Sessions per host ------------------------------------------------------\n\n";
-		print $fh "User     Count     Total Duration     Av. duration (s)\n";
+		print $fh "User     Count     Total Duration     Avg duration (s)\n";
 		foreach my $d (sort keys %{$session_info{host}}) {
 			print $fh "$d - ", &comma_numbers($session_info{host}{$d}{count}), " ", &convert_time($session_info{host}{$d}{duration}),
 				" ", &convert_time($session_info{host}{$d}{duration} / $session_info{host}{$d}{count}), "\n";
@@ -1817,7 +1817,7 @@ Report not supported by text format
 		}
 
 		print $fh "\n- Queries that took up the most time (N) -------------------------------\n\n";
-		print $fh "Rank     Total duration      Times executed     Min/Max/Av. duration (s)     Query\n";
+		print $fh "Rank     Total duration      Times executed     Min/Max/Avg duration (s)     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1853,7 +1853,7 @@ Report not supported by text format
 	}
 	if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
 		print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
-		print $fh "Rank     Times executed     Total duration     Min/Max/Av. duration (s)     Query\n";
+		print $fh "Rank     Times executed     Total duration     Min/Max/Avg duration (s)     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1889,7 +1889,7 @@ Report not supported by text format
 
 	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh "\n- Slowest queries (N) --------------------------------------------------\n\n";
-		print $fh "Rank     Min/Max/Av. duration (s)     Times executed     Total duration     Query\n";
+		print $fh "Rank     Min/Max/Avg duration (s)     Times executed     Total duration     Query\n";
 		my $idx = 1;
 		foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
 			next if (!$normalyzed_info{$k}{count});
@@ -1929,7 +1929,7 @@ Report not supported by text format
 	}
 
 	print $fh "\n\n";
-	print $fh "Report generated by PgBadger $VERSION ($project_url).\n";
+	print $fh "Report generated by pgBadger $VERSION ($project_url).\n";
 
 }
 
@@ -2037,7 +2037,7 @@ sub html_header
 <title>$report_title</title>
 <meta NAME="robots" CONTENT="noindex,nofollow">
 <meta HTTP-EQUIV="Expires" CONTENT="$date">
-<meta HTTP-EQUIV="Generator" CONTENT="PgBadger v$VERSION">
+<meta HTTP-EQUIV="Generator" CONTENT="pgBadger v$VERSION">
 <meta HTTP-EQUIV="Date" CONTENT="$date">
 <style type="text/css">
 body { background-color: #dedede; font-family: Verdana ;font-size: 14px;font-style: normal;font-weight: normal;text-transform: normal;letter-spacing: normal;line-height: 17px;padding: 0px; color: rgb(69,54,37); }
@@ -2548,19 +2548,19 @@ sub dump_as_html
 	</tr>
 	<tr>
 		<th>Count</th>
-		<th>Min/Max/Av.&nbsp;duration&nbsp;</th>
+		<th>Min/Max/Avg&nbsp;duration&nbsp;</th>
 		<th>Count</th>
-		<th>Av.&nbsp;duration&nbsp;</th>
+		<th>Avg&nbsp;duration&nbsp;</th>
 		<th>INSERT</th>
 		<th>UPDATE</th>
 		<th>DELETE</th>
-		<th>Av.&nbsp;duration&nbsp;</th>
+		<th>Avg&nbsp;duration&nbsp;</th>
 };
 		if (exists $connection_info{chronos}) {
-			print $fh "		<th>Count</th><th>Av./s</th>\n";
+			print $fh "		<th>Count</th><th>Avg/s</th>\n";
 		}
 		if (exists $session_info{chronos}) {
-			print $fh "		<th>Count</th><th>Av.&nbsp;duration&nbsp;</th>\n";
+			print $fh "		<th>Count</th><th>Avg&nbsp;duration&nbsp;</th>\n";
 		}
 		print $fh qq{
 	</tr>
@@ -2855,14 +2855,14 @@ sub dump_as_html
 			print $fh qq{</tr><tr>};
 		}
 		if ($tempfile_info{count}) {
-			print $fh qq{<th>Count</th><th>Av.&nbsp;size</th>};
+			print $fh qq{<th>Count</th><th>Avg&nbsp;size</th>};
 		}
 		if ($checkpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $checkpoint_info{warning}) {
-			print $fh qq{<th>Count</th><th>Av. time (sec)</th>};
+			print $fh qq{<th>Count</th><th>Avg time (sec)</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
@@ -3073,7 +3073,7 @@ sub dump_as_html
 						$data{"Others"} += $autovacuum_info{tables}{$t}{vacuums} || 0;
 					}
 				}
-				&flotr2_piegraph(9, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
+				&flotr2_piegraph(18, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
 				%data = ();
 				if ($total_tuples) {
 					print $fh "<br />\n";
@@ -3084,7 +3084,7 @@ sub dump_as_html
 							$data{"Others"} += $autovacuum_info{tables}{$t}{tuples}{removed} || 0;
 						}
 					}
-					&flotr2_piegraph(9, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
+					&flotr2_piegraph(19, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
 				}
 			}
 			print $fh "</td></tr></table>\n";
@@ -3096,7 +3096,7 @@ sub dump_as_html
 	<h2 id="AnalyzeByTableReport">ANALYZEs by table <a href="#top" title="Back to top">^</a></h2>
 	<table>
 	<tr><td width="500" align="left" valign="top">
-	<table class="SmallTableList"Autov>
+	<table class="SmallTableList">
 		<tr>
 			<th>Table</th>
 			<th>ANALYZEs</th>
@@ -3164,7 +3164,7 @@ sub dump_as_html
 			} else {
 				$data{"Sum types < $pie_percentage_limit%"} += $total - $totala;
 			}
-			&flotr2_piegraph(9, 'queriesbytype_graph', 'Type of queries', %data);
+			&flotr2_piegraph(22, 'queriesbytype_graph', 'Type of queries', %data);
 		}
 		print $fh "</td></tr></table>\n";
 
@@ -3253,7 +3253,7 @@ sub dump_as_html
 					$infos{$small[0]} = $infos{"Sum applications < $pie_percentage_limit%"};
 					delete $infos{"Sum applications < $pie_percentage_limit%"};
 				}
-				&flotr2_piegraph(20, 'requestsapplications_graph', 'Queries per application', %infos);
+				&flotr2_piegraph(21, 'requestsapplications_graph', 'Queries per application', %infos);
 			}
 			print $fh "</td></tr></table>\n";
 		}
@@ -3271,7 +3271,7 @@ sub dump_as_html
 		<th>Object</th>
 		<th>Count</th>
 		<th>Total Duration</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Avg&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
 		my $total_count    = 0;
@@ -3326,7 +3326,7 @@ sub dump_as_html
 		<th>Database</th>
 		<th>Count</th>
 		<th>Total Duration</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Avg&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
 		my $total_count = 0;
@@ -3371,7 +3371,7 @@ sub dump_as_html
 		<th>User</th>
 		<th>Count</th>
 		<th>Total Duration</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Avg&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
 		my $total_count = 0;
@@ -3416,7 +3416,7 @@ sub dump_as_html
 		<th>Host</th>
 		<th>Count</th>
 		<th>Total Duration</th>
-		<th>Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Avg&nbsp;duration&nbsp;(s)</th>
 	</tr>
 };
 		my $total_count = 0;
@@ -3616,7 +3616,7 @@ sub dump_as_html
 		<th>Total duration</th>
 		<th>Times executed</th>
 
-		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Avg&nbsp;duration&nbsp;(s)</th>
 		<th>Query</th>
 	</tr>
 };
@@ -3637,7 +3637,7 @@ sub dump_as_html
 				&convert_time($normalyzed_info{$k}{duration}),
 				"</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Avg&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -3692,7 +3692,7 @@ sub dump_as_html
 		<th>Rank</th>
 		<th>Times executed</th>
 		<th>Total duration</th>
-		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Avg&nbsp;duration&nbsp;(s)</th>
 		<th>Query</th>
 	</tr>
 };
@@ -3711,7 +3711,7 @@ sub dump_as_html
 			print $fh
 "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Avg&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
@@ -3763,7 +3763,7 @@ sub dump_as_html
 <table class="queryList">
 	<tr>
 		<th>Rank</th>
-		<th>Min/Max/Av.&nbsp;duration&nbsp;(s)</th>
+		<th>Min/Max/Avg&nbsp;duration&nbsp;(s)</th>
 
 		<th>Times executed</th>
 		<th>Total duration</th>
@@ -3788,7 +3788,7 @@ sub dump_as_html
 				&convert_time($normalyzed_info{$k}{average}),
 				"</td><td class=\"top center\"><div class=\"tooltipLink\"><span class=\"information\">",
 				&comma_numbers($normalyzed_info{$k}{count}),
-"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Av.&nbsp;Duration</th></tr>";
+"</span><div class=\"tooltip\"><table><tr><th>Day</th><th>Hour</th><th>Count</th><th>Duration</th><th>Avg&nbsp;Duration</th></tr>";
 			foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 				my $c = 1;
 				$d =~ /^\d{4}(\d{2})(\d{2})$/;
