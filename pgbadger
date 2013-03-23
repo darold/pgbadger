@@ -3096,7 +3096,7 @@ sub dump_as_html
 	<h2 id="AnalyzeByTableReport">ANALYZEs by table <a href="#top" title="Back to top">^</a></h2>
 	<table>
 	<tr><td width="500" align="left" valign="top">
-	<table class="SmallTableList"Autov>
+	<table class="SmallTableList">
 		<tr>
 			<th>Table</th>
 			<th>ANALYZEs</th>
