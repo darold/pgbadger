@@ -1441,9 +1441,9 @@ sub check_incremental_position
 
 	if ($last_parsed) {
 		if ($saved_last_line{datetime}) {
-			if ($cur_date < $saved_last_line{datetime}) {
+			if ($cur_date lt $saved_last_line{datetime}) {
 				return 0;
-			} elsif (!$last_line{datetime} && ($cur_date == $saved_last_line{datetime})) {
+			} elsif (!$last_line{datetime} && ($cur_date eq $saved_last_line{datetime})) {
 				return 0 if ($line ne $saved_last_line{orig});
 			}
 		}
