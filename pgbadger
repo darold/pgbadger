@@ -53,6 +53,7 @@ my %RUNNING_PIDS = ();
 my @tempfiles    = ();
 my $parent_pid   = $$;
 my $interrupt    = 0;
+my $tmp_last_parsed = '';
 
 ####
 # method used to fork as many child as wanted
@@ -98,6 +99,7 @@ sub wait_child
 	foreach my $f (@tempfiles) {
 		unlink("$f->[1]") if (-e "$f->[1]");
 	}
+	unlink("$tmp_last_parsed") if ($tmp_last_parsed);
 	_exit(0);
 }
 $SIG{INT} = \&wait_child;
@@ -610,7 +612,7 @@ my @graph_values        = ();
 my %cur_info            = ();
 my $nlines              = 0;
 my %last_line           = ();
-my %saved_last_line     = ();
+our %saved_last_line     = ();
 my %tsung_session       = ();
 
 my $t0 = Benchmark->new;
@@ -625,6 +627,8 @@ if ($last_parsed && -e $last_parsed) {
 		die "FATAL: can't read last parsed line from $last_parsed, $!\n";
 	}
 }
+$tmp_last_parsed = 'tmp_' . $last_parsed if ($last_parsed);
+	
 
 # Main loop reading log files
 my $global_totalsize = 0;
@@ -736,7 +740,24 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		$fht->close();
 	}
 
+	# Get last line parsed from all process
+	if ($last_parsed) {
+		if (open(IN, "$tmp_last_parsed") ) {
+			while (my $line = <IN>) {
+				chomp($line);
+				my ($d, $l) = split(/\t/, $line, 2);
+				if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
+					$last_line{datetime} = $d;
+					$last_line{orig} = $l;
+				}
+			}
+			close(IN);
+		}
+		unlink("$tmp_last_parsed");
+	}
+
 } else {
+
 	# Multiprocessing disabled, parse log files one by one
 	foreach my $logfile ( @given_log_files ) {
 		last if (&process_file($logfile));
@@ -954,8 +975,6 @@ sub init_stats_vars
 	@graph_values        = ();
 	%cur_info            = ();
 	$nlines              = 0;
-	%last_line           = ();
-	%saved_last_line     = ();
 	%tsung_session       = ();
 }
 
@@ -1413,6 +1432,17 @@ sub process_file
 		kill(12, $parent_pid);
 	}
 
+	# Save last line into temporary file
+	if ($last_parsed && scalar keys %last_line) {
+		if (open(OUT, ">>$tmp_last_parsed")) {
+			flock(OUT, 2) || return $getout;
+			print OUT "$last_line{datetime}\t$last_line{orig}\n";
+			close(OUT);
+		} else {
+			&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
+		}
+	}
+	
 	return $getout;
 }
 
