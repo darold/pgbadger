@@ -1,3 +1,54 @@
+2013-04-07 - Version 3.2
+
+This is mostly a bug fix release, it also adds escaping of HTML code inside queries
+and the adds Min/Max reports with Average duration in all queries reports.
+
+	- In multiprocess mode, fix case where pgbadger does not update
+	  the last-parsed file and do not take care of the previous run.
+	  Thanks to Kong Man for the report.
+	- Fix case where pgbadger does not update the last-parsed file.
+	  Thanks to Kong Man for the report.
+	- Add CDATA to make validator happy. Thanks to Euler Taveira de
+	  Oliveira for the patch.
+	- Some code review by  Euler Taveira de Oliveira, thanks for the
+	  patch.
+	- Fix case where stat were multiplied by N when -J was set to N.
+	  Thanks to thegnorf for the report.
+	- Add a line in documentation about log_statement that disable
+	  log_min_duration_statement when it is set to all.
+	- Add quick note on how to contribute, thanks to Damien Clochard
+	  for the patch.
+	- Fix issue with logs read from stdin. Thanks to hubert depesz
+	  lubaczewski for the report.
+	- Force pgbadger to not try to beautify queries bigger than 10kb,
+	  this will take too much time. This value can be reduce in the
+	  future if hang with long queries still happen. Thanks to John
+	  Rouillard for the report.
+	- Fix an other issue in replacing bind param when the bind value
+	  is alone on a single line. Thanks to Kjeld Peters for the report.
+	- Fix parsing of compressed files together with uncompressed files
+	  using the the -j option. Uncompressed files are now processed using
+	  split method and compressed ones are parsed per one dedicated process.
+	- Replace zcat by gunzip -c to fix an issue on MacOsx. Thanks to
+	  Kjeld Peters for the report.
+	- Escape HTML code inside queries. Thanks to denstark for the report.
+	- Add Min/Max in addition to Average duration values in queries reports.
+	  Thanks to John Rouillard fot the feature request.
+	- Fix top slowest array size with binary format.
+	- Fix an other case with bind parameters with value in next line and
+	  the top N slowest queries that was repeated until N even if the real
+	  number of queries was lower. Thanks to Kjeld Peters for the reports.
+	- Fix non replacement of bind parameters where there is line breaks in
+	  the parameters, aka multiline bind parameters. Thanks to Kjeld Peters
+	  for the report.
+	- Fix error with seekable export tag with Perl v5.8. Thanks to Jeff Bohmer
+	  for the report.
+	- Fix parsing of non standard syslog lines begining with a timestamp like
+	  "2013-02-28T10:35:11-05:00". Thanks to Ryan P. Kelly for the report.
+	- Fix issue #65 where using -c | --dbclient with csvlog was broken. Thanks
+	  to Jaime Casanova for the report.
+	- Fix empty report in watchlog mode (-w option).
+
 2013-02-21 - Version 3.1
 
 This is a quick release to fix missing reports of most frequent errors and slowest
