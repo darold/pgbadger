@@ -1,4 +1,4 @@
-=head1 ABSTRACT
+=head1 NAME
 
 pgBadger - a fast PostgreSQL log analysis report
 
