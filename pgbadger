@@ -429,6 +429,7 @@ my @action_regex = (
 # Compile custom log line prefix prefix
 my @prefix_params = ();
 if ($log_line_prefix) {
+	# Build parameters name that will be extracted from the prefix regexp
 	@prefix_params = &build_log_line_prefix_regex();
 	&check_regex($log_line_prefix, '--prefix');
 	if ($format eq 'syslog') {
@@ -5653,6 +5654,8 @@ sub build_log_line_prefix_regex
 	while ($log_line_prefix =~ s/(\%[audrhptmlscvxie])/$regex_map{"$1"}->[1]/) {
 		push(@param_list, $regex_map{"$1"}->[0]);
 	}
+	# replace %% by a single %
+	$log_line_prefix =~ s/\%\%/\%/;
 	return @param_list;
 }
 
