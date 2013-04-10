@@ -604,6 +604,7 @@ my %application_info    = ();
 my %session_info        = ();
 my %conn_received       = ();
 my %checkpoint_info     = ();
+my %restartpoint_info   = ();
 my %autovacuum_info     = ();
 my %autoanalyze_info    = ();
 my @graph_values        = ();
@@ -906,7 +907,7 @@ Options:
     --disable-connection   : do not generate connection report.
     --disable-lock         : do not generate lock report.
     --disable-temporary    : do not generate temporary report.
-    --disable-checkpoint   : do not generate checkpoint report.
+    --disable-checkpoint   : do not generate checkpoint/restartpoint report.
     --disable-autovacuum   : do not generate autovacuum report.
 
 Examples:
@@ -968,6 +969,7 @@ sub init_stats_vars
 	%session_info        = ();
 	%conn_received       = ();
 	%checkpoint_info     = ();
+	%restartpoint_info   = ();
 	%autovacuum_info     = ();
 	%autoanalyze_info    = ();
 	@graph_values        = ();
@@ -2231,7 +2233,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #connectionspersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #allqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #restartpointwritebuffers_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
 	width : 1025px;
 	height: 400px;
 	background:#F3F2ED;
@@ -2884,7 +2886,7 @@ sub dump_as_html
 	}
 
 	if (!$disable_hourly && (scalar keys %per_hour_info > 0)) {
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos} || exists $autovacuum_info{chronos} ) {
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos} || exists $restartpoint_info{chronos} || exists $autovacuum_info{chronos} ) {
 			print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 		}
 		if ($tempfile_info{count}) {
@@ -2898,10 +2900,15 @@ sub dump_as_html
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th colspan="2">Checkpoint warning</th>};
 		}
+		if ($restartpoint_info{wbuffer}) {
+			if (exists $restartpoint_info{chronos}) {
+				print $fh qq{<th colspan="4">Restartpoints</th>};
+			}
+		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th colspan=\"2\">Autovacuum</th>\n";
 		}
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos} || exists $restartpoint_info{chronos}) {
 			print $fh qq{</tr><tr>};
 		}
 		if ($tempfile_info{count}) {
@@ -2914,10 +2921,14 @@ sub dump_as_html
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th>Count</th><th>Avg time (sec)</th>};
 		}
+		if ($restartpoint_info{wbuffer}) {
+			print $fh
+	qq{<th>Wrote buffers</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
 		}
-		if ($tempfile_info{count} || exists $checkpoint_info{chronos}) {
+		if ($tempfile_info{count} || exists $checkpoint_info{chronos} || exists $restartpoint_info{chronos}) {
 			print $fh qq{</tr>};
 			foreach my $d (sort {$a <=> $b} keys %per_hour_info) {
 				my $c = 1;
@@ -2965,6 +2976,18 @@ sub dump_as_html
 								) || 0, "</td>";
 						} else {
 							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
+						}
+					}
+					if (exists $restartpoint_info{chronos} && $restartpoint_info{wbuffer}) {
+						if (exists $restartpoint_info{chronos}{$d}{$h}) {
+							print $fh "<td class=\"right\">", &comma_numbers($restartpoint_info{chronos}{$d}{$h}{wbuffer}) || 0,
+								"</td><td class=\"right\">", &comma_numbers($restartpoint_info{chronos}{$d}{$h}{write}) || 0,
+								"</td><td class=\"right\">", &comma_numbers($restartpoint_info{chronos}{$d}{$h}{sync})  || 0,
+								"</td><td class=\"right\">", &comma_numbers($restartpoint_info{chronos}{$d}{$h}{total}) || 0,
+								"</td>";
+						} else {
+							print $fh
+"<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
 						}
 					}
 					if (exists $autovacuum_info{chronos}) {
@@ -3024,6 +3047,28 @@ sub dump_as_html
 			$d1 = '';
 			$d2 = '';
 			$d3 = '';
+		}
+
+		# restartpoint size
+		if (exists $restartpoint_info{chronos} && $restartpoint_info{wbuffer}) {
+			foreach my $tm (sort {$a <=> $b} keys %{$restartpoint_info{chronos}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y  = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d  = $3;
+				foreach my $h ("00" .. "23") {
+					my $t = timegm_nocheck(0, 0, $h, $d, $mo, $y) * 1000;
+					next if ($t < $t_min_hour);
+					last if ($t > $t_max_hour);
+					$d1 .= "[$t, " . ($restartpoint_info{chronos}{$tm}{$h}{wbuffer} || 0) . "],";
+				}
+			}
+			$d1 =~ s/,$//;
+			&flotr2_graph(
+				6,         'restartpointwritebuffers_graph', $d1, '', '', 'Restartpoint write buffers',
+				'Buffers', 'Write buffers',                '',  ''
+			);
+			$d1 = '';
 		}
 
 		# Temporary file size
@@ -4089,6 +4134,7 @@ sub load_stats
 	my %_database_info = %{$stats{database_info}};
 	my %_application_info = %{$stats{application_info}};
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
+	my %_restartpoint_info = %{$stats{restartpoint_info}};
 	my %_session_info = %{$stats{session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
 	my %_logs_type = %{$stats{logs_type}};
@@ -4459,6 +4505,21 @@ sub load_stats
 		}
 	}
 
+	### restartpoint_info ###
+	$restartpoint_info{sync} += $_restartpoint_info{sync};
+	$restartpoint_info{wbuffer} += $_restartpoint_info{wbuffer};
+	$restartpoint_info{total} += $_restartpoint_info{total};
+	$restartpoint_info{write} += $_restartpoint_info{write};
+
+	foreach my $day (keys %{ $_restartpoint_info{chronos} }) {
+		foreach my $hour (keys %{ $_restartpoint_info{chronos}{$day} }) {
+			$restartpoint_info{chronos}{$day}{$hour}{sync} += $_restartpoint_info{chronos}{$day}{$hour}{sync};
+			$restartpoint_info{chronos}{$day}{$hour}{wbuffer} += $_restartpoint_info{chronos}{$day}{$hour}{wbuffer};
+			$restartpoint_info{chronos}{$day}{$hour}{total} += $_restartpoint_info{chronos}{$day}{$hour}{total};
+			$restartpoint_info{chronos}{$day}{$hour}{write} += $_restartpoint_info{chronos}{$day}{$hour}{write};
+		}
+	}
+
 	#### Autovacuum infos ####
 
 	$autovacuum_info{count} += $_autovacuum_info{count};
@@ -4503,6 +4564,7 @@ sub dump_as_binary
 		'database_info' => \%database_info,
 		'application_info' => \%application_info,
 		'checkpoint_info' => \%checkpoint_info,
+		'restartpoint_info' => \%restartpoint_info,
 		'session_info' => \%session_info,
 		'tempfile_info' => \%tempfile_info,
 		'error_info' => \%error_info,
@@ -4906,6 +4968,31 @@ sub parse_query
 		$checkpoint_info{warning_seconds} += $1;
 		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{warning}++;
 		$checkpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{warning_seconds} += $1;
+		return;
+	}
+
+	# Store restartpoint information
+	if (
+		($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~
+/restartpoint complete: wrote (\d+) buffers \(([^\)]+)\); write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
+		   )
+	   )
+	{
+		return if ($disable_checkpoint);
+		$restartpoint_info{wbuffer} += $1;
+
+		#$restartpoint_info{percent_wbuffer} += $2;
+		$restartpoint_info{write}         += $3;
+		$restartpoint_info{sync}          += $4;
+		$restartpoint_info{total}         += $5;
+
+		$restartpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{wbuffer} += $1;
+
+		#$restartpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{percent_wbuffer} += $2;
+		$restartpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{write}         += $3;
+		$restartpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{sync}          += $4;
+		$restartpoint_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{total}         += $5;
 		return;
 	}
 
