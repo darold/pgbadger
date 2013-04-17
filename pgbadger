@@ -2124,6 +2124,7 @@ div.reports { padding:4px; }
 #content table td.right { text-align:right; }
 #content table td.center { text-align:center; }
 #content table td.relevantInformation { font-weight:bold; }
+#content table td.relevantInformationSmall { font-size: 11px; font-weight:bold; }
 
 table.HourStatsTable {
 	background:#F3F2ED;
@@ -3870,7 +3871,7 @@ sub dump_as_html
 				}
 			}
 			my $col = $idx % 2;
-			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformation top center\">",
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">$idx</td><td class=\"relevantInformationSmall top center\">",
 				&convert_time($normalyzed_info{$k}{min}), "/",
 				&convert_time($normalyzed_info{$k}{max}), "/",
 				&convert_time($normalyzed_info{$k}{average}),
