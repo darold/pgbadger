@@ -1126,26 +1126,19 @@ sub process_file
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
 			$prefix_vars{'t_query'}    = $row->[13];
-
+			# Set ERROR additional informations
+			$prefix_vars{'t_detail'} = $row->[14];
+			$prefix_vars{'t_hint'} = $row->[15];
+			$prefix_vars{'t_context'} = $row->[18];
+			$prefix_vars{'t_statement'} = $row->[19];
+			
 			# Check if the log line should be excluded from the report
 			if (&validate_log_line($prefix_vars{'t_pid'})) {
+
 				# Parse the query now
 				&parse_query();
-				if ($row->[14]) {
-					if ($row->[11] eq 'LOG') {
-						if ($row->[13] =~ /^(duration: \d+\.\d+ ms)/) {
-							$row->[14] = "$1  $row->[14]";
-						}
-					}
-					$prefix_vars{'t_loglevel'} = 'DETAIL';
-					$prefix_vars{'t_query'}    = $row->[14];
-					&parse_query();
-				}
-				if ($row->[15]) {
-					$prefix_vars{'t_query'}    = $row->[15];
-					$prefix_vars{'t_loglevel'} = 'HINT';
-					&parse_query();
-				}
+				&store_queries($prefix_vars{'t_pid'});
+				delete $cur_info{$prefix_vars{'t_pid'}};
 			}
 		}
 		if (!$getout) {
@@ -5087,6 +5080,12 @@ sub parse_query
 		return;
 	}
 
+	if ( ($format eq 'csv') && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
+		$cur_info{$t_pid}{detail} = $prefix_vars{'t_detail'};
+		$cur_info{$t_pid}{hint} = $prefix_vars{'t_hint'};
+		$cur_info{$t_pid}{context} = $prefix_vars{'t_context'};
+		$cur_info{$t_pid}{statement} = $prefix_vars{'t_statement'}
+	}
 	&set_current_infos($t_pid);
 
 	return 1;
