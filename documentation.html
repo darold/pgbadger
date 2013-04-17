@@ -98,9 +98,6 @@ You need to enable other parameters in postgresql.conf to get more informations 
 </pre>
 </p>
 <p>
-Do not enable log_statement as their log format will not be parsed by pgBadger.
-</p>
-<p>
 Of course your log messages should be in english without locale support:
 <pre>
 	lc_messages='C'
@@ -108,45 +105,97 @@ Of course your log messages should be in english without locale support:
 but this is not only recommanded by pgbadger.
 </p>
 
-<h2>log_min_duration_statement versus log_duration</h2>
+<h2>log_min_duration_statement, log_duration and log_statement</h2>
 <p>
-If you want full statistics reports from your log file you must set
-log_min_duration_statement = 0. If you just want to report duration and
-number of queries and don't want all detail about queries, set
-log_min_duration_statement to -1 and enable log_duration. If you want to
-report only queries that tooks more than 5 seconds for example but still
-want to report all queries duration and number of queries you will need
-to generate 2 reports. One using the log_min_duration_statement and the
-second using the log_duration. Proceed as follow:
+If you want full statistics reports you must set
+log_min_duration_statement to 0 or more milliseconds.
+</p>
+<p>
+If you just want to report duration and number of queries and don't want
+all details about queries, set log_min_duration_statement to -1 to
+disable it and enable log_duration in your postgresql.conf file. If you
+want to add the most common request report you can either choose to set
+log_min_duration_statement to a higher value or choose to enable
+log_statement.
+</p>
+<p>
+Enabling log_min_duration_statement will add reports about slowest
+queries and queries that took up the most time. Take care that if you
+have log_statement set to 'all' nothing will be logged with
+log_line_prefix.
+</p>
+
+<h2>Parallel processing</h2>
+<p>
+    To enable parallel processing you just have to use the -j N option where
+    N is the number of cores you want to use.
+</p>
+<p>
+    pgbadger will then proceed as follow:
 </p>
 <pre>
-	pgbadger --enable-log_duration /var/log/postgresql.log
+            for each log file
+                chunk size = int(file size / N)
+                look at start/end offsets of these chunks
+                fork N processes and seek to the start offset of each chunk
+                    each process will terminate when the parser reach the end offset
+                    of its chunk
+                    each process write stats into a binary temporary file
+               wait for all children has terminated
+            All binary temporary files generated will then be read and loaded into
+            memory to build the html output.
 </pre>
 <p>
-to generate hourly statistics about the number of queries and duration
-stats. To generate detailled reports about queries use the following
-command:
+    With that method, at start/end of chunks pgbadger may truncate or omit a
+    maximum of N queries perl log file which is an insignificant gap if you
+    have millions of queries in your log file. The chance that the query
+    that you were looking for is loose is near 0, this is why I think this
+    gap is livable. Most of the time the query is counted twice but
+    truncated.
+</p>
+<p>
+    When you have lot of small log files and lot of CPUs it is speedier to
+    dedicate one core to one log file at a time. To enable this behavior you
+    have to use option -J N instead. With 200 log files of 10MB each the use
+    of the -J option start being really interesting with 8 Cores. Using this
+    method you will be sure to not loose any queries in the reports.
+</p>
+<p>
+    He are a benchmarck done on a server with 8 CPUs and a single file of
+    9.5GB.
 </p>
 <pre>
-	pgbadger --enable-log_min_duration /var/log/postgresql.log
+     Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
+    --------+---------+-------+-------+------
+       -j   | 1h41m18 | 50m25 | 25m39 | 15m58
+       -J   | 1h41m18 | 54m28 | 41m16 | 34m45
 </pre>
 <p>
-Note that enabling log_statement will not help at all and enabling those
-two options in the same command will report an error.
+    With 200 log files of 10MB each and a total og 2GB the results are
+    slightly different:
+</p>
+<pre>
+     Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
+    --------+-------+-------+-------+------
+       -j   | 20m15 |  9m56 |  5m20 | 4m20
+       -J   | 20m15 |  9m49 |  5m00 | 2m40
+</pre>
+<p>
+    So it is recommanded to use -j unless you have hundred of small log file
+    and can use at least 8 CPUs.
 </p>
 <p>
-Use those options if you don't want to log each queries to preserve your
-I/O but still want to know the slowest queries upper a certain time and
-still have a report on the number of queries and their duration.
-Otherwize if you don't have too much performance lost with a
-log_min_duration_statement set to 0, do not enable log_duration in your
-postgresql.conf file.
+    IMPORTANT: when you are using parallel parsing pgbadger will generate a
+    lot of temporary files in the /tmp directory and will remove them at
+    end, so do not remove those files unless pgbadger is not running. They
+    are all named with the following template tmp_pgbadgerXXXX.bin so they
+    can be easily identified.
 </p>
 <h2>Installation</h2>
 <p>Download the tarball from github and unpack the archive as follow:</p>
 <pre>
-	tar xzf pgbadger-1.x.tar.gz
-	cd pgbadger-1.x/
+	tar xzf pgbadger-3.x.tar.gz
+	cd pgbadger-3.x/
 	perl Makefile.PL
 	make && make install
 </pre>
@@ -180,38 +229,43 @@ postgresql.conf file.
         -a | --average minutes : number of minutes to build the average graphs of
                                  queries and connections.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
-        -c | --dbclient host   : only report what concern the given client host.
+        -c | --dbclient host   : only report on entries for the given client host.
         -C | --nocomment       : remove comments like /* ... */ from queries.
-        -d | --dbname database : only report what concern the given database
+        -d | --dbname database : only report on entries for the given database.
         -e | --end datetime    : end date/time for the data to be parsed in log.
-        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
+        -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr
         -G | --nograph         : disable graphs on HTML output. Enable by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
+        -j | --jobs number     : number of jobs to run on parallel on each log file.
+                                 Default is 1, run as single process.
+        -J | --Jobs number     : number of log file to parse in parallel. Default
+                                 is 1, run as single process.
         -l | --last-parsed file: allow incremental log parsing by registering the
                                  last datetime and line parsed. Useful if you want
                                  to watch errors since last run or if you want one
                                  report per day with a log rotated each week.
-        -m | --maxlength size  : maximum length of a query, it will be cutted above
+        -m | --maxlength size  : maximum length of a query, it will be restricted to
                                  the given size. Default: no truncate
         -n | --nohighlight     : disable SQL code highlighting.
-        -N | --appname name    : only report what concern the given application name
-        -o | --outfile filename: define the filename for the output. Default depends
-                                 of the output format: out.html, out.txt or out.tsung.
+        -N | --appname name    : only report on entries for given application name
+        -o | --outfile filename: define the filename for output. Default depends on
+                                 the output format: out.html, out.txt or out.tsung.
                                  To dump output to stdout use - as filename.
         -p | --prefix string   : give here the value of your custom log_line_prefix
-                                 defined in your postgresql.conf. You may used it only
-                                 if don't have the default allowed formats ot to use
-                                 other custom variables like client ip or application
-                                 name. See examples below.
+                                 defined in your postgresql.conf. Only use it if you
+                                 aren't using one of the standard prefixes specified
+                                 in the pgBadger documentation, such as if your prefix
+                                 includes additional variables like client ip or
+                                 application name. See examples below.
         -P | --no-prettify     : disable SQL queries prettify formatter.
         -q | --quiet           : don't print anything to stdout, even not a progress bar.
-        -s | --sample number   : number of query sample to store/display. Default: 3
-        -s | --select-only     : use it if you want reports on select queries only.
-        -t | --top number      : number of query to store/display. Default: 20
+        -s | --sample number   : number of query samples to store/display. Default: 3
+        -S | --select-only     : use it if you want to report select queries only.
+        -t | --top number      : number of queries to store/display. Default: 20
         -T | --title string    : change title of the HTML page report.
-        -u | --dbuser username : only report what concern the given user
-        -U | --exclude-user username : make report with exclude specified user.
+        -u | --dbuser username : only report on entries for the given user.
+        -U | --exclude-user username : exclude entries for the specified user from report.
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
         -V | --version         : show pgBadger version and exit.
         -w | --watch-mode      : only report errors just like logwatch could do.
@@ -221,28 +275,25 @@ postgresql.conf file.
         --pie-limit num        : pie data lower than num% will show a sum instead.
         --exclude-query regex  : any query matching the given regex will be excluded
                                  from the report. For example: "^(VACUUM|COMMIT)"
-                                 you can use this option multiple time.
+                                 You can use this option multiple times.
         --exclude-file filename: path of the file which contains all the regex to use
                                  to exclude queries from the report. One regex per line.
-        --include-query regex  : any query that do not match the given regex will be
+        --include-query regex  : any query that does not match the given regex will be
                                  excluded from the report. For example: "(table_1|table_2)"
-                                 you can use this option multiple time.
+                                 You can use this option multiple times.
         --include-file filename: path of the file which contains all the regex of the
                                  queries to include from the report. One regex per line.
         --disable-error        : do not generate error report.
-        --disable-hourly       : do not generate hourly reports.
+        --disable-hourly       : do not generate hourly report.
         --disable-type         : do not generate query type report.
-        --disable-query        : do not generate queries reports (slowest, most
+        --disable-query        : do not generate query reports (slowest, most
                                  frequent, ...).
         --disable-session      : do not generate session report.
         --disable-connection   : do not generate connection report.
         --disable-lock         : do not generate lock report.
         --disable-temporary    : do not generate temporary report.
         --disable-checkpoint   : do not generate checkpoint report.
-        --enable-log_duration  : force pgbadger to use log_duration even if
-                                 log_min_duration_statement format is autodetected.
-        --enable-log_min_duration: force pgbadger to use log_min_duration even if
-                                 log_duration format is autodetected.
+	--disable-autovacuum   : do not genrate report about autovacuum.
 
     Examples:
 
@@ -260,6 +311,10 @@ postgresql.conf file.
             perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
                             /pglog/postgresql-2012-08-21*
 
+    Use my 8 CPUs to parse my 10GB file faster, really faster
+
+            perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
+
     Generate Tsung sessions XML file with select queries only:
 
         perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
@@ -273,9 +328,8 @@ postgresql.conf file.
         0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` \
             -o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
-    This suppose that your log file and HTML report are also rotated every
+    This supposes that your log file and HTML report are also rotated every
     week.
-
 </pre>
 
 <div id="footer">
