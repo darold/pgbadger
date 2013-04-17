@@ -81,6 +81,7 @@ SYNOPSIS
         --disable-lock         : do not generate lock report.
         --disable-temporary    : do not generate temporary report.
         --disable-checkpoint   : do not generate checkpoint report.
+        --disable-autovacuum   : do not generate autovacuum report.
 
     Examples:
 
