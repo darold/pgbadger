@@ -609,10 +609,14 @@ my %autovacuum_info     = ();
 my %autoanalyze_info    = ();
 my @graph_values        = ();
 my %cur_info            = ();
+my %cur_temp_info       = ();
+my %cur_lock_info       = ();
 my $nlines              = 0;
 my %last_line           = ();
-our %saved_last_line     = ();
+our %saved_last_line    = ();
 my %tsung_session       = ();
+my @top_locked_info     = ();
+my @top_tempfile_info   = ();
 
 my $t0 = Benchmark->new;
 
@@ -1562,6 +1566,36 @@ sub convert_time
 	return $time;
 }
 
+# Stores the top N queries generating the biggest temporary file
+sub set_top_tempfile_info
+{
+	my ($q, $sz, $date, $db, $user, $remote, $app) = @_;
+
+	push(@top_tempfile_info, [($sz, $date, $q, $db, $user, $remote, $app)]);
+
+	my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} @top_tempfile_info;
+	@top_tempfile_info = ();
+	for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++) {
+		push(@top_tempfile_info, $tmp_top_tempfile_info[$i]);
+		last if ($i == $end_top);
+	}
+}
+
+# Stores the top N queries waiting the most
+sub set_top_locked_info
+{
+	my ($q, $dt, $date, $db, $user, $remote, $app) = @_;
+
+	push(@top_locked_info, [($dt, $date, $q, $db, $user, $remote, $app)]);
+
+	my @tmp_top_locked_info = sort {$b->[0] <=> $a->[0]} @top_locked_info;
+	@top_locked_info = ();
+	for (my $i = 0; $i <= $#tmp_top_locked_info; $i++) {
+		push(@top_locked_info, $tmp_top_locked_info[$i]);
+		last if ($i == $end_top);
+	}
+}
+
 # Stores the top N slowest queries
 sub set_top_slowest
 {
@@ -1671,9 +1705,9 @@ Number of unique normalized events: $fmt_unique_error
 	if ($tempfile_info{count}) {
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", ($tempfile_info{size} / $tempfile_info{count})));
-		print $fh qq{Number temporary file: $tempfile_info{count}
-Max size of temporary file: $fmt_temp_maxsise
-Average size of temporary file: $fmt_temp_avsize
+		print $fh qq{Number temporary files: $tempfile_info{count}
+Max size of temporary files: $fmt_temp_maxsise
+Average size of temporary files: $fmt_temp_avsize
 };
 	}
 	if (!$disable_session && $session_info{count}) {
@@ -2319,39 +2353,51 @@ EOF
 			print $fh qq{<a href="#RequestsDatabaseReport">Queries per database</a> | } if (scalar keys %database_info > 1);
 			print $fh qq{<a href="#RequestsApplicationReport">Queries per application</a> | } if (scalar keys %application_info > 1);
 		}
+		if (!$disable_query && ($#top_locked_info >= 0)) {
+			print $fh qq{
+<a href="#MostFrequentWaitingQueries">Most frequent waiting queries (N)</a> | 
+<a href="#QueriesThatWaitedTheMost">Queries that waited the most</a> | 
+};
+		}
+		if (!$disable_query && ($#top_tempfile_info >= 0)) {
+			print $fh qq{
+<a href="#QueriesMostTemporaryFiles">Queries generating the most temporary files (N)</a> | 
+<a href="#QueriesLargestTemporaryFiles">Queries generating the largest temporary files</a> | 
+};
+		}
 		if (!$disable_query && ($#top_slowest >= 0)) {
 			print $fh qq{
 <a href="#SlowestQueriesReport">Slowest queries</a> | 
-<a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> |
-<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> |
+<a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a> | 
+<a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a> | 
 };
 		} 
 		if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
-			print $fh "<a href=\"#NormalizedQueriesMostFrequentReport\">Most frequent queries (N)</a> <br />";
+			print $fh "<a href=\"#NormalizedQueriesMostFrequentReport\">Most frequent queries (N)</a> | ";
 		}
 		if (!$disable_lock && scalar keys %lock_info > 0) {
-			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> |};
+			print $fh qq{<a href="#LocksByTypeReport">Locks by type</a> | };
 		}
 		if (!$disable_session) {
 			if (exists $session_info{database}) {
-				print $fh qq{<a href="#SessionsDatabaseReport">Sessions per database</a> |};
+				print $fh qq{<a href="#SessionsDatabaseReport">Sessions per database</a> | };
 			}
 			if (exists $session_info{user}) {
-				print $fh qq{<a href="#SessionsUserReport">Sessions per user</a> |};
+				print $fh qq{<a href="#SessionsUserReport">Sessions per user</a> | };
 			}
 			if (exists $session_info{host}) {
-				print $fh qq{<a href="#SessionsHostReport">Sessions per host</a> |};
+				print $fh qq{<a href="#SessionsHostReport">Sessions per host</a> | };
 			}
 		}
 		if (!$disable_connection) {
 			if (exists $connection_info{database}) {
-				print $fh qq{<a href="#ConnectionsDatabaseReport">Connections per database</a> |};
+				print $fh qq{<a href="#ConnectionsDatabaseReport">Connections per database</a> | };
 			}
 			if (exists $connection_info{user}) {
-				print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> |};
+				print $fh qq{<a href="#ConnectionsUserReport">Connections per user</a> | };
 			}
 			if (exists $connection_info{host}) {
-				print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a><br>};
+				print $fh qq{<a href="#ConnectionsHostReport">Connections per host</a> | };
 			}
 		}
 	}
@@ -2401,7 +2447,7 @@ sub html_footer
 				print $fh qq{<li><a href="#SessionsUserReport">Sessions per user</a></li>};
 			}
 			if (exists $session_info{host}) {
-				print $fh qq{<li><a href="#SessionsHostReport">Sessions per host</a></li><li>};
+				print $fh qq{<li><a href="#SessionsHostReport">Sessions per host</a></li>};
 			}
 		}
 		if (!$disable_connection) {
@@ -2412,15 +2458,27 @@ sub html_footer
 				print $fh qq{<li><a href="#ConnectionsUserReport">Connections per user</a></li>};
 			}
 			if (exists $connection_info{host}) {
-				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li><li>};
+				print $fh qq{<li><a href="#ConnectionsHostReport">Connections per host</a></li>};
 			}
 		}
+		if (!$disable_query && ($#top_locked_info >= 0)) {
+			print $fh qq{<li><a href="#MostFrequentWaitingQueries">Most frequent waiting queries (N)</a></li>
+<li><a href="#QueriesThatWaitedTheMost">Queries that waited the most</a></li>};
+		}
+		if (!$disable_query && ($#top_tempfile_info >= 0)) {
+			print $fh qq{
+<li><a href="#QueriesMostTemporaryFiles">Queries generating the most temporary files (N)</a></li>
+<li><a href="#QueriesLargestTemporaryFiles">Queries generating the largest temporary files</a></li>
+};
+		}
 		if (!$disable_query && ($#top_slowest >= 0)) {
-			print $fh
-qq{<a href="#SlowestQueriesReport">Slowest queries</a></li><li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li><li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>};
+			print $fh qq{<li><a href="#SlowestQueriesReport">Slowest queries</a></li>
+<li><a href="#NormalizedQueriesMostTimeReport">Queries that took up the most time (N)</a></li>
+<li><a href="#NormalizedQueriesSlowestAverageReport">Slowest queries (N)</a></li>
+};
 		}
 		if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
-			print $fh qq{<li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li></li>};
+			print $fh qq{<li><a href="#NormalizedQueriesMostFrequentReport">Most frequent queries (N)</a></li>};
 		}
 	}
 	if (!$disable_error && (scalar keys %error_info > 0)) {
@@ -2513,9 +2571,9 @@ sub dump_as_html
 		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize}) || 0;
 		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", $tempfile_info{size} / $tempfile_info{count}));
 		print $fh qq{
-<li>Number temporary file: $tempfile_info{count}</li>
-<li>Max size of temporary file: $fmt_temp_maxsise</li>
-<li>Average size of temporary file: $fmt_temp_avsize</li>
+<li>Number of temporary files: $tempfile_info{count}</li>
+<li>Max size of temporary files: $fmt_temp_maxsise</li>
+<li>Average size of temporary files: $fmt_temp_avsize</li>
 };
 	}
 	if (!$disable_session && $session_info{count}) {
@@ -2910,14 +2968,14 @@ sub dump_as_html
 		}
 		if ($checkpoint_info{wbuffer}) {
 			print $fh
-	qq{<th>Wrote buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+	qq{<th>Written buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th>Count</th><th>Avg time (sec)</th>};
 		}
 		if ($restartpoint_info{wbuffer}) {
 			print $fh
-	qq{<th>Wrote buffers</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
+	qq{<th>Written buffers</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
@@ -3670,6 +3728,156 @@ sub dump_as_html
 		print $fh "</td></tr></table>\n";
 	}
 
+	# Show lock wait detailed informations
+	if (!$disable_lock && scalar keys %lock_info > 0) {
+
+		my @top_locked_queries;
+		foreach my $h (keys %normalyzed_info) {
+			if (exists($normalyzed_info{$h}{locks})) {
+				push (@top_locked_queries, [$h, $normalyzed_info{$h}{locks}{count}, $normalyzed_info{$h}{locks}{wait},
+				$normalyzed_info{$h}{locks}{minwait}, $normalyzed_info{$h}{locks}{maxwait}]);
+			}
+		}
+
+		# Most frequent waiting queries (N)
+		@top_locked_queries = sort {$b->[2] <=> $a->[2]} @top_locked_queries;
+		print $fh qq{
+<h2 id="MostFrequentWaitingQueries">Most frequent waiting queries (N)<a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+<tr>
+<th>Rank</th>
+<th>Count</th>
+<th>Total&nbsp;wait&nbsp;time&nbsp;(s)</th>
+<th>Min/Max/Avg&nbsp;duration&nbsp;(s)</th>
+<th>Query</th>
+</tr>
+};
+		for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
+			last if ($i > $end_top);
+			my $col = $i % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+			$top_locked_queries[$i]->[1], "</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[2]),
+			"</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
+			&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
+			"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
+			&highlight_code($top_locked_queries[$i]->[0]), "</div></td></tr>\n";
+		}
+		print $fh "</table>\n";
+		@top_locked_queries = ();
+
+		# Queries that waited the most
+		@top_locked_info = sort {$b->[1] <=> $a->[1]} @top_locked_info;
+		print $fh qq{
+<h2 id="QueriesThatWaitedTheMost">Queries that waited the most<a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+<tr>
+<th>Rank</th>
+<th>Wait&nbsp;time&nbsp;(s)</th>
+<th>Query</th>
+</tr>
+};
+		for (my $i = 0 ; $i <= $#top_locked_info ; $i++) {
+			my $col = $i % 2;
+			my $ttl = $top_locked_info[$i]->[1] || '';
+			my $db = " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
+			$db .= ", user: $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
+			$db .= ", remote: $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
+			$db .= ", app: $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
+			$db =~ s/^, / - /;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+			&convert_time($top_locked_info[$i]->[0]),
+			"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+			&highlight_code($top_locked_info[$i]->[2]), "</div></td></tr>\n";
+		}
+		print $fh "</table>\n";
+	}
+
+	# Show temporary files detailed informations
+	if (!$disable_temporary && scalar keys %tempfile_info > 0) {
+
+		my @top_temporary;
+		foreach my $h (keys %normalyzed_info) {
+			if (exists($normalyzed_info{$h}{tempfiles})) {
+				push (@top_temporary, [$h, $normalyzed_info{$h}{tempfiles}{count}, $normalyzed_info{$h}{tempfiles}{size},
+				$normalyzed_info{$h}{tempfiles}{minsize}, $normalyzed_info{$h}{tempfiles}{maxsize}]);
+			}
+		}
+
+		# Queries generating the most temporary files (N)
+		@top_temporary = sort {$b->[1] <=> $a->[1]} @top_temporary;
+		print $fh qq{
+<h2 id="QueriesMostTemporaryFiles">Queries generating the most temporary files (N)<a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+<tr>
+<th>Rank</th>
+<th>Count</th>
+<th>Total&nbsp;size</th>
+<th>Min/Max/Avg&nbsp;size</th>
+<th>Query</th>
+</tr>
+};
+		my $idx = 1;
+		for (my $i = 0 ; $i <= $#top_temporary ; $i++) {
+			last if ($i > $end_top);
+			my $col = $i % 2;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+			$top_temporary[$i]->[1], "</td><td class=\"center top\">", &comma_numbers($top_temporary[$i]->[2]),
+			"</td><td class=\"center top\">", &comma_numbers($top_temporary[$i]->[3]),
+			"/", &comma_numbers($top_temporary[$i]->[4]), "/",
+			&comma_numbers(sprintf("%.2f", $top_temporary[$i]->[2] / $top_temporary[$i]->[1])),
+			"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
+			&highlight_code($top_temporary[$i]->[0]), "</div>";
+			my $k = $top_temporary[$i]->[0];
+			if ($normalyzed_info{$k}{count} > 1) {
+				print $fh "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedQueriesMostFrequentReport_$idx\" name=\"button_NormalizedQueriesMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedQueriesMostFrequentReport_$idx', 'examples_NormalizedQueriesMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedQueriesMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
+				my $i = 0;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $colb = $i % 2;
+					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
+					print $fh "<div class=\"example$d\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+					      &convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+					$i++;
+				}
+				print $fh "</div>";
+			}                             
+			print $fh "</td></tr>\n";
+			$idx++;
+		}
+		print $fh "</table>\n";
+		@top_temporary = ();
+
+		# Top queries generating the largest temporary files
+		@top_tempfile_info = sort {$b->[1] <=> $a->[1]} @top_tempfile_info;
+
+		print $fh qq{
+<h2 id="QueriesLargestTemporaryFiles">Queries generating the largest temporary files<a href="#top" title="Back to top">^</a></h2>
+<table class="queryList">
+<tr>
+<th>Rank</th>
+<th>Size</th>
+<th>Query</th>
+</tr>
+};
+		for (my $i = 0 ; $i <= $#top_tempfile_info ; $i++) {
+			my $col = $i % 2;
+			my $ttl = $top_tempfile_info[$i]->[1] || '';
+			my $db = " - database: $top_tempfile_info[$i]->[3]" if ($top_tempfile_info[$i]->[3]);
+			$db .= ", user: $top_tempfile_info[$i]->[4]" if ($top_tempfile_info[$i]->[4]);
+			$db .= ", remote: $top_tempfile_info[$i]->[5]" if ($top_tempfile_info[$i]->[5]);
+			$db .= ", app: $top_tempfile_info[$i]->[6]" if ($top_tempfile_info[$i]->[6]);
+			$db =~ s/^, / - /;
+			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+			&comma_numbers($top_tempfile_info[$i]->[0]),
+			"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+			&highlight_code($top_tempfile_info[$i]->[2]), "</div></td></tr>\n";
+		}
+		print $fh "</table>\n";
+	}
+
 	# Show top information
 	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh qq{
@@ -3921,7 +4129,6 @@ sub dump_as_html
 		}
 		print $fh "</table>\n";
 	}
-	@top_slowest = ();
 
 	if (!$disable_error) {
 		&show_error_as_html();
@@ -4417,6 +4624,28 @@ sub load_stats
 		}
 
 		$normalyzed_info{$stmt}{duration} += $_normalyzed_info{$stmt}{duration};
+
+		if (exists $_normalyzed_info{$stmt}{locks}) {
+			$normalyzed_info{$stmt}{locks}{count} += $_normalyzed_info{$stmt}{locks}{count};
+			$normalyzed_info{$stmt}{locks}{wait} += $_normalyzed_info{$stmt}{locks}{wait};
+			if (!exists $normalyzed_info{$stmt}{locks}{minwait} || ($normalyzed_info{$stmt}{locks}{minwait} > $_normalyzed_info{$stmt}{locks}{minwait})) { 
+				$normalyzed_info{$stmt}{locks}{minwait} = $_normalyzed_info{$stmt}{locks}{minwait};
+			}
+			if (!exists $normalyzed_info{$stmt}{locks}{maxwait} || ($normalyzed_info{$stmt}{locks}{maxwait} < $_normalyzed_info{$stmt}{locks}{maxwait})) { 
+				$normalyzed_info{$stmt}{locks}{maxwait} = $_normalyzed_info{$stmt}{locks}{maxwait};
+			}
+		}
+
+		if (exists $_normalyzed_info{$stmt}{tempfiles}) {
+			$normalyzed_info{$stmt}{tempfiles}{count} += $_normalyzed_info{$stmt}{tempfiles}{count};
+			$normalyzed_info{$stmt}{tempfiles}{size} += $_normalyzed_info{$stmt}{tempfiles}{size};
+			if (!exists $normalyzed_info{$stmt}{tempfiles}{minsize} || ($normalyzed_info{$stmt}{tempfiles}{minsize} > $_normalyzed_info{$stmt}{tempfiles}{minsize})) { 
+				$normalyzed_info{$stmt}{tempfiles}{minsize} = $_normalyzed_info{$stmt}{tempfiles}{minsize};
+			}
+			if (!exists $normalyzed_info{$stmt}{tempfiles}{maxsize} || ($normalyzed_info{$stmt}{tempfiles}{maxsize} < $_normalyzed_info{$stmt}{tempfiles}{maxsize})) { 
+				$normalyzed_info{$stmt}{tempfiles}{maxsize} = $_normalyzed_info{$stmt}{tempfiles}{maxsize};
+			}
+		}
 	}
 
 	### session_info ###
@@ -4803,6 +5032,9 @@ sub parse_query
 		$lock_info{$1}{$2}{duration} += $3;
 		$lock_info{$1}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$lock_info{$1}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{duration}++;
+		# Store current lock information that will be used later
+		# when we will parse the query responsible of the locks
+		$cur_lock_info{$t_pid}{wait} = $3;
 		return;
 	}
 
@@ -4814,6 +5046,9 @@ sub parse_query
 		$tempfile_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$tempfile_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{size} += $1;
 		$tempfile_info{maxsize} = $1 if ($tempfile_info{maxsize} < $1);
+		# Store current temporary file information that will be used later
+		# when we will parse the query responsible of the tempfile
+		$cur_temp_info{$t_pid}{size} = $1;
 		return;
 	}
 
@@ -5337,6 +5572,36 @@ sub store_queries
 
 			# Store normalized query count and duration per time
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+
+			# Store normalized query temp file size if required
+			if (exists $cur_temp_info{$t_pid}) {
+				$normalyzed_info{$normalized}{tempfiles}{size} += $cur_temp_info{$t_pid}{size};
+				$normalyzed_info{$normalized}{tempfiles}{count}++;
+				if ($normalyzed_info{$normalized}{tempfiles}{maxsize} < $cur_temp_info{$t_pid}{size}) {
+					$normalyzed_info{$normalized}{tempfiles}{maxsize} = $cur_temp_info{$t_pid}{size};
+				}
+				if (!exists($normalyzed_info{$normalized}{tempfiles}{minsize})
+				    || $normalyzed_info{$normalized}{tempfiles}{minsize} > $cur_temp_info{$t_pid}{size}) {
+					$normalyzed_info{$normalized}{tempfiles}{minsize} = $cur_temp_info{$t_pid}{size};
+				}
+				&set_top_tempfile_info($cur_info{$t_pid}{query}, $cur_temp_info{$t_pid}{size}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				delete $cur_temp_info{$t_pid};
+			}
+
+			# Store normalized query that waited the most if required
+			if (exists $cur_lock_info{$t_pid}) {
+				$normalyzed_info{$normalized}{locks}{wait} += $cur_lock_info{$t_pid}{wait};
+				$normalyzed_info{$normalized}{locks}{count}++;
+				if ($normalyzed_info{$normalized}{locks}{maxwait} < $cur_lock_info{$t_pid}{wait}) {
+					$normalyzed_info{$normalized}{locks}{maxwait} = $cur_lock_info{$t_pid}{wait};
+				}
+				if (!exists($normalyzed_info{$normalized}{locks}{minwait})
+				    || $normalyzed_info{$normalized}{locks}{minwait} > $cur_lock_info{$t_pid}{wait}) {
+					$normalyzed_info{$normalized}{locks}{minwait} = $cur_lock_info{$t_pid}{wait};
+				}
+				&set_top_locked_info($cur_info{$t_pid}{query}, $cur_lock_info{$t_pid}{wait}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				delete $cur_lock_info{$t_pid};
+			}
 
 			if ($cur_info{$t_pid}{duration}) {
 
