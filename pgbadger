@@ -1887,7 +1887,8 @@ Report not supported by text format
 			my $k = $top_locked_queries[$i]->[0];
 			my $j = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+			my $ttl = $top_locked_info[$i]->[1] || '';
+				my $db = " - $normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -1896,7 +1897,7 @@ Report not supported by text format
 				$j++;
 			}
 		}
-		print $fh "</table>\n";
+		print $fh "\n";
 		@top_locked_queries = ();
 
 		# Queries that waited the most
@@ -1914,7 +1915,67 @@ Report not supported by text format
 			"  $ttl$db - ", $top_locked_info[$i]->[2], "\n";
 			print $fh "--\n";
 		}
-		print $fh "</table>\n";
+		print $fh "\n";
+	}
+
+	# Show temporary files detailed informations
+	if (!$disable_temporary && scalar keys %tempfile_info > 0) {
+
+		my @top_temporary;
+		foreach my $h (keys %normalyzed_info) {
+			if (exists($normalyzed_info{$h}{tempfiles})) {
+				push (@top_temporary, [$h, $normalyzed_info{$h}{tempfiles}{count}, $normalyzed_info{$h}{tempfiles}{size},
+				$normalyzed_info{$h}{tempfiles}{minsize}, $normalyzed_info{$h}{tempfiles}{maxsize}]);
+			}
+		}
+
+		# Queries generating the most temporary files (N)
+		@top_temporary = sort {$b->[1] <=> $a->[1]} @top_temporary;
+		print $fh "\n- Queries generating the most temporary files (N) ---------------------------\n\n";
+		print $fh "Rank   Count   Total size    Min/Max/Avg size    Query\n";
+		my $idx = 1;
+		for (my $i = 0 ; $i <= $#top_temporary ; $i++) {
+			last if ($i > $end_top);
+			print $fh $idx, ")   ",
+			$top_temporary[$i]->[1], " - ", &comma_numbers($top_temporary[$i]->[2]),
+			" - ", &comma_numbers($top_temporary[$i]->[3]),
+			"/", &comma_numbers($top_temporary[$i]->[4]), "/",
+			&comma_numbers(sprintf("%.2f", $top_temporary[$i]->[2] / $top_temporary[$i]->[1])),
+			" - ", $top_temporary[$i]->[0], "\n";
+			print $fh "--\n";
+			my $k = $top_temporary[$i]->[0];
+			if ($normalyzed_info{$k}{count} > 1) {
+				my $j = 1;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
+					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+					$j++;
+				}
+			}                             
+			$idx++;
+		}
+		@top_temporary = ();
+
+		# Top queries generating the largest temporary files
+		@top_tempfile_info = sort {$b->[1] <=> $a->[1]} @top_tempfile_info;
+
+		print $fh "\n- Queries generating the largest temporary files ----------------------------\n\n";
+		print $fh "Rank   Size    Query\n";
+		for (my $i = 0 ; $i <= $#top_tempfile_info ; $i++) {
+			my $ttl = $top_tempfile_info[$i]->[1] || '';
+			my $db = " - database: $top_tempfile_info[$i]->[3]" if ($top_tempfile_info[$i]->[3]);
+			$db .= ", user: $top_tempfile_info[$i]->[4]" if ($top_tempfile_info[$i]->[4]);
+			$db .= ", remote: $top_tempfile_info[$i]->[5]" if ($top_tempfile_info[$i]->[5]);
+			$db .= ", app: $top_tempfile_info[$i]->[6]" if ($top_tempfile_info[$i]->[6]);
+			$db =~ s/^, / - /;
+			print $fh ($i + 1), ")   ", &comma_numbers($top_tempfile_info[$i]->[0]),
+			" - $ttl$db - ", $top_tempfile_info[$i]->[2], "\n";
+		}
+		print $fh "\n";
 	}
 
 	# Show top information
