@@ -1863,6 +1863,61 @@ Report not supported by text format
 		}
 	}
 
+	# Show lock wait detailed informations
+	if (!$disable_lock && scalar keys %lock_info > 0) {
+
+		my @top_locked_queries;
+		foreach my $h (keys %normalyzed_info) {
+			if (exists($normalyzed_info{$h}{locks})) {
+				push (@top_locked_queries, [$h, $normalyzed_info{$h}{locks}{count}, $normalyzed_info{$h}{locks}{wait},
+				$normalyzed_info{$h}{locks}{minwait}, $normalyzed_info{$h}{locks}{maxwait}]);
+			}
+		}
+
+		# Most frequent waiting queries (N)
+		@top_locked_queries = sort {$b->[2] <=> $a->[2]} @top_locked_queries;
+		print $fh "\n- Most frequent waiting queries (N) -----------------------------------------\n\n";
+		print $fh "Rank  Count    Total wait time (s)    Min/Max/Avg duration (s)    Query\n";
+		for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
+			last if ($i > $end_top);
+			print $fh ($i + 1), ")   ", $top_locked_queries[$i]->[1], " - ", &convert_time($top_locked_queries[$i]->[2]),
+			" - ", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
+			&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
+			" - ", $top_locked_queries[$i]->[0], "\n";
+			print $fh "--\n";
+			my $k = $top_locked_queries[$i]->[0];
+			my $j = 1;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db =~ s/^, / - /;
+				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				$j++;
+			}
+		}
+		print $fh "</table>\n";
+		@top_locked_queries = ();
+
+		# Queries that waited the most
+		@top_locked_info = sort {$b->[1] <=> $a->[1]} @top_locked_info;
+		print $fh "\n- Queries that waited the mosts ---------------------------------------------\n\n";
+		print $fh "Rank   Wait time (s)    Query\n";
+		for (my $i = 0 ; $i <= $#top_locked_info ; $i++) {
+			my $ttl = $top_locked_info[$i]->[1] || '';
+			my $db = " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
+			$db .= ", user: $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
+			$db .= ", remote: $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
+			$db .= ", app: $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
+			$db =~ s/^, / - /;
+			print $fh ($i + 1), ")   ", &convert_time($top_locked_info[$i]->[0]),
+			"  $ttl$db - ", $top_locked_info[$i]->[2], "\n";
+			print $fh "--\n";
+		}
+		print $fh "</table>\n";
+	}
+
 	# Show top information
 	if (!$disable_query && ($#top_slowest >= 0)) {
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
@@ -3752,6 +3807,7 @@ sub dump_as_html
 <th>Query</th>
 </tr>
 };
+		my $idx = 1;
 		for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
 			last if ($i > $end_top);
 			my $col = $i % 2;
@@ -3760,7 +3816,28 @@ sub dump_as_html
 			"</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
 			&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
 			"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
-			&highlight_code($top_locked_queries[$i]->[0]), "</div></td></tr>\n";
+			&highlight_code($top_locked_queries[$i]->[0]), "</div>\n";
+			my $k = $top_locked_queries[$i]->[0];
+			if ($normalyzed_info{$k}{count} > 1) {
+				print $fh
+"<input type=\"button\" class=\"examplesButton\" id=\"button_QueriesThatWaitedTheMost_$idx\" name=\"button_QueriesThatWaitedTheMost_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_QueriesThatWaitedTheMost_$idx', 'examples_QueriesThatWaitedTheMost_$idx', 'examples');\" /><div id=\"examples_QueriesThatWaitedTheMost_$idx\" class=\"examples\" style=\"display:none;\">";
+				my $j = 0;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $colb = $j % 2;
+					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db =~ s/^, / - /;
+					print $fh
+"<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+					$j++;
+				}
+				print $fh "</div>";
+			}
+			print $fh "</td></tr>\n";
+			$idx++;
 		}
 		print $fh "</table>\n";
 		@top_locked_queries = ();
