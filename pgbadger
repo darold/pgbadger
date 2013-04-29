@@ -5175,6 +5175,18 @@ sub parse_query
 		return;
 	}
 
+	# Stores query related to last lock information
+	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_lock_info{$t_pid}) {
+		$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+		$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+		$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+		$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+		$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		return;
+	}
+
 	# Stores temporary files activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path .*, size (\d+)/)) {
 		return if ($disable_temporary);
@@ -5186,6 +5198,18 @@ sub parse_query
 		# Store current temporary file information that will be used later
 		# when we will parse the query responsible of the tempfile
 		$cur_temp_info{$t_pid}{size} = $1;
+		return;
+	}
+
+	# Stores query related to last created temporary file
+	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid}) {
+		$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+		$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+		$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+		$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+		$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 		return;
 	}
 
@@ -5679,6 +5703,51 @@ sub store_queries
 			$application_info{others}{count}++;
 		}
 
+		# Store normalized query temp file size if required
+		if (exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid} ne '') ) {
+
+			# Add a semi-colon at end of the query
+			$cur_temp_info{$t_pid}{query} .= ';' if (substr($cur_temp_info{$t_pid}{query}, -1, 1) ne ';');
+
+			# Normalize query
+			my $normalized = &normalize_query($cur_temp_info{$t_pid}{query});
+
+			$normalyzed_info{$normalized}{tempfiles}{size} += $cur_temp_info{$t_pid}{size};
+			$normalyzed_info{$normalized}{tempfiles}{count}++;
+			if ($normalyzed_info{$normalized}{tempfiles}{maxsize} < $cur_temp_info{$t_pid}{size}) {
+				$normalyzed_info{$normalized}{tempfiles}{maxsize} = $cur_temp_info{$t_pid}{size};
+			}
+			if (!exists($normalyzed_info{$normalized}{tempfiles}{minsize})
+			    || $normalyzed_info{$normalized}{tempfiles}{minsize} > $cur_temp_info{$t_pid}{size}) {
+				$normalyzed_info{$normalized}{tempfiles}{minsize} = $cur_temp_info{$t_pid}{size};
+			}
+			&set_top_tempfile_info($cur_temp_info{$t_pid}{query}, $cur_temp_info{$t_pid}{size}, $cur_temp_info{$t_pid}{timestamp}, $cur_temp_info{$t_pid}{dbname}, $cur_temp_info{$t_pid}{dbuser}, $cur_temp_info{$t_pid}{dbclient}, $cur_temp_info{$t_pid}{dbappname});
+			delete $cur_temp_info{$t_pid};
+		}
+
+		# Store normalized query that waited the most if required
+		if (exists $cur_lock_info{$t_pid}) {
+
+			# Add a semi-colon at end of the query
+			$cur_lock_info{$t_pid}{query} .= ';' if (substr($cur_lock_info{$t_pid}{query}, -1, 1) ne ';');
+
+			# Normalize query
+			my $normalized = &normalize_query($cur_lock_info{$t_pid}{query});
+
+			$normalyzed_info{$normalized}{locks}{wait} += $cur_lock_info{$t_pid}{wait};
+			$normalyzed_info{$normalized}{locks}{count}++;
+			if ($normalyzed_info{$normalized}{locks}{maxwait} < $cur_lock_info{$t_pid}{wait}) {
+				$normalyzed_info{$normalized}{locks}{maxwait} = $cur_lock_info{$t_pid}{wait};
+			}
+			if (!exists($normalyzed_info{$normalized}{locks}{minwait})
+			    || $normalyzed_info{$normalized}{locks}{minwait} > $cur_lock_info{$t_pid}{wait}) {
+				$normalyzed_info{$normalized}{locks}{minwait} = $cur_lock_info{$t_pid}{wait};
+			}
+			&set_top_locked_info($cur_lock_info{$t_pid}{query}, $cur_lock_info{$t_pid}{wait}, $cur_lock_info{$t_pid}{timestamp}, $cur_lock_info{$t_pid}{dbname}, $cur_lock_info{$t_pid}{dbuser}, $cur_lock_info{$t_pid}{dbclient}, $cur_lock_info{$t_pid}{dbappname});
+			delete $cur_lock_info{$t_pid};
+		}
+
+
 		if ($cur_info{$t_pid}{query}) {
 			# Add a semi-colon at end of the query
 			$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
@@ -5709,37 +5778,6 @@ sub store_queries
 
 			# Store normalized query count and duration per time
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
-
-			# Store normalized query temp file size if required
-			if (exists $cur_temp_info{$t_pid}) {
-				$normalyzed_info{$normalized}{tempfiles}{size} += $cur_temp_info{$t_pid}{size};
-				$normalyzed_info{$normalized}{tempfiles}{count}++;
-				if ($normalyzed_info{$normalized}{tempfiles}{maxsize} < $cur_temp_info{$t_pid}{size}) {
-					$normalyzed_info{$normalized}{tempfiles}{maxsize} = $cur_temp_info{$t_pid}{size};
-				}
-				if (!exists($normalyzed_info{$normalized}{tempfiles}{minsize})
-				    || $normalyzed_info{$normalized}{tempfiles}{minsize} > $cur_temp_info{$t_pid}{size}) {
-					$normalyzed_info{$normalized}{tempfiles}{minsize} = $cur_temp_info{$t_pid}{size};
-				}
-				&set_top_tempfile_info($cur_info{$t_pid}{query}, $cur_temp_info{$t_pid}{size}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
-				delete $cur_temp_info{$t_pid};
-			}
-
-			# Store normalized query that waited the most if required
-			if (exists $cur_lock_info{$t_pid}) {
-				$normalyzed_info{$normalized}{locks}{wait} += $cur_lock_info{$t_pid}{wait};
-				$normalyzed_info{$normalized}{locks}{count}++;
-				if ($normalyzed_info{$normalized}{locks}{maxwait} < $cur_lock_info{$t_pid}{wait}) {
-					$normalyzed_info{$normalized}{locks}{maxwait} = $cur_lock_info{$t_pid}{wait};
-				}
-				if (!exists($normalyzed_info{$normalized}{locks}{minwait})
-				    || $normalyzed_info{$normalized}{locks}{minwait} > $cur_lock_info{$t_pid}{wait}) {
-					$normalyzed_info{$normalized}{locks}{minwait} = $cur_lock_info{$t_pid}{wait};
-				}
-				&set_top_locked_info($cur_info{$t_pid}{query}, $cur_lock_info{$t_pid}{wait}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
-				delete $cur_lock_info{$t_pid};
-			}
-
 			if ($cur_info{$t_pid}{duration}) {
 
 				# Updtate top slowest queries statistics
