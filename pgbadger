@@ -93,13 +93,15 @@ sub wait_child
 {
         my $sig = shift;
         print STDERR "Received terminating signal ($sig).\n";
-        1 while wait != -1;
-        $SIG{INT} = \&wait_child;
-        $SIG{TERM} = \&wait_child;
-	foreach my $f (@tempfiles) {
-		unlink("$f->[1]") if (-e "$f->[1]");
+	if ($^O !~ /MSWin32|dos/i) {
+		1 while wait != -1;
+		$SIG{INT} = \&wait_child;
+		$SIG{TERM} = \&wait_child;
+		foreach my $f (@tempfiles) {
+			unlink("$f->[1]") if (-e "$f->[1]");
+		}
+		unlink("$tmp_last_parsed") if ($tmp_last_parsed);
 	}
-	unlink("$tmp_last_parsed") if ($tmp_last_parsed);
 	_exit(0);
 }
 $SIG{INT} = \&wait_child;
@@ -347,6 +349,14 @@ my $end_top = $top - 1;
 $queue_size ||= 1;
 $job_per_file ||= 1;
 
+if ($^O =~ /MSWin32|dos/i) {
+	if ( ($queue_size > 1) || ($job_per_file > 1) ) {
+		print STDERR "WARNING: parallel processing is not supported on this platform.\n";
+		$queue_size = 1;
+		$job_per_file = 1;
+	}
+}
+
 if ($extension eq 'tsung') {
 
 	# Open filehandle
@@ -356,6 +366,7 @@ if ($extension eq 'tsung') {
 	}
 	print $fh "<sessions>\n";
 	$fh->close();
+
 } else {
 
 	# Test file creation before going to parse log
@@ -676,6 +687,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
 	# Parse each log file following the multiprocess mode chosen (-j or -J)
 	foreach my $logfile ( @given_log_files ) {
+
 		while ($child_count >= $parallel_process) {
 			my $kid = waitpid(-1, WNOHANG);
 			if ($kid > 0) {
