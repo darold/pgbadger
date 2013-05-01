@@ -1,7 +1,46 @@
+2013-05-01 - Version 3.3
+
+This release adds four more useful reports about queries that generate locks and
+temporary files. An other new report about restartpoint on slaves and several
+bugs fix or cosmetic change. Support to parallel processing under Windows OS has
+been removed.
+
+	- Remove parallel processing under Windows platform, the use of waitpid
+	  is freezing pgbadger. Thanks to Saurabh Agrawal for the report. I'm
+	  not comfortable with that OS this is why support have been removed,
+	  if someone know how to fix that, please submit a patch.
+	- Fix Error in tempfile() under Windows. Thanks to Saurabh Agrawal for
+	  the report.
+	- Fix wrong queries storage with lock and temporary file reports. Thanks
+	  to Thomas Reiss for the report.
+	- Add samples queries to "Most frequent waiting queries" and "Queries
+	  generating the most temporary files" report.
+	- Add two more reports about locks: 'Most frequent waiting queries (N)",
+	  and "Queries that waited the most". Thanks to Thomas Reiss for the
+	  patch.
+	- Add two reports about temporary files: "Queries generating the most
+	  temporary files (N)" and "Queries generating the largest temporary
+	  files". Thanks to Thomas Reiss for the patch.
+	- Cosmetic change to the Min/Max/Avg duration columns.
+	- Fix report of samples error with csvlog format. Thanks to tpoindessous
+	  for the report.
+	- Add --disable-autovacuum to the documentation. Thanks to tpoindessous
+	  for the report.
+	- Fix unmatched ) in regex when using %s in prefix.
+	- Fix bad average size of temporary file in Overall statistics report.
+	  Thanks to Jehan Guillaume de Rorthais for the report.
+	- Add restartpoint reporting. Thanks to Guillaume Lelarge for the patch.
+	- Made some minor change in CSS.
+	- Replace %% in log line prefix internally by a single % so that it
+	  could be exactly the same than in log_line_prefix. Thanks to Cal
+	  Heldenbrand for the report.
+	- Fix perl documentation header, thanks to Cyril Bouthors for the patch.
+
 2013-04-07 - Version 3.2
 
-This is mostly a bug fix release, it also adds escaping of HTML code inside queries
-and the adds Min/Max reports with Average duration in all queries reports.
+This is mostly a bug fix release, it also adds escaping of HTML code inside
+queries and the adds Min/Max reports with Average duration in all queries
+reports.
 
 	- In multiprocess mode, fix case where pgbadger does not update
 	  the last-parsed file and do not take care of the previous run.
