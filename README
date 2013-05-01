@@ -142,6 +142,10 @@ FEATURE
     pgBadger reports everything about your SQL queries:
 
             Overall statistics.
+            The most frequent waiting queries.
+            Queries that waited the most.
+            Queries generating the most temporary files.
+            Queries generating the largest temporary files.
             The slowest queries.
             Queries that took up the most time.
             The most frequent queries.
@@ -152,6 +156,7 @@ FEATURE
             Hourly queries statistics.
             Hourly temporary file statistics.
             Hourly checkpoints statistics.
+            Hourly restartpoints statistics.
             Locks statistics.
             Queries by type (select/insert/update/delete).
             Distribution of queries type per database/application
@@ -192,8 +197,8 @@ REQUIREMENT
     value to --zcat option will remove this feature of mixed compressed
     format.
 
-    Note that multiprocessing can not be used with compressed files nor CSV
-    files.
+    Note that multiprocessing can not be used with compressed files or CSV
+    files as well as under Windows platform.
 
 POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
