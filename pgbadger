@@ -1365,7 +1365,11 @@ sub process_file
 				# Collect additional query information
 				} elsif ($cur_pid && ($line !~ $orphan_stderr_line)) {
 
-					if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+					if ($line =~ s/^(STATEMENT|DETAIL|HINT):\s+//) {
+						$line =~ s/ERROR:\s+//;
+						$cur_info{$cur_pid}{"\L$1\E"} = $line;
+						next;
+					} elsif ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
 						if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
 							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 						}
@@ -5834,6 +5838,7 @@ sub normalize_error
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
 	$orig_query =~ s/(database system was shut down at).*/$1 .../;
+	$orig_query =~ s/(relation) \d+ (deleted while still in use)/$1 ... $2/g;
 
 	# Need more normalization stuff here
 
