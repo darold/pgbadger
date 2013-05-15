@@ -82,6 +82,7 @@ SYNOPSIS
         --disable-temporary    : do not generate temporary report.
         --disable-checkpoint   : do not generate checkpoint report.
         --disable-autovacuum   : do not generate autovacuum report.
+        --charset              : used to set the HTML charset to be used. Default: utf-8.
 
     Examples:
 

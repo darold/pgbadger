@@ -172,6 +172,7 @@ my $select_only             = 0;
 my $tsung_queries           = 0;
 my $queue_size              = 0;
 my $job_per_file            = 0;
+my $charset                 = 'utf-8';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -240,6 +241,7 @@ my $result = GetOptions(
 	"disable-checkpoint!"      => \$disable_checkpoint,
 	"disable-autovacuum!"      => \$disable_autovacuum,
 	"client=s"                 => \@dbclient2, # Backward compatibility
+	"charset=s"                => \$charset,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -925,6 +927,7 @@ Options:
     --disable-temporary    : do not generate temporary report.
     --disable-checkpoint   : do not generate checkpoint/restartpoint report.
     --disable-autovacuum   : do not generate autovacuum report.
+    --charset              : used to set the HTML charset to be used. Default: utf-8.
 
 Examples:
 
@@ -2463,10 +2466,11 @@ sub html_header
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <title>$report_title</title>
-<meta NAME="robots" CONTENT="noindex,nofollow">
-<meta HTTP-EQUIV="Expires" CONTENT="$date">
-<meta HTTP-EQUIV="Generator" CONTENT="pgBadger v$VERSION">
-<meta HTTP-EQUIV="Date" CONTENT="$date">
+<meta http-equiv="Content-Type" content="text/html; charset=$charset" />
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Expires" CONTENT="$date">
+<meta http-equiv="Generator" content="pgBadger v$VERSION">
+<meta http-equiv="Date" content="$date">
 $style
 };
 	if (!$nograph) {
