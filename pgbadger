@@ -82,7 +82,7 @@ sub spawn
 	exit &$coderef();
 }
 
-# Informa the parent that it should stop iterate on parsing other files
+# Inform the parent that it should stop iterate on parsing other files
 sub stop_parsing
 {
 	$interrupt = 1;
