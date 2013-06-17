@@ -4624,28 +4624,32 @@ sub load_stats
 	foreach my $day (keys %{ $_connection_info{chronos} }) {
 		foreach my $hour (keys %{ $_connection_info{chronos}{$day} }) {
 
-			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database} }) {
-				$connection_info{chronos}{$day}{$hour}{database}{$db} += $_connection_info{chronos}{$day}{$hour}{database}{$db};
-			}
+			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count}
 
-			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user} }) {
-				foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user}{$db} }) {
-					$connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user} +=
-						$_connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user};
-				}
-			}
-
-			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count};
-
-			foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{user} }) {
-				$connection_info{chronos}{$day}{$hour}{user}{$user} +=
-					$_connection_info{chronos}{$day}{$hour}{user}{$user};
-			}
-
-			foreach my $host (keys %{ $_connection_info{chronos}{$day}{$hour}{host} }) {
-				$connection_info{chronos}{$day}{$hour}{host}{$host} +=
-					$_connection_info{chronos}{$day}{$hour}{host}{$host};
-			}
+###############################################################################
+# May be used in the future to display more detailed informations on connection
+#
+#			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database} }) {
+#				$connection_info{chronos}{$day}{$hour}{database}{$db} += $_connection_info{chronos}{$day}{$hour}{database}{$db};
+#			}
+#
+#			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user} }) {
+#				foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user}{$db} }) {
+#					$connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user} +=
+#						$_connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user};
+#				}
+#			}
+#
+#			foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{user} }) {
+#				$connection_info{chronos}{$day}{$hour}{user}{$user} +=
+#					$_connection_info{chronos}{$day}{$hour}{user}{$user};
+#			}
+#
+#			foreach my $host (keys %{ $_connection_info{chronos}{$day}{$hour}{host} }) {
+#				$connection_info{chronos}{$day}{$hour}{host}{$host} +=
+#					$_connection_info{chronos}{$day}{$hour}{host}{$host};
+#			}
+###############################################################################
 		}
 	}
 
@@ -5226,9 +5230,12 @@ sub parse_query
 		$connection_info{database}{$db}++;
 		$connection_info{database_user}{$db}{$usr}++;
 		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
-		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{user}{$usr}++;
-		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database}{$db}++;
-		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database_user}{$db}{$usr}++;
+###############################################################################
+# May be used in the future to display more detailed informations on connection
+#		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{user}{$usr}++;
+#		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database}{$db}++;
+#		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database_user}{$db}{$usr}++;
+###############################################################################
 
 		if ($graph) {
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{connection}{count}++;
@@ -5236,7 +5243,7 @@ sub parse_query
 		}
 		if (exists $conn_received{$t_pid}) {
 			$connection_info{host}{$conn_received{$t_pid}}++;
-			$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$conn_received{$t_pid}}++;
+			#$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$conn_received{$t_pid}}++;
 			delete $conn_received{$t_pid};
 		}
 		return;
