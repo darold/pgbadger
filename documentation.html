@@ -1,128 +1,161 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<title>pgBadger</title>
-	<link rel="stylesheet" href="style.css" type="text/css" media="all" />
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>pgBadger</title>
+        <link rel="stylesheet" href="style.css" type="text/css" media="all" />
 </head>
 <body>
 <div id="header">
-	<h1>pgBadger</h1>
+        <h1>pgBadger</h1>
 </div>
 <div id="menu">
-	<table width="100%"><tr><td align="left">
+        <table width="100%"><tr><td align="left">
 <cite id="menucite">&laquo; No! I'm not a fouine, I'm a badger! &raquo;</cite>
-	</td><td align="right">
-	<a href="index.html">Home</a> | 
-	<a href="news.html">News</a> | 
-	<a href="https://sourceforge.net/projects/pgbadger/" target="_new">Download</a> | 
+        </td><td align="right">
+        <a href="index.html">Home</a> |
+        <a href="news.html">News</a> |
+        <a href="https://sourceforge.net/projects/pgbadger/" target="_new">Download</a> |
         <a href="https://github.com/dalibo/pgbadger/"  target="_new">Code</a> |
-	<a href="documentation.html">Documentation</a> | 
-	<a href="sample.html">Sample reports</a> | 
-	<a href="support.html">Support</a>
-	</td></tr></table>
+        <a href="documentation.html">Documentation</a> |
+        <a href="sample.html">Sample reports</a> |
+        <a href="support.html">Support</a>
+        </td></tr></table>
 </div>
 
 <h2>Requirement</h2>
-<p>pgBadger comes as a single Perl script, you do not need anything else than a modern Perl distribution. Charts are rendered using a Javascript library so you don't need anything, your browser will do all the work.</p>
-
-<p>If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:</p>
-<ul>
-  <li>Text::CSV_XS - to parse PostgreSQL CSV log files.</li>
-</ul>
 <p>
-This module is optional, if you don't have PostgreSQL log in the CSV
-format you don't need to install it.
+    pgBadger comes as a single Perl script - you do not need anything other
+    than a modern Perl distribution. Charts are rendered using a Javascript
+    library so you don't need anything. Your browser will do all the work.
 </p>
 <p>
-Compressed log file format is autodetected following the file extention.
-If pgbadger find a gz extention it will use the zcat utility, with a bz2
-extention it will use bzcat and if the file extention is zip then the
-unzip utility will be used.
-</p>
-<p>
-Most of the time you don't need to take care of this but if those utilities
-are not found in the PATH environment variable then use the --zcat command
-line otption to change this path. For exemple:
+    If you planned to parse PostgreSQL CSV log files you might need some
+    Perl Modules:
 </p>
 <pre>
-	--zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
-	--zcat="C:\tools\unzip -p"
+            Text::CSV_XS - to parse PostgreSQL CSV log files.
 </pre>
+<p>
+    This module is optional, if you don't have PostgreSQL log in the CSV
+    format you don't need to install it.
 </p>
-By default pgBadger will use the zcat, bzcat and unzip utilities
-following the file extension. If you use the default autodetection
-compress format you can mixed gz, bz2 or zip files. Specifying a custom
-value to --zcat option will removed this feature of mixed compressed
-format.
+<p>
+    Compressed log file format is autodetected from the file exension. If
+    pgBadger find a gz extension it will use the zcat utility, with a bz2
+    extension it will use bzcat and if the file extension is zip then the
+    unzip utility will be used.
 </p>
+<p>
+    If those utilities are not found in the PATH environment variable then
+    use the --zcat command line option to change this path. For example:
+</p>
+<pre>
+            --zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
+            --zcat="C:\tools\unzip -p"
+</pre>
+<p>
+    By default pgBadger will use the zcat, bzcat and unzip utilities
+    following the file extension. If you use the default autodetection
+    compress format you can mixed gz, bz2 or zip files. Specifying a custom
+    value to --zcat option will remove this feature of mixed compressed
+    format.
+</p>
+<p>
+    Note that multiprocessing can not be used with compressed files or CSV
+    files as well as under Windows platform.
+</p>
+
 <h2>PostgreSQL configuration</h2>
 <p>
-You must enable some configuration directives into your postgresql.conf before starting.
+    You must enable and set some configuration directives in your
+    postgresql.conf before starting.
 </p>
 <p>
-You must first enable SQL query logging to have something to parse:
+    You must first enable SQL query logging to have something to parse:
+</p>
 <pre>
-        log_min_duration_statement = 0
+            log_min_duration_statement = 0
 </pre>
-Note that pgBadger is not compatible with statements logs provided by log_statement and log_duration.
+<p>
+    Here every statement will be logged, on busy server you may want to
+    increase this value to only log queries with a higher duration time.
+    Note that if you have log_statement set to 'all' nothing will be logged
+    with log_line_prefix. See next chapter for more information.
 </p>
 <p>
-With 'stderr' log format, log_line_prefix must be at least:
+    With 'stderr' log format, log_line_prefix must be at least:
+</p>
 <pre>
-        log_line_prefix = '%t [%p]: [%l-1] '
+            log_line_prefix = '%t [%p]: [%l-1] '
 </pre>
-Log line prefix could add user and database name as follow:
+<p>
+    Log line prefix could add user and database name as follows:
+</p>
 <pre>
-        log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+            log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
 </pre>
-or for syslog log file format:
+<p>
+    or for syslog log file format:
+</p>
 <pre>
-        log_line_prefix = 'user=%u,db=%d '
+            log_line_prefix = 'user=%u,db=%d '
 </pre>
-Log line prefix for stderr output could also be:
+<p>
+    Log line prefix for stderr output could also be:
+</p>
 <pre>
-        log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+            log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
 </pre>
-or for syslog output:
+<p>
+    or for syslog output:
+</p>
 <pre>
-        log_line_prefix = 'db=%d,user=%u '
+            log_line_prefix = 'db=%d,user=%u '
 </pre>
-You need to enable other parameters in postgresql.conf to get more informations from your log files:
+<p>
+    You need to enable other parameters in postgresql.conf to get more
+    information from your log files:
+</p>
 <pre>
-        log_checkpoints = on
-        log_connections = on
-        log_disconnections = on
-        log_lock_waits = on
-        log_temp_files = 0
+            log_checkpoints = on
+            log_connections = on
+            log_disconnections = on
+            log_lock_waits = on
+            log_temp_files = 0
 </pre>
+<p>
+    Do not enable log_statement as their log format will not be parsed by
+    pgBadger.
 </p>
 <p>
-Of course your log messages should be in english without locale support:
+    Of course your log messages should be in English without locale support:
+</p>
 <pre>
-	lc_messages='C'
+            lc_messages='C'
 </pre>
-but this is not only recommanded by pgbadger.
+<p>
+    but this is not only recommended by pgBadger.
 </p>
 
-<h2>log_min_duration_statement, log_duration and log_statement</h2>
+<h3>log_min_duration_statement, log_duration and log_statement</h2>
 <p>
-If you want full statistics reports you must set
-log_min_duration_statement to 0 or more milliseconds.
+    If you want full statistics reports you must set
+    log_min_duration_statement to 0 or more milliseconds.
 </p>
 <p>
-If you just want to report duration and number of queries and don't want
-all details about queries, set log_min_duration_statement to -1 to
-disable it and enable log_duration in your postgresql.conf file. If you
-want to add the most common request report you can either choose to set
-log_min_duration_statement to a higher value or choose to enable
-log_statement.
+    If you just want to report duration and number of queries and don't want
+    all details about queries, set log_min_duration_statement to -1 to
+    disable it and enable log_duration in your postgresql.conf file. If you
+    want to add the most common request report you can either choose to set
+    log_min_duration_statement to a higher value or choose to enable
+    log_statement.
 </p>
 <p>
-Enabling log_min_duration_statement will add reports about slowest
-queries and queries that took up the most time. Take care that if you
-have log_statement set to 'all' nothing will be logged with
-log_line_prefix.
+    Enabling log_min_duration_statement will add reports about slowest
+    queries and queries that took up the most time. Take care that if you
+    have log_statement set to 'all' nothing will be logged with
+    log_line_prefix.
 </p>
 
 <h2>Parallel processing</h2>
@@ -165,20 +198,20 @@ log_line_prefix.
     9.5GB.
 </p>
 <pre>
-     Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
-    --------+---------+-------+-------+------
-       -j   | 1h41m18 | 50m25 | 25m39 | 15m58
-       -J   | 1h41m18 | 54m28 | 41m16 | 34m45
+             Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
+            --------+---------+-------+-------+------
+               -j   | 1h41m18 | 50m25 | 25m39 | 15m58
+               -J   | 1h41m18 | 54m28 | 41m16 | 34m45
 </pre>
 <p>
     With 200 log files of 10MB each and a total og 2GB the results are
     slightly different:
 </p>
 <pre>
-     Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
-    --------+-------+-------+-------+------
-       -j   | 20m15 |  9m56 |  5m20 | 4m20
-       -J   | 20m15 |  9m49 |  5m00 | 2m40
+             Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
+            --------+-------+-------+-------+------
+               -j   | 20m15 |  9m56 |  5m20 | 4m20
+               -J   | 20m15 |  9m49 |  5m00 | 2m40
 </pre>
 <p>
     So it is recommanded to use -j unless you have hundred of small log file
@@ -191,28 +224,39 @@ log_line_prefix.
     are all named with the following template tmp_pgbadgerXXXX.bin so they
     can be easily identified.
 </p>
+
 <h2>Installation</h2>
-<p>Download the tarball from github and unpack the archive as follow:</p>
+<p>
+    Download the tarball from github and unpack the archive as follow:
+</p>
 <pre>
-	tar xzf pgbadger-3.x.tar.gz
-	cd pgbadger-3.x/
-	perl Makefile.PL
-	make && make install
+            tar xzf pgbadger-3.x.tar.gz
+            cd pgbadger-3.x/
+            perl Makefile.PL
+            make && sudo make install
 </pre>
-
-<p>This will copy the Perl script pgbadger in /usr/local/bin/pgbadger directory by default and the man page into /usr/local/share/man/man1/pgbadger.1. Those are the default installation directory for 'site' install.</p>
-
-<p>If you want to install all under /usr/ location, use INSTALLDIRS='perl' as argument of Makefile.PL. The script will be installed into /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.</p>
-
-<p>For example to install everything just like Debian does, proceed as follow:</p>
+<p>
+    This will copy the Perl script pgbadger to /usr/local/bin/pgbadger by
+    default and the man page into /usr/local/share/man/man1/pgbadger.1.
+    Those are the default installation directories for 'site' install.
+</p>
+<p>
+    If you want to install all under /usr/ location, use INSTALLDIRS='perl'
+    as an argument of Makefile.PL. The script will be installed into
+    /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.
+</p>
+<p>
+    For example, to install everything just like Debian does, proceed as
+    follows:
+</p>
 <pre>
-	perl Makefile.PL INSTALLDIRS=vendor
+            perl Makefile.PL INSTALLDIRS=vendor
 </pre>
-
-<p>By default INSTALLDIRS is set to site</p>
+<p>
+    By default INSTALLDIRS is set to site.
+</p>
 
 <h2>Usage</h2>
-
 <pre>
     pgbadger [options] logfile [...]
 
@@ -221,7 +265,7 @@ log_line_prefix.
     Arguments:
 
         logfile can be a single log file, a list of files, or a shell command
-        returning a list of file. If you want to pass log content from stdin
+        returning a list of files. If you want to pass log content from stdin
         use - as filename. Note that input from stdin will not work with csvlog.
 
     Options:
@@ -293,7 +337,8 @@ log_line_prefix.
         --disable-lock         : do not generate lock report.
         --disable-temporary    : do not generate temporary report.
         --disable-checkpoint   : do not generate checkpoint report.
-	--disable-autovacuum   : do not genrate report about autovacuum.
+        --disable-autovacuum   : do not generate autovacuum report.
+        --charset              : used to set the HTML charset to be used. Default: utf-8.
 
     Examples:
 
@@ -331,9 +376,9 @@ log_line_prefix.
     This supposes that your log file and HTML report are also rotated every
     week.
 </pre>
-
 <div id="footer">
 &copy; 2013 - <strong><a href="http://www.dalibo.com/">Dalibo</a></strong>
 </div>
 </body>
 </html>
+
