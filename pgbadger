@@ -978,6 +978,8 @@ sub init_stats_vars
 	# Empty where statistics are stored
 	%overall_stat        = ();
 	@top_slowest         = ();
+	@top_tempfile_info   = ();
+	@top_locked_info     = ();
 	%normalyzed_info     = ();
 	%error_info          = ();
 	%logs_type           = ();
@@ -3001,7 +3003,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 
 	if (scalar keys %per_minute_info > 0) {
 
-		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} ) {
+		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || $autovacuum_info{count}) {
 			print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 		}
 		if ($tempfile_info{count}) {
@@ -3237,7 +3239,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 			);
 		}
 		# Restart point
-		if (exists $graph_data{rwbuffer}) {
+		if ($restartpoint_info{wbuffer} && $graph_data{rwbuffer}) {
 			&flotr2_graph(
 				6,         'restartpointwritebuffers_graph',  $graph_data{rwbuffer}, '', '', 'Restartpoint write buffers (' . $avg_minutes . ' minutes period)',
 				'Buffers', 'Write buffers',                '',  ''
@@ -3245,7 +3247,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 		}
 
 		# Temporary file size
-		if (exists $graph_data{size}) {
+		if ($tempfile_info{count} && exists $graph_data{size}) {
 			&flotr2_graph(
 				8, 'temporaryfile_graph', $graph_data{size}, '', '', 'Temporary files (' . $avg_minutes . ' minutes period)',
 				'Size of files', 'Size of files', '', '', 'Number of files', $graph_data{count}, 'Number of files'
@@ -3253,11 +3255,13 @@ sub print_checkpoint_tempfile_vacuum_reports
 		}
 
 		# VACUUMs and ANALYZEs
-		if (exists $graph_data{vcount} || $graph_data{acount}) {
-			&flotr2_graph(
-				9, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount}, '', 'Autovacuum actions (' . $avg_minutes . ' minutes period)',
-				'', 'VACUUMs', 'ANALYZEs'
-			);
+		if ($autovacuum_info{count}) {
+			if (exists $graph_data{vcount} || exists $graph_data{acount}) {
+				&flotr2_graph(
+					9, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount}, '', 'Autovacuum actions (' . $avg_minutes . ' minutes period)',
+					'', 'VACUUMs', 'ANALYZEs'
+				);
+			}
 		}
 	}
 
@@ -3830,19 +3834,17 @@ sub print_connection_report
 
 sub print_lock_queries_report
 {
-	if (scalar keys %lock_info > 0) {
-
-		my @top_locked_queries;
-		foreach my $h (keys %normalyzed_info) {
-			if (exists($normalyzed_info{$h}{locks})) {
-				push (@top_locked_queries, [$h, $normalyzed_info{$h}{locks}{count}, $normalyzed_info{$h}{locks}{wait},
-				$normalyzed_info{$h}{locks}{minwait}, $normalyzed_info{$h}{locks}{maxwait}]);
-			}
+	my @top_locked_queries;
+	foreach my $h (keys %normalyzed_info) {
+		if (exists($normalyzed_info{$h}{locks})) {
+			push (@top_locked_queries, [$h, $normalyzed_info{$h}{locks}{count}, $normalyzed_info{$h}{locks}{wait},
+			$normalyzed_info{$h}{locks}{minwait}, $normalyzed_info{$h}{locks}{maxwait}]);
 		}
+	}
 
-		# Most frequent waiting queries (N)
-		@top_locked_queries = sort {$b->[2] <=> $a->[2]} @top_locked_queries;
-		print $fh qq{
+	# Most frequent waiting queries (N)
+	@top_locked_queries = sort {$b->[2] <=> $a->[2]} @top_locked_queries;
+	print $fh qq{
 <h2 id="MostFrequentWaitingQueries">Most frequent waiting queries (N)<a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 <tr>
@@ -3853,44 +3855,44 @@ sub print_lock_queries_report
 <th>Query</th>
 </tr>
 };
-		my $idx = 1;
-		for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
-			last if ($i > $end_top);
-			my $col = $i % 2;
-			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
-			$top_locked_queries[$i]->[1], "</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[2]),
-			"</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
-			&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
-			"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
-			&highlight_code($top_locked_queries[$i]->[0]), "</div>\n";
-			my $k = $top_locked_queries[$i]->[0];
-			if ($normalyzed_info{$k}{count} > 1) {
-				print $fh
+	my $idx = 1;
+	for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
+		last if ($i > $end_top);
+		my $col = $i % 2;
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+		$top_locked_queries[$i]->[1], "</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[2]),
+		"</td><td class=\"center top\">", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
+		&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
+		"</td><td><div class=\"sql\" onclick=\"sql_format(this)\">",
+		&highlight_code($top_locked_queries[$i]->[0]), "</div>\n";
+		my $k = $top_locked_queries[$i]->[0];
+		if ($normalyzed_info{$k}{count} > 1) {
+			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_QueriesThatWaitedTheMost_$idx\" name=\"button_QueriesThatWaitedTheMost_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_QueriesThatWaitedTheMost_$idx', 'examples_QueriesThatWaitedTheMost_$idx', 'examples');\" /><div id=\"examples_QueriesThatWaitedTheMost_$idx\" class=\"examples\" style=\"display:none;\">";
-				my $j = 0;
-				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-					my $colb = $j % 2;
-					my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
-					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
-					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
-					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
-					$db =~ s/^, / - /;
-					print $fh
+			my $j = 0;
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				my $colb = $j % 2;
+				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db =~ s/^, / - /;
+				print $fh
 "<div class=\"example$colb\" title=\"$normalyzed_info{$k}{samples}{$d}{date}$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
-						&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
-					$j++;
-				}
-				print $fh "</div>";
+					&convert_time($d), " | ", &highlight_code($normalyzed_info{$k}{samples}{$d}{query}), "</div></div>";
+				$j++;
 			}
-			print $fh "</td></tr>\n";
-			$idx++;
+			print $fh "</div>";
 		}
-		print $fh "</table>\n";
-		@top_locked_queries = ();
+		print $fh "</td></tr>\n";
+		$idx++;
+	}
+	print $fh "</table>\n";
+	@top_locked_queries = ();
 
-		# Queries that waited the most
-		@top_locked_info = sort {$b->[1] <=> $a->[1]} @top_locked_info;
-		print $fh qq{
+	# Queries that waited the most
+	@top_locked_info = sort {$b->[1] <=> $a->[1]} @top_locked_info;
+	print $fh qq{
 <h2 id="QueriesThatWaitedTheMost">Queries that waited the most<a href="#top" title="Back to top">^</a></h2>
 <table class="queryList">
 <tr>
@@ -3899,36 +3901,34 @@ sub print_lock_queries_report
 <th>Query</th>
 </tr>
 };
-		for (my $i = 0 ; $i <= $#top_locked_info ; $i++) {
-			my $col = $i % 2;
-			my $ttl = $top_locked_info[$i]->[1] || '';
-			my $db = " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
-			$db .= ", user: $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
-			$db .= ", remote: $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
-			$db .= ", app: $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
-			$db =~ s/^, / - /;
-			print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
-			&convert_time($top_locked_info[$i]->[0]),
-			"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
-			&highlight_code($top_locked_info[$i]->[2]), "</div></td></tr>\n";
-		}
-		print $fh "</table>\n";
+	for (my $i = 0 ; $i <= $#top_locked_info ; $i++) {
+		my $col = $i % 2;
+		my $ttl = $top_locked_info[$i]->[1] || '';
+		my $db = " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
+		$db .= ", user: $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
+		$db .= ", remote: $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
+		$db .= ", app: $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
+		$db =~ s/^, / - /;
+		print $fh "<tr class=\"row$col\"><td class=\"center top\">", $i + 1, "</td><td class=\"relevantInformation top center\">",
+		&convert_time($top_locked_info[$i]->[0]),
+		"</td><td title=\"$ttl$db\"><div class=\"sql\" onclick=\"sql_format(this)\">",
+		&highlight_code($top_locked_info[$i]->[2]), "</div></td></tr>\n";
 	}
+	print $fh "</table>\n";
 }
 
 sub print_tempfile_report
 {
-	if (scalar keys %tempfile_info > 0) {
-
-		my @top_temporary;
-		foreach my $h (keys %normalyzed_info) {
-			if (exists($normalyzed_info{$h}{tempfiles})) {
-				push (@top_temporary, [$h, $normalyzed_info{$h}{tempfiles}{count}, $normalyzed_info{$h}{tempfiles}{size},
-				$normalyzed_info{$h}{tempfiles}{minsize}, $normalyzed_info{$h}{tempfiles}{maxsize}]);
-			}
+	my @top_temporary = ();;
+	foreach my $h (keys %normalyzed_info) {
+		if (exists($normalyzed_info{$h}{tempfiles})) {
+			push (@top_temporary, [$h, $normalyzed_info{$h}{tempfiles}{count}, $normalyzed_info{$h}{tempfiles}{size},
+			$normalyzed_info{$h}{tempfiles}{minsize}, $normalyzed_info{$h}{tempfiles}{maxsize}]);
 		}
+	}
 
-		# Queries generating the most temporary files (N)
+	# Queries generating the most temporary files (N)
+	if ($#top_temporary >= 0) {
 		@top_temporary = sort {$b->[1] <=> $a->[1]} @top_temporary;
 		print $fh qq{
 <h2 id="QueriesMostTemporaryFiles">Queries generating the most temporary files (N)<a href="#top" title="Back to top">^</a></h2>
@@ -3974,8 +3974,9 @@ sub print_tempfile_report
 		}
 		print $fh "</table>\n";
 		@top_temporary = ();
-
-		# Top queries generating the largest temporary files
+	}
+	# Top queries generating the largest temporary files
+	if ($#top_tempfile_info >= 0) {
 		@top_tempfile_info = sort {$b->[1] <=> $a->[1]} @top_tempfile_info;
 
 		print $fh qq{
@@ -4001,7 +4002,9 @@ sub print_tempfile_report
 			&highlight_code($top_tempfile_info[$i]->[2]), "</div></td></tr>\n";
 		}
 		print $fh "</table>\n";
+		@top_tempfile_info = ();
 	}
+
 }
 
 sub print_top_reports
@@ -4307,10 +4310,10 @@ sub dump_as_html
 	&print_connection_report() if (!$disable_connection);
 
 	# Show lock wait detailed informations
-	&print_lock_queries_report() if (!$disable_lock);
+	&print_lock_queries_report() if (!$disable_lock && (scalar keys %lock_info > 0));
 
 	# Show temporary files detailed informations
-	&print_tempfile_report() if (!$disable_temporary);
+	&print_tempfile_report() if (!$disable_temporary && (scalar keys %tempfile_info > 0));
 
 	# Show top information
 	&print_top_reports() if (!$disable_query);
@@ -4534,6 +4537,8 @@ sub load_stats
 	my @_log_files = @{$stats{log_files}};
 	my %_autovacuum_info = %{$stats{autovacuum_info}};
 	my %_autoanalyze_info = %{$stats{autoanalyze_info}};
+	my @_top_locked_info = @{$stats{top_locked_info}};
+	my @_top_tempfile_info = @{$stats{top_tempfile_info}};
 
 	return if (!$_overall_stat{queries_number} && !$_overall_stat{'errors_number'});
 
@@ -4858,6 +4863,22 @@ sub load_stats
 		push(@top_slowest, $tmp_top_slowest[$i]);
 	}
 
+	### top_locked ###
+	my @tmp_top_locked_info = sort {$b->[0] <=> $a->[0]} (@top_locked_info, @_top_locked_info);
+	@top_locked_info = ();
+	for (my $i = 0; $i <= $#tmp_top_locked_info; $i++) {
+		last if ($i == $end_top);
+		push(@top_locked_info, $tmp_top_locked_info[$i]);
+	}
+
+	### top_tempfile ###
+	my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} (@top_tempfile_info, @_top_tempfile_info);
+	@top_tempfile_info = ();
+	for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++) {
+		last if ($i == $end_top);
+		push(@top_tempfile_info, $tmp_top_tempfile_info[$i]);
+	}
+
 	### checkpoint_info ###
 	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
 	$checkpoint_info{sync} += $_checkpoint_info{sync};
@@ -4928,7 +4949,9 @@ sub dump_as_binary
 		'nlines' => $nlines,
 		'log_files' => \@log_files,
 		'autovacuum_info' => \%autovacuum_info,
-		'autoanalyze_info' => \%autoanalyze_info
+		'autoanalyze_info' => \%autoanalyze_info,
+		'top_tempfile_info' => \@top_tempfile_info,
+		'top_locked_info' => \@top_locked_info,
 	}, $lfh) || die ("Couldn't save binary data to «$outfile»!\n");
 }
 
@@ -6280,7 +6303,7 @@ sub build_log_line_prefix_regex
         (?:[\w:@]+(?:\.(?:\w+|\*)?)*)
                                 # words, standard named placeholders, db.table.*, db.*
         |
-        (?: \$_\$ | \$\d+ | \${1,2} )
+        (?: \$_\$ | \$\d+ | \${1,2})
                                 # dollar expressions - eg $_$ $3 $$
         |
         \n                      # newline
