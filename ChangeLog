@@ -30,7 +30,7 @@ generate the most temporary files.
 	- Update documentation about missing new reports introduced in previous
 	  version 3.3.
 
-Note that this should be the last release of the 3.x branch unless there's major
+Note that it should be the last release of the 3.x branch unless there's major
 bug fixes, but next one will be a major release with a completely new design.
 
 
