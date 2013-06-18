@@ -6151,7 +6151,8 @@ document.writeln('<input type="button" class="dldButton" value="To Image" id="to
         },
         mouse: {
             track: true,
-	    trackFormatter: function(obj){ return obj.y },
+	    trackFormatter: function(obj){ return pieTracker(obj) },
+            relative: true
         },
         legend: {
             position: "sw",
@@ -6792,10 +6793,15 @@ function sql_format (obj)
 	}
 }
 
-function dateTracker(obj, label) 
+function dateTracker(obj) 
 {
 	var dateToDisplay = new Date(parseInt(obj.x)); 
-	return '('+dateToDisplay.toGMTString()+' , '+obj.series.label+': '+obj.y+')';
+	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+obj.y;
+}
+
+function pieTracker(obj) 
+{
+	return obj.series.label+': '+obj.y;
 }
 
 /*!
