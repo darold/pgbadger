@@ -4286,6 +4286,7 @@ sub dump_as_html
 		# Display checkpoint and temporary files report
 		&print_checkpoint_tempfile_vacuum_reports();
 	}
+	%per_minute_info = ();
 
 	# Create detailed vacuum reports
 	&print_vacuum_reports();
