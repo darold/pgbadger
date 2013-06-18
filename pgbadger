@@ -44,7 +44,7 @@ use IO::Handle;
 use IO::Pipe;
 use Time::HiRes qw/usleep/;
 
-$VERSION = '3.3';
+$VERSION = '3.4';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
@@ -3255,7 +3255,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 		}
 
 		# VACUUMs and ANALYZEs
-		if ($autovacuum_info{count}) {
+		if ($autovacuum_info{count} || $autoanalyze_info{count}) {
 			if (exists $graph_data{vcount} || exists $graph_data{acount}) {
 				&flotr2_graph(
 					9, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount}, '', 'Autovacuum actions (' . $avg_minutes . ' minutes period)',
