@@ -198,8 +198,8 @@ You must first enable SQL query logging to have something to parse:
         log_min_duration_statement = 0
 
 Here every statement will be logged, on busy server you may want to increase
-this value to only log queries with a higher duration time. Note that if you
-have log_statement set to 'all' nothing will be logged with log_line_prefix.
+this value to only log queries with a higher duration time. Note that if you have
+log_statement set to 'all' nothing will be logged through log_min_duration_statement.
 See next chapter for more information.
 
 With 'stderr' log format, log_line_prefix must be at least:
