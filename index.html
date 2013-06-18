@@ -53,18 +53,27 @@ pgBadger reports everything about your SQL queries:
 <li>The most frequent errors.</li>
 </ul>
 <p>
-The following reports are also available with hourly charts:
+The following reports are also available with hourly charts divide by
+periods of five minutes:
 </p>
 <ul>
 <li>Hourly queries statistics.</li>
 <li>Hourly temporary file statistics.</li>
 <li>Hourly checkpoints statistics.</li>
 <li>Hourly restartpoints statistics.</li>
+<li>Hourly autovacuum statistics.</li>
+<li>Hourly autoanalyze statistics.</li>
+</ul>
+<p>
+There's also some pie reports of distribution about:
+</p>
+<ul>
 <li>Locks statistics.</li>
 <li>Queries by type (select/insert/update/delete).</li>
+<li>Distribution of queries type per database/application</li>
 <li>Sessions per database/user/client.</li>
 <li>Connections per database/user/client.</li>
-<li>Reports about autovacuum and autoanalyze</li>
+<li>Autovacuum and autoanalyze per table.</li>
 </ul>
 
 <p>All charts are zoomable and can be saved as PNG images.</p>
