@@ -1464,13 +1464,15 @@ sub process_file
 	}
 
 	# Save last line into temporary file
-	if ($last_parsed && scalar keys %last_line) {
-		if (open(OUT, ">>$tmp_last_parsed")) {
-			flock(OUT, 2) || return $getout;
-			print OUT "$last_line{datetime}\t$last_line{orig}\n";
-			close(OUT);
-		} else {
-			&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
+	if ( ($queue_size > 1) || ($job_per_file > 1) ) {
+		if ($last_parsed && scalar keys %last_line) {
+			if (open(OUT, ">>$tmp_last_parsed")) {
+				flock(OUT, 2) || return $getout;
+				print OUT "$last_line{datetime}\t$last_line{orig}\n";
+				close(OUT);
+			} else {
+				&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
+			}
 		}
 	}
 	
