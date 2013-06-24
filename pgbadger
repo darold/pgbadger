@@ -5178,7 +5178,6 @@ sub parse_query
 		} elsif ($prefix_vars{'t_query'} =~ /database system was interrupted while in recovery/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
-print STDERR "EEEEEEEEEEEEEEEE $prefix_vars{'t_query'}\n";
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
 	}
