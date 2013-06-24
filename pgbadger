@@ -2185,16 +2185,20 @@ sub show_error_as_text
 		last if ($idx > $top);
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
-			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
-			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
+			$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
+			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
+			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if (   ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/))
+				if (   ($error_info{$k}{error}[$i] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/))
 				{
-					$logs_type{HINT}--;
+					$logs_type{ERROR}--;
 					$logs_type{LOG}++;
 				}
 				print $fh "\t- Example $j: $error_info{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
@@ -2206,10 +2210,12 @@ sub show_error_as_text
 				$j++;
 			}
 		} else {
-			if (   ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/))
+			if (   ($error_info{$k}{error}[0] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/))
 			{
-				$logs_type{HINT}--;
+				$logs_type{ERROR}--;
 				$logs_type{LOG}++;
 			}
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
@@ -2904,7 +2910,7 @@ sub print_hourly_reports
 								foreach my $action (@SQL_ACTION) {
 									$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{count} || 0);
 									$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
-									if ($action ne 'SELECT') {
+									if ( ($action ne 'SELECT') && exists $per_minute_info{$tm}{$h}{$m}{$action}{count}) {
 										$a_dataavg{write}{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{count} || 0);
 										$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 									}
@@ -2988,7 +2994,7 @@ sub print_hourly_reports
 					'Queries', 'Number of queries', '', '', 'Duration', $graph_data{"SELECT-2"}, 'Average duration (s)'
 				);
 				# Write queries
-				if (!$select_only) {
+				if (!$select_only && $graph_data{"write"}) {
 					&flotr2_graph(
 						5, 'writequeries_graph', $graph_data{"DELETE"}, $graph_data{"INSERT"}, $graph_data{"UPDATE"}, 'Write queries (' . $avg_minutes . ' minutes period)',
 						'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $graph_data{"write"}, 'Average duration (s)'
@@ -3099,18 +3105,20 @@ sub print_checkpoint_tempfile_vacuum_reports
 							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
 						}
 					}
-					if (scalar keys %cinf) {
-						print $fh "<td class=\"right\">", &comma_numbers($cinf{wbuffer}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{file_added}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{file_removed}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{file_recycled}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{write}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{sync}),
-							"</td><td class=\"right\">", &comma_numbers($cinf{total}),
-							"</td>";
-					} else {
-						print $fh
-"<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+					if ($checkpoint_info{wbuffer}) {
+						if (scalar keys %cinf) {
+							print $fh "<td class=\"right\">", &comma_numbers($cinf{wbuffer}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{file_added}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{file_removed}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{file_recycled}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{write}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{sync}),
+								"</td><td class=\"right\">", &comma_numbers($cinf{total}),
+								"</td>";
+						} else {
+							print $fh
+	"<td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td><td class=\"right\">0</td>";
+						}
 					}
 					if ($checkpoint_info{warning}) {
 						if (exists $cinf{warning}) {
@@ -3121,7 +3129,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 							print $fh "<td class=\"right\">0</td><td class=\"right\">0</td>";
 						}
 					}
-					if ($restartpoint_info{count}) {
+					if ($restartpoint_info{wbuffer}) {
 						if (scalar keys %rinf) {
 							print $fh "<td class=\"right\">", &comma_numbers($rinf{wbuffer}),
 								"</td><td class=\"right\">", &comma_numbers($rinf{write}),
@@ -3175,18 +3183,24 @@ sub print_checkpoint_tempfile_vacuum_reports
 
 					my $rd = &average_per_minutes($m, $avg_minutes);
 
-					if (exists $per_minute_info{$tm}{$h}{$m}{checkpoint}) {
-						$chk_dataavg{wbuffer}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{wbuffer} || 0);
-						$chk_dataavg{file_added}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_added} || 0);
-						$chk_dataavg{file_removed}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_removed}  || 0);
-						$chk_dataavg{file_recycled}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_recycled} || 0);
+					if ($checkpoint_info{wbuffer}) {
+						if (exists $per_minute_info{$tm}{$h}{$m}{checkpoint}) {
+							$chk_dataavg{wbuffer}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{wbuffer} || 0);
+							$chk_dataavg{file_added}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_added} || 0);
+							$chk_dataavg{file_removed}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_removed}  || 0);
+							$chk_dataavg{file_recycled}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_recycled} || 0);
+						}
 					}
-					if (exists $per_minute_info{$tm}{$h}{$m}{restartpoint}) {
-						$chk_dataavg{rwbuffer}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{restartpoint}{wbuffer} || 0);
+					if ($restartpoint_info{wbuffer}) {
+						if (exists $per_minute_info{$tm}{$h}{$m}{restartpoint}) {
+							$chk_dataavg{rwbuffer}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{restartpoint}{wbuffer} || 0);
+						}
 					}
-					if (exists $per_minute_info{$tm}{$h}{$m}{tempfile}) {
-						$t_dataavg{size}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{size} || 0);
-						$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{count} || 0);
+					if ($tempfile_info{count}) {
+						if (exists $per_minute_info{$tm}{$h}{$m}{tempfile}) {
+							$t_dataavg{size}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{size} || 0);
+							$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{count} || 0);
+						}
 					}
 					if (exists $per_minute_info{$tm}{$h}{$m}{autovacuum}) {
 						$v_dataavg{vcount}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{autovacuum}{count} || 0);
@@ -4416,18 +4430,27 @@ sub show_error_as_html
 		print $fh "</table></div></div></td>\n";
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
-			$msg =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/;
-			$msg =~ s/HINT:  (database system was shut down)/LOG:  $1/;
+			$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
+			$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
+			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
+			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
+			# Try to escape HTML code
+			$msg =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
-				if (   ($error_info{$k}{error}[$i] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/HINT:  (database system was shut down)/LOG:  $1/))
+				if (   ($error_info{$k}{error}[$i] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/))
 				{
-					$logs_type{HINT}--;
+					$logs_type{ERROR}--;
 					$logs_type{LOG}++;
 				}
+				# Try to escape HTML code
+				$error_info{$k}{statement}[$i] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[$i]);
+
 				my $c = $i % 2;
 				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
 				print $fh "<div class=\"errorInformation$c\">Detail: $error_info{$k}{detail}[$i]</div>\n"
@@ -4441,12 +4464,17 @@ sub show_error_as_html
 			}
 			print $fh "</div>";
 		} else {
-			if (   ($error_info{$k}{error}[0] =~ s/HINT:  (parameter "[^"]+" changed to)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/HINT:  (database system was shut down)/LOG:  $1/))
+			if (   ($error_info{$k}{error}[0] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/))
 			{
-				$logs_type{HINT}--;
+				$logs_type{ERROR}--;
 				$logs_type{LOG}++;
 			}
+			# Try to escape HTML code
+			$error_info{$k}{statement}[0] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[0]);
+
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
 			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n"   if ($error_info{$k}{detail}[0]);
 			print $fh "<div class=\"errorInformation\">Context: $error_info{$k}{context}[0]</div>\n" if ($error_info{$k}{context}[0]);
@@ -5144,9 +5172,14 @@ sub parse_query
 	# in the event/error/warning messages report part.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/) {
-			$prefix_vars{'t_loglevel'} = 'HINT';
+			$prefix_vars{'t_loglevel'} = 'ERROR';
 		} elsif ($prefix_vars{'t_query'} =~ /database system was shut down at /) {
-			$prefix_vars{'t_loglevel'} = 'HINT';
+			$prefix_vars{'t_loglevel'} = 'ERROR';
+		} elsif ($prefix_vars{'t_query'} =~ /database system was interrupted while in recovery/) {
+			$prefix_vars{'t_loglevel'} = 'ERROR';
+		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
+print STDERR "EEEEEEEEEEEEEEEE $prefix_vars{'t_query'}\n";
+			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
 	}
 
@@ -5483,7 +5516,7 @@ sub parse_query
 	# Log line that should not be parse
 	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} !~
-/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for|database system was shut down/
+/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
 			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
@@ -5845,9 +5878,9 @@ sub normalize_error
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
 	$orig_query =~ s/(database system was shut down at).*/$1 .../;
 	$orig_query =~ s/(relation) \d+ (deleted while still in use)/$1 ... $2/g;
+	$orig_query =~ s/[0-9A-F]{24}/.../g; # Remove WAL filename
 
 	# Need more normalization stuff here
-
 	return $orig_query;
 }
 
