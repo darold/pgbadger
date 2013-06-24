@@ -4434,7 +4434,7 @@ sub show_error_as_html
 			$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
 			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
-			# Try to escape HTML code
+			# Escape HTML code in error message
 			$msg =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
@@ -4448,7 +4448,7 @@ sub show_error_as_html
 					$logs_type{ERROR}--;
 					$logs_type{LOG}++;
 				}
-				# Try to escape HTML code
+				# Escape HTML code in error message
 				$error_info{$k}{statement}[$i] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[$i]);
 
 				my $c = $i % 2;
@@ -4472,7 +4472,7 @@ sub show_error_as_html
 				$logs_type{ERROR}--;
 				$logs_type{LOG}++;
 			}
-			# Try to escape HTML code
+			# Escape HTML code in error message
 			$error_info{$k}{statement}[0] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[0]);
 
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
@@ -4990,7 +4990,7 @@ sub highlight_code
 {
 	my $code = shift;
 
-	# Try to escape HTML code
+	# Escape HTML code into SQL values
 	$code =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
 
 	# Do not try to prettify queries longuer
