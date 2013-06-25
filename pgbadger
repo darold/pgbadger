@@ -4436,7 +4436,7 @@ sub show_error_as_html
 			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
 			# Escape HTML code in error message
-			$msg =~ s/(.*?)/encode_entities($1)/sge;
+			$msg = encode_entities($msg);
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
@@ -4450,7 +4450,7 @@ sub show_error_as_html
 					$logs_type{LOG}++;
 				}
 				# Escape HTML code in error message
-				$error_info{$k}{statement}[$i] =~ s/(.*?)/encode_entities($1)/sge if ($error_info{$k}{statement}[$i]);
+				$error_info{$k}{statement}[$i] = encode_entities($error_info{$k}{statement}[$i]) if ($error_info{$k}{statement}[$i]);
 
 				my $c = $i % 2;
 				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
@@ -4474,7 +4474,7 @@ sub show_error_as_html
 				$logs_type{LOG}++;
 			}
 			# Escape HTML code in error message
-			$error_info{$k}{statement}[0] =~ s/(.*?)/encode_entities($1)/sge if ($error_info{$k}{statement}[0]);
+			$error_info{$k}{statement}[0] = encode_entities($error_info{$k}{statement}[0]) if ($error_info{$k}{statement}[0]);
 
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
 			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n"   if ($error_info{$k}{detail}[0]);
