@@ -4391,6 +4391,13 @@ sub dump_error_as_html
 	&html_footer();
 }
 
+sub escape_html
+{
+	$_[0] =~ s/<([\/a-zA-Z][\s\t\>]*)/\&lt;$1/sg;
+
+	return $_[0];
+}
+
 sub show_error_as_html
 {
 
@@ -4435,7 +4442,7 @@ sub show_error_as_html
 			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
 			# Escape HTML code in error message
-			$msg =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
+			$msg = &escape_html($msg);
 			print $fh "<td><div class=\"error\">$msg</div>";
 			print $fh
 "<input type=\"button\" class=\"examplesButton\" id=\"button_NormalizedErrorsMostFrequentReport_$idx\" name=\"button_NormalizedErrorsMostFrequentReport_$idx\" value=\"Show examples\" onclick=\"javascript:toggle('button_NormalizedErrorsMostFrequentReport_$idx', 'examples_NormalizedErrorsMostFrequentReport_$idx', 'examples');\" /><div id=\"examples_NormalizedErrorsMostFrequentReport_$idx\" class=\"examples\" style=\"display:none;\">";
@@ -4449,7 +4456,8 @@ sub show_error_as_html
 					$logs_type{LOG}++;
 				}
 				# Escape HTML code in error message
-				$error_info{$k}{statement}[$i] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[$i]);
+				$error_info{$k}{error}[$i] = &escape_html($error_info{$k}{error}[$i]);
+				$error_info{$k}{statement}[$i] = &escape_html($error_info{$k}{statement}[$i]);
 
 				my $c = $i % 2;
 				print $fh "<div class=\"example$c\" title=\"$error_info{$k}{date}[$i]\">$error_info{$k}{error}[$i]</div>\n";
@@ -4473,7 +4481,8 @@ sub show_error_as_html
 				$logs_type{LOG}++;
 			}
 			# Escape HTML code in error message
-			$error_info{$k}{statement}[0] =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg if ($error_info{$k}{statement}[0]);
+			$error_info{$k}{error}[0] = &escape_html($error_info{$k}{error}[0]);
+			$error_info{$k}{statement}[0] = &escape_html($error_info{$k}{statement}[0]);
 
 			print $fh "<td><div class=\"error\" title=\"$error_info{$k}{date}[0]\">$error_info{$k}{error}[0]</div>";
 			print $fh "<div class=\"errorInformation\">Detail: $error_info{$k}{detail}[0]</div>\n"   if ($error_info{$k}{detail}[0]);
@@ -4991,7 +5000,7 @@ sub highlight_code
 	my $code = shift;
 
 	# Escape HTML code into SQL values
-	$code =~ s/<([\/a-zA-Z])\b/\&lt;$1/sg;
+	$code = &escape_html($code);
 
 	# Do not try to prettify queries longuer
 	# than 10KB this will take too much time
