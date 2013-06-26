@@ -83,34 +83,6 @@ sub spawn
 	exit &$coderef();
 }
 
-# Inform the parent that it should stop iterate on parsing other files
-sub stop_parsing
-{
-	$interrupt = 1;
-}
-
-# With multiprocess we need to wait all childs
-sub wait_child
-{
-        my $sig = shift;
-        print STDERR "Received terminating signal ($sig).\n";
-	if ($^O !~ /MSWin32|dos/i) {
-		1 while wait != -1;
-		$SIG{INT} = \&wait_child;
-		$SIG{TERM} = \&wait_child;
-		foreach my $f (@tempfiles) {
-			unlink("$f->[1]") if (-e "$f->[1]");
-		}
-		unlink("$tmp_last_parsed") if ($tmp_last_parsed);
-	}
-	_exit(0);
-}
-$SIG{INT} = \&wait_child;
-$SIG{TERM} = \&wait_child;
-$SIG{USR2} = \&stop_parsing;
-
-$| = 1;
-
 # Command line options
 my $zcat_cmd                = 'gunzip -c';
 my $zcat                    = $zcat_cmd;
@@ -189,6 +161,36 @@ my $pie_percentage_limit = 2;
 my $n       = 5 / 2;
 my $num_sep = ',';
 $num_sep = ' ' if ($n =~ /,/);
+
+# Inform the parent that it should stop iterate on parsing other files
+sub stop_parsing
+{
+	$interrupt = 1;
+}
+
+# With multiprocess we need to wait all childs
+sub wait_child
+{
+        my $sig = shift;
+        print STDERR "Received terminating signal ($sig).\n";
+	if ($^O !~ /MSWin32|dos/i) {
+		1 while wait != -1;
+		$SIG{INT} = \&wait_child;
+		$SIG{TERM} = \&wait_child;
+		foreach my $f (@tempfiles) {
+			unlink("$f->[1]") if (-e "$f->[1]");
+		}
+	}
+	if ($last_parsed && -e $tmp_last_parsed) {
+		unlink("$tmp_last_parsed");
+	}
+	_exit(0);
+}
+$SIG{INT} = \&wait_child;
+$SIG{TERM} = \&wait_child;
+$SIG{USR2} = \&stop_parsing;
+
+$| = 1;
 
 # get the command line parameters
 my $result = GetOptions(
@@ -759,29 +761,28 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		&load_stats($fht);
 		$fht->close();
 	}
-
-	# Get last line parsed from all process
-	if ($last_parsed) {
-		if (open(IN, "$tmp_last_parsed") ) {
-			while (my $line = <IN>) {
-				chomp($line);
-				my ($d, $l) = split(/\t/, $line, 2);
-				if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
-					$last_line{datetime} = $d;
-					$last_line{orig} = $l;
-				}
-			}
-			close(IN);
-		}
-		unlink("$tmp_last_parsed");
-	}
-
 } else {
 
 	# Multiprocessing disabled, parse log files one by one
 	foreach my $logfile ( @given_log_files ) {
 		last if (&process_file($logfile));
 	}
+}
+
+# Get last line parsed from all process
+if ($last_parsed) {
+	if (open(IN, "$tmp_last_parsed") ) {
+		while (my $line = <IN>) {
+			chomp($line);
+			my ($d, $l) = split(/\t/, $line, 2);
+			if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
+				$last_line{datetime} = $d;
+				$last_line{orig} = $l;
+			}
+		}
+		close(IN);
+	}
+	unlink("$tmp_last_parsed");
 }
 
 # Save last line parsed
@@ -1476,15 +1477,13 @@ sub process_file
 	}
 
 	# Save last line into temporary file
-	if ( ($queue_size > 1) || ($job_per_file > 1) ) {
-		if ($last_parsed && scalar keys %last_line) {
-			if (open(OUT, ">>$tmp_last_parsed")) {
-				flock(OUT, 2) || return $getout;
-				print OUT "$last_line{datetime}\t$last_line{orig}\n";
-				close(OUT);
-			} else {
-				&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
-			}
+	if ($last_parsed && scalar keys %last_line) {
+		if (open(OUT, ">>$tmp_last_parsed")) {
+			flock(OUT, 2) || return $getout;
+			print OUT "$last_line{datetime}\t$last_line{orig}\n";
+			close(OUT);
+		} else {
+			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
 		}
 	}
 	
