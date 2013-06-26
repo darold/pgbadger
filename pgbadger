@@ -1294,7 +1294,11 @@ sub process_file
 						$cur_info{$cur_pid}{parameters} .= " $t_query";
 						next;
 					} 
-					if ($cur_info{$cur_pid}{statement}) {
+					if (exists $cur_temp_info{$cur_pid}{query}) {
+						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
+						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
 					} elsif ($cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
@@ -1307,7 +1311,11 @@ sub process_file
 					# Collect orphans lines of multiline queries
 				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
 
-					if ($cur_info{$cur_pid}{statement}) {
+					if (exists $cur_temp_info{$cur_pid}{query}) {
+						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
+						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif ($cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
 					} elsif ($cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
@@ -1386,7 +1394,11 @@ sub process_file
 						$cur_info{$cur_pid}{parameters} .= " $line";
 						next;
 					} 
-					if (exists $cur_info{$cur_pid}{statement}) {
+					if (exists $cur_temp_info{$cur_pid}{query}) {
+						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
+						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
