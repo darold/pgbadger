@@ -1676,7 +1676,8 @@ sub set_top_error_sample
 
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
-		if (($q =~ /deadlock detected/) || !grep(/\Q$real_error\E/, @{$error_info{$q}{error}})) {
+		if ( ($q =~ /deadlock detected/) || ($statement && !grep(/\Q$statement\E/, @{$error_info{$q}{statement}}))
+			|| ($real_error && !grep(/\Q$real_error\E/, @{$error_info{$q}{error}})) ) {
 			push(@{$error_info{$q}{date}},      $date);
 			push(@{$error_info{$q}{detail}},    $detail);
 			push(@{$error_info{$q}{context}},   $context);
