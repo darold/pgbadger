@@ -290,6 +290,10 @@ for (my $i = 0 ; $i < 59 ; $i += $avg_minutes) {
 }
 push(@avgs, 59);
 
+# Set error like log level regex
+my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
+my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
+
 # Set syslog prefix regex
 my $other_syslog_line =
 	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
@@ -1111,7 +1115,7 @@ sub process_file
 			}
 
 			# Process only relevant lines
-			next if ($row->[11] !~ /^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT)$/);
+			next if ($row->[11] !~ $full_error_regex);
 
 			# Extract the date
 			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
@@ -1231,6 +1235,9 @@ sub process_file
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
+					# Stores temporary files and locks informations
+					&store_temporary_and_lock_infos($cur_pid);
+
 					# Standard syslog format does not have year information, months are
 					# three letters and day are not always with 2 digit.
 					if ($prefix_vars{'t_month'} !~ /\d/) {
@@ -1299,30 +1306,30 @@ sub process_file
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{statement}) {
+					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
-					} elsif ($cur_info{$cur_pid}{context}) {
+					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
-					} elsif ($cur_info{$cur_pid}{detail}) {
+					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
-					} else {
+					} elsif (exists $cur_info{$cur_pid}{query}) {
 						$cur_info{$cur_pid}{query} .= "\n" . $t_query;
 					}
 
-					# Collect orphans lines of multiline queries
+				# Collect orphans lines of multiline queries
 				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
 
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{statement}) {
+					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{context}) {
+					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
-					} elsif ($cur_info{$cur_pid}{detail}) {
+					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
-					} else {
+					} elsif (exists $cur_info{$cur_pid}{query}) {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
 
@@ -1337,6 +1344,10 @@ sub process_file
 					for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 						$prefix_vars{$prefix_params[$i]} = $matches[$i];
 					}
+
+					# Stores temporary files and locks informations
+					&store_temporary_and_lock_infos($cur_pid);
+
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
@@ -1405,7 +1416,7 @@ sub process_file
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
-					} else {
+					} elsif (exists $cur_info{$cur_pid}{query}) {
 						$cur_info{$cur_pid}{query} .= "\n" . $line;
 					}
 
@@ -5125,7 +5136,6 @@ sub validate_log_line
 
 		# Log line do not match the required dbname
 		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
-			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
@@ -5133,7 +5143,6 @@ sub validate_log_line
 
 		# Log line do not match the required dbuser
 		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
-			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
@@ -5142,7 +5151,6 @@ sub validate_log_line
 		# Log line does not match the required dbclient
 		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
 		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
-			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
@@ -5150,7 +5158,6 @@ sub validate_log_line
 
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_appname'} || !grep(/^$prefix_vars{'t_appname'}$/i, @dbappname)) {
-			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
@@ -5158,7 +5165,6 @@ sub validate_log_line
 
 		# Log line matches the excluded dbuser
 		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
-			delete $cur_info{$t_pid};
 			return 0;
 		}
 	}
@@ -5189,8 +5195,8 @@ sub parse_query
 
 	my $t_pid = $prefix_vars{'t_pid'};
 
-	# Force parameter change to be a hint message so that it can appear
-	# in the event/error/warning messages report part.
+	# Force some LOG messages to be ERROR messages so that they will appear
+	# in the event/error/warning messages report.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
@@ -5203,21 +5209,13 @@ sub parse_query
 		}
 	}
 
-	# Do not parse lines that are not an error like message
-	if ($error_only && ($prefix_vars{'t_loglevel'} !~ /(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/)) {
-		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-			&store_queries($t_pid);
-			delete $cur_info{$t_pid};
-		}
+	# Do not parse lines that are not an error message when error only report is requested
+	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
 		return;
 	}
 
-	# Do not parse lines that are an error like message
-	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ /WARNING|ERROR|FATAL|PANIC|HINT|CONTEXT|DETAIL|STATEMENT/)) {
-		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-			&store_queries($t_pid);
-			delete $cur_info{$t_pid};
-		}
+	# Do not parse lines that are an error like message when error report are not wanted
+	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ $full_error_regex)) {
 		return;
 	}
 
@@ -5225,7 +5223,23 @@ sub parse_query
 	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
 	# Replace syslog tabulation rewrite
-	$prefix_vars{'t_query'} =~ s/#011/\t/g if ($format =~ /syslog/);
+	if ($format =~ /syslog/) {
+		$prefix_vars{'t_query'} =~ s/#011/\t/g;
+	}
+
+	# Reject lines generated by debug tool
+	if ( ($prefix_vars{'t_loglevel'} eq 'CONTEXT') && ($prefix_vars{'t_query'} =~ /SQL statement "/) ) {
+		return;
+	}
+
+	# Stores the error's detail if previous line was an error
+	if ($cur_info{$t_pid}{loglevel} =~ $main_error_regex) {
+		# and current one is a detailed information
+		if ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
+			$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
+			return;
+		}
+	}
 
 	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
 
@@ -5363,7 +5377,7 @@ sub parse_query
 		return;
 	}
 
-	# Store autovacuum information
+	# Store autovacuum informations
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
@@ -5379,6 +5393,8 @@ sub parse_query
 		$cur_info{$t_pid}{vacuum} = $1;
 		return;
 	}
+
+	# Store autoanalyze informations
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
@@ -5421,6 +5437,8 @@ sub parse_query
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{total}         += $8;
 		return;
 	}
+
+	# Store checkpoint warning information
 	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~ /checkpoints are occurring too frequently \((\d+) seconds apart\)/))
 	{
@@ -5457,15 +5475,7 @@ sub parse_query
 		return;
 	}
 
-	# Store the detail of the error
-	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC/) {
-		if ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
-			$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
-			return;
-		}
-	}
-
-	# Process current query following context
+	# Look at bind parameters if any
 	if ($cur_info{$t_pid}{query}) {
 
 		# Remove obsolete connection storage
@@ -5481,21 +5491,22 @@ sub parse_query
 				return;
 			}
 		}
-		# When we are ready to overwrite the last storage, add it to the global stats
-		if (   ($prefix_vars{'t_loglevel'} =~ /LOG|FATAL|PANIC|ERROR|WARNING|HINT/)
-			&& exists $cur_info{$t_pid}
-			&& (($format eq 'csv') || (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session})))
-		) {
+	}
+
+	####
+	# Registrer previous query storage into global statistics before starting to store current query 
+	####
+	if (exists $cur_info{$t_pid}{query}) {
+		# when switching to a new log message
+		if ( ($prefix_vars{'t_loglevel'} eq 'LOG') || ($format eq 'csv') || ($prefix_vars{'t_loglevel'} =~ $main_error_regex) ) {
 			&store_queries($t_pid);
 			delete $cur_info{$t_pid};
 		}
 	}
 
-	# Registrer previous query storage into global statistics before starting to store current query 
-	if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-		&store_queries($t_pid);
-		delete $cur_info{$t_pid};
-	}
+	####
+	# Store current query informations
+	####
 
 	# Log lines with duration only, generated by log_duration = on in postgresql.conf
 	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
@@ -5518,7 +5529,7 @@ sub parse_query
 		$prefix_vars{'t_duration'} = $1;
 		$t_action   = $2;
 	# Log line with duration and statement from prepared queries
-	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//is)
 	{
 		$prefix_vars{'t_duration'} = $1;
 		$t_action   = $2;
@@ -5528,22 +5539,18 @@ sub parse_query
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
 		$t_action = $1;
 	# Log line without duration at all from prepared queries
-	} elsif ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute|execute from fetch)\s+[^:]+:\s//is)
+	} elsif ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//is)
 	{
 		$t_action = $1;
 		# Skipping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
-	# Log line that should not be parse
+	# Log line that would not be parse
 	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} !~
 /incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
 			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
-		}
-		if (exists $cur_info{$t_pid} && (!$prefix_vars{'t_session_line'} || ($prefix_vars{'t_session_line'} != $cur_info{$t_pid}{session}))) {
-			&store_queries($t_pid);
-			delete $cur_info{$t_pid};
 		}
 		return;
 	}
@@ -5645,6 +5652,11 @@ sub store_queries
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
 	}
 
+	# Stores temporary files and locks informations
+	&store_temporary_and_lock_infos($t_pid);
+
+	return if (!exists $cur_info{$t_pid});
+
 	# Cleanup and normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
 	$cur_info{$t_pid}{query} =~ s/[\t\s\r\n;]+$//s;
@@ -5708,7 +5720,7 @@ sub store_queries
 	my $cur_hour_str = "$cur_info{$t_pid}{hour}";
 
 	# Store the collected information into global statistics
-	if ($cur_info{$t_pid}{loglevel} =~ /WARNING|ERROR|FATAL|PANIC|HINT/) {
+	if ($cur_info{$t_pid}{loglevel} =~ $main_error_regex) {
 
 		# Add log level at beginning of the query and normalize it
 		$cur_info{$t_pid}{query} = $cur_info{$t_pid}{loglevel} . ":  " . $cur_info{$t_pid}{query};
@@ -5770,9 +5782,6 @@ sub store_queries
 			$application_info{others}{count}++;
 		}
 
-		# Stores temporary files and locks informations
-		&store_temporary_and_lock_infos($t_pid);
-
 		if ($cur_info{$t_pid}{query}) {
 			# Add a semi-colon at end of the query
 			$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
@@ -5833,6 +5842,8 @@ sub store_temporary_and_lock_infos
 {
 	my $t_pid = shift;
 
+	return if (!$t_pid);
+
 	# Store normalized query temp file size if required
 	if (exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid}{query} ne '') ) {
 
@@ -5844,6 +5855,7 @@ sub store_temporary_and_lock_infos
 
 		$normalyzed_info{$normalized}{tempfiles}{size} += $cur_temp_info{$t_pid}{size};
 		$normalyzed_info{$normalized}{tempfiles}{count}++;
+
 		if ($normalyzed_info{$normalized}{tempfiles}{maxsize} < $cur_temp_info{$t_pid}{size}) {
 			$normalyzed_info{$normalized}{tempfiles}{maxsize} = $cur_temp_info{$t_pid}{size};
 		}
@@ -5853,6 +5865,7 @@ sub store_temporary_and_lock_infos
 		}
 		&set_top_tempfile_info($cur_temp_info{$t_pid}{query}, $cur_temp_info{$t_pid}{size}, $cur_temp_info{$t_pid}{timestamp}, $cur_temp_info{$t_pid}{dbname}, $cur_temp_info{$t_pid}{dbuser}, $cur_temp_info{$t_pid}{dbclient}, $cur_temp_info{$t_pid}{dbappname});
 		delete $cur_temp_info{$t_pid};
+		#delete $cur_info{$t_pid};
 	}
 
 	# Store normalized query that waited the most if required
@@ -5875,6 +5888,7 @@ sub store_temporary_and_lock_infos
 		}
 		&set_top_locked_info($cur_lock_info{$t_pid}{query}, $cur_lock_info{$t_pid}{wait}, $cur_lock_info{$t_pid}{timestamp}, $cur_lock_info{$t_pid}{dbname}, $cur_lock_info{$t_pid}{dbuser}, $cur_lock_info{$t_pid}{dbclient}, $cur_lock_info{$t_pid}{dbappname});
 		delete $cur_lock_info{$t_pid};
+		#delete $cur_info{$t_pid};
 	}
 
 }
