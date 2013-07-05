@@ -3041,12 +3041,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 
 	if (scalar keys %per_minute_info > 0) {
 
-		#if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || exists $autovacuum_info{count}) {
-		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || exists $autovacuum_info{count}) {
-			print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
-		} else {
-			return;
-		}
+		print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
 		if (exists $tempfile_info{count}) {
 			print $fh qq{<th colspan="2">Temporary files</th>};
 		}
@@ -4331,11 +4326,14 @@ sub dump_as_html
 	$t_max += ($avg_minutes * 60000);
 
 	if (!$disable_hourly) {
+
 		# Start creating hourly reports about queries and connections
 		&print_hourly_reports();
 
 		# Display checkpoint and temporary files report
-		&print_checkpoint_tempfile_vacuum_reports();
+		if ($tempfile_info{count} || $checkpoint_info{wbuffer} || $restartpoint_info{wbuffer} || $autovacuum_info{chronos} || $autovacuum_info{count}) {
+			&print_checkpoint_tempfile_vacuum_reports();
+		}
 	}
 	%per_minute_info = ();
 
