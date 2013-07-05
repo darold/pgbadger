@@ -2938,6 +2938,7 @@ sub print_hourly_reports
 
 							if (!$disable_query) {
 								foreach my $action (@SQL_ACTION) {
+									next if (!$per_minute_info{$tm}{$h}{$m}{$action}{count});
 									$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{count} || 0);
 									$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 									if ( ($action ne 'SELECT') && exists $per_minute_info{$tm}{$h}{$m}{$action}{count}) {
@@ -2991,7 +2992,6 @@ sub print_hourly_reports
 							foreach my $action (@SQL_ACTION) {
 								next if ($select_only && ($action ne 'SELECT'));
 								# Average per minute
-								#$graph_data{"$action"} .= "[$t, " . int(($a_dataavg{$action}{count}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 								$graph_data{"$action"} .= "[$t, " . ($a_dataavg{$action}{count}{"$rd"} || 0) . "],";
 								if ($action eq 'SELECT') {
 									$graph_data{"$action-2"} .= "[$t, " . sprintf("%.2f", (($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) / 1000) . "]," if ($action eq 'SELECT');
@@ -3022,7 +3022,7 @@ sub print_hourly_reports
 				&flotr2_graph(
 					4, 'selectqueries_graph', $graph_data{"SELECT"}, '', '', 'SELECT queries (' . $avg_minutes . ' minutes period)',
 					'Queries', 'Number of queries', '', '', 'Duration', $graph_data{"SELECT-2"}, 'Average duration (s)'
-				);
+				) if ($graph_data{"SELECT"});
 				# Write queries
 				if (!$select_only && $graph_data{"write"}) {
 					&flotr2_graph(
