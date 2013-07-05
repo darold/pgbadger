@@ -1595,6 +1595,8 @@ sub comma_numbers
 {
 	return 0 if ($#_ < 0);
 
+	return 0 if (!$_[0]);
+
 	my $text = reverse $_[0];
 
 	$text =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1$num_sep/g;
@@ -3039,45 +3041,48 @@ sub print_checkpoint_tempfile_vacuum_reports
 
 	if (scalar keys %per_minute_info > 0) {
 
-		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || $autovacuum_info{count}) {
+		#if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || exists $autovacuum_info{count}) {
+		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer} || exists $autovacuum_info{chronos} || exists $autovacuum_info{count}) {
 			print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
+		} else {
+			return;
 		}
-		if ($tempfile_info{count}) {
+		if (exists $tempfile_info{count}) {
 			print $fh qq{<th colspan="2">Temporary files</th>};
 		}
-		if ($checkpoint_info{wbuffer}) {
+		if (exists $checkpoint_info{wbuffer}) {
 			print $fh qq{<th colspan="7">Checkpoints</th>};
 		}
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th colspan="2">Checkpoint warning</th>};
 		}
-		if ($restartpoint_info{wbuffer}) {
+		if (exists $restartpoint_info{wbuffer}) {
 			print $fh qq{<th colspan="4">Restartpoints</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th colspan=\"2\">Autovacuum</th>\n";
 		}
-		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
+		if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
 			print $fh qq{</tr><tr>};
 		}
-		if ($tempfile_info{count}) {
+		if (exists $tempfile_info{count}) {
 			print $fh qq{<th>Count</th><th>Avg&nbsp;size</th>};
 		}
-		if ($checkpoint_info{wbuffer}) {
+		if (exists $checkpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Written buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $checkpoint_info{warning}) {
 			print $fh qq{<th>Count</th><th>Avg time (sec)</th>};
 		}
-		if ($restartpoint_info{wbuffer}) {
+		if (exists $restartpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Written buffers</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
 		}
-		if ($tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
+		if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
 			print $fh qq{</tr>};
 			foreach my $d (sort {$a <=> $b} keys %per_minute_info) {
 				my $c = 1;
@@ -3425,8 +3430,8 @@ sub print_query_type_report
 
 	my $r = 0;
 	foreach my $a (@SQL_ACTION) {
-	print $fh "<tr class=\"row$r\"><td>$a</td><td class=\"right\">", &comma_numbers($overall_stat{'$a'}),
-		"</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{$a} * 100) / $total), "%</td></tr>\n";
+		print $fh "<tr class=\"row$r\"><td>$a</td><td class=\"right\">", &comma_numbers($overall_stat{$a}),
+			"</td><td class=\"right\">", sprintf("%0.2f", ($overall_stat{$a} * 100) / $total), "%</td></tr>\n";
 		($r > 0) ? $r = 0 : $r = 1;
 	}
 	print $fh "<tr class=\"row0\"><td>OTHERS</td><td class=\"right\">", &comma_numbers($total - $totala),
