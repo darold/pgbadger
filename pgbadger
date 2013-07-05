@@ -1302,10 +1302,11 @@ sub process_file
 						$cur_info{$cur_pid}{parameters} .= " $t_query";
 						next;
 					} 
+
 					if (exists $cur_temp_info{$cur_pid}{query}) {
-						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+						$cur_lock_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{context}) {
