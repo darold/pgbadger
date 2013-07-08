@@ -3042,42 +3042,42 @@ sub print_checkpoint_tempfile_vacuum_reports
 	if (scalar keys %per_minute_info > 0) {
 
 		print $fh qq{<table class="HourStatsTable"><tr><th rowspan="2">Day</th><th rowspan="2">Hour</th>};
-		if (exists $tempfile_info{count}) {
+		if ($tempfile_info{count}) {
 			print $fh qq{<th colspan="2">Temporary files</th>};
 		}
-		if (exists $checkpoint_info{wbuffer}) {
+		if ($checkpoint_info{wbuffer}) {
 			print $fh qq{<th colspan="7">Checkpoints</th>};
 		}
-		if (exists $checkpoint_info{warning}) {
+		if ($checkpoint_info{warning}) {
 			print $fh qq{<th colspan="2">Checkpoint warning</th>};
 		}
-		if (exists $restartpoint_info{wbuffer}) {
+		if ($restartpoint_info{wbuffer}) {
 			print $fh qq{<th colspan="4">Restartpoints</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th colspan=\"2\">Autovacuum</th>\n";
 		}
-		if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
+		if ($tempfile_info{count} || $checkpoint_info{wbuffer} || $restartpoint_info{wbuffer}) {
 			print $fh qq{</tr><tr>};
 		}
-		if (exists $tempfile_info{count}) {
+		if ($tempfile_info{count}) {
 			print $fh qq{<th>Count</th><th>Avg&nbsp;size</th>};
 		}
-		if (exists $checkpoint_info{wbuffer}) {
+		if ($checkpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Written buffers</th><th>Added</th><th>Removed</th><th>Recycled</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
-		if (exists $checkpoint_info{warning}) {
+		if ($checkpoint_info{warning}) {
 			print $fh qq{<th>Count</th><th>Avg time (sec)</th>};
 		}
-		if (exists $restartpoint_info{wbuffer}) {
+		if ($restartpoint_info{wbuffer}) {
 			print $fh
 	qq{<th>Written buffers</th><th>Write time (sec)</th><th>Sync time (sec)</th><th>Total time (sec)</th>};
 		}
 		if (exists $autovacuum_info{chronos}) {
 			print $fh "		<th>VACUUMs</th><th>ANALYZEs</th>\n";
 		}
-		if (exists $tempfile_info{count} || exists $checkpoint_info{wbuffer} || exists $restartpoint_info{wbuffer}) {
+		if ($tempfile_info{count} || $checkpoint_info{wbuffer} || $restartpoint_info{wbuffer}) {
 			print $fh qq{</tr>};
 			foreach my $d (sort {$a <=> $b} keys %per_minute_info) {
 				my $c = 1;
@@ -6062,14 +6062,19 @@ sub flotr2_graph
 	$data3 = "var d3 = [$data3];" if ($data3);
 	$data4 = "var d4 = [$data4];" if ($data4);
 
-	$legend1 = "{ data: d1, label: \"$legend1\" },"          if ($legend1);
-	$legend2 = "{ data: d2, label: \"$legend2\" },"          if ($legend2);
-	$legend3 = "{ data: d3, label: \"$legend3\" },"          if ($legend3);
-	$legend4 = "{ data: d4, label: \"$legend4\",yaxis: 2 }," if ($legend4);
+	$legend1 = "{ data: d1, label: \"$legend1\", mouse:{track:true}},"          if ($legend1);
+	$legend2 = "{ data: d2, label: \"$legend2\", mouse:{track:true}},"          if ($legend2);
+	$legend3 = "{ data: d3, label: \"$legend3\", mouse:{track:true}},"          if ($legend3);
+	$legend4 = "{ data: d4, label: \"$legend4\",yaxis: 2, mouse:{track:true}}," if ($legend4);
 
 	my $yaxis2 = '';
 	if ($ytitle2) {
 		$yaxis2 = "y2axis: { mode: \"normal\", title: \"$ytitle2\", min: 0, color: \"#4DA74D\" },";
+	}
+
+	my $type = '';
+	if ($ytitle eq 'Size of files') {
+		$type = 'size';
 	}
 
 	print $fh <<EOF;
@@ -6098,6 +6103,7 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
         yaxis: {
             mode: "normal",
             title: "$ytitle",
+	    tickFormatter: function(val){ return pretty_print(val,'$type') },
         },
 	$yaxis2
         selection: {
@@ -6112,9 +6118,14 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
         },
 	mouse: {
             track: true,
-	    trackAll: true,
 	    trackFormatter: function(obj){ return dateTracker(obj) },
-            relative: true
+            relative: true,
+	    sensibility: 1,
+	    trackDecimals: 2,
+	    lineColor: 'purple',
+        },
+	crosshair:{
+            mode: 'xy'
         },
         HtmlText: false,
     };
@@ -6875,6 +6886,35 @@ function dateTracker(obj)
 	var dateToDisplay = new Date(parseInt(obj.x)); 
 	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+obj.y;
 }
+
+function pretty_print(val, type) 
+{
+	if (type == 'size') {
+		if (val >= 1000000000000)
+			return Math.round(val / 1000000000000) + " TB";
+		else if (val >= 1000000000)
+			return Math.round(val / 1000000000) + " GB";
+		else if (val >= 1000000)
+			return Math.round(val / 1000000) + " MB";
+		else if (val >= 1000)
+			return Math.round(val / 1000) + " KB";
+		else
+			return Math.round(val) + " B"; 
+	} else {
+		if (val >= 1000000000000)
+			return Math.round(val / 1000000000000) + " T";
+		else if (val >= 1000000000)
+			return Math.round(val / 1000000000) + " G";
+		else if (val >= 1000000)
+			return Math.round(val / 1000000) + " M";
+		else if (val >= 1000)
+			return Math.round(val / 1000) + " K";
+		else
+			return Math.round(val); 
+	}
+	return val;
+}
+
 
 function pieTracker(obj) 
 {
