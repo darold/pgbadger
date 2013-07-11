@@ -6103,7 +6103,7 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
         yaxis: {
             mode: "normal",
             title: "$ytitle",
-	    tickFormatter: function(val){ return pretty_print(val,'$type') },
+	    tickFormatter: function(val){ return pretty_print_number(val,'$type') },
         },
 	$yaxis2
         selection: {
@@ -6120,7 +6120,7 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
             track: true,
 	    trackFormatter: function(obj){ return dateTracker(obj) },
             relative: true,
-	    sensibility: 1,
+	    sensibility: 10,
 	    trackDecimals: 2,
 	    lineColor: 'purple',
         },
@@ -6887,30 +6887,44 @@ function dateTracker(obj)
 	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+obj.y;
 }
 
-function pretty_print(val, type) 
+function pretty_print_number(val, type) 
 {
 	if (type == 'size') {
-		if (val >= 1000000000000)
-			return Math.round(val / 1000000000000) + " TB";
-		else if (val >= 1000000000)
-			return Math.round(val / 1000000000) + " GB";
-		else if (val >= 1000000)
-			return Math.round(val / 1000000) + " MB";
-		else if (val >= 1000)
-			return Math.round(val / 1000) + " KB";
-		else
-			return Math.round(val) + " B"; 
+		if (val >= 1125899906842624) {
+			val = (val / 1125899906842624);
+			val = val.toFixed(2) + " PiB";
+		} else if (val >= 1099511627776) {
+			val = (val / 1099511627776);
+			val = val.toFixed(2) + " TiB";
+		} else if (val >= 1073741824) {
+			val = (val / 1073741824);
+			val = val.toFixed(2) + " GiB";
+		} else if (val >= 1048576) {
+			val = (val / 1048576);
+			val = val.toFixed(2) + " MiB";
+		} else if (val >= 1024) {
+			val = (val / 1024);
+			val = val.toFixed(2) + " KiB";
+		} else {
+			val = val + " B";
+		}
 	} else {
-		if (val >= 1000000000000)
-			return Math.round(val / 1000000000000) + " T";
-		else if (val >= 1000000000)
-			return Math.round(val / 1000000000) + " G";
-		else if (val >= 1000000)
-			return Math.round(val / 1000000) + " M";
-		else if (val >= 1000)
-			return Math.round(val / 1000) + " K";
-		else
-			return Math.round(val); 
+		if (val >= 1000000000000000) {
+			val = (val / 1000000000000000);
+			val = val.toFixed(2) + " P";
+		} else if (val >= 1000000000000) {
+			val = (val / 1000000000000);
+			val = val.toFixed(2) + " T";
+		} else if (val >= 1000000000) {
+			val = (val / 1000000000);
+			val = val.toFixed(2) + " G";
+		} else if (val >= 1000000) {
+			val = (val / 1000000);
+			val = val.toFixed(2) + " M";
+		} else if (val >= 1000) {
+			val = (val / 1000);
+			val = val.toFixed(2) + " K";
+		}
 	}
 	return val;
 }
