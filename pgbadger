@@ -2446,7 +2446,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #connectionspersecond_graph, #queriesduration_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #restartpointwritebuffers_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #queriesduration_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #restartpointwritebuffers_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
 	width : 1025px;
 	height: 400px;
 	background:#F3F2ED;
@@ -3296,12 +3296,21 @@ sub print_checkpoint_tempfile_vacuum_reports
 		}
 
 		# Temporary file size
-		if ($tempfile_info{count} && exists $graph_data{size}) {
+		if (exists $graph_data{size}) {
 			&flotr2_graph(
-				$graphid++, 'temporaryfile_graph', $graph_data{size}, '', '', 'Temporary files (' . $avg_minutes . ' minutes period)',
-				'Size of files', 'Size of files', '', '', 'Number of files', $graph_data{count}, 'Number of files'
+				$graphid++, 'temporarydata_graph', $graph_data{size}, '', '', 'Size of temporary files (' . $avg_minutes . ' minutes period)',
+				'Size of files', 'Size of files'
 			);
 		}
+
+		# Temporary file number
+		if ($tempfile_info{count}) {
+			&flotr2_graph(
+				$graphid++, 'temporaryfile_graph', $graph_data{count}, '', '', 'Number of temporary files (' . $avg_minutes . ' minutes period)',
+				'Number of files', 'Number of files'
+			);
+		}
+
 
 		# VACUUMs and ANALYZEs
 		if ($autovacuum_info{count} || $autoanalyze_info{count}) {
@@ -6125,14 +6134,11 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
         },
 	mouse: {
             track: true,
-	    trackFormatter: function(obj){ return dateTracker(obj) },
+	    trackFormatter: function(obj){ return dateTracker(obj,'$type') },
             relative: true,
 	    sensibility: 5,
 	    trackDecimals: 2,
 	    lineColor: 'purple',
-        },
-	crosshair:{
-            mode: 'xy'
         },
         HtmlText: false,
     };
@@ -6888,10 +6894,10 @@ function sql_format (obj)
 	}
 }
 
-function dateTracker(obj) 
+function dateTracker(obj, gtype) 
 {
 	var dateToDisplay = new Date(parseInt(obj.x)); 
-	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+obj.y;
+	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+pretty_print_number(obj.y, gtype);
 }
 
 function pretty_print_number(val, type) 
