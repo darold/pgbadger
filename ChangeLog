@@ -1,3 +1,45 @@
+2013-07-11 - Version 3.5
+
+Last release of the 3.x branch, this is a bug fix release that also adds some
+pretty print of Y axis number on graphs and a new graph that groups queries
+duration series that was shown as second Y axis on graphs, as well as a new
+graph with number of temporary file that was also used as second Y axis.
+
+	- Split temporary files report into two graphs (files size and number
+	  of file) to no more used a second Y axis with flotr2 - mouse tracker
+	  is not working as expected.
+	- Duration series representing the second Y axis in queries graph have
+	  been removed and are now drawn in a new "Average queries duration"
+	  independant graph.
+	- Add pretty print of numbers in Y axis and mouse tracker output with
+	  PB, TB, GB, KB, B units, and seconds, microseconds. Number without
+	  unit are shown with P, T, M, K suffix for easiest very long number
+	  reading.
+	- Remove Query type reports when log only contains duration.
+	- Fix display of checkpoint hourly report with no entry.
+	- Fix count in Query type report.
+	- Fix minimal statistics output when nothing was load from log file.
+	  Thanks to Herve Werner for the report.
+	- Fix several bug in log line parser. Thanks to Den Untevskiy for the
+	  report.
+	- Fix bug in last parsed storage when log files was not provided in the
+	  right order. Thanks to Herve Werner for the report.
+	- Fix orphan lines wrongly associated to previous queries instead of
+	  temporary file and lock logged statement. Thanks to Den Untevskiy for
+	  the report.
+	- Fix number of different samples shown in events report.
+	- Escape HTML tags on error messages examples. Thanks to Mael Rimbault
+	  for the report.
+	- Remove some temporary debug informations used with some LOG messages
+	  reported as events.
+	- Fix several issues with restartpoint and temporary files reports.
+	  Thanks to Guillaume Lelarge for the report.
+	- Fix issue when an absolute path was given to the incremental file.
+	  Thanks to Herve Werner for the report.
+	- Remove creation of incremental temp file $tmp_last_parsed when not
+	  running in multiprocess mode. Thanks to Herve Werner for the report.
+
+
 2013-06-18 - Version 3.4
 
 This release adds lot of graphic improvements and a better rendering with logs
