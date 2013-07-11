@@ -54,7 +54,8 @@ my @tempfiles    = ();
 my $parent_pid   = $$;
 my $interrupt    = 0;
 my $tmp_last_parsed = '';
-my @SQL_ACTION = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+my $graphid      = 1;
 
 ####
 # method used to fork as many child as wanted
@@ -2445,7 +2446,7 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 
-#queriespersecond_graph, #connectionspersecond_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #restartpointwritebuffers_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #queriesduration_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #restartpointwritebuffers_graph, #temporaryfile_graph, #autovacuum_graph, #selectqueries_graph, #writequeries_graph {
 	width : 1025px;
 	height: 400px;
 	background:#F3F2ED;
@@ -2978,7 +2979,7 @@ sub print_hourly_reports
 						# Mini queries per minute
 						$graph_data{query3} .= "[$t, " . ($q_dataavg{min}{"$rd"} || 0) . "],";
 						# Average duration per minute
-						$graph_data{query4} .= "[$t, " . sprintf("%.2f", (($q_dataavg{duration}{"$rd"} || 0) / ($q_dataavg{count}{"$rd"} || 1)) / 1000) . "],";
+						$graph_data{query4} .= "[$t, " . sprintf("%.3f", ($q_dataavg{duration}{"$rd"} || 0) / ($q_dataavg{count}{"$rd"} || 1)) . "],";
 						if (scalar keys %c_dataavg) { 
 							# Average connections per minute
 							$graph_data{conn2} .= "[$t, " . int(($c_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
@@ -2994,9 +2995,9 @@ sub print_hourly_reports
 								# Average per minute
 								$graph_data{"$action"} .= "[$t, " . ($a_dataavg{$action}{count}{"$rd"} || 0) . "],";
 								if ($action eq 'SELECT') {
-									$graph_data{"$action-2"} .= "[$t, " . sprintf("%.2f", (($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) / 1000) . "]," if ($action eq 'SELECT');
+									$graph_data{"$action-2"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) . "]," if ($action eq 'SELECT');
 								} else {
-									$graph_data{"write"} .= "[$t, " . sprintf("%.2f", (($a_dataavg{write}{duration}{"$rd"} || 0) / ($a_dataavg{write}{count}{"$rd"} || 1)) / 1000) . "],";
+									$graph_data{"write"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{write}{duration}{"$rd"} || 0) / ($a_dataavg{write}{count}{"$rd"} || 1)) . "],";
 								}
 							}
 						}
@@ -3006,31 +3007,35 @@ sub print_hourly_reports
 			foreach (keys %graph_data) {
 				$graph_data{$_} =~ s/,$//;
 			}
-			&flotr2_graph(
-				1, 'queriespersecond_graph', $graph_data{query1}, $graph_data{query2}, $graph_data{query3}, 'Queries per second (' . $avg_minutes . ' minutes average)',
-				'Queries per second', 'Maximum', 'Average', 'Minimum', 'Duration', $graph_data{query4}, 'Average duration (s)'
+			&flotr2_graph( $graphid++, 'queriespersecond_graph', $graph_data{query1},
+				$graph_data{query2}, $graph_data{query3}, 'Queries per second (' . $avg_minutes . ' minutes average)',
+				'Queries per second', 'Maximum', 'Average', 'Minimum'
 			);
 
 			if (exists $graph_data{conn1}) {
-				&flotr2_graph(
-					2, 'connectionspersecond_graph', $graph_data{conn1}, $graph_data{conn2}, $graph_data{conn3}, 'Connections per second (' . $avg_minutes . ' minutes average)',
+				&flotr2_graph( $graphid++, 'connectionspersecond_graph', $graph_data{conn1},
+					$graph_data{conn2}, $graph_data{conn3}, 'Connections per second (' . $avg_minutes . ' minutes average)',
 					'Connections per second', 'Maximum', 'Average', 'Minimum'
 				);
 			}
 
 			if (!$disable_query) {
-				&flotr2_graph(
-					4, 'selectqueries_graph', $graph_data{"SELECT"}, '', '', 'SELECT queries (' . $avg_minutes . ' minutes period)',
-					'Queries', 'Number of queries', '', '', 'Duration', $graph_data{"SELECT-2"}, 'Average duration (s)'
+				&flotr2_graph( $graphid++, 'selectqueries_graph', $graph_data{"SELECT"}, '', '',
+					 'SELECT queries (' . $avg_minutes . ' minutes period)',
+					'Queries', 'Number of queries', '', ''
 				) if ($graph_data{"SELECT"});
 				# Write queries
 				if (!$select_only && $graph_data{"write"}) {
 					&flotr2_graph(
-						5, 'writequeries_graph', $graph_data{"DELETE"}, $graph_data{"INSERT"}, $graph_data{"UPDATE"}, 'Write queries (' . $avg_minutes . ' minutes period)',
-						'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries', 'Duration', $graph_data{"write"}, 'Average duration (s)'
+						$graphid++, 'writequeries_graph', $graph_data{"DELETE"}, $graph_data{"INSERT"}, $graph_data{"UPDATE"}, 'Write queries (' . $avg_minutes . ' minutes period)',
+						'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries'
 					);
 				}
 			}
+			&flotr2_graph(
+				$graphid++, 'queriesduration_graph', $graph_data{query4}, $graph_data{"SELECT-2"}, $graph_data{write}, 'Average queries duration (' . $avg_minutes . ' minutes average)',
+				'Duration', 'All queries', 'Select queries', 'Write queries'
+			);
 		}
 	}
 
@@ -3273,19 +3278,19 @@ sub print_checkpoint_tempfile_vacuum_reports
 		}
 		if (exists $graph_data{wbuffer}) {
 			&flotr2_graph(
-				6,         'checkpointwritebuffers_graph', $graph_data{wbuffer}, '', '', 'Checkpoint write buffers (' . $avg_minutes . ' minutes period)',
+				$graphid++,         'checkpointwritebuffers_graph', $graph_data{wbuffer}, '', '', 'Checkpoint write buffers (' . $avg_minutes . ' minutes period)',
 				'Buffers', 'Write buffers',                '',  ''
 			);
 
 			&flotr2_graph(
-				7, 'checkpointfiles_graph', $graph_data{file_added}, $graph_data{file_removed}, $graph_data{file_recycled},
+				$graphid++, 'checkpointfiles_graph', $graph_data{file_added}, $graph_data{file_removed}, $graph_data{file_recycled},
 				'Checkpoint Wal files usage', 'Number of files', 'Added', 'Removed', 'Recycled'
 			);
 		}
 		# Restart point
 		if ($restartpoint_info{wbuffer} && $graph_data{rwbuffer}) {
 			&flotr2_graph(
-				6,         'restartpointwritebuffers_graph',  $graph_data{rwbuffer}, '', '', 'Restartpoint write buffers (' . $avg_minutes . ' minutes period)',
+				$graphid++,         'restartpointwritebuffers_graph',  $graph_data{rwbuffer}, '', '', 'Restartpoint write buffers (' . $avg_minutes . ' minutes period)',
 				'Buffers', 'Write buffers',                '',  ''
 			);
 		}
@@ -3293,7 +3298,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 		# Temporary file size
 		if ($tempfile_info{count} && exists $graph_data{size}) {
 			&flotr2_graph(
-				8, 'temporaryfile_graph', $graph_data{size}, '', '', 'Temporary files (' . $avg_minutes . ' minutes period)',
+				$graphid++, 'temporaryfile_graph', $graph_data{size}, '', '', 'Temporary files (' . $avg_minutes . ' minutes period)',
 				'Size of files', 'Size of files', '', '', 'Number of files', $graph_data{count}, 'Number of files'
 			);
 		}
@@ -3302,7 +3307,7 @@ sub print_checkpoint_tempfile_vacuum_reports
 		if ($autovacuum_info{count} || $autoanalyze_info{count}) {
 			if (exists $graph_data{vcount} || exists $graph_data{acount}) {
 				&flotr2_graph(
-					9, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount}, '', 'Autovacuum actions (' . $avg_minutes . ' minutes period)',
+					$graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount}, '', 'Autovacuum actions (' . $avg_minutes . ' minutes period)',
 					'', 'VACUUMs', 'ANALYZEs'
 				);
 			}
@@ -3358,7 +3363,7 @@ sub print_vacuum_reports
 					$data{"Others"} += $autovacuum_info{tables}{$t}{vacuums} || 0;
 				}
 			}
-			&flotr2_piegraph(18, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
+			&flotr2_piegraph($graphid++, 'autovacuumbytable_graph', 'Autovacuum per table', %data);
 			%data = ();
 			if ($total_tuples) {
 				print $fh "<br />\n";
@@ -3369,7 +3374,7 @@ sub print_vacuum_reports
 						$data{"Others"} += $autovacuum_info{tables}{$t}{tuples}{removed} || 0;
 					}
 				}
-				&flotr2_piegraph(19, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
+				&flotr2_piegraph($graphid++, 'autovacuumtuplesremoved_graph', 'Autovacuum tuples removed per table', %data);
 			}
 		}
 		print $fh "</td></tr></table>\n";
@@ -3448,7 +3453,7 @@ sub print_query_type_report
 		} else {
 			$data{"Sum types < $pie_percentage_limit%"} += $total - $totala;
 		}
-		&flotr2_piegraph(22, 'queriesbytype_graph', 'Type of queries', %data);
+		&flotr2_piegraph($graphid++, 'queriesbytype_graph', 'Type of queries', %data);
 	}
 	print $fh "</td></tr></table>\n";
 }
@@ -3495,7 +3500,7 @@ sub print_request_report
 				$infos{$small[0]} = $infos{"Sum databases < $pie_percentage_limit%"};
 				delete $infos{"Sum databases < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(20, 'requestsdatabases_graph', 'Queries per database', %infos);
+			&flotr2_piegraph($graphid++, 'requestsdatabases_graph', 'Queries per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3540,7 +3545,7 @@ sub print_request_report
 				$infos{$small[0]} = $infos{"Sum applications < $pie_percentage_limit%"};
 				delete $infos{"Sum applications < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(21, 'requestsapplications_graph', 'Queries per application', %infos);
+			&flotr2_piegraph($graphid++, 'requestsapplications_graph', 'Queries per application', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3598,7 +3603,7 @@ sub print_locktype_report
 				$locktype{$small[0]} = $locktype{"Sum types < $pie_percentage_limit%"};
 				delete $locktype{"Sum types < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(10, 'lockbytype_graph', 'Type of locks', %locktype);
+			&flotr2_piegraph($graphid++, 'lockbytype_graph', 'Type of locks', %locktype);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3645,7 +3650,7 @@ sub print_session_report
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(11, 'databasesessions_graph', 'Sessions per database', %infos);
+			&flotr2_piegraph($graphid++, 'databasesessions_graph', 'Sessions per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3690,7 +3695,7 @@ sub print_session_report
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(12, 'usersessions_graph', 'Sessions per user', %infos);
+			&flotr2_piegraph($graphid++, 'usersessions_graph', 'Sessions per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3735,7 +3740,7 @@ sub print_session_report
 				$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
 				delete $infos{"Sum sessions < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(13, 'hostsessions_graph', 'Sessions per host', %infos);
+			&flotr2_piegraph($graphid++, 'hostsessions_graph', 'Sessions per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3782,7 +3787,7 @@ sub print_connection_report
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(14, 'databaseconnections_graph', 'Connections per database', %infos);
+			&flotr2_piegraph($graphid++, 'databaseconnections_graph', 'Connections per database', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3825,7 +3830,7 @@ sub print_connection_report
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(15, 'userconnections_graph', 'Connections per user', %infos);
+			&flotr2_piegraph($graphid++, 'userconnections_graph', 'Connections per user', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -3868,7 +3873,7 @@ sub print_connection_report
 				$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
 				delete $infos{"Sum connections < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(16, 'hostconnections_graph', 'Connections per host', %infos);
+			&flotr2_piegraph($graphid++, 'hostconnections_graph', 'Connections per host', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -4574,7 +4579,7 @@ sub show_error_as_html
 				$infos{$small[0]} = $infos{"Sum log types < $pie_percentage_limit%"};
 				delete $infos{"Sum log types < $pie_percentage_limit%"};
 			}
-			&flotr2_piegraph(17, 'logstype_graph', 'Logs per type', %infos);
+			&flotr2_piegraph($graphid++, 'logstype_graph', 'Logs per type', %infos);
 		}
 		print $fh "</td></tr></table>\n";
 	}
@@ -6065,7 +6070,7 @@ sub flotr2_graph
 	$legend1 = "{ data: d1, label: \"$legend1\", mouse:{track:true}},"          if ($legend1);
 	$legend2 = "{ data: d2, label: \"$legend2\", mouse:{track:true}},"          if ($legend2);
 	$legend3 = "{ data: d3, label: \"$legend3\", mouse:{track:true}},"          if ($legend3);
-	$legend4 = "{ data: d4, label: \"$legend4\",yaxis: 2, mouse:{track:true}}," if ($legend4);
+	$legend4 = "{ data: d4, label: \"$legend4\",yaxis: 2}," if ($legend4);
 
 	my $yaxis2 = '';
 	if ($ytitle2) {
@@ -6075,6 +6080,8 @@ sub flotr2_graph
 	my $type = '';
 	if ($ytitle eq 'Size of files') {
 		$type = 'size';
+	} elsif ($ytitle eq 'Duration') {
+		$type = 'duration';
 	}
 
 	print $fh <<EOF;
@@ -6120,7 +6127,7 @@ document.writeln('<table align="center"><tr><td><input type="button" class="dldB
             track: true,
 	    trackFormatter: function(obj){ return dateTracker(obj) },
             relative: true,
-	    sensibility: 10,
+	    sensibility: 5,
 	    trackDecimals: 2,
 	    lineColor: 'purple',
         },
@@ -6907,6 +6914,13 @@ function pretty_print_number(val, type)
 			val = val.toFixed(2) + " KiB";
 		} else {
 			val = val + " B";
+		}
+	} else if (type == 'duration') {
+		if (val >= 1000) {
+			val = (val / 1000);
+			val = val.toFixed(3) + " sec";
+		} else {
+			val = val + " ms";
 		}
 	} else {
 		if (val >= 1000000000000000) {
