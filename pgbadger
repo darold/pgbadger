@@ -4803,10 +4803,12 @@ sub load_stats
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{total} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{total};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{file_added} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{file_added};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{write} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{write};
-				$per_minute_info{$day}{$hour}{$min}{restartpoint}{sync} += $_per_minute_info{restartpoint}{$day}{$hour}{$min}{sync};
-				$per_minute_info{$day}{$hour}{$min}{restartpoint}{wbuffer} += $_per_minute_info{restartpoint}{$day}{$hour}{$min}{wbuffer};
-				$per_minute_info{$day}{$hour}{$min}{restartpoint}{total} += $_per_minute_info{restartpoint}{$day}{$hour}{$min}{total};
-				$per_minute_info{$day}{$hour}{$min}{restartpoint}{write} += $_per_minute_info{restartpoint}{$day}{$hour}{$min}{write};
+				$per_minute_info{$day}{$hour}{$min}{restartpoint}{sync} += $_per_minute_info{$day}{$hour}{$min}{restartpoint}{sync};
+				$per_minute_info{$day}{$hour}{$min}{restartpoint}{wbuffer} += $_per_minute_info{$day}{$hour}{$min}{restartpoint}{wbuffer};
+				$per_minute_info{$day}{$hour}{$min}{restartpoint}{total} += $_per_minute_info{$day}{$hour}{$min}{restartpoint}{total};
+				$per_minute_info{$day}{$hour}{$min}{restartpoint}{write} += $_per_minute_info{$day}{$hour}{$min}{restartpoint}{write};
+				$per_minute_info{$day}{$hour}{$min}{autovacuum}{count} += $_per_minute_info{$day}{$hour}{$min}{autovacuum}{count};
+				$per_minute_info{$day}{$hour}{$min}{autoanalyze}{count} += $_per_minute_info{$day}{$hour}{$min}{autoanalyze}{count};
 			}
 		}
 	}
@@ -5409,6 +5411,7 @@ sub parse_query
 		$autovacuum_info{tables}{$1}{vacuums} += 1;
 		$autovacuum_info{tables}{$1}{idxscans} += $2;
 		$autovacuum_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{count}++;
 		$cur_info{$t_pid}{vacuum} = $1;
 		return;
 	}
@@ -5425,6 +5428,7 @@ sub parse_query
 		$autoanalyze_info{count}++;
 		$autoanalyze_info{tables}{$1}{analyzes} += 1;
 		$autoanalyze_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autoanalyze}{count}++;
 	}
 
 	# Store checkpoint information
