@@ -5076,7 +5076,7 @@ sub highlight_code
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
 		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
-		$code =~ s/(?<!STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+		$code =~ s/(?<!(?-i)STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS2 ; $x++) {
 		$code =~ s/(?<!:)\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
