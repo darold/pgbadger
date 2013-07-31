@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #------------------------------------------------------------------------------
 #
 # pgBadger - Advanced PostgreSQL log analyzer
@@ -506,14 +506,21 @@ sub check_regex
 
 # Check start/end date time
 if ($from) {
-	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
-		die "FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss\n";
-	}
+	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+		die "FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n";
+	} else {
+                my $fractional_seconds = $7 || "0";
+                $from = "$1-$2-$3 $4:$5:$6.$7"
+        }
+
 }
 if ($to) {
-	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) {
-		die "FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss\n";
-	}
+	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+		die "FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n";
+	} else {
+                my $fractional_seconds = $7 || "0";
+                $from = "$1-$2-$3 $4:$5:$6.$7"
+        }
 }
 
 # Stores the last parsed line from log file to allow incremental parsing
@@ -5076,7 +5083,7 @@ sub highlight_code
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
 		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
-		$code =~ s/(?<!STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+		$code =~ s/(?<!(?-i)STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS2 ; $x++) {
 		$code =~ s/(?<!:)\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
