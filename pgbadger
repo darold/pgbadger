@@ -145,6 +145,7 @@ my $tsung_queries           = 0;
 my $queue_size              = 0;
 my $job_per_file            = 0;
 my $charset                 = 'utf-8';
+my $csv_sep_char            = ',';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -244,6 +245,7 @@ my $result = GetOptions(
 	"disable-autovacuum!"      => \$disable_autovacuum,
 	"client=s"                 => \@dbclient2, # Backward compatibility
 	"charset=s"                => \$charset,
+	"csv-separator=s"          => \$csv_sep_char,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -292,6 +294,7 @@ for (my $i = 0 ; $i < 59 ; $i += $avg_minutes) {
 push(@avgs, 59);
 
 # Set error like log level regex
+my $parse_regex = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
 
@@ -944,6 +947,7 @@ Options:
     --disable-checkpoint   : do not generate checkpoint/restartpoint report.
     --disable-autovacuum   : do not generate autovacuum report.
     --charset              : used to set the HTML charset to be used. Default: utf-8.
+    --csv-separator        : used to set the CSV field separator, default: ,
 
 Examples:
 
@@ -1094,7 +1098,7 @@ sub process_file
 	if ($format eq 'csv') {
 
 		require Text::CSV_XS;
-		my $csv = Text::CSV_XS->new({binary => 1, eol => $/});
+		my $csv = Text::CSV_XS->new({binary => 1, eol => $/, sep_char => $csv_sep_char});
 
 		# Parse csvlog lines
 		while (my $row = $csv->getline($lfile)) {
@@ -1121,9 +1125,7 @@ sub process_file
 					$cursize = 0;
 				}
 			}
-
-			# Process only relevant lines
-			next if ($row->[11] !~ $full_error_regex);
+			next if ($row->[11] !~ $parse_regex);
 
 			# Extract the date
 			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
@@ -5521,6 +5523,12 @@ sub parse_query
 				return;
 			}
 		}
+	}
+
+	# Apply bind parameters if any
+	if ($prefix_vars{'t_detail'} =~ /parameters: (.*)/) {
+		$cur_info{$t_pid}{parameters} = "$1";
+		# go look at other params
 	}
 
 	####
