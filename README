@@ -83,6 +83,7 @@ SYNOPSIS
         --disable-checkpoint   : do not generate checkpoint report.
         --disable-autovacuum   : do not generate autovacuum report.
         --charset              : used to set the HTML charset to be used. Default: utf-8.
+        --csv-separator        : used to set the CSV field separator, default: ,
 
     Examples:
 
