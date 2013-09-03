@@ -1146,11 +1146,11 @@ sub process_file
 				last;
 			}
 
-			# Store the current timestamp of the log line
-			&store_current_timestamp($prefix_vars{'t_timestamp'});
-
 			# Jump to the last line parsed if required
 			next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
+
+			# Store the current timestamp of the log line
+			&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 			# Set query parameters as global variables
 			$prefix_vars{'t_dbuser'}  = $row->[1] || '';
@@ -1275,13 +1275,13 @@ sub process_file
 						last;
 					}
 
-					# Store the current timestamp of the log line
-					&store_current_timestamp($prefix_vars{'t_timestamp'});
-
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 					$goon = 1;
+
+					# Store the current timestamp of the log line
+					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -1380,12 +1380,12 @@ sub process_file
 						last;
 					}
 
-					# Store the current timestamp of the log line
-					&store_current_timestamp($prefix_vars{'t_timestamp'});
-
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
+
+					# Store the current timestamp of the log line
+					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
