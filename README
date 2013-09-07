@@ -47,7 +47,7 @@ SYNOPSIS
                                  includes additional variables like client ip or
                                  application name. See examples below.
         -P | --no-prettify     : disable SQL queries prettify formatter.
-        -q | --quiet           : don't print anything to stdout, even not a progress bar.
+        -q | --quiet           : don't print anything to stdout, not even a progress bar.
         -s | --sample number   : number of query samples to store/display. Default: 3
         -S | --select-only     : use it if you want to report select queries only.
         -t | --top number      : number of queries to store/display. Default: 20
