@@ -1,3 +1,26 @@
+2013-09-17 - version 3.6
+
+Still an other version in 3.x branch to fix two major bugs in vacuum and checkpoint
+graphs. Some other minors bugs has also been fixed.
+
+	- Fix grammar in --quiet usage. Thanks to stephen-a-ingram for the report.
+	- Fix reporting period to starts after the last --last-parsed value instead
+	  of the first log line. Thanks to Keith Fiske for the report.
+	- Add --csv-separator command line usage to documentation.
+	- Fix CSV log parser and add --csv-separator command line option to allow
+	  change of the default csv field separator, coma, in any other character.
+	- Avoid "negative look behind not implemented" errors on perl 5.16/5.18.
+	  Thanks to Marco Baringer for the patch.
+	- Support timestamps for begin/end with fractional seconds (so it'll handle
+	  postgresql's normal string representation of timestamps).
+	- When using negative look behind set sub-regexp to -i (not case insensitive)
+	  to avoid issues where some upper case letter sequence, like SS or ST.
+	- Change shebang from /usr/bin/perl to /usr/bin/env perl so that user-local
+	  (perlbrew) perls will get used.
+	- Fix empty graph of autovacuum and autoanalyze.
+	- Fix checkpoint graphs that was not displayed any more.
+
+
 2013-07-11 - Version 3.5
 
 Last release of the 3.x branch, this is a bug fix release that also adds some

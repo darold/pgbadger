@@ -44,7 +44,7 @@ use IO::Handle;
 use IO::Pipe;
 use Time::HiRes qw/usleep/;
 
-$VERSION = '3.5';
+$VERSION = '3.6';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
