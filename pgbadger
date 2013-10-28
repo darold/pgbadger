@@ -5286,6 +5286,15 @@ sub parse_query
 		# Store current lock information that will be used later
 		# when we will parse the query responsible of the locks
 		$cur_lock_info{$t_pid}{wait} = $3;
+		if ($format eq 'csv') {
+			$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+			$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		}
 		return;
 	}
 
@@ -5312,6 +5321,15 @@ sub parse_query
 		# Store current temporary file information that will be used later
 		# when we will parse the query responsible of the tempfile
 		$cur_temp_info{$t_pid}{size} = $1;
+		if ($format eq 'csv') {
+			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		}
 		return;
 	}
 
