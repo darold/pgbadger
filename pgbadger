@@ -3126,12 +3126,13 @@ sub compute_query_graphs
 						}
 
 						# Search minimum and maximum during this minute
+						$q_dataavg{max}{"$rd"} = 0 if (!$q_dataavg{max}{"$rd"});
+						$q_dataavg{min}{"$rd"} = 0 if (!$q_dataavg{min}{"$rd"});
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{query}{second}}) {
 							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
 								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} > $q_dataavg{max}{"$rd"});
 							$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
-								if (not exists $q_dataavg{min}{"$rd"}
-								|| ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} < $q_dataavg{min}{"$rd"}));
+								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} < $q_dataavg{min}{"$rd"});
 						}
 
 						if (!$disable_query) {
@@ -3143,6 +3144,15 @@ sub compute_query_graphs
 									$a_dataavg{write}{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{count} || 0);
 									$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 								}
+								# Search minimum and maximum during this minute
+								$a_dataavg{$action}{max}{"$rd"} = 0 if (!$a_dataavg{$action}{max}{"$rd"});
+								$a_dataavg{$action}{min}{"$rd"} = 0 if (!$a_dataavg{$action}{min}{"$rd"});
+								foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{$action}{second}}) {
+									$a_dataavg{$action}{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{$action}{second}{$s}
+										if ($per_minute_info{$tm}{$h}{$m}{$action}{second}{$s} > $a_dataavg{$action}{max}{"$rd"});
+									$a_dataavg{$action}{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{$action}{second}{$s}
+										if ($per_minute_info{$tm}{$h}{$m}{$action}{second}{$s} < $a_dataavg{$action}{min}{"$rd"});
+								}
 							}
 						}
 					}
@@ -3152,12 +3162,13 @@ sub compute_query_graphs
 						$c_dataavg{average}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{connection}{count};
 
 						# Search minimum and maximum during this minute
+						$c_dataavg{max}{"$rd"} = 0 if (!$c_dataavg{max}{"$rd"});
+						$c_dataavg{min}{"$rd"} = 0 if (!$c_dataavg{min}{"$rd"});
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{connection}{second}}) {
 							$c_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{connection}{second}{$s}
 								if ($per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} > $c_dataavg{max}{"$rd"});
 							$c_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{connection}{second}{$s}
-								if (not exists $c_dataavg{min}{"$rd"}
-								|| ($per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} < $c_dataavg{min}{"$rd"}));
+								if ($per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} < $c_dataavg{min}{"$rd"});
 						}
 						delete $per_minute_info{$tm}{$h}{$m}{connection};
 					}
@@ -3171,11 +3182,11 @@ sub compute_query_graphs
 
 					if (exists $q_dataavg{count}) {
 						# Average queries per minute
-						$graph_data{query2} .= "[$t, " . int(($q_dataavg{count}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+						$graph_data{query} .= "[$t, " . int(($q_dataavg{count}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 						# Maxi queries per minute
-						$graph_data{query1} .= "[$t, " . ($q_dataavg{max}{"$rd"} || 0) . "],";
+						$graph_data{'query-max'} .= "[$t, " . ($q_dataavg{max}{"$rd"} || 0) . "],";
 						# Mini queries per minute
-						$graph_data{query3} .= "[$t, " . ($q_dataavg{min}{"$rd"} || 0) . "],";
+						$graph_data{'query-min'} .= "[$t, " . ($q_dataavg{min}{"$rd"} || 0) . "],";
 						# Average duration per minute
 						$graph_data{query4} .= "[$t, " . sprintf("%.3f", ($q_dataavg{duration}{"$rd"} || 0) / ($q_dataavg{count}{"$rd"} || 1)) . "],";
 					}
@@ -3191,11 +3202,18 @@ sub compute_query_graphs
 					if (!$disable_query && (scalar keys %a_dataavg> 0)) { 
 						foreach my $action (@SQL_ACTION) {
 							next if ($select_only && ($action ne 'SELECT'));
-							# Average per minute
-							$graph_data{"$action"} .= "[$t, " . ($a_dataavg{$action}{count}{"$rd"} || 0) . "],";
+
+							# Average queries per minute
+							$graph_data{"$action"} .= "[$t, " . int(($a_dataavg{$action}{count}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 							if ($action eq 'SELECT') {
+								# Maxi queries per minute
+								$graph_data{"$action-max"} .= "[$t, " . ($a_dataavg{$action}{max}{"$rd"} || 0) . "],";
+								# Mini queries per minute
+								$graph_data{"$action-min"} .= "[$t, " . ($a_dataavg{$action}{min}{"$rd"} || 0) . "],";
+								# Average query duration
 								$graph_data{"$action-2"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) . "]," if ($action eq 'SELECT');
 							} else {
+								# Average query duration
 								$graph_data{"write"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{write}{duration}{"$rd"} || 0) / ($a_dataavg{write}{count}{"$rd"} || 1)) . "],";
 							}
 						}
@@ -3212,8 +3230,8 @@ sub compute_query_graphs
 			$graph_data{$_} =~ s/,$//;
 		}
 	}
-	$drawn_graphs{'queriespersecond_graph'} = &flotr2_graph( $graphid++, 'queriespersecond_graph', $graph_data{query1},
-		$graph_data{query2}, $graph_data{query3}, 'Queries per second (' . $avg_minutes . ' minutes average)',
+	$drawn_graphs{'queriespersecond_graph'} = &flotr2_graph( $graphid++, 'queriespersecond_graph', $graph_data{'query-max'},
+		$graph_data{query}, $graph_data{'query-min'}, 'Queries per second (' . $avg_minutes . ' minutes average)',
 		'Queries per second', 'Maximum', 'Average', 'Minimum'
 	);
 
@@ -3222,9 +3240,9 @@ sub compute_query_graphs
 		'Connections per second', 'Maximum', 'Average', 'Minimum'
 	);
 
-	$drawn_graphs{'selectqueries_graph'} = &flotr2_graph( $graphid++, 'selectqueries_graph', $graph_data{"SELECT"}, '', '',
+	$drawn_graphs{'selectqueries_graph'} = &flotr2_graph( $graphid++, 'selectqueries_graph', $graph_data{"SELECT-max"}, $graph_data{"SELECT"}, $graph_data{"SELECT-min"},
 		 'SELECT queries (' . $avg_minutes . ' minutes period)',
-		'Queries', 'Number of queries', '', ''
+		'Queries per second', 'Maximum', 'Average', 'Minimum'
 	);
 	$drawn_graphs{'writequeries_graph'} = &flotr2_graph(
 		$graphid++, 'writequeries_graph', $graph_data{"DELETE"}, $graph_data{"INSERT"}, $graph_data{"UPDATE"}, 'Write queries (' . $avg_minutes . ' minutes period)',
@@ -6630,6 +6648,8 @@ sub load_stats
 				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{connection}{second} }) {
 					$per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} +=
 						($_per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} || 0);
+				}
+				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{query}{second} }) {
 					$per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} +=
 						($_per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} || 0);
 				}
@@ -6637,6 +6657,10 @@ sub load_stats
 					if (exists $_per_minute_info{$day}{$hour}{$min}{$action}) {
 						$per_minute_info{$day}{$hour}{$min}{$action}{count} += $_per_minute_info{$day}{$hour}{$min}{$action}{count};
 						$per_minute_info{$day}{$hour}{$min}{$action}{duration} += $_per_minute_info{$day}{$hour}{$min}{$action}{duration};
+						foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
+							$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
+								($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
+						}
 					}
 				}
 				foreach my $k ('prepare', 'bind','execute') {
@@ -7773,6 +7797,7 @@ sub store_queries
 						$overall_stat{'peak'}{$cur_last_log_timestamp}{write}++;
 					}
 					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
+					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
 					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 					if ($cur_info{$t_pid}{dbname}) {
 						$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
