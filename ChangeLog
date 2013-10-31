@@ -1,3 +1,86 @@
+2013-10-31 - Version 4.0
+
+This major release is the "Say goodbye to the fouine" release. With a full
+rewrite of the reports design, pgBadger has now turn the HTML reports into
+a more intuitive user experience and professional look.
+
+The report is now driven by a dynamic menu with the help of the embedded
+boostrap library. Every main menu correspond to hidden an slide that is
+brought to front when the menu or one of his submenus is activated. There's
+also the embedded font FontAwasome webfont to beautify the report.
+
+Every statistic report now include a key value section that shows you
+immediately some of the relevant informations. Pie charts have also been
+separated from their data tables using two tabs, one for the chart and the
+other one for the data.
+
+Tables reporting hourly statistic have been moved to a multiple tabs report
+following the data. This is used with General (queries, connections, sessions),
+Checkpoints (buffer, files, warnings), Temporary file and Vacuums activities.
+
+There's some new useful informations shown in the key value sections. Peak
+information shows the number and datetime of the highest activity. Here is the
+list of those reports:
+
+	- Queries peak
+	- Read queries peak
+	- Write queries peak
+	- Connections peak
+	- Checkpoints peak
+	- Wal files usage Peak
+	- Checkpoints warnings peak
+	- Temporary file size peak
+	- Temporary file number peak
+
+Reports about Checkpoints and Restartpoints have been merge in a single one.
+This is the same, outside the fact that restartpoints are on a slave cluster,
+so there was no need to separate those informations.
+
+Recent PostgreSQL versions add additional information about checkpoint, the
+number of synced files, the longest sync and the average of sync time per file.
+pgBadger collects and shows these informations in the Checkpoint Activity report.
+
+There's also some new reports:
+
+	- Prepared queries ratio (execute vs prepare)
+	- Prepared over normal queries
+	- Queries (select, insert, update, delete) per user/host/application
+	- Pie charts for tables with the more tuples and pages removed during vacuum.
+
+The vacuum report will now highlight the costly table during a vacuum or
+analyze of a database.
+
+The errors are now highlighted by a different color following the level.
+A LOG level will be green, HINT will be yellow, WARNING orange, ERROR red
+and FATAL dark red.
+
+Some changes in the binary format are not backward compatible and option
+--client have been remove as it was replaced by --dbclient for a long time now.
+
+If you are running a pg_dump or some batch process with very slow queries your
+report analyze will be annoyed by those queries taking too much place in the
+report. Before that release it was a pain to exclude those queries from the
+report. Now you can use the --exclude-time command line option to exclude all
+traces matching the given time regexp from the report. For example, let's say
+you have a pg_dump at 13:00 each day during half an hour, you can use pgbadger
+as follow:
+
+	pgbadger --exclude-time "2013-09-.* 13:.*" postgresql.log 
+
+If your are also running a pg_dump at night, let's say 22:00, you can write it
+as follow:
+
+	pgbadger --exclude-time '2013-09-\d+ 13:[0-3]' --exclude-time '2013-09-\d+ 22:[0-3]' postgresql.log 
+
+or more shortly:
+
+	pgbadger --exclude-time '2013-09-\d+ (13|22):[0-3]' postgresql.log 
+
+Exclude time always require the iso notation yyyy-mm-dd hh:mm:ss, even if log
+format is syslog. This is the same for all time related options. Take care that
+this option has a high cost on the parser performances.
+
+
 2013-09-17 - version 3.6
 
 Still an other version in 3.x branch to fix two major bugs in vacuum and checkpoint
