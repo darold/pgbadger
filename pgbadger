@@ -1183,7 +1183,7 @@ sub process_file
 			$prefix_vars{'t_session_line'} =~ s/\..*//;
 			$prefix_vars{'t_loglevel'} = $row->[11];
 			$prefix_vars{'t_query'}    = $row->[13];
-			# Set ERROR additional informations
+			# Set ERROR additional information
 			$prefix_vars{'t_detail'} = $row->[14];
 			$prefix_vars{'t_hint'} = $row->[15];
 			$prefix_vars{'t_context'} = $row->[18];
@@ -1264,7 +1264,7 @@ sub process_file
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
-					# Stores temporary files and locks informations
+					# Stores temporary files and locks information
 					&store_temporary_and_lock_infos($cur_pid);
 
 					# Standard syslog format does not have year information, months are
@@ -1392,7 +1392,7 @@ sub process_file
 						$prefix_vars{$prefix_params[$i]} = $matches[$i];
 					}
 
-					# Stores temporary files and locks informations
+					# Stores temporary files and locks information
 					&store_temporary_and_lock_infos($cur_pid);
 
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
@@ -1502,15 +1502,15 @@ sub process_file
 
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
-		# Stores last queries informations
+		# Stores last queries information
 		&store_queries($pid);
 
 	}
-	# Stores last temporary files and locks informations
+	# Stores last temporary files and locks information
 	foreach my $pid (keys %cur_temp_info) {
 		&store_temporary_and_lock_infos($pid);
 	}
-	# Stores last temporary files and locks informations
+	# Stores last temporary files and locks information
 	foreach my $pid (keys %cur_lock_info) {
 		&store_temporary_and_lock_infos($pid);
 	}
@@ -2049,7 +2049,7 @@ Report not supported by text format
 		}
 	}
 
-	# Show lock wait detailed informations
+	# Show lock wait detailed information
 	if (!$disable_lock && scalar keys %lock_info > 0) {
 
 		my @top_locked_queries;
@@ -2105,7 +2105,7 @@ Report not supported by text format
 		print $fh "\n";
 	}
 
-	# Show temporary files detailed informations
+	# Show temporary files detailed information
 	if (!$disable_temporary && scalar keys %tempfile_info > 0) {
 
 		my @top_temporary;
@@ -6020,7 +6020,7 @@ sub dump_as_html
 		<li class="slide" id="connections-slide">
 };
 
-			# Draw connections indormation
+			# Draw connections information
 			&print_simultaneous_connection() if (!$disable_hourly);
 
 			# Show per database/user connections
@@ -6063,10 +6063,10 @@ sub dump_as_html
 		</li>
 		<li class="slide" id="tempfiles-slide">
 };
-			# Show temporary files detailed informations
+			# Show temporary files detailed information
 			&print_temporary_file();
 
-			# Show informations about queries generating temporary files
+			# Show information about queries generating temporary files
 			&print_tempfile_report();
 		}
 
@@ -6075,7 +6075,7 @@ sub dump_as_html
 		</li>
 		<li class="slide" id="vacuums-slide">
 };
-			# Show vacuums/analyses detailed informations
+			# Show detailed vacuum/analyse information
 			&print_vacuum();
 
 		}
@@ -6088,7 +6088,7 @@ sub dump_as_html
 			# Lock stats per type
 			&print_lock_type();
 
-			# Show lock wait detailed informations
+			# Show lock wait detailed information
 			&print_lock_queries_report();
 		}
 
@@ -6172,7 +6172,7 @@ sub print_log_level
 {
 	my %infos = ();
 
-	# Some message have seen their log level change during log parsing.
+	# Some messages have seen their log level change during log parsing.
 	# Set the real log level count back
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
@@ -6581,7 +6581,7 @@ sub load_stats
 			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count}
 
 ###############################################################################
-# May be used in the future to display more detailed informations on connection
+# May be used in the future to display more detailed information on connection
 #
 #			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database} }) {
 #				$connection_info{chronos}{$day}{$hour}{database}{$db} += $_connection_info{chronos}{$day}{$hour}{database}{$db};
@@ -6850,7 +6850,7 @@ sub load_stats
 	$checkpoint_info{file_added} += $_checkpoint_info{file_added};
 	$checkpoint_info{write} += $_checkpoint_info{write};
 
-	#### Autovacuum infos ####
+	#### Autovacuum info ####
 
 	$autovacuum_info{count} += $_autovacuum_info{count};
 
@@ -6870,7 +6870,7 @@ sub load_stats
 		$autovacuum_info{peak}{system_usage}{table} = $_autovacuum_info{peak}{system_usage}{table};
 		$autovacuum_info{peak}{system_usage}{date} = $_autovacuum_info{peak}{system_usage}{date};
 	}
-	#### Autoanalyze infos ####
+	#### Autoanalyze info ####
 
 	$autoanalyze_info{count} += $_autoanalyze_info{count};
 
@@ -6930,8 +6930,8 @@ sub highlight_code
 	# Escape HTML code into SQL values
 	$code = &escape_html($code);
 
-	# Do not try to prettify queries longuer
-	# than 10KB this will take too much time
+	# Do not try to prettify queries longer
+	# than 10KB as this will take too much time
 	return $code if (length($code) > 10240);
 
 	# prettify SQL query
@@ -6992,10 +6992,10 @@ sub highlight_code
 sub compute_arg_list
 {
 
-	# Some command lines arguments can be used multiple time or be written
-	# as a coma separated list.
+	# Some command line arguments can be used multiple times or written
+	# as a comma-separated list.
 	# For example: --dbuser=postgres --dbuser=joe or --dbuser=postgres,joe
-	# So we have to aggregate all the possible value
+	# So we have to aggregate all the possible values
 	my @tmp = ();
 	foreach my $v (@exclude_user) {
 		push(@tmp, split(/,/, $v));
@@ -7039,14 +7039,14 @@ sub validate_log_line
 	# Check user and/or database if require
 	if ($#dbname >= 0) {
 
-		# Log line do not match the required dbname
+		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
 			return 0;
 		}
 	}
 	if ($#dbuser >= 0) {
 
-		# Log line do not match the required dbuser
+		# Log line does not match the required dbuser
 		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
 			return 0;
 		}
@@ -7119,7 +7119,7 @@ sub parse_query
 		return;
 	}
 
-	# Do not parse lines that are an error like message when error report are not wanted
+	# Do not parse lines that are an error-like message when error reports are not wanted
 	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ $full_error_regex)) {
 		return;
 	}
@@ -7249,7 +7249,7 @@ sub parse_query
 		$connection_info{database_user}{$db}{$usr}++;
 		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 ###############################################################################
-# May be used in the future to display more detailed informations on connection
+# May be used in the future to display more detailed information on connection
 #		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{user}{$usr}++;
 #		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database}{$db}++;
 #		$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{database_user}{$db}{$usr}++;
@@ -7302,7 +7302,7 @@ sub parse_query
 		return;
 	}
 
-	# Store autovacuum informations
+	# Store autovacuum information
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
@@ -7326,7 +7326,7 @@ sub parse_query
 		return;
 	}
 
-	# Store autoanalyze informations
+	# Store autoanalyze information
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
@@ -7475,7 +7475,7 @@ sub parse_query
 	}
 
 	####
-	# Store current query informations
+	# Store current query information
 	####
 
 	# Log lines with duration only, generated by log_duration = on in postgresql.conf
@@ -7638,7 +7638,7 @@ sub store_queries
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
 	}
 
-	# Stores temporary files and locks informations
+	# Stores temporary files and locks information
 	&store_temporary_and_lock_infos($t_pid);
 
 	return if (!exists $cur_info{$t_pid});
