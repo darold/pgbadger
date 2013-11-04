@@ -8834,10 +8834,7 @@ sub get_log_file
 			$totalsize = `$cmd_file_size`;
 			chomp($totalsize);
 		}
-		if ($queue_size) {
-			$job_per_file = $queue_size;
-			$queue_size = 0;
-		}
+		$queue_size = 0;
 	}
 
 	# In list context returns the filehandle and the size of the file
@@ -8870,12 +8867,10 @@ sub split_logfile
 		$cmd_file_size =~ s/\%f/$logf/g;
 		$totalsize = `$cmd_file_size`;
 		chomp($totalsize);
-		if ($queue_size) {
-			$job_per_file = $queue_size;
-			$queue_size = 0;
-		}
+		$queue_size = 0;
 	} elsif ($logf =~ /\.bz2/i) {
 		$totalsize = 0;
+		$queue_size = 0;
 	}
 
 	return (0, -1) if (!$totalsize);
