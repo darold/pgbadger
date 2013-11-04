@@ -8039,10 +8039,12 @@ sub progress_bar
 	$width ||= 25;
 	$char  ||= '=';
 	my $num_width = length $total;
+	my $nchars = (($width - 1) * $got / $total);
+	$nchars = ($width - 1) if ($nchars >= $width);
 	if ($extension eq 'tsung') {
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
-			$char x (($width - 1) * $got / $total) . '>',
+			$char x $nchars . '>',
 			$got, $total, 100 * $got / +$total, ($queries || $tsung_queries)
 		);
 	} elsif($format eq 'binary') {
@@ -8054,7 +8056,7 @@ sub progress_bar
 	} else {
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
-			$char x (($width - 1) * $got / $total) . '>',
+			$char x $nchars . '>',
 			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'}), ($errors || $overall_stat{'errors_number'})
 		);
 	}
