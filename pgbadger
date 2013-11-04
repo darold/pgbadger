@@ -10202,6 +10202,20 @@ define("google-code-prettify",[],function(){return X})})();return e}();R||P(Q,0)
 		jQuery('.slide').hide();
 		jQuery('.active-slide').show();
 
+		/* Go to specific slide and report from external link call
+                var activeMenu = location.hash;
+                if (activeMenu) {
+                        activeMenu = activeMenu.substring(1);
+                        var lkobj = document.getElementById(activeMenu);
+                        var liId = jQuery(lkobj).parent().attr("id");
+                        if (liId != undefined) {
+                                var slideId = '#'+liId;
+                                jQuery('#main-container li.slide').removeClass('active-slide').hide();
+                                jQuery(slideId).addClass("active-slide").fadeIn();
+                                window.location.hash = '#'+activeMenu;
+                        }
+                }
+
 		jQuery('.navbar li.dropdown').click(function() {
 			var id = jQuery(this).attr("id");
 			id = id.substring(5);
