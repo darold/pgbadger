@@ -107,6 +107,7 @@ my @dbuser                  = ();
 my @dbclient                = ();
 my @dbappname               = ();
 my @exclude_user            = ();
+my @exclude_appname         = ();
 my $ident                   = '';
 my $top                     = 0;
 my $sample                  = 0;
@@ -237,6 +238,7 @@ my $result = GetOptions(
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
 	"exclude-file=s"           => \$exclude_file,
+	"exclude-appname=s"        => \@exclude_appname,
 	"include-query=s"          => \@include_query,
 	"include-file=s"           => \$include_file,
 	"disable-error!"           => \$disable_error,
@@ -961,6 +963,8 @@ Options:
     --exclude-time  regex  : any timestamp matching the given regex will be
 			     excluded from the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
+    --exclude-appname name : exclude entries for the specified application name
+			     from report. Example: "pg_dump".
 
 Examples:
 
@@ -1003,7 +1007,9 @@ use pgbadger as follow to exclude these period from the report:
 
     pgbadger --exclude-time "2013-09-.* (23|13):.*" postgresql.log 
 
-This will help to not have all COPY order on top of slowest queries.
+This will help to not have all COPY order on top of slowest queries. You can
+also use --exclude-appname "pg_dump" to solve this problem in a more simple way.
+
 };
 
 	exit 0;
@@ -7030,6 +7036,14 @@ sub compute_arg_list
 	}
 	@dbappname = ();
 	push(@dbappname, @tmp);
+
+	@tmp = ();
+	foreach my $v (@exclude_appname) {
+		push(@tmp, split(/,/, $v));
+	}
+	@exclude_appname = ();
+	push(@exclude_appname, @tmp);
+
 }
 
 sub validate_log_line
@@ -7073,6 +7087,14 @@ sub validate_log_line
 			return 0;
 		}
 	}
+	if ($#exclude_appname >= 0) {
+
+		# Log line matches the excluded appname
+		if ($prefix_vars{'t_appname'} && grep(/^$prefix_vars{'t_appname'}$/i, @exclude_appname)) {
+			return 0;
+		}
+	}
+
 	return 1;
 }
 
