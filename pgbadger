@@ -294,10 +294,9 @@ $avg_minutes ||= 5;
 $avg_minutes = 60 if ($avg_minutes > 60);
 $avg_minutes = 1  if ($avg_minutes < 1);
 my @avgs   = ();
-for (my $i = 0 ; $i < 59 ; $i += $avg_minutes) {
+for (my $i = 0 ; $i < 60 ; $i += $avg_minutes) {
 	push(@avgs, sprintf("%02d", $i));
 }
-push(@avgs, 59);
 
 # Set error like log level regex
 my $parse_regex = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
@@ -7960,16 +7959,15 @@ sub average_per_minutes
 	my $idx = shift;
 
 	my @avgs = ();
-	for (my $i = 0 ; $i < 59 ; $i += $idx) {
+	for (my $i = 0 ; $i < 60 ; $i += $idx) {
 		push(@avgs, sprintf("%02d", $i));
 	}
-	push(@avgs, 59);
 
 	for (my $i = 0 ; $i <= $#avgs ; $i++) {
 		if ($val == $avgs[$i]) {
 			return "$avgs[$i]";
-		} elsif ($avgs[$i] == $avgs[-1]) {
-			return "$avgs[$i-1]";
+		} elsif ($i == $#avgs) {
+			return "$avgs[$i]";
 		} elsif (($val > $avgs[$i]) && ($val < $avgs[$i + 1])) {
 			return "$avgs[$i]";
 		}
