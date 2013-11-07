@@ -232,6 +232,29 @@ REQUIREMENT
     Note that multiprocessing can not be used with compressed files or CSV
     files as well as under Windows platform.
 
+INSTALLATION
+    Download the tarball from github and unpack the archive as follow:
+
+            tar xzf pgbadger-4.x.tar.gz
+            cd pgbadger-4.x/
+            perl Makefile.PL
+            make && sudo make install
+
+    This will copy the Perl script pgbadger to /usr/local/bin/pgbadger by
+    default and the man page into /usr/local/share/man/man1/pgbadger.1.
+    Those are the default installation directories for 'site' install.
+
+    If you want to install all under /usr/ location, use INSTALLDIRS='perl'
+    as an argument of Makefile.PL. The script will be installed into
+    /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.
+
+    For example, to install everything just like Debian does, proceed as
+    follows:
+
+            perl Makefile.PL INSTALLDIRS=vendor
+
+    By default INSTALLDIRS is set to site.
+
 POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
     postgresql.conf before starting.
@@ -300,7 +323,7 @@ log_min_duration_statement, log_duration and log_statement
     have log_statement set to 'all' nothing will be logged with
     log_line_prefix.
 
-Parallel processing
+PARALLEL PROCESSING
     To enable parallel processing you just have to use the -j N option where
     N is the number of cores you want to use.
 
@@ -355,28 +378,34 @@ Parallel processing
     are all named with the following template tmp_pgbadgerXXXX.bin so they
     can be easily identified.
 
-INSTALLATION
-    Download the tarball from github and unpack the archive as follow:
+INCREMENTAL REPORTS
+    Using the binary format it is possible to have incremental and
+    cumulative reports. For example, if you want to refresh a pgbadger
+    report each hour from a daily PostgreSQl log file, you can proceed by
+    running each hour the following commands
 
-            tar xzf pgbadger-4.x.tar.gz
-            cd pgbadger-4.x/
-            perl Makefile.PL
-            make && sudo make install
+        pgbadder --last-parsed .pgbadger_last_state_file -o sunday/hourX.bin /var/log/pgsql/postgresql-Sun.log
 
-    This will copy the Perl script pgbadger to /usr/local/bin/pgbadger by
-    default and the man page into /usr/local/share/man/man1/pgbadger.1.
-    Those are the default installation directories for 'site' install.
+    to generate the incremental data files in binary format. And to generate
+    the fresh HTML report from that binary file:
 
-    If you want to install all under /usr/ location, use INSTALLDIRS='perl'
-    as an argument of Makefile.PL. The script will be installed into
-    /usr/bin/pgbadger and the manpage into /usr/share/man/man1/pgbadger.1.
+        pgbadder sunday/*.bin
 
-    For example, to install everything just like Debian does, proceed as
-    follows:
+    Or an other example, if you have one log file per hour and you want a
+    reports to be rebuild each time the log file is switched. Proceed as
+    follow:
 
-            perl Makefile.PL INSTALLDIRS=vendor
+            pgbadger -o day1/hour01.bin /var/log/pgsql/pglog/postgresql-2012-03-23_10.log
+            pgbadger -o day1/hour02.bin /var/log/pgsql/pglog/postgresql-2012-03-23_11.log
+            pgbadger -o day1/hour03.bin /var/log/pgsql/pglog/postgresql-2012-03-23_12.log
+            ...
 
-    By default INSTALLDIRS is set to site.
+    When you want to refresh the HTML report, for example each time after a
+    new binary file is generated, just do the following:
+
+            pgbadger -o day1_report.html day1/*.bin
+
+    Adjust the commands following your needs.
 
 AUTHORS
     pgBadger is an original work from Gilles Darold.
