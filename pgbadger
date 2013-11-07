@@ -10224,7 +10224,7 @@ define("google-code-prettify",[],function(){return X})})();return e}();R||P(Q,0)
 		jQuery('.slide').hide();
 		jQuery('.active-slide').show();
 
-		/* Go to specific slide and report from external link call
+		/* Go to specific slide and report from external link call */
                 var activeMenu = location.hash;
                 if (activeMenu) {
                         activeMenu = activeMenu.substring(1);
