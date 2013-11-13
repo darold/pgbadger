@@ -2455,7 +2455,7 @@ sub html_header
 };
 			if (!$disable_hourly) {
 				print $fh qq{
-     				<li><a href="#simultaneous-connections">Simultaneous connections</a></li>
+     				<li><a href="#established-connections">Established connections</a></li>
 };
 			}
 			print $fh qq{
@@ -3272,7 +3272,7 @@ sub compute_query_graphs
 
 }
 
-sub print_simultaneous_connection
+sub print_established_connection
 {
 
 	my $connection_peak = 0;
@@ -3286,8 +3286,8 @@ sub print_simultaneous_connection
 	print $fh qq{
 	<h1 class="page-header"><i class="icon-external-link-sign"></i> Connections</h1>
 
-	<div id="simultaneous-connections" class="analysis-item row-fluid">
-	<h2 class=""><i class="icon-random"></i> Simultaneous Connections</h2>
+	<div id="established-connections" class="analysis-item row-fluid">
+	<h2 class=""><i class="icon-random"></i> Established Connections</h2>
 	<div class="span3">
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
@@ -3301,7 +3301,7 @@ sub print_simultaneous_connection
 		<h3 class="">Connections per second ($avg_minutes minutes average)</h3>
 $drawn_graphs{connectionspersecond_graph}
 		</div>
-	</div><!-- end of Simultaneous connections -->
+	</div><!-- end of Established connections -->
 };
 	delete $drawn_graphs{connectionspersecond_graph};
 
@@ -6026,7 +6026,7 @@ sub dump_as_html
 };
 
 			# Draw connections information
-			&print_simultaneous_connection() if (!$disable_hourly);
+			&print_established_connection() if (!$disable_hourly);
 
 			# Show per database/user connections
 			&print_database_connection() if (exists $connection_info{database});
