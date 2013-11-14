@@ -7049,6 +7049,12 @@ sub validate_log_line
 {
 	my ($t_pid) = @_;
 
+	# Look at particular cas of vacuum/analyze that have the database
+	# name inside the log message so that they could be associated
+	if ($prefix_vars{'t_query'} =~ / of table "([^\.]+)\.[^\.]+\.[^\.]+":/) {
+		$prefix_vars{'t_dbname'}  = $1;
+	}
+
 	# Check user and/or database if require
 	if ($#dbname >= 0) {
 
