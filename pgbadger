@@ -314,8 +314,8 @@ $format ||= &autodetect_format($log_files[0]);
 
 if ($format eq 'syslog2') {
 	$other_syslog_line =
-		qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-	$orphan_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+		qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+	$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
 }
 
 # Set default top query
@@ -479,7 +479,7 @@ if ($log_line_prefix) {
 	} elsif ($format eq 'syslog2') {
 		$format = 'syslog';
 		$log_line_prefix =
-			  '^(\d+)-(\d+)-(\d+)T\d+:\d+:\d+(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
+			  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
 			. $log_line_prefix
 			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
@@ -499,7 +499,7 @@ qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]
 } elsif ($format eq 'syslog2') {
 	$format = 'syslog';
 	$compiled_prefix =
-qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
+qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(.*)/;
 	push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 		't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
@@ -1328,9 +1328,9 @@ sub process_file
 					}
 
 				} elsif ($goon && ($line =~ $other_syslog_line)) {
+
 					$cur_pid = $8;
 					my $t_query = $10;
-					$t_query = $11 if ($format eq 'syslog-ng');
 					$t_query =~ s/#011/\t/g;
 					next if ($t_query eq "\t");
 
@@ -8017,7 +8017,7 @@ sub autodetect_format
 				$ident_name{$1}++;
 
 			} elsif ($line =~
-	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 			   )
 			{
 				$fmt = 'syslog2';
