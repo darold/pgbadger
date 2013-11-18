@@ -7837,14 +7837,14 @@ sub store_queries
 						$application_info{'unknown'}{$action}++;
 					}
 					if ($cur_info{$t_pid}{dbuser}) {
-						$user_info{$cur_info{$t_pid}{dbuser}}{count}++;
+						$user_info{$cur_info{$t_pid}{dbuser}}{$action}++;
 					} else {
-						$user_info{'unknown'}{count}++;
+						$user_info{'unknown'}{$action}++;
 					}
 					if ($cur_info{$t_pid}{dbclient}) {
-						$host_info{$cur_info{$t_pid}{dbclient}}{count}++;
+						$host_info{$cur_info{$t_pid}{dbclient}}{$action}++;
 					} else {
-						$host_info{'unknown'}{count}++;
+						$host_info{'unknown'}{$action}++;
 					}
 					last;
 				}
