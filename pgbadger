@@ -153,6 +153,7 @@ my $queue_size              = 0;
 my $job_per_file            = 0;
 my $charset                 = 'utf-8';
 my $csv_sep_char            = ',';
+my %current_sessions        = ();
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -1877,6 +1878,10 @@ Average size of temporary files: $fmt_temp_avsize
 Total duration of sessions: $tot_session_duration
 Average duration of sessions: $avg_session_duration
 };
+		foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
+			print $fh "Session peak: ", &comma_numbers($overall_stat{'peak'}{$_}{session}), " sessions at $_";
+			last;
+		}
 	}
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
@@ -2470,7 +2475,14 @@ sub html_header
 			print $fh qq{
      		<li id="menu-sessions" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Sessions <span class="caret"></span></a>
      			<ul class="dropdown-menu">
-     				<li><a href="#sessions-per-database">Sessions per database</a></li>
+};
+			if (!$disable_hourly) {
+				print $fh qq{
+     				<li><a href="#simultaneous-sessions">Simultaneous sessions</a></li>
+};
+			}
+			print $fh qq{
+     				<li><a href="#sessions-per-database">Sessions per datSimultaneous sessabase</a></li>
      				<li><a href="#sessions-per-user">Sessions per user</a></li>
      				<li><a href="#sessions-per-host">Sessions per host</a></li>
      			</ul>
@@ -2658,9 +2670,16 @@ sub print_overall_statistics
 	my $connection_count = &comma_numbers($connection_info{count});
 	my $connection_peak = 0;
 	my $connection_peak_date = '';
+	my $session_peak = 0;
+	my $session_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{connection} <=> $overall_stat{'peak'}{$a}{connection}} keys %{$overall_stat{'peak'}}) {
 		$connection_peak = &comma_numbers($overall_stat{'peak'}{$_}{connection});
 		$connection_peak_date = $_;
+		last;
+	}
+	foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
+		$session_peak = &comma_numbers($overall_stat{'peak'}{$_}{session});
+		$session_peak_date = $_;
 		last;
 	}
 	my $db_count = scalar keys %database_info;
@@ -2711,6 +2730,7 @@ sub print_overall_statistics
 					<div class="tab-pane" id="tab-sessions">
 						<ul>
 							<li class="first"><span class="figure">$session_count</span> <span class="figure-label">Total number of sessions</span></li>
+							<li><span class="figure">$session_peak sessions at $session_peak_date</span> <span class="figure-label">Session peak</span></li>
 							<li><span class="figure">$tot_session_duration</span> <span class="figure-label">Total duration of sessions</span></li>
 							<li><span class="figure">$avg_session_duration</span> <span class="figure-label">Average duration of sessions</span></li>
 						</ul>
@@ -3109,6 +3129,7 @@ sub compute_query_graphs
 				my %q_dataavg = ();
 				my %a_dataavg = ();
 				my %c_dataavg = ();
+				my %s_dataavg = ();
 				my %p_dataavg = ();
 				foreach my $m ("00" .. "59") {
 					next if (!exists $per_minute_info{$tm}{$h}{$m});
@@ -3161,6 +3182,7 @@ sub compute_query_graphs
 							}
 						}
 					}
+
 					if (exists $per_minute_info{$tm}{$h}{$m}{connection}) {
 
 						# Average per minute
@@ -3176,6 +3198,23 @@ sub compute_query_graphs
 								if ($per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} < $c_dataavg{min}{"$rd"});
 						}
 						delete $per_minute_info{$tm}{$h}{$m}{connection};
+					}
+
+					if (exists $per_minute_info{$tm}{$h}{$m}{session}) {
+
+						# Average per minute
+						$s_dataavg{average}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{session}{count};
+
+						# Search minimum and maximum during this minute
+						$s_dataavg{max}{"$rd"} = 0 if (!$s_dataavg{max}{"$rd"});
+						$s_dataavg{min}{"$rd"} = 0 if (!$s_dataavg{min}{"$rd"});
+						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{session}{second}}) {
+							$s_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{session}{second}{$s}
+								if ($per_minute_info{$tm}{$h}{$m}{session}{second}{$s} > $s_dataavg{max}{"$rd"});
+							$s_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{session}{second}{$s}
+								if ($per_minute_info{$tm}{$h}{$m}{session}{second}{$s} < $s_dataavg{min}{"$rd"});
+						}
+						delete $per_minute_info{$tm}{$h}{$m}{session};
 					}
 				}
 
@@ -3197,12 +3236,21 @@ sub compute_query_graphs
 					}
 					if (scalar keys %c_dataavg) { 
 						# Average connections per minute
-						$graph_data{conn2} .= "[$t, " . int(($c_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+						$graph_data{conn_avg} .= "[$t, " . int(($c_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 						# Maxi connections per minute
-						$graph_data{conn1} .= "[$t, " . ($c_dataavg{max}{"$rd"} || 0) . "],";
+						$graph_data{conn_max} .= "[$t, " . ($c_dataavg{max}{"$rd"} || 0) . "],";
 
 						# Mini connections per minute
-						$graph_data{conn3} .= "[$t, " . ($c_dataavg{min}{"$rd"} || 0) . "],";
+						$graph_data{conn_min} .= "[$t, " . ($c_dataavg{min}{"$rd"} || 0) . "],";
+					}
+					if (scalar keys %s_dataavg) { 
+						# Average connections per minute
+						$graph_data{sess_avg} .= "[$t, " . int(($s_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+						# Maxi connections per minute
+						$graph_data{sess_max} .= "[$t, " . ($s_dataavg{max}{"$rd"} || 0) . "],";
+
+						# Mini connections per minute
+						$graph_data{sess_min} .= "[$t, " . ($s_dataavg{min}{"$rd"} || 0) . "],";
 					}
 					if (!$disable_query && (scalar keys %a_dataavg> 0)) { 
 						foreach my $action (@SQL_ACTION) {
@@ -3240,19 +3288,27 @@ sub compute_query_graphs
 		'Queries per second', 'Maximum', 'Average', 'Minimum'
 	);
 
-	$drawn_graphs{'connectionspersecond_graph'} = &flotr2_graph( $graphid++, 'connectionspersecond_graph', $graph_data{conn1},
-		$graph_data{conn2}, $graph_data{conn3}, 'Connections per second (' . $avg_minutes . ' minutes average)',
+	$drawn_graphs{'connectionspersecond_graph'} = &flotr2_graph( $graphid++, 'connectionspersecond_graph', $graph_data{conn_max},
+		$graph_data{conn_avg}, $graph_data{conn_min}, 'Connections per second (' . $avg_minutes . ' minutes average)',
 		'Connections per second', 'Maximum', 'Average', 'Minimum'
 	);
 
-	$drawn_graphs{'selectqueries_graph'} = &flotr2_graph( $graphid++, 'selectqueries_graph', $graph_data{"SELECT-max"}, $graph_data{"SELECT"}, $graph_data{"SELECT-min"},
-		 'SELECT queries (' . $avg_minutes . ' minutes period)',
+	$drawn_graphs{'sessionspersecond_graph'} = &flotr2_graph( $graphid++, 'sessionspersecond_graph', $graph_data{sess_max},
+		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions (' . $avg_minutes . ' minutes average)',
+		'Sessions', 'Maximum', 'Average', 'Minimum'
+	);
+
+	$drawn_graphs{'selectqueries_graph'} = &flotr2_graph( $graphid++, 'selectqueries_graph', $graph_data{"SELECT-max"},
+		$graph_data{"SELECT"}, $graph_data{"SELECT-min"},
+		'SELECT queries (' . $avg_minutes . ' minutes period)',
 		'Queries per second', 'Maximum', 'Average', 'Minimum'
 	);
+
 	$drawn_graphs{'writequeries_graph'} = &flotr2_graph(
 		$graphid++, 'writequeries_graph', $graph_data{"DELETE"}, $graph_data{"INSERT"}, $graph_data{"UPDATE"}, 'Write queries (' . $avg_minutes . ' minutes period)',
 		'Queries', 'DELETE queries', 'INSERT queries', 'UPDATE queries'
 	);
+
 	if (!$select_only) {
 		$drawn_graphs{'durationqueries_graph'} = &flotr2_graph(
 			$graphid++, 'durationqueries_graph', $graph_data{query4}, $graph_data{"SELECT-2"}, $graph_data{write}, 'Average queries duration (' . $avg_minutes . ' minutes average)',
@@ -3284,8 +3340,6 @@ sub print_established_connection
 	}
 
 	print $fh qq{
-	<h1 class="page-header"><i class="icon-external-link-sign"></i> Connections</h1>
-
 	<div id="established-connections" class="analysis-item row-fluid">
 	<h2 class=""><i class="icon-random"></i> Established Connections</h2>
 	<div class="span3">
@@ -3542,6 +3596,40 @@ sub print_database_connection
 	delete $drawn_graphs{databaseconnections_graph};
 }
 
+sub print_simultaneous_session
+{
+
+	my $session_peak = 0;
+	my $session_peak_date = '';
+	foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
+		$session_peak = &comma_numbers($overall_stat{'peak'}{$_}{session});
+		$session_peak_date = $_;
+		last;
+	}
+
+	print $fh qq{
+	<div id="simultaneous-sessions" class="analysis-item row-fluid">
+	<h2 class=""><i class="icon-random"></i> Simultaneous sessions</h2>
+	<div class="span3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+				<li><span class="figure">$session_peak sessions</span> <span class="figure-label">Session Peak</span></li>
+				<li><span class="figure">$session_peak_date</span> <span class="figure-label">Date</span></li>    
+			</ul>
+		</div>
+	</div>
+	<div class="span8">
+		<h3 class="">Number of sessions ($avg_minutes minutes average)</h3>
+$drawn_graphs{sessionspersecond_graph}
+		</div>
+	</div><!-- end of Simultaneous sessions -->
+};
+	delete $drawn_graphs{sessionspersecond_graph};
+
+}
+
+
 sub print_user_session
 {
 	my %infos = ();
@@ -3742,8 +3830,6 @@ sub print_database_session
 
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
-	<h1 class="page-header"><i class="icon-off"></i> Sessions</h1>
-
 	<div class="analysis-item row-fluid" id="sessions-per-database">
 		<h2><i class="icon-list-alt"></i> Sessions per database</h2>
 		<div class="span3">
@@ -6023,6 +6109,8 @@ sub dump_as_html
 			print $fh qq{
 		</li>
 		<li class="slide" id="connections-slide">
+	<h1 class="page-header"><i class="icon-external-link-sign"></i> Connections</h1>
+
 };
 
 			# Draw connections information
@@ -6044,7 +6132,11 @@ sub dump_as_html
 			print $fh qq{
 		</li>
 		<li class="slide" id="sessions-slide">
+	<h1 class="page-header"><i class="icon-off"></i> Sessions</h1>
+
 };
+			# Show number of simultaneous sessions
+			&print_simultaneous_session();
 			# Show per database sessions
 			&print_database_session();
 			# Show per user sessions
@@ -6507,6 +6599,7 @@ sub load_stats
 		$overall_stat{peak}{$k}{select} += $_overall_stat{peak}{$k}{select};
 		$overall_stat{peak}{$k}{write} += $_overall_stat{peak}{$k}{write};
 		$overall_stat{peak}{$k}{connection} += $_overall_stat{peak}{$k}{connection};
+		$overall_stat{peak}{$k}{session} += $_overall_stat{peak}{$k}{session};
 		$overall_stat{peak}{$k}{tempfile_size} += $_overall_stat{peak}{$k}{tempfile_size};
 		$overall_stat{peak}{$k}{tempfile_count} += $_overall_stat{peak}{$k}{tempfile_count};
 	}
@@ -6646,6 +6739,8 @@ sub load_stats
 			foreach my $min (keys %{ $_per_minute_info{$day}{$hour} }) {
 				$per_minute_info{$day}{$hour}{$min}{connection}{count} +=
 					($_per_minute_info{$day}{$hour}{$min}{connection}{count} || 0);
+				$per_minute_info{$day}{$hour}{$min}{session}{count} +=
+					($_per_minute_info{$day}{$hour}{$min}{session}{count} || 0);
 				$per_minute_info{$day}{$hour}{$min}{query}{count} +=
 					($_per_minute_info{$day}{$hour}{$min}{query}{count} || 0);
 				$per_minute_info{$day}{$hour}{$min}{query}{duration} += $_per_minute_info{$day}{$hour}{$min}{query}{duration};
@@ -6653,6 +6748,10 @@ sub load_stats
 				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{connection}{second} }) {
 					$per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} +=
 						($_per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} || 0);
+				}
+				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{session}{second} }) {
+					$per_minute_info{$day}{$hour}{$min}{session}{second}{$sec} +=
+						($_per_minute_info{$day}{$hour}{$min}{session}{second}{$sec} || 0);
 				}
 				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{query}{second} }) {
 					$per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} +=
@@ -7177,6 +7276,14 @@ sub parse_query
 	my $cur_last_log_timestamp = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
 				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
 
+	# set current session workload
+	if (!$disable_session) {
+		my $sess_count = scalar keys %current_sessions;
+		$overall_stat{'peak'}{$cur_last_log_timestamp}{session} = $sess_count;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{count} = $sess_count;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{second}{$prefix_vars{'t_sec'}} = $sess_count;
+	}
+
 	# Stores lock activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/))
 	{
@@ -7250,6 +7357,7 @@ sub parse_query
 	# Stores pre-connection activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+) port=(\d+)/)) {
 		return if ($disable_connection);
+		$current_sessions{$prefix_vars{'t_pid'}} = 1;
 		$conn_received{$t_pid} = $1;
 		return;
 	}
@@ -7259,6 +7367,7 @@ sub parse_query
 		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) database=([^\s]+)/))
 	{
 		return if ($disable_connection);
+		$current_sessions{$prefix_vars{'t_pid'}} = 1;
 		my $usr = $1;
 		my $db  = $2;
 		if ($extension eq 'tsung') {
@@ -7303,6 +7412,7 @@ sub parse_query
 		if ($extension eq 'tsung') {
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
 		}
+		delete $current_sessions{$prefix_vars{'t_pid'}};
 		my $time = $1;
 		my $usr  = $2;
 		my $db   = $3;
@@ -10095,7 +10205,7 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 		color:#eee;
 	}
 
-	#queriespersecond_graph, #connectionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
 	width : 100%;
 	height: 400px;
 }
@@ -10144,7 +10254,7 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 		}
 
 
-		#queriespersecond_graph, #connectionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+		#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
 			width : 94.5%;
 		}
 
