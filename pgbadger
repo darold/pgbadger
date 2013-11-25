@@ -2567,7 +2567,7 @@ sub html_header
 	}
 	print $fh qq{
      	</ul>
-     	<a class="pull-right btn btn-info" href="#" id="pop-infos" rel="popover" data-html="true" data-placement="bottom" data-original-title="Log Info" data-content="$global_info">
+     	<a class="pull-right btn btn-info" id="pop-infos" rel="popover" data-html="true" data-placement="bottom" data-original-title="Log Info" data-content="$global_info">
 <i class="icon-info-sign icon-large"></i></a><a id="show-hide-menu" class="btn pull-right" data-toggle="collapse" href="#navigation"><i class="icon-reorder icon-large"></i></a>
 
     </div>
