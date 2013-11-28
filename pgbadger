@@ -2682,6 +2682,15 @@ sub print_overall_statistics
 		$session_peak_date = $_;
 		last;
 	}
+        my $main_error = 0;
+        my $total = 0;
+        foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
+                next if (!$error_info{$k}{count});
+                $main_error = &comma_numbers($error_info{$k}{count}) if (!$main_error);
+                $total += $error_info{$k}{count};
+        }
+        $total = &comma_numbers($total);
+
 	my $db_count = scalar keys %database_info;
 	print $fh qq{
 	    <h1 class="page-header"><i class="icon-eye-open"></i> Overview</h1>
@@ -2712,6 +2721,7 @@ sub print_overall_statistics
 						<ul>
 							<li class="first"><span class="figure">$fmt_errors</span> <span class="figure-label">Number of events</span></li>
 							<li><span class="figure">$fmt_unique_error</span> <span class="figure-label">Number of unique normalized events</span></li>
+							<li><span class="figure">$main_error</span> <span class="figure-label">Max number of times the same event was reported</span></li>
 						</ul>
 					</div>
 					<div class="tab-pane" id="tab-vacuums">
