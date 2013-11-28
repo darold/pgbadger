@@ -2482,7 +2482,7 @@ sub html_header
 };
 			}
 			print $fh qq{
-     				<li><a href="#sessions-per-database">Sessions per datSimultaneous sessabase</a></li>
+     				<li><a href="#sessions-per-database">Sessions per database</a></li>
      				<li><a href="#sessions-per-user">Sessions per user</a></li>
      				<li><a href="#sessions-per-host">Sessions per host</a></li>
      			</ul>
