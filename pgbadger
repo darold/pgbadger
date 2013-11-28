@@ -6395,8 +6395,8 @@ sub show_error_as_html
 				<h3 class="">Key values</h3>
 				<div class="well key-figures">
 					<ul>
-						<li><span class="figure">$main_error</span> <span class="figure-label">Max number of times the same error was reported</span></li>
-						<li><span class="figure">$total</span> <span class="figure-label">Total errors found</span></li>    
+						<li><span class="figure">$main_error</span> <span class="figure-label">Max number of times the same event was reported</span></li>
+						<li><span class="figure">$total</span> <span class="figure-label">Total events found</span></li>    
 					</ul>
 				</div>  	  
   	  		</div>
