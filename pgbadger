@@ -6328,7 +6328,8 @@ sub print_log_level
 	if (!$total_logs) {
 		$logtype_info = qq{<tr><td colspan="7">$NODATA</td></tr>};
 	}
-
+	$logs_type{ERROR} ||= 0;
+	$logs_type{FATAL} ||= 0;
 	$total_logs = &comma_numbers($total_logs);
 	print $fh qq{
 	<h1 class="page-header"><i class="icon-bullhorn"></i> Events</h1>
@@ -6339,7 +6340,8 @@ sub print_log_level
 			<div class="well key-figures">
 				<ul>
 					<li><span class="figure">$total_logs</span> <span class="figure-label">Log entries</span></li>
-					<li><span class="figure">$logs_type{ERROR}</span> <span class="figure-label">Number of errors</span></li>
+					<li><span class="figure">$logs_type{ERROR}</span> <span class="figure-label">Number of ERROR entries</span></li>
+					<li><span class="figure">$logs_type{FATAL}</span> <span class="figure-label">Number of FATAL entries</span></li>
 				</ul>
 			</div>
 		</div>
