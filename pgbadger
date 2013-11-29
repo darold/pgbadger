@@ -5184,7 +5184,7 @@ sub print_query_per_application
 						<table class="table table-striped table-hover">
 							<thead>
 								<tr>
-									<th>Database</th>
+									<th>Application</th>
 									<th>Request type</th>
 									<th>Count</th>
 								</tr>
