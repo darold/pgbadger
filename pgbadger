@@ -7994,7 +7994,7 @@ sub store_queries
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 				# Store normalized query samples
-				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $overall_stat{'last_log_ts'},$cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
 			}
 		}
 	}
