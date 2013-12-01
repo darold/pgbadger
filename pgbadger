@@ -6623,11 +6623,10 @@ sub load_stats
 		$overall_stat{$k} += $_overall_stat{$k};
 	}
 
-
-	$logs_type{ERROR} += $_logs_type{ERROR} if exists $_logs_type{ERROR};
-	$logs_type{LOG} += $_logs_type{LOG} if exists $_logs_type{LOG};
-	$logs_type{DETAIL} += $_logs_type{DETAIL} if exists $_logs_type{DETAIL};
-	$logs_type{STATEMENT} += $_logs_type{STATEMENT} if exists $_logs_type{STATEMENT};
+	### Logs level ###
+	foreach my $l qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT) {
+		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
+	}
 
 	### database_info ###
 
