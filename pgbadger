@@ -6624,7 +6624,7 @@ sub load_stats
 	}
 
 	### Logs level ###
-	foreach my $l qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT) {
+	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
 		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
 	}
 
