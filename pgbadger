@@ -386,6 +386,7 @@ if ($extension eq 'tsung') {
 	if (not defined $fh) {
 		die "FATAL: can't write to $outfile, $!\n";
 	}
+	binmode($fh, ':utf8');
 	print $fh "<sessions>\n";
 	$fh->close();
 
@@ -839,6 +840,7 @@ if ($extension ne 'tsung') {
 	if (not defined $fh) {
 		die "FATAL: can't write to $outfile, $!\n";
 	}
+	binmode($fh, ':utf8');
 	if (($extension eq 'text') || ($extension eq 'txt')) {
 		if ($error_only) {
 			&dump_error_as_text();
@@ -862,6 +864,7 @@ if ($extension ne 'tsung') {
 	if (not defined $fh) {
 		die "FATAL: can't write to $outfile, $!\n";
 	}
+	binmode($fh, ':utf8');
 	print $fh "</sessions>\n";
 	$fh->close();
 }
