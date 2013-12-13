@@ -42,7 +42,6 @@ use File::Spec qw/ tmpdir /;
 use File::Temp qw/ tempfile /;
 use IO::Handle;
 use IO::Pipe;
-use Time::HiRes qw/usleep/;
 
 $VERSION = '4.1';
 
@@ -733,7 +732,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 				$child_count--;
 				delete $RUNNING_PIDS{$kid};
 			}
-			usleep(500000);
+			sleep(1);
 		}
 		# Do not use split method with compressed files
 		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip)/i) ) {
@@ -746,7 +745,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 						$child_count--;
 						delete $RUNNING_PIDS{$kid};
 					}
-					usleep(500000);
+					sleep(1);
 				}
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 				spawn sub {
@@ -776,7 +775,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		if ($kid > 0) {
 			delete $RUNNING_PIDS{$kid};
 		}
-		usleep(500000);
+		sleep(1);
 	}
 	# Terminate the process logger
 	foreach my $k (keys %RUNNING_PIDS) {
