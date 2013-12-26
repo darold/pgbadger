@@ -40,6 +40,7 @@ SYNOPSIS
         -o | --outfile filename: define the filename for output. Default depends on
                                  the output format: out.html, out.txt or out.tsung.
                                  To dump output to stdout use - as filename.
+        -O | --outdir path     : directory where out file must be saved.
         -p | --prefix string   : give here the value of your custom log_line_prefix
                                  defined in your postgresql.conf. Only use it if you
                                  aren't using one of the standard prefixes specified

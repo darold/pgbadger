@@ -220,6 +220,7 @@ my $result = GetOptions(
 	"N|appname=s"              => \@dbappname,
 	"n|nohighlight!"           => \$nohighlight,
 	"o|outfile=s"              => \$outfile,
+	"O|outdir=s"               => \$outdir,
 	"p|prefix=s"               => \$log_line_prefix,
 	"P|no-prettify!"           => \$noprettify,
 	"q|quiet!"                 => \$quiet,
@@ -358,8 +359,17 @@ $img_format = 'png' if ($img_format ne 'jpeg');
 
 # Extract the output directory from outfile so that graphs will
 # be created in the same directory
-my @infs = fileparse($outfile);
-$outdir = $infs[1] . '/';
+if ($outfile ne '-') {
+	if (!$outdir) {
+		my @infs = fileparse($outfile);
+		$outdir = $infs[1];
+	} elsif (!-d "$outdir") {
+		# An output directory have been passed as command line parameter
+		die "FATAL: $outdir is not a directory or doesn't exist.\n";
+	}
+	$outfile = basename($outfile);
+	$outfile = $outdir . '/' . $outfile;
+}
 
 # Remove graph support if output is not html
 $graph = 0 unless ($extension eq 'html' or $extension eq 'binary' );
@@ -915,6 +925,7 @@ Options:
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html, out.txt or out.tsung.
                              To dump output to stdout use - as filename.
+    -O | --outdir path     : directory where out file must be saved.
     -p | --prefix string   : give here the value of your custom log_line_prefix
                              defined in your postgresql.conf. Only use it if you
                              aren't using one of the standard prefixes specified
