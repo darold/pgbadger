@@ -1088,7 +1088,6 @@ if (!$incremental) {
 			my $week = "Week $1";
 			# foreach week add link to daily reports
 			my @wdays = &get_wdays("$1", $y);
-			print $fh "<li>$w (", join(" , ", @wdays), ")</li>\n";
 			my $data_content = '';
 			for (my $i = 0; $i <= $#wdays; $i++) { 
 				my $bpath = $wdays[$i];
