@@ -35,7 +35,7 @@ use Benchmark;
 use File::Basename;
 use Storable qw(store_fd fd_retrieve);
 use Time::Local 'timegm_nocheck';
-use POSIX qw(locale_h sys_wait_h _exit);
+use POSIX qw(locale_h sys_wait_h _exit strftime);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
 use File::Spec qw/ tmpdir /;
@@ -99,6 +99,7 @@ my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
 my $format                  = '';
 my $outfile                 = '';
 my $outdir                  = '';
+my $incremental             = '';
 my $help                    = '';
 my $ver                     = '';
 my @dbname                  = ();
@@ -153,6 +154,8 @@ my $job_per_file            = 0;
 my $charset                 = 'utf-8';
 my $csv_sep_char            = ',';
 my %current_sessions        = ();
+my $incr_date               = '';
+my $last_incr_date          = '';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -160,6 +163,10 @@ my $RESRC_URL   = '';
 my $img_format  = 'png';
 my @log_files   = ();
 my %prefix_vars = ();
+
+# Load the DATA  part of the script
+my @jscode = <DATA>;
+
 my $sql_prettified;
 
 # Do not display data in pie where percentage is lower than this value
@@ -193,6 +200,9 @@ sub wait_child
 	if ($last_parsed && -e $tmp_last_parsed) {
 		unlink("$tmp_last_parsed");
 	}
+	if ($last_parsed && -e "$last_parsed.tmp") {
+		unlink("$last_parsed.tmp");
+	}
 	_exit(0);
 }
 $SIG{INT} = \&wait_child;
@@ -213,6 +223,7 @@ my $result = GetOptions(
 	"G|nograph!"               => \$nograph,
 	"h|help!"                  => \$help,
 	"i|ident=s"                => \$ident,
+	"I|incremental!"           => \$incremental,
 	"j|jobs=i"                 => \$queue_size,
 	"J|job_per_file=i"         => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
@@ -587,7 +598,7 @@ my @KEYWORDS1 = qw(
         KEYS KILL KEY LINES LOAD LOCAL LOCK LOW_PRIORITY LANGUAGE LEAST LOGIN MODIFY
         NULLIF NOSUPERUSER NOCREATEDB NOCREATEROLE OPTIMIZE OPTION OPTIONALLY OUTFILE OWNER PROCEDURE
         PROCEDURAL READ REGEXP RENAME RETURN REVOKE RLIKE ROLE ROLLBACK SHOW SONAME STATUS
-        STRAIGHT_JOIN SET SEQUENCE TABLES TEMINATED TRUNCATE TEMPORARY TRIGGER TRUSTED UNLOCK
+        STRAIGHT_JOIN SET SEQUENCE TABLES TEMINATED TRUNCATE TEMPORARY TRIGGER TRUSTED UN$filenumLOCK
         USE UPDATE UNSIGNED VALUES VARIABLES VIEW VACUUM WRITE ZEROFILL XOR
         ABORT ABSOLUTE ACCESS ACTION ADMIN AFTER AGGREGATE ALSO ALWAYS ASSERTION ASSIGNMENT AT ATTRIBUTE
         BACKWARD BEFORE BIGINT CACHE CALLED CASCADE CASCADED CATALOG CHAIN CHARACTER CHARACTERISTICS
@@ -677,6 +688,29 @@ my @top_tempfile_info   = ();
 my %drawn_graphs        = ();
 
 my $t0 = Benchmark->new;
+
+# Automatically set parameters with incremental mode
+if ($incremental) {
+	# In incremental mode an output directory must be set
+	if (!$outdir) {
+		die "FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n"
+	}
+	# Ensure this is not a relative path
+	if (dirname($outdir) eq '.') {
+		die "FATAL: output directory ($outdir) is not an absolute path.\n";
+	}
+	# Ensure that the directory already exists
+	if (!-d $outdir) {
+		die "FATAL: output directory $outdir does not exists\n";
+	}
+	# Set default last parsed file in incremental mode
+	if (!$last_parsed) {
+		$last_parsed = $outdir . '/LAST_PARSED';
+	}
+	$outfile = 'index.html';
+	# Set default output format
+	$extension = 'binary';
+}
 
 # Reading last line parsed
 if ($last_parsed && -e $last_parsed) {
@@ -801,6 +835,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		&load_stats($fht);
 		$fht->close();
 	}
+
 } else {
 
 	# Multiprocessing disabled, parse log files one by one
@@ -839,40 +874,261 @@ my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
 
-&logmsg('LOG', "Ok, generating $extension report...");
-
-# Open filehandle
+# Global output filehandle
 my $fh = undef;
-if ($extension ne 'tsung') {
-	$fh = new IO::File ">$outfile";
-	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
-	}
-	if (($extension eq 'text') || ($extension eq 'txt')) {
-		if ($error_only) {
-			&dump_error_as_text();
-		} else {
-			&dump_as_text();
+
+if (!$incremental) {
+
+	&logmsg('LOG', "Ok, generating $extension report...");
+
+	if ($extension ne 'tsung') {
+		$fh = new IO::File ">$outfile";
+		if (not defined $fh) {
+			die "FATAL: can't write to $outfile, $!\n";
 		}
-	} elsif ($extension eq 'binary') {
-		&dump_as_binary($fh);
+		if (($extension eq 'text') || ($extension eq 'txt')) {
+			if ($error_only) {
+				&dump_error_as_text();
+			} else {
+				&dump_as_text();
+			}
+		} elsif ($extension eq 'binary') {
+			&dump_as_binary($fh);
+		} else {
+			# Create instance to prettify SQL query
+			if (!$noprettify) {
+				$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+			}
+			&dump_as_html();
+		}
+		$fh->close;
 	} else {
+
+		# Open filehandle
+		$fh = new IO::File ">>$outfile";
+		if (not defined $fh) {
+			die "FATAL: can't write to $outfile, $!\n";
+		}
+		print $fh "</sessions>\n";
+		$fh->close();
+	}
+
+} else {
+
+	# Build a report per day
+	my %weeks_directories = ();
+	my @build_directories = ();
+	if (open(IN, "$last_parsed.tmp")) {
+		while (my $l = <IN>) {
+			chomp($l);
+			push(@build_directories, $l) if (!grep(/^$l$/, @build_directories));
+		}
+		close(IN);
+		unlink("$last_parsed.tmp");
+	} else {
+		&logmsg('ERROR', "can't read file $last_parsed.tmp, $!");
+	}
+	foreach $incr_date (@build_directories) {
+		$last_incr_date = $incr_date;
+		my $bpath = $incr_date;
+		$bpath =~ s/\-/\//g;
+		$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
+		my $wn = &get_week_number($1, $2, $3);
+		$weeks_directories{$wn} = "$1-$2" if (!exists $weeks_directories{$wn});
+
+		# Load all data gathered by all the differents processes
+		&init_stats_vars();
+                unless(opendir(DIR, "$outdir/$bpath")) {
+                        die "Error: can't opendir $outdir/$bpath: $!";
+                }
+                my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
+                closedir DIR;
+		foreach my $f (@mfiles) {
+			my $fht = new IO::File;
+			$fht->open("< $outdir/$bpath/$f") or die "FATAL: can't open file $outdir/$bpath/$f, $!\n";
+			&load_stats($fht);
+			$fht->close();
+		}
+
+		&logmsg('LOG', "Ok, generating HTML daily report into $outdir/$bpath/...");
+
+		$fh = new IO::File ">$outdir/$bpath/$outfile";
+		if (not defined $fh) {
+			die "FATAL: can't write to $outdir/$bpath/$outfile, $!\n";
+		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
 			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
 		}
 		&dump_as_html();
+		$fh->close;
 	}
-	$fh->close;
-} else {
 
-	# Open filehandle
-	$fh = new IO::File ">>$outfile";
-	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
+	# Build a report per week
+	foreach my $wn (sort keys %weeks_directories) {
+		&init_stats_vars();
+
+		# Get all days of the current week
+		my @wdays = &get_wdays($wn, $weeks_directories{$wn});
+		my $wdir = '';
+
+		# Load data per day
+		foreach $incr_date (@wdays) {
+			my $bpath = $incr_date;
+			$bpath =~ s/\-/\//g;
+			$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
+			$wdir = "$1/week-$wn";
+
+			# Load all data gathered by all the differents processes
+			if (-e "$outdir/$bpath") {
+				unless(opendir(DIR, "$outdir/$bpath")) {
+					die "Error: can't opendir $outdir/$bpath: $!";
+				}
+				my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
+				closedir DIR;
+				foreach my $f (@mfiles) {
+					my $fht = new IO::File;
+					$fht->open("< $outdir/$bpath/$f") or die "FATAL: can't open file $outdir/$bpath/$f, $!\n";
+					&load_stats($fht);
+					$fht->close();
+				}
+			}
+		}
+
+		&logmsg('LOG', "Ok, generating HTML weekly report into $outdir/$wdir/...");
+		if (!-d "$outdir/$wdir") {
+			mkdir("$outdir/$wdir");
+		}
+		$fh = new IO::File ">$outdir/$wdir/$outfile";
+		if (not defined $fh) {
+			die "FATAL: can't write to $outdir/$wdir/$outfile, $!\n";
+		}
+		# Create instance to prettify SQL query
+		if (!$noprettify) {
+			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+		}
+		&dump_as_html();
+		$fh->close;
+
 	}
-	print $fh "</sessions>\n";
-	$fh->close();
+
+	&logmsg('LOG', "Ok, generating global index to access incremental reports...");
+	
+	$fh = new IO::File ">$outdir/index.html";
+	if (not defined $fh) {
+		die "FATAL: can't write to $outdir/index.html, $!\n";
+	}
+	my $date = localtime(time);
+	print $fh qq{<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>pgBadger :: Global Index on incremental reports</title>
+<meta http-equiv="Content-Type" content="text/html; charset=$charset" />
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Expires" content="$date">
+<meta http-equiv="Generator" content="pgBadger v$VERSION">
+<meta http-equiv="Date" content="$date">
+<link rel="shortcut icon" href="$pgbadger_ico" />
+@jscode
+</head>
+
+<body>
+
+<nav class="navbar navbar-inverse navbar-fixed-top">
+  <div class="navbar-inner">
+    <div class="container-fluid">
+	<a data-placement="bottom" rel="tooltip" data-original-title="$report_title" href="" id="pgbadger-brand" class="brand">$pgbadger_logo Global Index of pgBadger incremental reports</a>
+    </div>
+  </div>
+</nav>
+
+<div id="top"><br /><br /></div>
+<div class="container" id="main-container">
+
+<script type="text/javascript">
+\$(function () {
+    \$(".pgb-popover a").popover({
+        placement : 'bottom',
+        html : true,
+    });
+});
+</script>
+<style type="text/css">
+.btn-primary {
+        font-size: 2.0em;
+        font-weight: bold;
+        height: 60px;
+        width: 184px;
+}
+</style>
+
+};
+	# get years directories
+	unless(opendir(DIR, "$outdir")) {
+		die "Error: can't opendir $outdir: $!";
+	}
+	my @dyears = grep { !/^\./ && /^\d{4}$/ } readdir(DIR);
+	closedir DIR;
+	my @day_names = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
+	my @month_names = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec');
+	foreach my $y (@dyears) {
+		print $fh qq{
+<h1>Year $y</h1>
+<div class="alert alert-info">
+<ul class="pgb-popover inline">
+};
+		# foreach year directory look for week directories
+		unless(opendir(DIR, "$outdir/$y")) {
+			die "Error: can't opendir $outdir/$y: $!";
+		}
+		my @yweeks = grep { !/^\./ && /^week-\d+$/ } readdir(DIR);
+		closedir DIR;
+		foreach my $w (@yweeks) {
+			$w =~ /week\-(\d+)/;
+			my $week = "Week $1";
+			# foreach week add link to daily reports
+			my @wdays = &get_wdays("$1", $y);
+			print $fh "<li>$w (", join(" , ", @wdays), ")</li>\n";
+			my $data_content = '';
+			for (my $i = 0; $i <= $#wdays; $i++) { 
+				my $bpath = $wdays[$i];
+				$bpath =~ s/\-/\//g;
+				if (-e "$outdir/$bpath/index.html") {
+					$data_content .= "<a href='$bpath/index.html' target='new'>$day_names[$i] $month_names[$i] $y</a><br>";
+				} else {
+					$data_content .= "<del>$day_names[$i] $month_names[$i] $y</del><br>";
+				}
+			}
+			print $fh qq{
+	<li><a href="#" class="btn btn-primary" data-toggle="popover" title="<a href='$y/$w/index.html' target='new'>$week: view report</a>" data-content="$data_content"><br>$week</a></li>
+};
+		}
+		print $fh qq{
+</ul>
+</div>
+};
+	}
+	print $fh qq{
+</div>
+
+<footer>
+<div class="">
+	<small class="pull-right">Report generated by <a href="$project_url" target="_new">pgBadger $VERSION.</a></small>
+</div>
+</footer>
+
+<div id="littleToc">
+	<div id="littleTocTitle"><a href="#top">&nbsp;^&nbsp;</a></div>
+</div>
+
+</body>
+</html>
+};
+
+
+
+	$fh->close;
+
 }
 
 my $t2 = Benchmark->new;
@@ -912,6 +1168,8 @@ Options:
     -G | --nograph         : disable graphs on HTML output. Enable by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
+    -I | --incremental     : use incremental mode, reports will be generated by
+                             days in a separate directory, --outdir must be set.
     -j | --jobs number     : number of jobs to run at same time. Default is 1,
 			     run as single process.
     -l | --last-parsed file: allow incremental log parsing by registering the
@@ -1027,6 +1285,7 @@ also use --exclude-appname "pg_dump" to solve this problem in a more simple way.
 
 sub init_stats_vars
 {
+
 	# Empty where statistics are stored
 	%overall_stat        = ();
 	%overall_checkpoint  = ();
@@ -1556,9 +1815,40 @@ sub process_file
 
 	%cur_info = ();
 
-	if ($tmpoutfile) {
+	# In incremental mode data are saved to disk per day
+	if ($incremental && $last_line{datetime}) {
+		$incr_date = $last_line{datetime};
+		$incr_date =~ s/\s.*$//;
+		# set path and create subdirectories
+		my $bpath = $incr_date;
+		while ($bpath =~ s/([^\-]+)\-/$1\//) {
+			mkdir("$outdir/$1") if (!-d "$outdir/$1");
+		}
+		mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
+		
+		# Save binary data
+		my $filenum = $$;
+		$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
+		my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
+		if (not defined $fhb) {
+			die "FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n";
+		}
+		&dump_as_binary($fhb);
+		$fhb->close;
+		&init_stats_vars();
+		if (open(OUT, ">>$last_parsed.tmp")) {
+			flock(OUT, 2) || return $getout;
+			print OUT "$incr_date\n";
+			close(OUT);
+		} else {
+			&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
+		}
+
+	} elsif ($tmpoutfile) {
+
 		&dump_as_binary($tmpoutfile);
 		$tmpoutfile->close();
+
 	}
 
 	# Inform the parent that it should stop parsing other files
@@ -1613,6 +1903,40 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
+	}
+
+	# In incremental mode data are saved to disk per day
+	if ($incremental) {
+		$cur_date =~ s/\s.*$//;
+		# Check if the current day has changed, if so save data
+		$incr_date = $cur_date if (!$incr_date);
+		if ($cur_date gt $incr_date) {
+			# set path and create subdirectories
+			my $bpath = $incr_date;
+			while ($bpath =~ s/([^\-]+)\-/$1\//) {
+				mkdir("$outdir/$1") if (!-d "$outdir/$1");
+			}
+			mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
+	
+			# Save binary data
+			my $filenum = $$;
+			$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
+			my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
+			if (not defined $fhb) {
+				die "FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n";
+			}
+			&dump_as_binary($fhb);
+			$fhb->close;
+			&init_stats_vars();
+			$incr_date = $cur_date;
+			if (open(OUT, ">>$last_parsed.tmp")) {
+				flock(OUT, 2) || return 1;
+				print OUT "$incr_date\n";
+				close(OUT);
+			} else {
+				&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
+			}
+		}
 	}
 
 	return 1;
@@ -2422,15 +2746,13 @@ sub html_header
 	my $date = localtime(time);
 	my $global_info = &print_global_information();
 
-	my @jscode = <DATA>;
-
 	print $fh qq{<!DOCTYPE html>
 <html lang="en">
 <head>
 <title>pgBadger :: $report_title</title>
 <meta http-equiv="Content-Type" content="text/html; charset=$charset" />
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Expires" CONTENT="$date">
+<meta http-equiv="Expires" content="$date">
 <meta http-equiv="Generator" content="pgBadger v$VERSION">
 <meta http-equiv="Date" content="$date">
 <link rel="shortcut icon" href="$pgbadger_ico" />
@@ -9041,6 +9363,84 @@ sub split_logfile
 
 	return @chunks;
 }
+
+# Return the week number of the year for a given date
+sub get_week_number
+{
+        my ($year, $month, $day) = @_;
+
+#       %U     The week number of the current year as a decimal number, range 00 to 53, starting with the first
+#              Sunday as the first day of week 01.
+#       %V     The  ISO 8601  week  number (see NOTES) of the current year as a decimal number, range 01 to 53,
+#              where week 1 is the first week that has at least 4 days in the new year.
+#       %W     The week number of the current year as a decimal number, range 00 to 53, starting with the first
+#              Monday as the first day of week 01.
+
+	# Check if the date is valide first
+	my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $month - 1, $year - 1900);
+	if ($datefmt ne "$year-$month-$day") {
+		return -1;
+	}
+	my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $month - 1, $year - 1900);
+
+	return $weekNumber;
+}
+
+# Returns day number of the week of a given days
+sub get_day_of_week
+{
+        my ($year, $month, $day) = @_;
+
+#       %u     The day of the week as a decimal, range 1 to 7, Monday being 1.
+#       %w     The day of the week as a decimal, range 0 to 6, Sunday being 0.
+
+	my $weekDay = POSIX::strftime("%u", 1,1,1,$day,--$month,$year-1900);
+
+	return $weekDay;
+}
+
+# Returns all days following the week number
+sub get_wdays
+{
+	my $wn = shift;
+	my ($year, $month) = split(/\-/, shift);
+	my @retdays = ();
+
+	$month ||= '01';
+	my $start_month = $month;
+	if ($month == 1) {
+		$start_month = 12;
+		$year--;
+	} else {
+		$start_month--;
+	}
+	my $end_month = $start_month + 2;
+	$end_month = 13 if ($start_month > 13);
+
+	for (my $m = $start_month; $m <= $end_month; $m++) {
+		if ($m == 13)   {
+			$m = '01';
+			$year++;
+		}
+		$m = sprintf("%02d", $m);
+		foreach my $day ("01" .. "31") {
+			# Check if the date is valide first
+			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $year - 1900);
+			if ($datefmt ne "$year-$m-$day") {
+				next;
+			}
+			my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $year - 1900);
+			if ( ($weekNumber == $wn) || (($weekNumber eq '00') && (($wn < 1) || ($wn > 50))) ) {
+				push(@retdays, "$year-$m-$day");
+				return @retdays if ($#retdays == 6);
+			}
+			next if ($weekNumber > $wn);
+		}
+	}
+
+	return @retdays;
+}
+
 
 __DATA__
 
