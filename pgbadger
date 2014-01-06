@@ -1095,7 +1095,7 @@ if (!$incremental) {
 				if (-e "$outdir/$bpath/index.html") {
 					$data_content .= "<a href='$bpath/index.html' target='new'>$day_names[$i] $month_names[$i] $y</a><br>";
 				} else {
-					$data_content .= "<del>$day_names[$i] $month_names[$i] $y</del><br>";
+					$data_content .= "$day_names[$i] $month_names[$i] $y<br>";
 				}
 			}
 			print $fh qq{
