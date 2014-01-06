@@ -2226,7 +2226,9 @@ Average duration of sessions: $avg_session_duration
 	if (!$disable_connection && $connection_info{count}) {
 		print $fh "Total number of connections: $connection_info{count}\n";
 		foreach (sort {$overall_stat{'peak'}{$b}{connection} <=> $overall_stat{'peak'}{$a}{connection}} keys %{$overall_stat{'peak'}}) {
-			print $fh "Connection peak: ", &comma_numbers($overall_stat{'peak'}{$_}{connection}), " conn/s at $_";
+			if ($overall_stat{'peak'}{$_}{connection} > 0) {
+				print $fh "Connection peak: ", &comma_numbers($overall_stat{'peak'}{$_}{connection}), " conn/s at $_";
+			}
 			last;
 		}
 	}
@@ -3086,7 +3088,13 @@ sub print_overall_statistics
 					<div class="tab-pane" id="tab-connections">
 						<ul>
 							<li class="first"><span class="figure">$connection_count</span> <span class="figure-label">Total number of connections</span></li>
+};
+	if ($connection_count) {
+		print $fh qq{
 							<li><span class="figure">$connection_peak connections/s at $connection_peak_date</span> <span class="figure-label">Connection peak</span></li>
+};
+	}
+	print $fh qq{
 							<li><span class="figure">$db_count</span> <span class="figure-label">Total number of databases</span></li>
 						</ul>
 					</div>
