@@ -130,6 +130,13 @@ Generate report every week using incremental behavior:
 
 This supposes that your log file and HTML report are also rotated every week.
 
+Or better, use the auto-generated incremental reports:
+
+    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 \
+        -O /var/www/pg_reports/
+
+will generate a report per day and per week in the given output directory.
+
 If you have a pg_dump at 23:00 and 13:00 each day during half an hour, you can
 use pgbadger as follow to exclude these periods from the report:
 
@@ -188,6 +195,8 @@ There's also some pie reports of distribution about:
 	Autovacuum and autoanalyze per table.
 
 All charts are zoomable and can be saved as PNG images. SQL queries reported are highlighted and beautified automatically.
+
+You can also have incremental reports with one report per day and a cumulative report per week.
 
 =head1 REQUIREMENT
 
@@ -362,9 +371,28 @@ with the following template tmp_pgbadgerXXXX.bin so they can be easily identifie
 
 =head1 INCREMENTAL REPORTS
 
-Using the binary format it is possible to have incremental and cumulative reports.
-For example, if you want to refresh a pgbadger report each hour from a daily PostgreSQl
-log file, you can proceed by running each hour the following commands
+pgBadger include an automatic incremental report mode using option -I or
+--incremental. When running in this mode, pgBadger will generate one report
+per day and a cumulative report per week. Output is first done in binary
+format into the mandatory output directory (see option -O or --outdir),
+then in HTML format for daily and weekly reports with a main index file.
+
+The main index file will show a dropdown menu per week with a link to the week
+report and links to daily reports of this week.
+
+For example, if you run pgBadger as follow based on a daily rotated file:
+
+    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 \
+        -O /var/www/pg_reports/
+
+you will have all daily and weekly reports for the full running period.
+
+=head1 BINARY FORMAT
+
+Using the binary format it is possible to create custom incremental and
+cumulative reports. For example, if you want to refresh a pgbadger report
+each hour from a daily PostgreSQl log file, you can proceed by running each
+hour the following commands:
 
     pgbadder --last-parsed .pgbadger_last_state_file -o sunday/hourX.bin /var/log/pgsql/postgresql-Sun.log
 
@@ -398,7 +426,7 @@ The pgBadger v4.x design comes from the "Art is code" company.
 
 This web site is a work of Gilles Darold.
 
-pgBadger is maintained by Gilles Darold and the good folks at Dalibo every one who wants to contribute.
+pgBadger is maintained by Gilles Darold, the good folks at Dalibo, and every one who wants to contribute.
 
 Many people have contributed to pgBadger, they are all quoted in the Changelog file.
 

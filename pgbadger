@@ -1269,6 +1269,13 @@ Generate report every week using incremental behavior:
 
 This supposes that your log file and HTML report are also rotated every week.
 
+Or better, use the auto-generated incremental reports:
+
+    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 \
+	-O /var/www/pg_reports/
+
+will generate a report per day and per week.
+
 If you have a pg_dump at 23:00 and 13:00 each day during half an hour, you can
 use pgbadger as follow to exclude these period from the report:
 
