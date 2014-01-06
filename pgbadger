@@ -7720,12 +7720,21 @@ sub parse_query
 
 	# Stores connection activity
 	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
-		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) database=([^\s]+)/))
+		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) /))
 	{
 		return if ($disable_connection);
 		$current_sessions{$prefix_vars{'t_pid'}} = 1;
 		my $usr = $1;
-		my $db  = $2;
+		my $db  = 'unknown';
+		my $host  = '';
+		if ($prefix_vars{'t_query'} =~ / database=([^\s]+)/) {
+			$db = $1;
+		} elsif ($prefix_vars{'t_dbname'}) {
+			$db = $prefix_vars{'t_dbname'};
+		}
+		if ($prefix_vars{'t_query'} =~ / host=([^\s]+)/) {
+			$host = $1;
+		}
 		if ($extension eq 'tsung') {
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $db;
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $usr;
@@ -7755,6 +7764,9 @@ sub parse_query
 			$connection_info{host}{$conn_received{$t_pid}}++;
 			#$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$conn_received{$t_pid}}++;
 			delete $conn_received{$t_pid};
+		} elsif ($host) {
+			$connection_info{host}{$host}++;
+			#$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$host}++;
 		}
 		return;
 	}
@@ -8799,8 +8811,8 @@ sub build_log_line_prefix_regex
 		'%a' => [('t_appname',      '(.*)')],                                   # application name
 		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # user name
 		'%d' => [('t_dbname',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # database name
-		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?[\(\d\)]*')],     # remote host and port
-		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?')],              # remote host
+		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[\(\d\)]*')],     # remote host and port
+		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?')],              # remote host
 		'%p' => [('t_pid',          '(\d+)')],                                                        # process ID
 		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?: [A-Z\d]{3,6})?')],      # timestamp without milliseconds
 		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\d]{3,6})?')], # timestamp with milliseconds
