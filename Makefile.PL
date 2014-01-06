@@ -34,7 +34,7 @@ WriteMakefile(
 	'DESTDIR'      => $DESTDIR,
 	'INSTALLDIRS'  => $INSTALLDIRS,
 	'clean'	       => {},
-	'META_MERGE'   => {
+	($ExtUtils::MakeMaker::VERSION < 6.46 ? () : 'META_MERGE'   => {
 		resources  => {
 			homepage => 'http://projects.dalibo.org/pgbadger',
 			repository  => {
@@ -44,5 +44,6 @@ WriteMakefile(
 			},
 		},
         }
+	)
 );
 
