@@ -969,7 +969,7 @@ if (!$incremental) {
 		&init_stats_vars();
 
 		# Get all days of the current week
-		my @wdays = &get_wdays($wn, $weeks_directories{$wn});
+		my @wdays = &get_wdays_per_month($wn, $weeks_directories{$wn});
 		my $wdir = '';
 
 		# Load data per day
@@ -1083,19 +1083,22 @@ if (!$incremental) {
 		}
 		my @yweeks = grep { !/^\./ && /^week-\d+$/ } readdir(DIR);
 		closedir DIR;
+		my %ywdays = &get_wdays_per_year($y);
 		foreach my $w (@yweeks) {
 			$w =~ /week\-(\d+)/;
 			my $week = "Week $1";
 			# foreach week add link to daily reports
-			my @wdays = &get_wdays("$1", $y);
+			my @wdays = @{$ywdays{$1}};
 			my $data_content = '';
 			for (my $i = 0; $i <= $#wdays; $i++) { 
 				my $bpath = $wdays[$i];
-				$bpath =~ s/\-/\//g;
+				$bpath =~ s/(\d+)\-(\d+)\-(\d+)/$1\/$2\/$3/g;
+				my $mmonth = $month_names[$2 - 1];
+				my $dday = $3;
 				if (-e "$outdir/$bpath/index.html") {
-					$data_content .= "<a href='$bpath/index.html' target='new'>$day_names[$i] $month_names[$i] $y</a><br>";
+					$data_content .= "<a href='$bpath/index.html' target='new'>$day_names[$i] $mmonth $dday $y</a><br>";
 				} else {
-					$data_content .= "$day_names[$i] $month_names[$i] $y<br>";
+					$data_content .= "$day_names[$i] $mmonth $dday $y<br>";
 				}
 			}
 			print $fh qq{
@@ -9426,37 +9429,39 @@ sub get_day_of_week
 }
 
 # Returns all days following the week number
-sub get_wdays
+sub get_wdays_per_month
 {
 	my $wn = shift;
 	my ($year, $month) = split(/\-/, shift);
+	my @months = ();
 	my @retdays = ();
 
 	$month ||= '01';
+	push(@months, "$year$month");
 	my $start_month = $month;
-	if ($month == 1) {
-		$start_month = 12;
-		$year--;
+	if ($month eq '01') {
+		unshift(@months, ($year - 1) . "12");
 	} else {
-		$start_month--;
+		unshift(@months, $year . sprintf("%02d", $month - 1));
 	}
-	my $end_month = $start_month + 2;
-	$end_month = 13 if ($start_month > 13);
+	if ($month == 12) {
+		push(@months, ($year+1) . "01");
+	} else {
+		push(@months, $year . sprintf("%02d", $month + 1));
+	}
 
-	for (my $m = $start_month; $m <= $end_month; $m++) {
-		if ($m == 13)   {
-			$m = '01';
-			$year++;
-		}
-		$m = sprintf("%02d", $m);
+	foreach my $d (@months) {
+		$d =~ /^(\d{4})(\d{2})$/;
+		my $y = $1;
+		my $m = $2;
 		foreach my $day ("01" .. "31") {
 			# Check if the date is valide first
-			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $year - 1900);
-			if ($datefmt ne "$year-$m-$day") {
+			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $y - 1900);
+			if ($datefmt ne "$y-$m-$day") {
 				next;
 			}
-			my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $year - 1900);
-			if ( ($weekNumber == $wn) || (($weekNumber eq '00') && (($wn < 1) || ($wn > 50))) ) {
+			my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
+			if ( ($weekNumber == $wn) || ($weekNumber eq '00') ) {
 				push(@retdays, "$year-$m-$day");
 				return @retdays if ($#retdays == 6);
 			}
@@ -9466,6 +9471,28 @@ sub get_wdays
 
 	return @retdays;
 }
+
+# Returns all days following the week number
+sub get_wdays_per_year
+{
+	my $y = shift;
+	my %result = ();
+
+	foreach my $m ("01" .. "12") {
+		foreach my $day ("01" .. "31") {
+			# Check if the date is valide first
+			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $y - 1900);
+			if ($datefmt ne "$y-$m-$day") {
+				next;
+			}
+			my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
+			push(@{$result{$weekNumber}}, "$y-$m-$day");
+		}
+	}
+
+	return %result;
+}
+
 
 
 __DATA__
