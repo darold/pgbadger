@@ -926,7 +926,8 @@ if (!$incremental) {
 		close(IN);
 		unlink("$last_parsed.tmp");
 	} else {
-		&logmsg('ERROR', "can't read file $last_parsed.tmp, $!");
+		&logmsg('WARNING', "can't read file $last_parsed.tmp, $!");
+		&logmsg('HINT', "maybe there's no new entries in your log since last run.");
 	}
 	foreach $incr_date (@build_directories) {
 		$last_incr_date = $incr_date;
@@ -3530,8 +3531,8 @@ sub compute_query_graphs
 									$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 								}
 								# Search minimum and maximum during this minute
-								$a_dataavg{$action}{max}{"$rd"} = 0 if (!$a_dataavg{$action}{max}{"$rd"});
-								$a_dataavg{$action}{min}{"$rd"} = 0 if (!$a_dataavg{$action}{min}{"$rd"});
+								$a_dataavg{$action}{max}{"$rd"} = 0 if (! exists $a_dataavg{$action}{max}{"$rd"});
+								$a_dataavg{$action}{min}{"$rd"} = 0 if (! exists $a_dataavg{$action}{min}{"$rd"});
 								foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{$action}{second}}) {
 									$a_dataavg{$action}{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{$action}{second}{$s}
 										if ($per_minute_info{$tm}{$h}{$m}{$action}{second}{$s} > $a_dataavg{$action}{max}{"$rd"});
@@ -3611,7 +3612,7 @@ sub compute_query_graphs
 						# Mini connections per minute
 						$graph_data{sess_min} .= "[$t, " . ($s_dataavg{min}{"$rd"} || 0) . "],";
 					}
-					if (!$disable_query && (scalar keys %a_dataavg> 0)) { 
+					if (!$disable_query && (scalar keys %a_dataavg > 0)) { 
 						foreach my $action (@SQL_ACTION) {
 							next if ($select_only && ($action ne 'SELECT'));
 
