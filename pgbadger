@@ -373,7 +373,12 @@ $img_format = 'png' if ($img_format ne 'jpeg');
 if ($outfile ne '-') {
 	if (!$outdir) {
 		my @infs = fileparse($outfile);
-		$outdir = $infs[1];
+		if ($infs[0] ne '') {
+			$outdir = $infs[1];
+		} else {
+			# maybe a confusion between -O and -o
+			die "FATAL: output file $outfile is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n";
+		}
 	} elsif (!-d "$outdir") {
 		# An output directory have been passed as command line parameter
 		die "FATAL: $outdir is not a directory or doesn't exist.\n";
