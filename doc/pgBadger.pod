@@ -387,6 +387,12 @@ For example, if you run pgBadger as follow based on a daily rotated file:
 
 you will have all daily and weekly reports for the full running period.
 
+In this mode pgBagder will create an automatic incremental file into the
+output directory, so you don't have to use the -l option unless you want
+to change the path of that file. This mean that you can run pgBadger in
+this mode each days on a log file rotated each week, it will not count
+the log entries twice.
+
 =head1 BINARY FORMAT
 
 Using the binary format it is possible to create custom incremental and
