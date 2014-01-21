@@ -8583,16 +8583,46 @@ sub flotr2_graph
 <div id="$divid" class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>
 };
 	}
-	$data1 = "var d1 = [$data1];" if ($data1);
-	$data2 = "var d2 = [$data2];" if ($data2);
-	$data3 = "var d3 = [$data3];" if ($data3);
-	$data4 = "var d4 = [$data4];" if ($data4);
+	my $dateTracker_lblopts = '';
+	if ($legend1) {
+		$dateTracker_lblopts .= "'$legend1',";
+		$legend1 = "{ data: d1, label: \"$legend1\", color: \"#6e9dc9\", mouse:{track:true}},";
+	}
+	if ($legend2) {
+		$dateTracker_lblopts .= "'$legend2',";
+		$legend2 = "{ data: d2, label: \"$legend2\", color: \"#f4ab3a\", mouse:{track:true}},";
+	}
+	if ($legend3) {
+		$dateTracker_lblopts .= "'$legend3',";
+		$legend3 = "{ data: d3, label: \"$legend3\", color: \"#ac7fa8\", mouse:{track:true}},";
+	}
+	if ($legend4) {
+		$dateTracker_lblopts .= "'$legend4',";
+		$legend4 = "{ data: d4, label: \"$legend4\", color: \"#8dbd0f\",yaxis: 2},";
+	}
+	$dateTracker_lblopts =~ s/,$//;
+	$dateTracker_lblopts = "[$dateTracker_lblopts]";
 
-	$legend1 = "{ data: d1, label: \"$legend1\", color: \"#6e9dc9\", mouse:{track:true}}," if ($legend1);
-	$legend2 = "{ data: d2, label: \"$legend2\", color: \"#f4ab3a\", mouse:{track:true}}," if ($legend2);
-	$legend3 = "{ data: d3, label: \"$legend3\", color: \"#ac7fa8\", mouse:{track:true}}," if ($legend3);
-	$legend4 = "{ data: d4, label: \"$legend4\", color: \"#8dbd0f\",yaxis: 2},"            if ($legend4);
-
+	my $dateTracker_dataopts = '';
+	if ($data1) {
+		$data1 = "var d1 = [$data1];";
+		$dateTracker_dataopts .= "d1,";
+	}
+	if ($data2) {
+		$data2 = "var d2 = [$data2];";
+		$dateTracker_dataopts .= "d2,";
+	}
+	if ($data3) {
+		$data3 = "var d3 = [$data3];";
+		$dateTracker_dataopts .= "d3,";
+	}
+	if ($data4) {
+		$data4 = "var d4 = [$data4];";
+		$dateTracker_dataopts .= "d4,";
+	}
+	$dateTracker_dataopts =~ s/,$//;
+	$dateTracker_dataopts = "[$dateTracker_dataopts]";
+	
 	my $yaxis2 = '';
 	if ($ytitle2) {
 		$yaxis2 = "y2axis: { mode: \"normal\", title: \"$ytitle2\", min: 0, color: \"#8dbd0f\" },";
@@ -8646,7 +8676,7 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
         },
 	mouse: {
             track: true,
-	    trackFormatter: function(obj){ return dateTracker(obj,'$type') },
+	    trackFormatter: function(obj){ return dateTracker(obj,'$type',$dateTracker_lblopts,$dateTracker_dataopts) },
             relative: true,
 	    sensibility: 5,
 	    trackDecimals: 2,
@@ -9540,10 +9570,33 @@ function sql_format (obj)
 	}
 }
 
-function dateTracker(obj, gtype) 
+function dateTracker(obj, gtype, labels, datasets) 
 {
 	var dateToDisplay = new Date(parseInt(obj.x)); 
-	return dateToDisplay.toGMTString()+', '+obj.series.label+': '+pretty_print_number(obj.y, gtype);
+	var posValue = parseInt(obj.x);
+
+	// look for the position in data arrays 
+        var pos = 0;
+        if (datasets != undefined) { 
+                for (pos=0; pos < datasets[0].length; pos++) {
+			// If timestamp are the same we have found the position
+                        if (datasets[0][pos][0] == posValue) {
+				// get out of here
+                                break;
+                        }
+                }
+	} else {
+		return '<span class="mfigure">NO DATASET</span>';
+        }
+
+	var textToShow = '<div class="mouse-figures">On '+dateToDisplay.toGMTString();
+	for (var i = 0; i < labels.length; i++) {
+		if (datasets[i] != undefined) {
+			textToShow += '<br><span class="mfigure">'+pretty_print_number(datasets[i][pos][1], gtype)+' <small>'+labels[i]+'</small></span>';
+		}
+	}
+	textToShow += '</div>';
+	return textToShow;
 }
 
 function pretty_print_number(val, type) 
@@ -10673,6 +10726,25 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 	.figure-label {
 		display: block;
 		color: #666;
+	}
+
+	.mouse-figures {
+		font-weight: bold;
+		font-size: 1.2em;
+		margin: 0;
+		padding: 0;
+	}       
+
+	.mfigure {
+		font-weight: bold;
+		font-size: 1.4em;
+		color:#d26115;
+	}
+
+	.mfigure small {
+		font-weight: bold;
+		font-size: 0.6em;
+		color:#ffffff;
 	}
 
 	.navbar-inverse .navbar-inner {
