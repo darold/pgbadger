@@ -660,6 +660,21 @@ my %SYMBOLS = (
 my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
+# Inbounds of query times histogram
+my @histogram_query_time = (0, 100, 500, 1000, 10000);
+
+# Get inbounds of query times histogram
+sub get_hist_inbound
+{
+	my $duration = shift;
+
+	for (my $i = 0; $i <= $#histogram_query_time; $i++) {
+		return $histogram_query_time[$i-1] if ($histogram_query_time[$i] > $duration);
+	}
+
+	return -1;
+}
+
 # Where statistics are stored
 my %overall_stat        = ();
 my %overall_checkpoint  = ();
@@ -2906,6 +2921,7 @@ sub html_header
 			print $fh qq{
      		<li id="menu-topqueries" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Top <span class="caret"></span></a>
      			<ul class="dropdown-menu">
+     				<li><a href="#histogram-query-times">Histogram of query times</a></li>
      				<li><a href="#slowest-individual-queries">Slowest individual queries</a></li>
      				<li><a href="#time-consuming-queries">Time Consuming queries (N)</a></li>
      				<li><a href="#most-frequent-queries">Most frequent queries (N)</a></li>
@@ -6019,13 +6035,88 @@ sub print_tempfile_report
 
 }
 
+sub print_histogram_query_times
+{
+	my %data = ();
+	my $histogram_info = '';
+	my $most_range = '';
+	my $most_range_value = '';
+
+	for (my $i = 1; $i <= $#histogram_query_time; $i++) {
+                $histogram_info .= "<tr><td>$histogram_query_time[$i-1]-$histogram_query_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]}) .
+                        "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
+		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
+		if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > $most_range_value) {
+			$most_range = "$histogram_query_time[$i-1]-$histogram_query_time[$i]ms";
+			$most_range_value = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
+		}
+	}
+	if ($overall_stat{histogram}{total} > 0) {
+		$histogram_info .= "<tr><td> &gt; $histogram_query_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{'-1'}) .
+			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{'-1'} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
+		$data{"> $histogram_query_time[-1]ms"} = $overall_stat{histogram}{query_time}{"-1"};
+		if ($overall_stat{histogram}{query_time}{"-1"} > $most_range_value) {
+			$most_range = "> $histogram_query_time[-1]ms";
+			$most_range_value = $overall_stat{histogram}{query_time}{"-1"};
+		}
+	} else {
+		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
+	}
+
+	$drawn_graphs{histogram_query_times_graph} = &flotr2_piegraph($graphid++, 'histogram_query_times_graph', 'Histogram of query times', %data);
+
+	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
+
+	print $fh qq{
+	<h2><i class="icon-question-sign"></i> Top Queries</h2>
+	<div class="analysis-item row-fluid" id="histogram-query-times">
+		<h2><i class="icon-signal"></i> Histogram of query times</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$most_range_value</span> <span class="figure-label">$most_range duration</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#histogram-query-times-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#histogram-query-times-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="histogram-query-times-graph">
+						$drawn_graphs{histogram_query_times_graph}
+					</div>
+					<div class="tab-pane" id="histogram-query-times-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Range</th>
+									<th>Count</th>
+									<th>Percentage</th>
+								</tr>
+							</thead>
+							<tbody>
+							$histogram_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of queries by type -->
+};
+	delete $drawn_graphs{histogram_query_times_graph};
+}
+
 sub print_slowest_individual_queries
 {
 
 	print $fh qq{
-		<h2><i class="icon-question-sign"></i> Top Queries</h2>
 		<div class="analysis-item row-fluid" id="slowest-individual-queries">
-			<h2><i class="icon-spinner"></i> Slowest individual query</h2>
+			<h2><i class="icon-spinner"></i> Slowest individual queries</h2>
 			<div class="span11">
 				<table class="table table-striped" id="slowest-individual-queries-table">
 				<thead>
@@ -6582,6 +6673,9 @@ sub dump_as_html
 		</li>
 		<li class="slide" id="topqueries-slide">
 };
+			# Show histogram for query times
+			&print_histogram_query_times();
+
 			# Show top information
 			&print_slowest_individual_queries();
 
@@ -6969,13 +7063,19 @@ sub load_stats
 		$overall_stat{peak}{$k}{tempfile_size} += $_overall_stat{peak}{$k}{tempfile_size};
 		$overall_stat{peak}{$k}{tempfile_count} += $_overall_stat{peak}{$k}{tempfile_count};
 	}
-	foreach my $k (keys %{$_overall_checkpoint{peak}}) {
-		$overall_checkpoint{peak}{$k}{checkpoint_wbuffer} += $_overall_checkpoint{peak}{$k}{checkpoint_wbuffer};
-		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
+
+	foreach my $k (keys %{$_overall_stat{histogram}{query_time}}) {
+		$overall_stat{histogram}{query_time}{$k} += $_overall_stat{histogram}{query_time}{$k};
 	}
+	$overall_stat{histogram}{total} += $_overall_stat{histogram}{total};
 
 	foreach my $k ('prepare', 'bind','execute') {
 		$overall_stat{$k} += $_overall_stat{$k};
+	}
+
+	foreach my $k (keys %{$_overall_checkpoint{peak}}) {
+		$overall_checkpoint{peak}{$k}{checkpoint_wbuffer} += $_overall_checkpoint{peak}{$k}{checkpoint_wbuffer};
+		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
 	}
 
 	### Logs level ###
@@ -7996,6 +8096,9 @@ sub parse_query
 	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
 		$prefix_vars{'t_duration'} = $1;
 		$prefix_vars{'t_query'} = '';
+		my $k = &get_hist_inbound($1);
+		$overall_stat{histogram}{query_time}{$k}++;
+		$overall_stat{histogram}{total}++;
 		&set_current_infos($t_pid);
 		return;
 	}
@@ -8012,6 +8115,9 @@ sub parse_query
 	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 		$prefix_vars{'t_duration'} = $1;
 		$t_action   = $2;
+		my $k = &get_hist_inbound($1);
+		$overall_stat{histogram}{query_time}{$k}++;
+		$overall_stat{histogram}{total}++;
 		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)\b/i) {
 			$overall_stat{lc($1)}++;
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
@@ -8021,6 +8127,9 @@ sub parse_query
 	{
 		$prefix_vars{'t_duration'} = $1;
 		$t_action = $2;
+		my $k = &get_hist_inbound($1);
+		$overall_stat{histogram}{query_time}{$k}++;
+		$overall_stat{histogram}{total}++;
 		$t_action =~ s/ from fetch//;
 		$t_action = 'prepare' if ($t_action eq 'parse');
 		$overall_stat{$t_action}++;
@@ -10761,7 +10870,7 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 	height: 400px;
 }
 
-	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph {
+	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph {
 	width : 100%;
 	height: 320px;
 }
@@ -10809,7 +10918,7 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 			width : 94.5%;
 		}
 
-		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph {
+		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph {
 			width : 94.5%;
 		}
 

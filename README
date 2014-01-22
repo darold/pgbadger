@@ -189,6 +189,7 @@ FEATURE
             Queries that took up the most time.
             The most frequent queries.
             The most frequent errors.
+            Histogram of query times.
 
     The following reports are also available with hourly charts divide by
     periods of five minutes:
