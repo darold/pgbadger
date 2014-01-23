@@ -661,7 +661,7 @@ my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
 # Inbounds of query times histogram
-my @histogram_query_time = (0, 10, 25, 50, 100, 500, 1000, 10000);
+my @histogram_query_time = (0, 5, 10, 25, 50, 100, 500, 1000, 10000);
 
 # Get inbounds of query times histogram
 sub get_hist_inbound
@@ -986,7 +986,7 @@ if (!$incremental) {
 	}
 
 	# Build a report per week
-	foreach my $wn (sort keys %weeks_directories) {
+	foreach my $wn (sort { $a <=> $b } keys %weeks_directories) {
 		&init_stats_vars();
 
 		# Get all days of the current week
@@ -1092,7 +1092,7 @@ if (!$incremental) {
 	closedir DIR;
 	my @day_names = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 	my @month_names = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec');
-	foreach my $y (@dyears) {
+	foreach my $y (sort { $b <=> $a } @dyears) {
 		print $fh qq{
 <h1>Year $y</h1>
 <div class="alert alert-info">
@@ -1102,10 +1102,11 @@ if (!$incremental) {
 		unless(opendir(DIR, "$outdir/$y")) {
 			die "Error: can't opendir $outdir/$y: $!";
 		}
+
 		my @yweeks = grep { !/^\./ && /^week-\d+$/ } readdir(DIR);
 		closedir DIR;
 		my %ywdays = &get_wdays_per_year($y);
-		foreach my $w (@yweeks) {
+		foreach my $w (sort { &sort_by_week($a, $b); } @yweeks) {
 			$w =~ /week\-(\d+)/;
 			my $week = "Week $1";
 			# foreach week add link to daily reports
@@ -1311,6 +1312,19 @@ also use --exclude-appname "pg_dump" to solve this problem in a more simple way.
 };
 
 	exit 0;
+}
+
+sub sort_by_week
+{
+	my $curr = shift;
+	my $next = shift;
+
+	$a =~ /week\-(\d+)/;
+	$curr = $1;
+	$b =~ /week\-(\d+)/;
+	$next = $1;
+
+	return $next <=> $curr;
 }
 
 sub init_stats_vars
@@ -6045,7 +6059,7 @@ sub print_histogram_query_times
 	for (my $i = 1; $i <= $#histogram_query_time; $i++) {
                 $histogram_info .= "<tr><td>$histogram_query_time[$i-1]-$histogram_query_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]}) .
                         "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
-		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
+		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > 0);
 		if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > $most_range_value) {
 			$most_range = "$histogram_query_time[$i-1]-$histogram_query_time[$i]ms";
 			$most_range_value = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
@@ -6054,7 +6068,7 @@ sub print_histogram_query_times
 	if ($overall_stat{histogram}{total} > 0) {
 		$histogram_info .= "<tr><td> &gt; $histogram_query_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{'-1'}) .
 			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{'-1'} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
-		$data{"> $histogram_query_time[-1]ms"} = $overall_stat{histogram}{query_time}{"-1"};
+		$data{"> $histogram_query_time[-1]ms"} = $overall_stat{histogram}{query_time}{"-1"} if ($overall_stat{histogram}{query_time}{"-1"} > 0);
 		if ($overall_stat{histogram}{query_time}{"-1"} > $most_range_value) {
 			$most_range = "> $histogram_query_time[-1]ms";
 			$most_range_value = $overall_stat{histogram}{query_time}{"-1"};
