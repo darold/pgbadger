@@ -6352,6 +6352,7 @@ sub print_most_frequent
                                                                                         <th>Hour</th>
                                                                                         <th>Count</th>
                                                                                         <th>Duration</th>
+                                                                                        <th>Avg duration</th>
                                                                                 </tr>
                                                                         </thead>
                                                                         <tbody>
