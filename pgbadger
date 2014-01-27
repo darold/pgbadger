@@ -661,7 +661,7 @@ my @BRACKETS = ('(', ')');
 map {$_ = quotemeta($_)} @BRACKETS;
 
 # Inbounds of query times histogram
-my @histogram_query_time = (0, 5, 10, 25, 50, 100, 500, 1000, 10000);
+my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
 
 # Get inbounds of query times histogram
 sub get_hist_inbound
