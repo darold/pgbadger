@@ -8805,6 +8805,11 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
 	    trackDecimals: 2,
 	    lineColor: 'purple',
         },
+	crosshair: {
+	    mode: 'x',
+	    color: '#000000',
+	    hideCursor: false,
+	},
         HtmlText: false,
     };
 
