@@ -737,7 +737,16 @@ if ($last_parsed && -e $last_parsed) {
 	if (open(IN, "$last_parsed")) {
 		my $line = <IN>;
 		close(IN);
-		($saved_last_line{datetime}, $saved_last_line{orig}) = split(/\t/, $line, 2);
+		($saved_last_line{datetime}, $saved_last_line{current_pos}, $saved_last_line{orig}) = split(/\t/, $line, 3);
+		# Preserve backward compatibility with version < 5
+		if ($saved_last_line{current_pos} =~ /\D/) {
+			$saved_last_line{orig} = $saved_last_line{current_pos} . "\t" . $saved_last_line{orig};
+			$saved_last_line{current_pos} = 0;
+		}
+		if ( ($format eq 'binary') || ($format eq 'csv') ) {
+			$saved_last_line{current_pos} = 0;
+		}
+
 	} else {
 		die "FATAL: can't read last parsed line from $last_parsed, $!\n";
 	}
@@ -749,6 +758,12 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 my $global_totalsize = 0;
 my @given_log_files = ( @log_files );
 
+# Verify that the file have not changed for incremental move
+if ( ($saved_last_line{current_pos} > 0) && ($#given_log_files == 0)) {
+	$saved_last_line{current_pos} = 0 if (&check_file_changed($given_log_files[0], $saved_last_line{datetime}));
+	$saved_last_line{current_pos}++ if ($saved_last_line{current_pos} > 0);
+}
+
 # log files must be erase when loading stats from binary format
 if ($format eq 'binary') {
 	$queue_size = 1;
@@ -757,6 +772,9 @@ if ($format eq 'binary') {
 }
 
 my $pipe;
+
+# Seeking to an old log position is not possible when multiple file are provided
+$saved_last_line{current_pos} = 0 if (!$last_parsed && ($#given_log_files > 0));
 
 # Start parsing all given files using multiprocess
 if ( ($queue_size > 1) || ($job_per_file > 1) ) {
@@ -862,7 +880,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
 	# Multiprocessing disabled, parse log files one by one
 	foreach my $logfile ( @given_log_files ) {
-		last if (&process_file($logfile));
+		last if (&process_file($logfile, '', $saved_last_line{current_pos}));
 	}
 }
 
@@ -871,10 +889,15 @@ if ($last_parsed) {
 	if (open(IN, "$tmp_last_parsed") ) {
 		while (my $line = <IN>) {
 			chomp($line);
-			my ($d, $l) = split(/\t/, $line, 2);
+			my ($d, $p, $l) = split(/\t/, $line, 3);
 			if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
 				$last_line{datetime} = $d;
-				$last_line{orig} = $l;
+				if ($p =~ /^\d+$/) {
+					$last_line{orig} = $l;
+					$last_line{current_pos} = $p;
+				} else {
+					$last_line{orig} = $p . "\t" . $l;
+				}
 			}
 		}
 		close(IN);
@@ -885,7 +908,8 @@ if ($last_parsed) {
 # Save last line parsed
 if ($last_parsed && scalar keys %last_line) {
 	if (open(OUT, ">$last_parsed")) {
-		print OUT "$last_line{datetime}\t$last_line{orig}\n";
+		$last_line{current_pos} ||= 0;
+		print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 		close(OUT);
 	} else {
 		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
@@ -1541,6 +1565,7 @@ sub process_file
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
+		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile");
 		if ($start_offset) {
 			$lfile->seek($start_offset, 0);
 		}
@@ -1826,6 +1851,8 @@ sub process_file
 			}
 			last if (($stop_offset > 0) && ($current_offset > $stop_offset));
 		}
+		$last_line{current_pos} = $current_offset if ($last_parsed &&  ($#given_log_files == 0));
+
 	}
 	close $lfile;
 
@@ -1916,7 +1943,8 @@ sub process_file
 	if ($last_parsed && scalar keys %last_line) {
 		if (open(OUT, ">>$tmp_last_parsed")) {
 			flock(OUT, 2) || return $getout;
-			print OUT "$last_line{datetime}\t$last_line{orig}\n";
+			$last_line{current_pos} ||= 0;
+			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 			close(OUT);
 		} else {
 			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
@@ -1941,6 +1969,88 @@ sub store_current_timestamp
 		$overall_stat{'last_log_ts'} = $t_timestamp;
 	}
 }
+
+# Method used to check if the file stores logs after the last incremental position or not
+# This position should have been saved in the incremental file and read in the $last_parsed at
+# start up. Here we just verify that the first date in file is before the last incremental date.
+sub check_file_changed
+{
+	my ($file, $saved_date) = @_;
+
+	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
+
+	# Compressed files do not allow seeking
+	if ($iscompressed) {
+		close($lfile);
+		return 1;
+	# do not seek if filesize is smaller than the seek position
+	} elsif ($saved_last_line{current_pos} > $totalsize) {
+		close($lfile);
+		return 1;
+	}
+
+	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
+	$gyear += 1900;
+	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+
+	%prefix_vars = ();
+	while (my $line = <$lfile>) {
+
+		if ($format =~ /syslog/) {
+
+			my @matches = ($line =~ $compiled_prefix);
+			if ($#matches >= 0) {
+
+				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+					$prefix_vars{$prefix_params[$i]} = $matches[$i];
+				}
+				# Standard syslog format does not have year information, months are
+				# three letters and day are not always with 2 digit.
+				if ($prefix_vars{'t_month'} !~ /\d/) {
+					$prefix_vars{'t_year'}  = $gyear;
+					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
+					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
+					# Take care of year overlapping
+					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
+						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
+					}
+				}
+				$prefix_vars{'t_timestamp'} =
+"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+					close($lfile);
+					return 0;
+				} else {
+					last;
+				}
+			}
+
+		} elsif ($format eq 'stderr') {
+
+			my @matches = ($line =~ $compiled_prefix);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+					$prefix_vars{$prefix_params[$i]} = $matches[$i];
+				}
+				if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
+					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
+				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
+					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+				}
+			}
+			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+				close($lfile);
+				return 0;
+			} else {
+				last;
+			}
+		}
+	}
+	close($lfile);
+
+	return 1;
+}
+
 
 # Method used to check if we have already reach the last parsing position in incremental mode
 # This position should have been saved in the incremental file and read in the $last_parsed at
@@ -9516,11 +9626,13 @@ sub get_log_file
 
 	# get file size
 	my $totalsize = (stat("$logf"))[7] || 0;
+	my $iscompressed = 1;
 
 	# Open a file handle
 	if ($logf !~ /\.(gz|bz2|zip)/i) {
 		open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
 		$totalsize = 0 if ($lfile eq '-');
+		$iscompressed = 0;
 	} else {
 		my $uncompress = $zcat;
 		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
@@ -9550,7 +9662,7 @@ sub get_log_file
 
 	# In list context returns the filehandle and the size of the file
 	if (wantarray()) {
-		return ($lfile, $totalsize);
+		return ($lfile, $totalsize, $iscompressed);
 	}
 	# In scalar context return size only
 	close($lfile);
@@ -9588,6 +9700,10 @@ sub split_logfile
 
 	my @chunks = (0);
 	my $i = 1;
+	if ($last_parsed && $saved_last_line{current_pos} && ($#given_log_files == 0)) {
+		$chunks[0] = $saved_last_line{current_pos};
+		$i = $saved_last_line{current_pos};
+	}
 	while ($i < $queue_size) {
 		push(@chunks, int(($totalsize/$queue_size) * $i));
 		$i++;
