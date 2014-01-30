@@ -1869,7 +1869,16 @@ sub process_file
 			mkdir("$outdir/$1") if (!-d "$outdir/$1");
 		}
 		mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
-		
+
+		# Mark the directory as needing index update
+		if (open(OUT, ">>$last_parsed.tmp")) {
+			flock(OUT, 2) || return $getout;
+			print OUT "$incr_date\n";
+			close(OUT);
+		} else {
+			&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
+		}
+
 		# Save binary data
 		my $filenum = $$;
 		$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
@@ -1880,13 +1889,6 @@ sub process_file
 		&dump_as_binary($fhb);
 		$fhb->close;
 		&init_stats_vars();
-		if (open(OUT, ">>$last_parsed.tmp")) {
-			flock(OUT, 2) || return $getout;
-			print OUT "$incr_date\n";
-			close(OUT);
-		} else {
-			&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
-		}
 
 	} elsif ($tmpoutfile) {
 
@@ -1961,7 +1963,16 @@ sub check_incremental_position
 				mkdir("$outdir/$1") if (!-d "$outdir/$1");
 			}
 			mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
-	
+
+			# Mark this directory as needing a reindex	
+			if (open(OUT, ">>$last_parsed.tmp")) {
+				flock(OUT, 2) || return 1;
+				print OUT "$incr_date\n";
+				close(OUT);
+			} else {
+				&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
+			}
+
 			# Save binary data
 			my $filenum = $$;
 			$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
@@ -1971,15 +1982,8 @@ sub check_incremental_position
 			}
 			&dump_as_binary($fhb);
 			$fhb->close;
-			&init_stats_vars();
 			$incr_date = $cur_date;
-			if (open(OUT, ">>$last_parsed.tmp")) {
-				flock(OUT, 2) || return 1;
-				print OUT "$incr_date\n";
-				close(OUT);
-			} else {
-				&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
-			}
+			&init_stats_vars();
 		}
 	}
 
