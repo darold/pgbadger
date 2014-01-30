@@ -7071,17 +7071,21 @@ sub load_stats
 
 	$overall_stat{queries_number} += $_overall_stat{queries_number};
 
-	$overall_stat{'first_log_ts'} = $_overall_stat{'first_log_ts'}
-		if not $overall_stat{'first_log_ts'} || ( $_overall_stat{'first_log_ts'}
-			&& ($overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'}) );
+	if ($_overall_stat{'first_log_ts'}) {
+		$overall_stat{'first_log_ts'} = $_overall_stat{'first_log_ts'}
+			if (!$overall_stat{'first_log_ts'} || 
+				($overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'}));
+	}
 
 	$overall_stat{'last_log_ts'} = $_overall_stat{'last_log_ts'}
 		if not $overall_stat{'last_log_ts'}
 			or $overall_stat{'last_log_ts'} lt $_overall_stat{'last_log_ts'};
 
-	$overall_stat{'first_query_ts'} = $_overall_stat{'first_query_ts'}
-		if not $overall_stat{'first_query_ts'} || ( $_overall_stat{'first_query_ts'}
-			&& ($overall_stat{'first_query_ts'} gt $_overall_stat{'first_query_ts'}) );
+	if ($_overall_stat{'first_query_ts'}) {
+		$overall_stat{'first_query_ts'} = $_overall_stat{'first_query_ts'}
+			if (!$overall_stat{'first_query_ts'} ||
+				($overall_stat{'first_query_ts'} gt $_overall_stat{'first_query_ts'}));
+	}
 
 	$overall_stat{'last_query_ts'} = $_overall_stat{'last_query_ts'}
 		if not $overall_stat{'last_query_ts'} 
