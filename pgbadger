@@ -846,8 +846,10 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		%RUNNING_PIDS = ();
 	}
 
-	# Load all data gathered by all the differents processes
+	# Clear previous statistics
 	&init_stats_vars();
+
+	# Load all data gathered by all the differents processes
 	foreach my $f (@tempfiles) {
 		next if (!-e "$f->[1]" || -z "$f->[1]");
 		my $fht = new IO::File;
@@ -950,15 +952,22 @@ if (!$incremental) {
 		&logmsg('HINT', "maybe there's no new entries in your log since last run.");
 	}
 	foreach $incr_date (@build_directories) {
+
 		$last_incr_date = $incr_date;
+
+		# Set the path to binary files
 		my $bpath = $incr_date;
 		$bpath =~ s/\-/\//g;
 		$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
+
+		# Get the week number following the date
 		my $wn = &get_week_number($1, $2, $3);
 		$weeks_directories{$wn} = "$1-$2" if (!exists $weeks_directories{$wn});
 
-		# Load all data gathered by all the differents processes
+		# First clear previous stored statistics
 		&init_stats_vars();
+
+		# Load all data gathered by all the differents processes
                 unless(opendir(DIR, "$outdir/$bpath")) {
                         die "Error: can't opendir $outdir/$bpath: $!";
                 }
@@ -1844,11 +1853,11 @@ sub process_file
 		if (!$tmpoutfile) {
 			if ($totalsize) {
 				if (($stop_offset > 0) && ($format ne 'csv')) {
-					print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=',$overall_stat{'queries_number'},$overall_stat{'errors_number'});
+					print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=',$overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
 				} elsif ($extension eq 'tsung') {
 					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $logfile);
 				} else {
-					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $overall_stat{'queries_number'},$overall_stat{'errors_number'});
+					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
 				}
 				print STDERR "\n";
 			}
@@ -1957,6 +1966,27 @@ sub check_incremental_position
 		# Check if the current day has changed, if so save data
 		$incr_date = $cur_date if (!$incr_date);
 		if ($cur_date gt $incr_date) {
+
+			# Get stats from all pending temporary storage
+			foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
+				# Stores last queries information
+				&store_queries($pid);
+			}
+			# Stores last temporary files and locks information
+			foreach my $pid (keys %cur_temp_info) {
+				&store_temporary_and_lock_infos($pid);
+			}
+			# Stores last temporary files and locks information
+			foreach my $pid (keys %cur_lock_info) {
+				&store_temporary_and_lock_infos($pid);
+			}
+
+			if ($extension eq 'tsung') {
+				foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
+					&store_tsung_session($pid);
+				}
+			}
+
 			# set path and create subdirectories
 			my $bpath = $incr_date;
 			while ($bpath =~ s/([^\-]+)\-/$1\//) {
@@ -3095,8 +3125,8 @@ sub print_overall_statistics
 							<li class="first"><span class="figure">$fmt_unique</span> <span class="figure-label">Number of unique normalized queries</span></li>
 							<li><span class="figure">$fmt_queries</span> <span class="figure-label">Number of queries</span></li>
 							<li><span class="figure">$fmt_duration</span> <span class="figure-label">Total query duration</span></li>
-							<li><span class="figure">$overall_stat{first_query_ts}</span> <span class="figure-label">First query</span></li>
-							<li><span class="figure">$overall_stat{last_query_ts}</span> <span class="figure-label">Last query</span></li>
+							<li><span class="figure">$overall_stat{'first_query_ts'}</span> <span class="figure-label">First query</span></li>
+							<li><span class="figure">$overall_stat{'last_query_ts'}</span> <span class="figure-label">Last query</span></li>
 							<li><span class="figure">$query_peak queries/s at $query_peak_date</span> <span class="figure-label">Query peak</span></li>
 						</ul>
 					</div>
@@ -7041,20 +7071,20 @@ sub load_stats
 	$overall_stat{queries_number} += $_overall_stat{queries_number};
 
 	$overall_stat{'first_log_ts'} = $_overall_stat{'first_log_ts'}
-		if not $overall_stat{'first_log_ts'}
-			or $overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'};
+		if not $overall_stat{'first_log_ts'} || ( $_overall_stat{'first_log_ts'}
+			&& ($overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'}) );
 
 	$overall_stat{'last_log_ts'} = $_overall_stat{'last_log_ts'}
 		if not $overall_stat{'last_log_ts'}
 			or $overall_stat{'last_log_ts'} lt $_overall_stat{'last_log_ts'};
 
-	$overall_stat{first_query_ts} = $_overall_stat{first_query_ts}
-		if not $overall_stat{first_query_ts}
-			or $overall_stat{first_query_ts} gt $_overall_stat{first_query_ts};
+	$overall_stat{'first_query_ts'} = $_overall_stat{'first_query_ts'}
+		if not $overall_stat{'first_query_ts'} || ( $_overall_stat{'first_query_ts'}
+			&& ($overall_stat{'first_query_ts'} gt $_overall_stat{'first_query_ts'}) );
 
-	$overall_stat{last_query_ts} = $_overall_stat{last_query_ts}
-		if not $overall_stat{last_query_ts}
-			or $overall_stat{last_query_ts} lt $_overall_stat{last_query_ts};
+	$overall_stat{'last_query_ts'} = $_overall_stat{'last_query_ts'}
+		if not $overall_stat{'last_query_ts'} 
+			or $overall_stat{'last_query_ts'} lt $_overall_stat{'last_query_ts'};
 
 	$overall_stat{errors_number} += $_overall_stat{errors_number};
 	$overall_stat{queries_duration} += $_overall_stat{queries_duration};
@@ -8687,11 +8717,11 @@ sub progress_bar
 			$char x $nchars . '>',
 			$got, $total, 100 * $got / +$total, ($queries || $tsung_queries)
 		);
-	} elsif($format eq 'binary') {
+	} elsif ($format eq 'binary') {
 		my $file = $_[-1];
 		sprintf(
 			"Loaded %d queries and %d events from binary file %s...\r",
-			$overall_stat{'queries_number'}, $overall_stat{'errors_number'}, $queries
+			$overall_stat{'queries_number'}, $overall_stat{'errors_number'}, $file
 		);
 	} else {
 		sprintf(
