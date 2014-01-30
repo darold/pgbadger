@@ -999,7 +999,7 @@ if (!$incremental) {
 		&init_stats_vars();
 
 		# Get all days of the current week
-		my @wdays = &get_wdays_per_month($wn, $weeks_directories{$wn});
+		my @wdays = &get_wdays_per_month($wn - 1, $weeks_directories{$wn});
 		my $wdir = '';
 
 		# Load data per day
@@ -1119,7 +1119,8 @@ if (!$incremental) {
 			$w =~ /week\-(\d+)/;
 			my $week = "Week $1";
 			# foreach week add link to daily reports
-			my @wdays = @{$ywdays{$1}};
+			my $wn = sprintf("%02d", $1 - 1);
+			my @wdays = @{$ywdays{$wn}};
 			my $data_content = '';
 			for (my $i = 0; $i <= $#wdays; $i++) { 
 				my $bpath = $wdays[$i];
@@ -9611,7 +9612,7 @@ sub get_week_number
 	}
 	my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $month - 1, $year - 1900);
 
-	return $weekNumber;
+	return sprintf("%02d", $weekNumber+1);
 }
 
 # Returns day number of the week of a given days
@@ -9660,7 +9661,7 @@ sub get_wdays_per_month
 				next;
 			}
 			my $weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
-			if ( ($weekNumber == $wn) || ($weekNumber eq '00') ) {
+			if ( ($weekNumber == $wn) || ( ($weekNumber eq '00') && (($wn == 1) || ($wn >= 52)) ) ) {
 				push(@retdays, "$year-$m-$day");
 				return @retdays if ($#retdays == 6);
 			}
