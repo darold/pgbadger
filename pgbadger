@@ -6354,6 +6354,40 @@ sub print_time_consuming
 		my $max = &convert_time($normalyzed_info{$k}{max});
 		my $avg = &convert_time($normalyzed_info{$k}{average});
 		my $query = &highlight_code($k);
+		my $details = '';
+		my %hourly_count = ();
+		my %hourly_duration = ();
+		my $days = 0;
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$2} $3";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
+				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+				$zday = "";
+			}
+		}
+		# Set graph dataset
+		my %graph_data = ();
+		foreach my $h ("00" .. "23") {
+			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
+			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+		}
+		$graph_data{count} =~ s/,$//;
+		$graph_data{duration} =~ s/,$//;
+		%hourly_count = ();
+		%hourly_duration = ();
+
+		my $query_histo = 
+		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+
 		print $fh qq{
 				<tr>
 				<td>$rank</td>
@@ -6369,6 +6403,7 @@ sub print_time_consuming
 						<!-- Details collapse -->
 					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Time consuming queries #$rank</small></h3>
+						$query_histo
 								<table class="table table-stripped table-condensed">
 									<thead>
 										<tr>
@@ -6380,22 +6415,6 @@ sub print_time_consuming
 										</tr>
 									</thead>
 									<tbody>
-};
-		my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
-				$zday = "";
-			}
-		}
-		print $fh qq{
 										$details
 									</tbody>
 								</table>
@@ -6475,6 +6494,40 @@ sub print_most_frequent
 		my $max = &convert_time($normalyzed_info{$k}{max});
 		my $avg = &convert_time($normalyzed_info{$k}{average});
 		my $query = &highlight_code($k);
+		my %hourly_count = ();
+		my %hourly_duration = ();
+		my $days = 0;
+                my $details = '';
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+				$zday = "";
+			}
+		}
+		# Set graph dataset
+		my %graph_data = ();
+		foreach my $h ("00" .. "23") {
+			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
+			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+		}
+		$graph_data{count} =~ s/,$//;
+		$graph_data{duration} =~ s/,$//;
+		%hourly_count = ();
+		%hourly_duration = ();
+
+                my $query_histo =
+                &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+
                 print $fh qq{
                                 <tr>
                                 <td>$rank</td>
@@ -6490,6 +6543,7 @@ sub print_most_frequent
                                                 <!-- Details collapse -->
                                             <div id="most-frequent-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
+						$query_histo
                                                                 <table class="table table-stripped table-condensed">
                                                                         <thead>
                                                                                 <tr>
@@ -6501,22 +6555,6 @@ sub print_most_frequent
                                                                                 </tr>
                                                                         </thead>
                                                                         <tbody>
-};
-                my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
-				$zday = "";
-			}
-		}
-                print $fh qq{
 										$details
 									</tbody>
 								</table>
@@ -6596,6 +6634,41 @@ sub print_slowest_queries
                 my $max = &convert_time($normalyzed_info{$k}{max});
                 my $avg = &convert_time($normalyzed_info{$k}{average});
                 my $query = &highlight_code($k);
+		my $details = '';
+		my %hourly_count = ();
+		my %hourly_duration = ();
+		my $days = 0;
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+				$zday = "";
+			}
+		}
+		# Set graph dataset
+		my %graph_data = ();
+		foreach my $h ("00" .. "23") {
+			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
+			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+		}
+		$graph_data{count} =~ s/,$//;
+		$graph_data{duration} =~ s/,$//;
+		%hourly_count = ();
+		%hourly_duration = ();
+
+		my $query_histo =
+		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+
                 print $fh qq{
                                 <tr>
                                 <td>$rank</td>
@@ -6611,6 +6684,7 @@ sub print_slowest_queries
                                                 <!-- Details collapse -->
                                             <div id="normalized-slowest-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
+						$query_histo
                                                                 <table class="table table-stripped table-condensed">
                                                                         <thead>
                                                                                 <tr>
@@ -6622,23 +6696,6 @@ sub print_slowest_queries
                                                                                 </tr>
                                                                         </thead>
                                                                         <tbody>
-};
-		my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
-				$zday = "";
-			}
-		}
-                print $fh qq{
 										$details
 									</tbody>
 								</table>
@@ -7053,6 +7110,32 @@ sub show_error_as_html
 		} elsif ($msg =~ /^PANIC: /) {
 			$error_level_class = 'text-panic';
 		}
+		my $details = '';
+                my %hourly_count = ();
+                my $days = 0;
+		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
+				$hourly_count{"$h"} += $error_info{$k}{chronos}{$d}{$h}{count};
+				$zday = "";
+			}
+		}
+                # Set graph dataset
+                my %graph_data = ();
+                foreach my $h ("00" .. "23") {
+                        $graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
+                }
+                $graph_data{count} =~ s/,$//;
+                %hourly_count = ();
+
+                my $error_histo =
+                &flotr2_histograph($graphid++, 'error_graph_'.$rank, $graph_data{count});
+
 		# Escape HTML code in error message
 		$msg = &escape_html($msg);
 		print $fh qq{
@@ -7066,6 +7149,7 @@ sub show_error_as_html
 						<!-- Details collapse -->
 					    <div id="most-frequent-errors-events-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Most Frequent Error / Event #$rank</small></h3>
+						$error_histo
 								<table class="table table-stripped table-condensed">
 									<thead>
 										<tr>
@@ -7075,19 +7159,6 @@ sub show_error_as_html
 										</tr>
 									</thead>
 									<tbody>
-};
-		my $details = '';
-		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
-			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
-				$zday = "";
-			}
-		}
-		print $fh qq{
 										$details
 									</tbody>
 								</table>
@@ -9121,6 +9192,150 @@ EOF
 
 }
 
+sub flotr2_histograph
+{
+	my ($buttonid, $divid, $data1, $data2) = @_;
+
+	if (!$data1) {
+		return qq{
+<div id="$divid" class="flotr-graph histo-graph"><blockquote><b>NO DATASET</b></blockquote></div>
+};
+	}
+	my $legend1 = 'Avg. queries';
+	my $legend2 = '';
+	my $dateTracker_lblopts = "'$legend1',";
+	$legend1 = "{ data: d1, label: \"$legend1\", color: \"#6e9dc9\", mouse:{track:true}, bars: {show: true,shadowSize: 0}, },";
+	if ($data2) {
+		$legend2 = 'Avg. duration';
+		$dateTracker_lblopts .= "'$legend2'";
+		$legend2 = "{ data: d2, label: \"$legend2\", color: \"#8dbd0f\", yaxis: 2},";
+	}
+	$dateTracker_lblopts =~ s/,$//;
+	$dateTracker_lblopts = "[$dateTracker_lblopts]";
+
+	my $dateTracker_dataopts = '';
+	if ($data1) {
+		$data1 = "var d1 = [$data1];";
+		$dateTracker_dataopts .= "d1,";
+	}
+	if ($data2) {
+		$data2 = "var d2 = [$data2];";
+		$dateTracker_dataopts .= "d2";
+	}
+	$dateTracker_dataopts =~ s/,$//;
+	$dateTracker_dataopts = "[$dateTracker_dataopts]";
+	
+	my $yaxis2 = "y2axis: { mode: \"normal\", title: \"Duration\", min: 0, color: \"#8dbd0f\", tickFormatter: function(val){ return pretty_print_number(val,'duration') }, },";
+	$yaxis2 = '' if (!$data2);
+
+	return <<EOF;
+<div id="$divid" class="flotr-graph histo-graph"></div>
+<script type="text/javascript">
+/* <![CDATA[ */
+(function mouse_zoom(container) {
+    $data1
+    $data2
+    var options = {
+        xaxis: {
+            min: 0,
+            max: 23,
+            tickDecimals: 0,
+            noTicks: 24,
+            mode: "normal",
+            labelsAngle: 45
+        },
+        yaxis: {
+            mode: "normal",
+            title: "Count",
+	    tickFormatter: function(val){ return pretty_print_number(val,'') },
+            noTicks: 4,
+        },
+	$yaxis2
+        selection: {
+            mode: "x",
+            fps: 30
+        },
+        legend: {
+	    show: false,
+            position: "nw",
+            backgroundColor: "#eee",
+	    backgroundOpacity: 0.4
+        },
+	mouse: {
+            track: true,
+	    trackFormatter: function(obj){ return histoHourTracker(obj,$dateTracker_lblopts,$dateTracker_dataopts) },
+            relative: true,
+	    sensibility: 5,
+	    trackDecimals: 2,
+	    lineColor: 'purple',
+        },
+	crosshair: {
+	    mode: 'x',
+	    color: '#000000',
+	    hideCursor: false,
+	},
+        HtmlText: false,
+    };
+
+    function drawGraph(opts) {
+        var o = Flotr._.extend(Flotr._.clone(options), opts );
+        return Flotr.draw(
+        	container,
+        	[
+        		$legend1
+        		$legend2
+    		],
+    		o
+    	);
+    }
+
+    var graph = drawGraph();
+    Flotr.EventAdapter.observe(container, "flotr:select", function(area) {
+        f = drawGraph({
+            xaxis: {
+                mode: "time",
+                labelsAngle: 45,
+                min: area.x1,
+                max: area.x2
+            },
+            yaxis: {
+                min: area.y1,
+                max: area.y2
+            }
+        });
+    });
+    Flotr.EventAdapter.observe(container, "flotr:click", function() {
+        drawGraph();
+    });
+    document.getElementById('reset$buttonid').onclick = function() {
+      graph.download.restoreCanvas();
+    };
+    document.getElementById('download$buttonid').onclick = function(){
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$img_format');
+    };
+    document.getElementById('toimage$buttonid').onclick = function() {
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$img_format', null, null, true);
+    };
+
+})(document.getElementById("$divid"));
+/* ]]> */
+</script>
+EOF
+
+}
+
 sub build_log_line_prefix_regex
 {
 	my %regex_map = (
@@ -9878,6 +10093,26 @@ function dateTracker(obj, gtype, labels, datasets)
 		if (datasets[i] != undefined) {
 			textToShow += '<br><span class="mfigure">'+pretty_print_number(datasets[i][pos][1], gtype)+' <small>'+labels[i]+'</small></span>';
 		}
+	}
+	textToShow += '</div>';
+	return textToShow;
+}
+
+function histoHourTracker(obj, labels, datasets) 
+{
+	var posValue = parseInt(obj.x);
+
+	// position in data arrays is equals to the hours, aka posValue
+        if (datasets == undefined) { 
+		return '<span class="mfigure">NO DATASET</span>';
+        }
+
+	var textToShow = '<div class="mouse-figures">';
+	if (datasets[0] != undefined) {
+		textToShow += '<span class="hfigure">'+pretty_print_number(datasets[0][posValue][1], '')+' <small>'+labels[0]+'</small></span><br>';
+	}
+	if (datasets[1] != undefined) {
+		textToShow += '<span class="hfigure">'+pretty_print_number(datasets[1][posValue][1], 'duration')+' <small>'+labels[1]+'</small></span><br>';
 	}
 	textToShow += '</div>';
 	return textToShow;
@@ -11031,6 +11266,19 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 		color:#ffffff;
 	}
 
+	.hfigure {
+		font-weight: bold;
+		font-size: 1.0em;
+		color:#8dbd0f;
+	}
+
+	.hfigure small {
+		font-weight: bold;
+		font-size: 0.6em;
+		color:#ffffff;
+	}
+
+
 	.navbar-inverse .navbar-inner {
 		background: #5f5555;
 		border: none;
@@ -11049,6 +11297,12 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 	width : 100%;
 	height: 320px;
 }
+.histo-graph {
+
+	width : 90%;
+	height: 80px;
+}
+
 /*
 		#show-hide-menu {
 			position: absolute;
@@ -11095,6 +11349,10 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 
 		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph {
 			width : 94.5%;
+		}
+
+		.histo-graph {
+			width : 84.5%;
 		}
 
 		.key-figures ul {
