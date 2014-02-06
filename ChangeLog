@@ -3,13 +3,13 @@
 This new major release adds some new features like incremental mode and SQL
 queries times histogram. There is also a hourly graphic representation of the
 count and average duration of top normalized queries. Same for errors or events,
-you will be able to see graphically at which hours they are occuring the most
+you will be able to see graphically at which hours they are occurring the most
 often.
 
 The incremental mode is an old request issued at PgCon Ottawa 2012 that concern
 the ability to construct incremental reports with successive runs of pgBadger.
 It is now possible to run pgbadger each days or even more, each hours, and have
-cumulatives reports per day and per week. A top index page allow you to go
+cumulative reports per day and per week. A top index page allow you to go
 directly to the weekly and daily reports.
 
 This mode have been build with simplicity in mind so running pgbadger by cron
@@ -17,7 +17,7 @@ as follow:
 
 	0 23 * * * pgbadger -q -I -O /var/www/pgbadger/ /var/log/postgresql.log
 
-is enough to have daily and weelky reports viewable using your browser.
+is enough to have daily and weekly reports viewable using your browser.
 
 You can take a look at a sample report at http://dalibo.github.io/pgbadger/demov5/index.html
 
@@ -28,7 +28,7 @@ single log file. Let's say you have a weekly rotated log file and want to run
 pgBadger each days. With 2GB of log per day, pgbadger was spending 5 minutes
 per block of 2 GB to reach the last position in the log, so at the end of the
 week this feature will save you 35 minutes. Now pgBadger will start parsing
-new log entries immediatly. This feature is compatible with the multiprocess
+new log entries immediately. This feature is compatible with the multiprocess
 mode using -j option (n processes for one log file).
 
 Histogram of query times is a new report in top queries slide that shows the
