@@ -1,3 +1,162 @@
+2014-02-05 version 5.0
+
+This new major release adds some new features like incremental mode and SQL
+queries times histogram. There is also a hourly graphic representation of the
+count and average duration of top normalized queries. Same for errors or events,
+you will be able to see graphically at which hours they are occuring the most
+often.
+
+The incremental mode is an old request issued at PgCon Ottawa 2012 that concern
+the ability to construct incremental reports with successive runs of pgBadger.
+It is now possible to run pgbadger each days or even more, each hours, and have
+cumulatives reports per day and per week. A top index page allow you to go
+directly to the weekly and daily reports.
+
+This mode have been build with simplicity in mind so running pgbadger by cron
+as follow:
+
+	0 23 * * * pgbadger -q -I -O /var/www/pgbadger/ /var/log/postgresql.log
+
+is enough to have daily and weelky reports viewable using your browser.
+
+You can take a look at a sample report at http://dalibo.github.io/pgbadger/demov5/index.html
+
+There's also a useful improvement to allow pgBadger to seek directly to the
+last position in the same log file after a successive execution. This feature
+is only available using the incremental mode or the -l option and parsing a
+single log file. Let's say you have a weekly rotated log file and want to run
+pgBadger each days. With 2GB of log per day, pgbadger was spending 5 minutes
+per block of 2 GB to reach the last position in the log, so at the end of the
+week this feature will save you 35 minutes. Now pgBadger will start parsing
+new log entries immediatly. This feature is compatible with the multiprocess
+mode using -j option (n processes for one log file).
+
+Histogram of query times is a new report in top queries slide that shows the
+query times distribution during the analyzed period. For example:
+
+	Range 		Count 		Percentage
+	--------------------------------------------
+	0-1ms		10,367,313	53.52%
+	1-5ms		799,883		4.13%
+	5-10ms		451,646		2.33%
+	10-25ms		2,965,883	15.31%
+	25-50ms		4,510,258	23.28%
+	50-100ms	180,975		0.93%
+	100-500ms	87,613		0.45%
+	500-1000ms	5,856		0.03%
+	1000-10000ms	2,697		0.01%
+	> 10000ms	74		0.00%
+
+
+There is also some graphic and report improvements, like the mouse tracker
+formatting that have been reviewed. It now shows a vertical crosshair and
+all dataset values at a time when mouse pointer moves over series. Automatic
+queries formatting has also been changed, it is now done on double click
+event as simple click was painful when you want to copy some part of the
+queries.
+
+The report "Simultaneous Connections" has been relabeled into "Established
+Connections", it is less confusing as many people think that this is the number
+of simultaneous sessions, which is not the case. It only count the number of
+connections established at same time.
+
+Autovacuum reports now associate database name to the autovacuum and autoanalyze
+entries. Statistics now refer to "dbname.schema.table", previous versions was only
+showing the pair "schema.table".
+
+This release also adds Session peak information and a report about Simultaneous
+sessions. Parameters log_connections and log_disconnections must be enabled in
+postgresql.conf.
+
+Complete ChangeLog:
+
+	- Fix size of SQL queries columns to prevent exceeding screen width.
+	- Add new histogram reports on top normalized queries and top errors
+	  or event. It shows at what hours and in which quantity the queries
+	  or errors appears.
+	- Add seeking to last parser position in log file in incremental mode.
+	  This prevent parsing all the file to find the last line parse from
+	  previous run.  This only works when parsing a single flat file, -j
+	  option is permitted. Thanks to ioguix for the kick.
+	- Rewrite reloading of last log time from binary files.
+	- Fix missing statistics of last parsed queries in incremental mode.
+	- Fix bug in incremental mode that prevent reindexing a previous day.
+	  Thanks to Martin Prochazka for the great help.
+	- Fix missing label "Avg duration" on column header in details of Most
+	  frequent queries (N).
+	- Add vertical crosshair on graph.
+	- Fix case where queries and events was not updated when using -b and
+	  -e command line. Thanks to Nicolas Thauvin for the report.
+	- Fix week sorting on incremental report main index page. Thanks to
+	  Martin Prochazka for the report.
+	- Add "Histogram of query times" report to show statistics like
+	  0-100ms : 80%, 100-500ms :14%, 500-1000ms : 3%, > 1000ms : 1%.
+	  Thanks to tmihail for the feature request.
+	- Format mouse tracker on graphs to show all dataset value at a time.
+	- Add control of -o vs -O option with incremental mode to prevent
+	  wrong use.
+	- Change log level of missing LAST_PARSED.tmp file to WARNING and
+	  add a HINT.
+	- Update copyright date to 2014
+	- Fix empty reports of connections. Thanks to Reeshna Ramakrishnan
+	  for the report.
+	- Fix display of connections peak when no connection was reported.
+	- Fix warning on META_MERGE for ExtUtils::MakeMaker < 6.46. Thanks
+	  to Julien Rouhaud for the patch.
+	- Add documentation about automatic incremental mode.
+	- Add incremental mode to pgBadger. This mode will build a report
+	  per day and a cumulative report per week. It also create an index
+	  interface to easiest access to the different report. Must be run,
+	  for example, as:
+		pgbadger /var/log/postgresql.log.1 -I -O /var/www/pgbadger/
+	  after a daily PostgreSQL log file rotation.
+	- Add -O | --outdir path to specify the directory where out file
+	  must be saved.
+	- Automatic queries formatting is now done on double click event,
+	  simple click was painful when you want to copy some part of the
+	  queries. Thanks to Guillaume Smet for the feature request.
+	- Remove calls of binmode to force html file output to be utf8 as
+	  there is some bad side effect. Thanks to akorotkov for the report.
+	- Remove use of Time::HiRes Perl module as some distributions does
+	  not include this module by default in core Perl install.
+	- Fix "Wide character in print" Perl message by setting binmode
+	  to :utf8. Thanks to Casey Allen Shobe for the report.
+	- Fix application name search regex to handle application name with
+	  space like "pgAdmin III - Query Tool".
+	- Fix wrong timestamps saved with top queries. Thanks to Herve Werner
+	  for the report.
+	- Fix missing logs types statitics when using binary mode. Thanks to
+	  Herve Werner for the report.
+	- Fix Queries by application table column header: Database replaced
+	  by Application. Thanks to Herve Werner for the report.
+	- Add "Max number of times the same event was reported" report in
+	  Global stats Events tab.
+	- Replace "Number of errors" by "Number of ERROR entries" and add
+	  "Number of FATAL entries".
+	- Replace "Number of errors" by "Number of events" and "Total errors
+	  found" by "Total events found" in Events reports. Thanks to Herve
+	  Werner for the report.
+	- Fix title error in Sessions per database.
+	- Fix clicking on the info link to not go back to the top of the page.
+	  Thanks to Guillaume Smet for the report and solution.
+	- Fix incremental report from binary output where binary data was not
+	  loaded if no queries were present in log file. Thanks to Herve Werner
+	  for the report.
+	- Fix parsing issue when log_error_verbosity = verbose. Thanks to vorko
+	  for the report.
+	- Add Session peak information and a report about Simultaneous sessions.
+	  log_connections+log_disconnections must be enabled in postgresql.conf.
+	- Fix wrong requests number in Queries by user and by host. Thanks to
+	  Jehan-Guillaume de Rorthais for the report.
+	- Fix issue with rsyslog format failing to parse logs. Thanks to Tim
+	  Sampson for the report.
+	- Associate autovacuum and autoanalyze log entry to the corresponding
+	  database name. Thanks to Herve Werner for the feature request.
+	- Change "Simultaneous Connections" label into "Established Connections",
+	  it is less confusing as many people think that this is the number of
+	  simultaneous sessions, which is not the case. It only count the number
+	  of connections established at same time. Thanks to Ronan Dunklau for
+	  the report.
 
 2013-11-08 version 4.1
 
