@@ -43,7 +43,7 @@ use File::Temp qw/ tempfile /;
 use IO::Handle;
 use IO::Pipe;
 
-$VERSION = '4.1';
+$VERSION = '5.0';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
@@ -5955,7 +5955,7 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
-				<div class="sql" ondblclick="sql_format(this)">$query</div>
+				<div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div>
 				 $example
 			<!-- Examples collapse -->
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
@@ -5972,7 +5972,7 @@ sub print_lock_queries_report
 				$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 				$details .= " ]";
 				print $fh qq{
-					<dt><div class="sql" ondblclick="sql_format(this)">$query</div></dt>
+					<dt><div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div></dt>
 					<dd><pre>$details</pre></dd>
 };
 
@@ -6032,7 +6032,7 @@ sub print_lock_queries_report
 				<td>$rank</td>
 				<td>$time</td>
 				<td id="queries-that-waited-most-examples-details-rank-$rank">
-					<div class="sql" ondblclick="sql_format(this)">$query</div>
+					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6101,7 +6101,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
-					<div class="sql" ondblclick="sql_format(this)">$query</div>
+					<div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div>
 					$example
 				<!-- Examples collapse -->
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
@@ -6117,7 +6117,7 @@ sub print_tempfile_report
 					$details .= "Remote: $normalyzed_info{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$k}{samples}{$d}{remote});
 					$details .= "Application: $normalyzed_info{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$k}{samples}{$d}{app});
 					print $fh qq{
-						<dt><div class="sql" ondblclick="sql_format(this)">$query</div></dt>
+						<dt><div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div></dt>
 						<dd><pre>$details</pre></dd>
 };
 
@@ -6176,7 +6176,7 @@ sub print_tempfile_report
 				<td>$rank</td>
 				<td>$size</td>
 				<td id="queries-generating-largest-temporary-files-examples-details-rank-$rank">
-					<div class="sql" ondblclick="sql_format(this)">$query</div>
+					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6304,7 +6304,7 @@ sub print_slowest_individual_queries
 				<td>$rank</td>
 				<td>$duration</td>
 				<td id="slowest-individual-queries-examples-rank-$rank">
-					<div class="sql" ondblclick="sql_format(this)">$query</div>
+					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6399,7 +6399,7 @@ sub print_time_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-queries-examples-details-rank-$rank">
-					<div class="sql" ondblclick="sql_format(this)">$query</div>
+					<div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div>
 						<!-- Details collapse -->
 					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6436,7 +6436,7 @@ sub print_time_consuming
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql" ondblclick="sql_format(this)">$query</div></dt>
+								<dt><div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div></dt>
 								<dd><pre>$details</pre></dd>
 };
 		}
@@ -6539,7 +6539,7 @@ sub print_most_frequent
                                 <td>$max</td>
                                 <td>$avg</td>
                                 <td id="most-frequent-queries-examples-details-rank-$rank">
-                                        <div class="sql" ondblclick="sql_format(this)">$query</div>
+                                        <div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div>
                                                 <!-- Details collapse -->
                                             <div id="most-frequent-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6576,7 +6576,7 @@ sub print_most_frequent
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql" ondblclick="sql_format(this)">$query</div></dt>
+								<dt><div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div></dt>
 								<dd><pre>$details</pre></dd>
 };
 		}
@@ -6680,7 +6680,7 @@ sub print_slowest_queries
                                 </td>
                                 <td>$duration</td>
                                 <td id="normalized-slowest-queries-examples-details-rank-$rank">
-                                        <div class="sql" ondblclick="sql_format(this)">$query</div>
+                                        <div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div>
                                                 <!-- Details collapse -->
                                             <div id="normalized-slowest-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6717,7 +6717,7 @@ sub print_slowest_queries
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql" ondblclick="sql_format(this)">$query</div></dt>
+								<dt><div class="sql sql-middlesize" ondblclick="sql_format(this)">$query</div></dt>
 								<dd><pre>$details</pre></dd>
 };
 		}
@@ -10057,6 +10057,9 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .st0 {color: #ff0000;}
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
+.sql-smallsize  {width: 450px; }
+.sql-middlesize  {width: 650px; }
+.sql-largesize  {width: 900px; }
 </style>
 <script type="text/javascript">
 /* <![CDATA[ */
