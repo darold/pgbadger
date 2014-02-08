@@ -18,6 +18,22 @@ $ENV{DESTDIR} =~ s/\/$//;
 # Default install path
 my $DESTDIR = $ENV{DESTDIR} || '';
 my $INSTALLDIRS = $ENV{INSTALLDIRS} || 'site';
+my %merge_compat = ();
+
+if ($ExtUtils::MakeMaker::VERSION >= 6.46) {
+	%merge_compat = (
+		'META_MERGE'   => {
+			resources  => {
+				homepage => 'http://projects.dalibo.org/pgbadger',
+				repository  => {
+					type => 'git',
+					git => 'git@github.com:dalibo/pgbadger.git',
+					web => 'https://github.com/dalibo/pgbadger',
+				},
+			},
+		}
+	);
+}
 
 WriteMakefile(
 	'DISTNAME'	=> 'pgbadger',
@@ -34,16 +50,6 @@ WriteMakefile(
 	'DESTDIR'      => $DESTDIR,
 	'INSTALLDIRS'  => $INSTALLDIRS,
 	'clean'	       => {},
-	($ExtUtils::MakeMaker::VERSION < 6.46 ? () : 'META_MERGE'   => {
-		resources  => {
-			homepage => 'http://projects.dalibo.org/pgbadger',
-			repository  => {
-				type => 'git',
-				git => 'git@github.com:dalibo/pgbadger.git',
-				web => 'https://github.com/dalibo/pgbadger',
-			},
-		},
-        }
-	)
+	%merge_compat
 );
 
