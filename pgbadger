@@ -9110,7 +9110,7 @@ sub flotr2_piegraph
 	my @datadef = ();
 	my @contdef = ();
 	my $i       = 1;
-	foreach my $k (sort keys %data) {
+	foreach my $k (sort { if ( ($a =~ /(\d+)/) && ($b =~ /(\d+)/) ) { ($a =~ /(\d+)/)[0] <=> ($b =~ /(\d+)/)[0]; } else { $a cmp $b; } } keys %data) {
 		push(@datadef, "var d$i = [ [0,$data{$k}] ];\n");
 		my $color = '';
 		$color = ", color: \"$colors[$i-1]\"" if (($i-1) <= $#colors);
