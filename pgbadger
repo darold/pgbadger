@@ -1566,6 +1566,7 @@ sub process_file
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
+		$start_offset ||= 0;
 		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile");
 		if ($start_offset) {
 			$lfile->seek($start_offset, 0);
