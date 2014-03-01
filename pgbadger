@@ -322,7 +322,8 @@ my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\
 my $orphan_stderr_line = '';
 
 # Set default format
-$format ||= &autodetect_format($log_files[0]);
+my $frmt = &autodetect_format($log_files[0]);
+$format ||= $frmt;
 
 if ($format eq 'syslog2') {
 	$other_syslog_line =
@@ -858,6 +859,9 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		}
 		sleep(1);
 	}
+	# This is the last file, so the progress bar can be closed
+	#$pipe->print("QUIT\n");
+
 	# Terminate the process logger
 	foreach my $k (keys %RUNNING_PIDS) {
 		kill(10, $k);
@@ -1411,16 +1415,17 @@ sub multiprocess_progressbar
 	my $cursize  = 0;
 	my $nqueries = 0;
 	my $nerrors  = 0;
+	my $last     = 0;
 	$pipe->reader();
 	while (my $r = <$pipe>) {
 		chomp($r);
 		my @infos = split(/\s+/, $r);
+		last if ($infos[0] eq 'QUIT');
 		$cursize  += $infos[0];
 		$nqueries += $infos[1];
 		$nerrors  += $infos[2];
 		$cursize = $totalsize if ($cursize > $totalsize);
 		print STDERR &progress_bar($cursize, $totalsize, 25, '=', $nqueries, $nerrors);
-		last if ($cursize >= $totalsize);
 	}
 	print STDERR "\n";
 
@@ -8877,8 +8882,10 @@ sub autodetect_format
 			last if (($nfound > 10) || ($nline > 5000));
 		}
 		$tfile->close();
-		if (!$fmt || ($nfound < 10)) {
-			die "FATAL: unable to detect log file format from $file, please use -f option.\n";
+		if (!$format) {
+			if (!$fmt || ($nfound < 10)) {
+				die "FATAL: unable to detect log file format from $file, please use -f option.\n";
+			}
 		}
 
 		if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
