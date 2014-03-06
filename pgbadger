@@ -42,6 +42,7 @@ use File::Spec qw/ tmpdir /;
 use File::Temp qw/ tempfile /;
 use IO::Handle;
 use IO::Pipe;
+use FileHandle;
 
 $VERSION = '5.0';
 
