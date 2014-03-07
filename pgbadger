@@ -1128,47 +1128,26 @@ if (!$incremental) {
 	}
 	my @dyears = grep { !/^\./ && /^\d{4}$/ } readdir(DIR);
 	closedir DIR;
-	my @day_names = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
-	my @month_names = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec');
 	foreach my $y (sort { $b <=> $a } @dyears) {
 		print $fh qq{
 <h1>Year $y</h1>
-<div class="alert alert-info">
-<ul class="pgb-popover inline">
+	<table class="table table-condensed"><tr>
 };
 		# foreach year directory look for week directories
 		unless(opendir(DIR, "$outdir/$y")) {
 			die "Error: can't opendir $outdir/$y: $!";
 		}
 
-		my @yweeks = grep { !/^\./ && /^week-\d+$/ } readdir(DIR);
+		my @ymonths = grep { /^\d{2}$/ } readdir(DIR);
 		closedir DIR;
-		my %ywdays = &get_wdays_per_year($y);
-		foreach my $w (sort { &sort_by_week($a, $b); } @yweeks) {
-			$w =~ /week\-(\d+)/;
-			my $week = "Week $1";
-			# foreach week add link to daily reports
-			my $wn = sprintf("%02d", $1 - 1);
-			my @wdays = @{$ywdays{$wn}};
-			my $data_content = '';
-			for (my $i = 0; $i <= $#wdays; $i++) { 
-				my $bpath = $wdays[$i];
-				$bpath =~ s/(\d+)\-(\d+)\-(\d+)/$1\/$2\/$3/g;
-				my $mmonth = $month_names[$2 - 1];
-				my $dday = $3;
-				if (-e "$outdir/$bpath/index.html") {
-					$data_content .= "<a href='$bpath/index.html' target='new'>$day_names[$i] $mmonth $dday $y</a><br>";
-				} else {
-					$data_content .= "$day_names[$i] $mmonth $dday $y<br>";
-				}
-			}
-			print $fh qq{
-	<li><a href="#" class="btn btn-primary" data-toggle="popover" title="<a href='$y/$w/index.html' target='new'>$week: view report</a>" data-content="$data_content"><br>$week</a></li>
-};
+		my $i = 1;
+		foreach my $m (sort {$a <=> $b } @ymonths) {
+			print $fh "</tr>\n<tr>\n" if ( ($i%4) == 0 );
+			print $fh "<td><span class=\"span3\">", &get_calendar($y, $m), "</span></td>\n";
+			$i++;
 		}
 		print $fh qq{
-</ul>
-</div>
+	</tr></table>
 };
 	}
 	print $fh qq{
@@ -10036,6 +10015,81 @@ sub get_wdays_per_year
 	}
 
 	return %result;
+}
+
+####
+# Display calendar
+####
+sub get_calendar
+{
+	my ($year, $month) = @_;
+
+	my $str = "<table class=\"table table-striped table-hover table-condensed\">\n";
+	my @wday = qw(Mo Tu We Th Fr Sa Su);
+	#my @wday = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
+	my @std_day = qw(Su Mo Tu We Th Fr Sa);
+	my %day_lbl = ();
+	for (my $i = 0; $i <= $#wday; $i++) {
+		$day_lbl{$wday[$i]} = $wday[$i];
+	}
+	$str .= "<thead><tr><td>&nbsp;</td>";
+	map { $str .= '<th>' . $day_lbl{$_} . '</th>'; } @wday;
+	$str .= "</tr></thead>\n<tbody>\n";
+	my @currow = ('','','','','','','');
+	my $d = '';
+	my $wd = 0;
+	my $wn = 0;
+	my $week = '';
+	for $d ("01" .. "31") {
+		$wd = &get_day_of_week($year,$month,$d);
+		$wn =  &get_week_number($year,$month,$d);
+		next if ($wn == -1);
+		if ( !-e "$outdir/$year/$month/$d/index.html" ) {
+			$currow[$wd-1] = "<td>$d</td>";
+		} else {
+			$currow[$wd-1] = "<td><a href=\"$year/$month/$d/index.html\" target=\"new\">$d</a></td>";
+		}
+		if ($wd == 7) {
+			$week = sprintf("%02d", $wn);
+			if (-e "$outdir/$year/week-$week/index.html") {
+				$week = "<th><a href=\"$year/week-$week/index.html\" target=\"new\">$week</a>&nbsp;</th>";
+			} else {
+				$week = "<th>$week</th>";
+			}
+			map { $_ = "<td>&nbsp;</td>" if ($_ eq ''); } @currow;
+			$str .= "<tr>$week" . join('', @currow) . "</tr>\n";
+			@currow = ('','','','','','','');
+		}
+	} 
+	if ($wd != 7) {
+		$week = sprintf("%02d", $wn);
+		if (-e "$outdir/$year/week-$week/index.html") {
+			$week = "<th><a href=\"$year/week-$week/index.html\" target=\"new\">$week</a>&nbsp;</th>";
+		} else {
+			$week = "<th>$week</th>";
+		}
+		map { $_ = "<td>&nbsp;</td>" if ($_ eq ''); } @currow;
+		$str .= "<tr>$week" . join('', @currow) . "</tr>\n";
+		@currow = ('','','','','','','');
+	}
+	$str .=  "</tbody>\n</table>\n";
+
+	my %month_name = (
+		'01' => 'January', '02' => 'Febuary', '03' => 'March', '04' => 'April',
+		'05' => 'May', '06' => 'June', '07' => 'Jully', '08' => 'August',
+		'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
+	);
+	return qq{
+              <div class="panel panel-default">
+                <div class="panel-heading">
+                <i class="fa fa-cogs fa-2x pull-left fa-border"></i>&nbsp;<h2>$month_name{$month}</h2>
+                </div>
+                <div class="panel-body">
+		$str
+                </div>
+              </div>
+};
+
 }
 
 
