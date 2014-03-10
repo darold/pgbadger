@@ -10017,6 +10017,11 @@ sub get_wdays_per_year
 	return %result;
 }
 
+sub IsLeapYear
+{
+	return (((@_[0] & 3) == 0) && ((@_[0] % 100 != 0) || (@_[0] % 400 == 0)));
+} 
+
 ####
 # Display calendar
 ####
@@ -10041,6 +10046,9 @@ sub get_calendar
 	my $wn = 0;
 	my $week = '';
 	for $d ("01" .. "31") {
+		last if (($d == 31) && grep(/^$month$/, '04','06','09','11'));
+		last if (($d == 30) && ($month eq '02'));
+		last if (($d == 29) && ($month eq '02') && !&IsLeapYear($year));
 		$wd = &get_day_of_week($year,$month,$d);
 		$wn =  &get_week_number($year,$month,$d);
 		next if ($wn == -1);
@@ -10061,7 +10069,7 @@ sub get_calendar
 			@currow = ('','','','','','','');
 		}
 	} 
-	if ($wd != 7) {
+	if ( ($wd != 7) || ($currow[0] ne '') ) {
 		$week = sprintf("%02d", $wn);
 		if (-e "$outdir/$year/week-$week/index.html") {
 			$week = "<th><a href=\"$year/week-$week/index.html\" target=\"new\">$week</a>&nbsp;</th>";
@@ -10075,7 +10083,7 @@ sub get_calendar
 	$str .=  "</tbody>\n</table>\n";
 
 	my %month_name = (
-		'01' => 'January', '02' => 'Febuary', '03' => 'March', '04' => 'April',
+		'01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
 		'05' => 'May', '06' => 'June', '07' => 'Jully', '08' => 'August',
 		'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 	);
