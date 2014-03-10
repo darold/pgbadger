@@ -9014,7 +9014,7 @@ sub flotr2_graph
 
 document.writeln('<div class="pull-right btn-group"><input type="button" class="btn" value="To Image" id="toimage$buttonid" onclick="return false;">'+
 	'<input type="button" class="btn" value="Download" id="download$buttonid" onclick="return false;">' +
-	'<input type="button" class="btn" value="Reset" id="reset$buttonid" onclick="return false;"></div>'
+	'<input type="button" class="btn" value="To Chart" id="reset$buttonid" onclick="return false;"></div>'
 	);
     $data1
     $data2
