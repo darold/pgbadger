@@ -1690,6 +1690,9 @@ sub process_file
 						next;
 					} 
 
+					# Some log line may be written by applications
+					next if ($line =~ / LOG:  /);
+
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
@@ -1706,6 +1709,9 @@ sub process_file
 
 				# Collect orphaned lines of multiline queries
 				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
+
+					# Some log line may be written by applications
+					next if ($line =~ / LOG:  /);
 
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
@@ -1810,6 +1816,10 @@ sub process_file
 						$cur_info{$cur_pid}{parameters} .= " $line";
 						next;
 					} 
+
+					# Some log line may be written by applications
+					next if ($line =~ / LOG:  /);
+
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
