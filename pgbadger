@@ -10152,7 +10152,7 @@ div#littleToc li { font-size:11px; list-style-type:none; padding:0px; text-inden
 div#littleToc a { color:#000000; padding:2px; margin:2px; display:block; text-decoration:none; border:1px solid #CCCCCC; }
 div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 
-.flotr-graph { color: #ac1316; }
+.flotr-graph { color: #ac1316; z-index: 99;}
 .sql  {font-family:monospace;}
 .sql .imp {font-weight: bold; color: red;}
 .sql .kw1 {color: #993333; font-weight: bold; text-transform: uppercase;}
@@ -10847,7 +10847,7 @@ button.btn.btn-mini,input[type="submit"].btn.btn-mini{*padding-top:1px;*padding-
 .icon-filter{background-position:-408px -144px;}
 .icon-briefcase{background-position:-432px -144px;}
 .icon-fullscreen{background-position:-456px -144px;}
-.btn-group{position:relative;display:inline-block;*display:inline;*zoom:1;font-size:0;vertical-align:middle;white-space:nowrap;*margin-left:.3em;}.btn-group:first-child{*margin-left:0;}
+.btn-group{position:relative;display:inline-block;*display:inline;*zoom:1;font-size:0;vertical-align:middle;white-space:nowrap;*margin-left:.3em;z-index: 90; }.btn-group:first-child{*margin-left:0;}
 .btn-group+.btn-group{margin-left:5px;}
 .btn-toolbar{font-size:0;margin-top:10px;margin-bottom:10px;}.btn-toolbar>.btn+.btn,.btn-toolbar>.btn-group+.btn,.btn-toolbar>.btn+.btn-group{margin-left:5px;}
 .btn-group>.btn{position:relative;-webkit-border-radius:0;-moz-border-radius:0;border-radius:0;}
