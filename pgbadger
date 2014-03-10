@@ -911,7 +911,7 @@ if ($last_parsed) {
 }
 
 # Save last line parsed
-if ($last_parsed && scalar keys %last_line) {
+if ($last_parsed && $last_line{datetime} && $last_line{orig}) {
 	if (open(OUT, ">$last_parsed")) {
 		$last_line{current_pos} ||= 0;
 		print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
