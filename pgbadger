@@ -4424,6 +4424,10 @@ sub print_checkpoint
 					my $rd = &average_per_minutes($m, $avg_minutes);
 
 					if ($checkpoint_info{wbuffer}) {
+						$chk_dataavg{wbuffer}{"$rd"} = 0 if (!exists $chk_dataavg{wbuffer}{"$rd"});
+						$chk_dataavg{file_added}{"$rd"} = 0 if (!exists $chk_dataavg{file_added}{"$rd"});
+						$chk_dataavg{file_removed}{"$rd"} = 0 if (!exists $chk_dataavg{file_removed}{"$rd"});
+						$chk_dataavg{file_recycled}{"$rd"} = 0 if (!exists $chk_dataavg{file_recycled}{"$rd"});
 						if (exists $per_minute_info{$tm}{$h}{$m}{checkpoint}) {
 							$chk_dataavg{wbuffer}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{wbuffer} || 0);
 							$chk_dataavg{file_added}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_added} || 0);
@@ -4932,6 +4936,8 @@ sub print_vacuum
 				next if (!exists $per_minute_info{$tm}{$h}{$m});
 
 				my $rd = &average_per_minutes($m, $avg_minutes);
+				$v_dataavg{acount}{"$rd"} = 0 if (!exists $v_dataavg{acount}{"$rd"});
+				$v_dataavg{vcount}{"$rd"} = 0 if (!exists $v_dataavg{vcount}{"$rd"});
 
 				if (exists $per_minute_info{$tm}{$h}{$m}{autovacuum}) {
 					$v_dataavg{vcount}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{autovacuum}{count} || 0);
