@@ -3673,10 +3673,38 @@ sub compute_query_graphs
 
 					my $rd = &average_per_minutes($m, $avg_minutes);
 
-					$p_dataavg{prepare}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{prepare}
-						if (exists $per_minute_info{$tm}{$h}{$m}{prepare});
-					$p_dataavg{prepare}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{prepare}
-						if (exists $per_minute_info{$tm}{$h}{$m}{parse});
+					if (!exists $p_dataavg{prepare}{"$rd"}) {
+						$p_dataavg{prepare}{"$rd"} = 0;
+						$p_dataavg{execute}{"$rd"} = 0;
+
+						$q_dataavg{count}{"$rd"} = 0;
+						$q_dataavg{duration}{"$rd"} = 0;
+						$q_dataavg{max}{"$rd"} = 0;
+						$q_dataavg{min}{"$rd"} = 0;
+
+						if (!$disable_query) {
+							foreach my $action (@SQL_ACTION) {
+								$a_dataavg{$action}{count}{"$rd"} = 0;
+								$a_dataavg{$action}{duration}{"$rd"} = 0;
+								$a_dataavg{$action}{max}{"$rd"} = 0;
+								$a_dataavg{$action}{min}{"$rd"} = 0;
+							}
+							$a_dataavg{write}{count}{"$rd"} = 0;
+							$a_dataavg{write}{duration}{"$rd"} = 0;
+						}
+
+						$c_dataavg{average}{"$rd"} = 0;
+						$c_dataavg{max}{"$rd"} = 0;
+						$c_dataavg{min}{"$rd"} = 0;
+						$s_dataavg{average}{"$rd"} = 0;
+						$s_dataavg{max}{"$rd"} = 0;
+						$s_dataavg{min}{"$rd"} = 0;
+					}
+					if (exists $per_minute_info{$tm}{$h}{$m}{prepare}) {
+						$p_dataavg{prepare}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{prepare};
+					} elsif (exists $per_minute_info{$tm}{$h}{$m}{parse}) {
+						$p_dataavg{prepare}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{parse};
+					}
 					$p_dataavg{execute}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{execute}
 						if (exists $per_minute_info{$tm}{$h}{$m}{execute});
 
@@ -3689,8 +3717,6 @@ sub compute_query_graphs
 						}
 
 						# Search minimum and maximum during this minute
-						$q_dataavg{max}{"$rd"} = 0 if (!$q_dataavg{max}{"$rd"});
-						$q_dataavg{min}{"$rd"} = 0 if (!$q_dataavg{min}{"$rd"});
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{query}{second}}) {
 							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
 								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} > $q_dataavg{max}{"$rd"});
@@ -3708,8 +3734,6 @@ sub compute_query_graphs
 									$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 								}
 								# Search minimum and maximum during this minute
-								$a_dataavg{$action}{max}{"$rd"} = 0 if (! exists $a_dataavg{$action}{max}{"$rd"});
-								$a_dataavg{$action}{min}{"$rd"} = 0 if (! exists $a_dataavg{$action}{min}{"$rd"});
 								foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{$action}{second}}) {
 									$a_dataavg{$action}{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{$action}{second}{$s}
 										if ($per_minute_info{$tm}{$h}{$m}{$action}{second}{$s} > $a_dataavg{$action}{max}{"$rd"});
@@ -3726,8 +3750,6 @@ sub compute_query_graphs
 						$c_dataavg{average}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{connection}{count};
 
 						# Search minimum and maximum during this minute
-						$c_dataavg{max}{"$rd"} = 0 if (!$c_dataavg{max}{"$rd"});
-						$c_dataavg{min}{"$rd"} = 0 if (!$c_dataavg{min}{"$rd"});
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{connection}{second}}) {
 							$c_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{connection}{second}{$s}
 								if ($per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} > $c_dataavg{max}{"$rd"});
@@ -3743,8 +3765,6 @@ sub compute_query_graphs
 						$s_dataavg{average}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{session}{count};
 
 						# Search minimum and maximum during this minute
-						$s_dataavg{max}{"$rd"} = 0 if (!$s_dataavg{max}{"$rd"});
-						$s_dataavg{min}{"$rd"} = 0 if (!$s_dataavg{min}{"$rd"});
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{session}{second}}) {
 							$s_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{session}{second}{$s}
 								if ($per_minute_info{$tm}{$h}{$m}{session}{second}{$s} > $s_dataavg{max}{"$rd"});
@@ -4691,6 +4711,8 @@ sub print_temporary_file
 					next if (!exists $per_minute_info{$tm}{$h}{$m});
 					my $rd = &average_per_minutes($m, $avg_minutes);
 					if ($tempfile_info{count}) {
+						$t_dataavg{size}{"$rd"} = 0 if (!exists $t_dataavg{size}{"$rd"});
+						$t_dataavg{count}{"$rd"} = 0 if (!exists $t_dataavg{count}{"$rd"});
 						if (exists $per_minute_info{$tm}{$h}{$m}{tempfile}) {
 							$t_dataavg{size}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{size} || 0);
 							$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{count} || 0);
@@ -10035,7 +10057,7 @@ sub get_wdays_per_year
 
 sub IsLeapYear
 {
-	return (((@_[0] & 3) == 0) && ((@_[0] % 100 != 0) || (@_[0] % 400 == 0)));
+	return ((($_[0] & 3) == 0) && (($_[0] % 100 != 0) || ($_[0] % 400 == 0)));
 } 
 
 ####
