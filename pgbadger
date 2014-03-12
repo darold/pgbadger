@@ -7905,7 +7905,7 @@ sub validate_log_line
 	if ($#dbappname >= 0) {
 
 		# Log line does not match the required dbname
-		if (!$prefix_vars{'t_appname'} || !grep(/^$prefix_vars{'t_appname'}$/i, @dbappname)) {
+		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname)) {
 			return 0;
 		}
 	}
@@ -7919,7 +7919,7 @@ sub validate_log_line
 	if ($#exclude_appname >= 0) {
 
 		# Log line matches the excluded appname
-		if ($prefix_vars{'t_appname'} && grep(/^$prefix_vars{'t_appname'}$/i, @exclude_appname)) {
+		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname)) {
 			return 0;
 		}
 	}
