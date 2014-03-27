@@ -8387,15 +8387,15 @@ sub parse_query
 	{
 		$prefix_vars{'t_duration'} = $1;
 		$t_action = $2;
-		my $k = &get_hist_inbound($1);
-		$overall_stat{histogram}{query_time}{$k}++;
-		$overall_stat{histogram}{total}++;
 		$t_action =~ s/ from fetch//;
 		$t_action = 'prepare' if ($t_action eq 'parse');
 		$overall_stat{$t_action}++;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
 		# Skipping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
+		my $k = &get_hist_inbound($prefix_vars{'t_duration'});
+		$overall_stat{histogram}{query_time}{$k}++;
+		$overall_stat{histogram}{total}++;
 	# Log line without duration at all
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
 		$t_action = $1;
