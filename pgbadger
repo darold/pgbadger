@@ -9887,7 +9887,7 @@ sub get_log_file
 		}
 		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $xzcat;
-		
+		}
 		&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 
 		# Open a pipe to zcat program for compressed log
