@@ -95,8 +95,10 @@ my $zcat_cmd                = 'gunzip -c';
 my $zcat                    = $zcat_cmd;
 my $bzcat                   = 'bunzip2 -c';
 my $ucat                    = 'unzip -p';
+my $xzcat                   = 'xzcat';
 my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
+my $xz_uncompress_size      = "xz -l %f | grep %f | awk '{print \$5}'";
 my $format                  = '';
 my $outfile                 = '';
 my $outdir                  = '';
@@ -9872,7 +9874,7 @@ sub get_log_file
 	my $iscompressed = 1;
 
 	# Open a file handle
-	if ($logf !~ /\.(gz|bz2|zip)/i) {
+	if ($logf !~ /\.(gz|bz2|zip|xz)/i) {
 		open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
 		$totalsize = 0 if ($lfile eq '-');
 		$iscompressed = 0;
@@ -9883,6 +9885,9 @@ sub get_log_file
 		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $ucat;
 		}
+		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
+			$uncompress = $xzcat;
+		
 		&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 
 		# Open a pipe to zcat program for compressed log
@@ -9891,11 +9896,14 @@ sub get_log_file
 		# Real size of the file is unknown, try to find it
 		# bz2 does not report real size
 		$totalsize = 0;
-		if ($logf =~ /\.(gz|zip)/i) {
+		if ($logf =~ /\.(gz|zip|xz)/i) {
 			my $cmd_file_size = $gzip_uncompress_size;
 			if ($logf =~ /\.zip/i) {
 				$cmd_file_size = $zip_uncompress_size;
 			}
+			if ($logf =~ /\.xz/i) {
+				$cmd_file_size = $xz_uncompress_size;
+			}			
 			$cmd_file_size =~ s/\%f/$logf/g;
 			$totalsize = `$cmd_file_size`;
 			chomp($totalsize);
