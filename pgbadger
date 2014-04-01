@@ -1879,8 +1879,6 @@ sub process_file
 			if ($totalsize) {
 				if (($stop_offset > 0) && ($format ne 'csv')) {
 					print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=',$overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
-				} elsif ($extension eq 'tsung') {
-					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $logfile);
 				} else {
 					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
 				}
@@ -8567,10 +8565,6 @@ sub store_queries
 			}
 		}
 
-		# Truncate the query if requested by the user
-		$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
-
 		# Dump queries as tsung request and return
 		if ($extension eq 'tsung') {
 			if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
@@ -8582,8 +8576,17 @@ sub store_queries
 					$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
 				}
 			}
+
+			# Stores global statistics
+			$overall_stat{'queries_number'}++;
+			$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			return;
 		}
+
+		# Truncate the query if requested by the user
+		$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
+
 	}
 
 	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
@@ -8929,7 +8932,7 @@ sub progress_bar
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
 			$char x $nchars . '>',
-			$got, $total, 100 * $got / +$total, ($queries || $tsung_queries)
+			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'})
 		);
 	} elsif ($format eq 'binary') {
 		my $file = $_[-1];
