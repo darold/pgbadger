@@ -9957,11 +9957,31 @@ sub split_logfile
 		$chunks[0] = $saved_last_line{current_pos};
 		$i = $saved_last_line{current_pos};
 	}
+	my ($lfile, $totalsize) = &get_log_file($logf); # Get file handle and size of the file
 	while ($i < $queue_size) {
-		push(@chunks, int(($totalsize/$queue_size) * $i));
+		my $pos = int(($totalsize/$queue_size) * $i);
+		#Goto the position of that chunk
+		$lfile->seek($pos, 0);
+		#Get the lenght of the current line
+		my $line = <$lfile>;
+		my $Length = length $line ;
+		#Move to the end of that line
+		$pos = $pos + $Length;
+
+		push(@chunks, $pos);
 		$i++;
 	}
 	push(@chunks, $totalsize);
+	
+        #BEGIN TEST
+        #$i=0;
+        #while ($i < $queue_size) {
+        #    $lfile->seek(@chunks[$i], 0);
+        #    my $line = <$lfile>;
+        #    &logmsg('DEBUG', $line);
+        #    $i++;
+        #}
+        #END TEST
 
 	return @chunks;
 }
