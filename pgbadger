@@ -2322,12 +2322,14 @@ sub set_top_sample
 	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
 	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
 
-	my $i = 1;
-	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
-		if ($i > $sample) {
-			delete $normalyzed_info{$norm}{samples}{$k};
+	if ($sample > 0) {
+		my $i = 1;
+		foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
+			if ($i > $sample) {
+				delete $normalyzed_info{$norm}{samples}{$k};
+			}
+			$i++;
 		}
-		$i++;
 	}
 }
 
@@ -7208,7 +7210,11 @@ sub show_error_as_html
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-errors-events-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
+};
+		print $fh qq{
 <p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-errors-events-examples-rank-$rank">Examples</button></p>							   
+} if (($sample > 0) && ($#{$error_info{$k}{date}} >= 0));
+		print $fh qq{
 						<!-- Examples collapse -->
 						<div id="most-frequent-errors-events-examples-rank-$rank" class="collapse">
 							<dl>
@@ -8628,12 +8634,14 @@ sub store_queries
 		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 
 		# Stores normalized query samples
-		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
-						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-		&set_top_error_sample(
-			$normalized_error,          $cur_last_log_timestamp,      $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
-			$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}, $cur_info{$t_pid}{dbname}
-		);
+		if ($sample > 0) {
+			my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
+							"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
+			&set_top_error_sample(
+				$normalized_error, $cur_last_log_timestamp, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
+				$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}, $cur_info{$t_pid}{dbname}
+			);
+		}
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 
