@@ -415,7 +415,29 @@ if ($extension eq 'tsung') {
 	if (not defined $fh) {
 		die "FATAL: can't write to $outfile, $!\n";
 	}
-	print $fh "<sessions>\n";
+	print $fh qq{
+<?xml version="1.0"?>
+<!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
+<tsung loglevel="notice" version="1.0">
+
+    <!-- Configuration du client -->
+    <clients>
+        <client host="localhost" use_controller_vm="true"/>
+    </clients>
+
+    <!-- Configuration du serveur -->
+    <servers>
+        <server host="localhost" port="5432" type="tcp"></server>
+    </servers>
+
+    <load>
+        <arrivalphase phase="1" duration="1" unit="second">
+            <users maxnumber="1" arrivalrate="1" unit="second"></users>
+        </arrivalphase>
+    </load>
+
+<sessions>
+};
 	$fh->close();
 
 } else {
@@ -962,7 +984,7 @@ if (!$incremental) {
 		if (not defined $fh) {
 			die "FATAL: can't write to $outfile, $!\n";
 		}
-		print $fh "</sessions>\n";
+		print $fh "</sessions>\n</tsung>\n";
 		$fh->close();
 	}
 
