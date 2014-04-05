@@ -113,7 +113,7 @@ my @exclude_user            = ();
 my @exclude_appname         = ();
 my $ident                   = '';
 my $top                     = 0;
-my $sample                  = 0;
+my $sample                  = 3;
 my $extension               = '';
 my $maxlength               = 0;
 my $graph                   = 1;
@@ -336,9 +336,6 @@ if ($format eq 'syslog2') {
 
 # Set default top query
 $top ||= 20;
-
-# Set the default number of samples
-$sample ||= 3;
 
 # Set the default extension and output format
 if (!$extension) {
