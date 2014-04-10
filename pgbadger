@@ -2300,9 +2300,9 @@ sub set_top_locked_info
 # Stores the top N slowest queries
 sub set_top_slowest
 {
-	my ($q, $dt, $date, $db, $user, $remote, $app) = @_;
+	my ($q, $dt, $date, $db, $user, $remote, $app, $bind) = @_;
 
-	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app)]);
+	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app, $bind)]);
 
 	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} @top_slowest;
 	@top_slowest = ();
@@ -2316,7 +2316,7 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($norm, $q, $dt, $date, $db, $user, $remote, $app) = @_;
+	my ($norm, $q, $dt, $date, $db, $user, $remote, $app, $bind) = @_;
 
 	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
 	$normalyzed_info{$norm}{samples}{$dt}{date}  = $date;
@@ -2324,6 +2324,7 @@ sub set_top_sample
 	$normalyzed_info{$norm}{samples}{$dt}{user}  = $user;
 	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
 	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
+	$normalyzed_info{$norm}{samples}{$dt}{bind}  = $bind;
 
 	if ($sample > 0) {
 		my $i = 1;
@@ -2635,6 +2636,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$j++;
@@ -2694,6 +2696,7 @@ Report not supported by text format
 					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					$db =~ s/^, / - /;
 					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 					$j++;
@@ -2730,6 +2733,7 @@ Report not supported by text format
 			$db .= ", user: $top_slowest[$i]->[4]" if ($top_slowest[$i]->[4]);
 			$db .= ", remote: $top_slowest[$i]->[5]" if ($top_slowest[$i]->[5]);
 			$db .= ", app: $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
+			$db .= ", bind query: yes" if ($top_slowest[$i]->[7]);
 			$db =~ s/^, //;
 			print $fh $i + 1, ") " . &convert_time($top_slowest[$i]->[0]) . "$db - $top_slowest[$i]->[2]\n";
 			print $fh "--\n";
@@ -2763,6 +2767,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
@@ -2798,6 +2803,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
@@ -2834,6 +2840,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{yes});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
 				$i++;
@@ -6019,10 +6026,11 @@ sub print_lock_queries_report
 				$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$details .= " ]";
 				print $fh qq{
 					<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
-					<dd><pre>$details</pre></dd>
+					<pre>$details</pre>
 };
 
 			}
@@ -6074,6 +6082,7 @@ sub print_lock_queries_report
 		$details .= " - <b>User:</b> $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
 		$details .= " - <b>Remote:</b> $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
 		$details .= " - <b>Application:</b> $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
+		$details .= " - <b>Bind query:</b> yes" if ($top_locked_info[$i]->[7]);
 		$details .= " ]";
 		my $time = &convert_time($top_locked_info[$i]->[0]);
 		print $fh qq{
@@ -6165,9 +6174,10 @@ sub print_tempfile_report
 					$details .= "User: $normalyzed_info{$k}{samples}{$d}{user}<br/>" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$details .= "Remote: $normalyzed_info{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$k}{samples}{$d}{remote});
 					$details .= "Application: $normalyzed_info{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					print $fh qq{
 						<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
-						<dd><pre>$details</pre></dd>
+						<pre>$details</pre>
 };
 
 				}
@@ -6218,6 +6228,7 @@ sub print_tempfile_report
 			$details .= " - <b>User:</b> $top_tempfile_info[$i]->[4]" if ($top_tempfile_info[$i]->[4]);
 			$details .= " - <b>Remote:</b> $top_tempfile_info[$i]->[5]" if ($top_tempfile_info[$i]->[5]);
 			$details .= " - <b>Application:</b> $top_tempfile_info[$i]->[6]" if ($top_tempfile_info[$i]->[6]);
+			$details .= " - <b>Bind yes:</b> yes" if ($top_tempfile_info[$i]->[7]);
 			$details .= " ]";
 			my $query = &highlight_code($top_tempfile_info[$i]->[2]);
 			print $fh qq{
@@ -6346,6 +6357,7 @@ sub print_slowest_individual_queries
 		$details .= " - <b>User:</b> $top_slowest[$i]->[4]" if ($top_slowest[$i]->[4]);
 		$details .= " - <b>Remote:</b> $top_slowest[$i]->[5]" if ($top_slowest[$i]->[5]);
 		$details .= " - <b>Application:</b> $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
+		$details .= " - <b>Bind query:</b> yes" if ($top_slowest[$i]->[7]);
 		$details .= " ]";
 		my $query = &highlight_code($top_slowest[$i]->[2]);
 		print $fh qq{
@@ -6482,11 +6494,12 @@ sub print_time_consuming
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
-								<dd><pre>$details</pre></dd>
+								<pre>$details</pre>
 };
 		}
 		print $fh qq{
@@ -6622,11 +6635,12 @@ sub print_most_frequent
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
-								<dd><pre>$details</pre></dd>
+								<pre>$details</pre>
 };
 		}
                 print $fh qq{
@@ -6763,11 +6777,12 @@ sub print_slowest_queries
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
-								<dd><pre>$details</pre></dd>
+								<pre>$details</pre>
 };
 		}
                 print $fh qq{
@@ -7244,7 +7259,7 @@ sub show_error_as_html
 			}
 			print $fh qq{
 								<dt><span class="$error_level_class">$message</span></dt>
-								<dd><pre>$details</pre></dd>
+								<pre>$details</pre>
 };
 		}
 		print $fh qq{
@@ -7580,7 +7595,9 @@ sub load_stats
 	foreach my $stmt (keys %_normalyzed_info) {
 
 		foreach my $dt (keys %{$_normalyzed_info{$stmt}{samples}} ) {
-			$normalyzed_info{$stmt}{samples}{$dt} = $_normalyzed_info{$stmt}{samples}{$dt};
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{samples}{$dt}} ) {
+				$normalyzed_info{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$stmt}{samples}{$dt}{$k};
+			}
 		}
 
 		# Keep only the top N samples
@@ -8424,6 +8441,7 @@ sub parse_query
 		my $k = &get_hist_inbound($prefix_vars{'t_duration'});
 		$overall_stat{histogram}{query_time}{$k}++;
 		$overall_stat{histogram}{total}++;
+		$prefix_vars{'t_bind'} = 1;
 	# Log line without duration at all
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
 		$t_action = $1;
@@ -8441,6 +8459,7 @@ sub parse_query
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
 		# Skipping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
+		$prefix_vars{'t_bind'} = 1;
 	# Log line that could not be parsed
 	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} !~
@@ -8486,6 +8505,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
+	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'};
 
 }
 
@@ -8749,7 +8769,7 @@ sub store_queries
 			if ($cur_info{$t_pid}{duration}) {
 
 				# Update top slowest queries statistics
-				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind});
 
 				# Store normalized query total duration
 				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
@@ -8765,7 +8785,7 @@ sub store_queries
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 				# Store normalized query samples
-				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname});
+				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind});
 			}
 		}
 	}
