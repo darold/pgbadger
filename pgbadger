@@ -4619,16 +4619,16 @@ $drawn_graphs{checkpointfiles_graph}
 			}
 			if (scalar keys %cinf) {
 				$buffers .= "<td>" . &comma_numbers($cinf{wbuffer}) .
-					"</td><td>" . &comma_numbers($cinf{write}) .
-					"</td><td>" . &comma_numbers($cinf{sync}) .
-					"</td><td>" . &comma_numbers($cinf{total}) .
+					"</td><td>" . &comma_numbers($cinf{write}) . 's' .
+					"</td><td>" . &comma_numbers($cinf{sync}) . 's' .
+					"</td><td>" . &comma_numbers($cinf{total}) . 's' .
 					"</td></tr>";
 				$files .= "<td>" . &comma_numbers($cinf{file_added}) .
 					"</td><td>" . &comma_numbers($cinf{file_removed}) .
 					"</td><td>" . &comma_numbers($cinf{file_recycled}) .
-					"<td>" . &comma_numbers($cainf{sync_files}) .
-					"</td><td>" . &comma_numbers($cainf{sync_longest}) .
-					"</td><td>" . &comma_numbers($cainf{sync_avg}) .
+					"<td>" . &comma_numbers($cainf{sync_files}) . 's' .
+					"</td><td>" . &comma_numbers($cainf{sync_longest}) . 's' .
+					"</td><td>" . &comma_numbers($cainf{sync_avg}) . 's' .
 					"</td></tr>";
 			} else {
 				$buffers .= "<td>0</td><td>0</td><td>0</td><td>0</td></tr>";
@@ -4637,7 +4637,7 @@ $drawn_graphs{checkpointfiles_graph}
 			if (exists $cinf{warning}) {
 				$warnings .= "<td>" . &comma_numbers($cinf{warning}) . "</td><td>" .
 					&comma_numbers(sprintf( "%.2f", ($cinf{warning_seconds} || 0) / ($cinf{warning} || 1))) .
-					 "</td></tr>";
+					 "s</td></tr>";
 			} else {
 				$warnings .= "<td>0</td><td>0</td></tr>";
 			}
