@@ -1868,7 +1868,7 @@ sub process_file
 				# unknown format
 				&logmsg('DEBUG', "Unknown line format: $line");
 			}
-			last if (($stop_offset > 0) && ($current_offset > $stop_offset));
+			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
 		$last_line{current_pos} = $current_offset if ($last_parsed &&  ($#given_log_files == 0));
 
@@ -9987,20 +9987,10 @@ sub split_logfile
 	}
 	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
 	while ($i < $queue_size) {
-		push(@chunks, int(($totalsize/$queue_size) * $i));
 		my $pos = int(($totalsize/$queue_size) * $i);
-		my $safe_pos = $pos;
-		# Goto the position of that chunk and rewind to the begining of the line
-		# Do not rewind more than 1OK to prevent infinite loop.
-		my $line = '';
-		my @matches = ();
-		do {
-			$lfile->seek($pos, 0);
-			$line = <$lfile>;
-			@matches = ($line =~ $compiled_prefix);
-			$pos-- if (@matches < 0);
-		} while ((@matches < 0) && ($pos > ($safe_pos - 10000)));
-		# Get EOL position
+		$lfile->seek($pos, 0);
+		#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
+		$pos= $pos + length(<$lfile>) - 1;
 		push(@chunks, $pos);
 		$i++;
 	}
