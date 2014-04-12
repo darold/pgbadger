@@ -18,6 +18,8 @@ Options:
 
     -a | --average minutes : number of minutes to build the average graphs of
                              queries and connections.
+    -A | --histo-avg minutes: number of minutes to build the histogram graphs
+                             of queries. Default 60 minutes.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
@@ -195,9 +197,15 @@ There's also some pie reports of distribution about:
 	Connections per database/user/client.
 	Autovacuum and autoanalyze per table.
 
-All charts are zoomable and can be saved as PNG images. SQL queries reported are highlighted and beautified automatically.
+All charts are zoomable and can be saved as PNG images. SQL queries reported are
+highlighted and beautified automatically.
 
-You can also have incremental reports with one report per day and a cumulative report per week.
+You can also have incremental reports with one report per day and a cumulative
+report per week.
+
+Histogram granularity can be adjusted using the -A command line option. By default
+they will report the mean of each top queries/error occuring per hour, but you can
+specify the granularity down to the minute.
 
 =head1 REQUIREMENT
 

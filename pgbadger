@@ -142,6 +142,7 @@ my $disable_temporary       = 0;
 my $disable_checkpoint      = 0;
 my $disable_autovacuum      = 0;
 my $avg_minutes             = 5;
+my $histo_avg_minutes       = 60;
 my $last_parsed             = '';
 my $report_title            = 'PostgreSQL log analyzer';
 my $log_line_prefix         = '';
@@ -217,6 +218,7 @@ $| = 1;
 # get the command line parameters
 my $result = GetOptions(
 	"a|average=i"              => \$avg_minutes,
+	"A|histo-average=i"        => \$histo_avg_minutes,
 	"b|begin=s"                => \$from,
 	"c|dbclient=s"             => \@dbclient,
 	"C|nocomment!"             => \$remove_comment,
@@ -308,9 +310,16 @@ $progress = 0 if ($quiet);
 $avg_minutes ||= 5;
 $avg_minutes = 60 if ($avg_minutes > 60);
 $avg_minutes = 1  if ($avg_minutes < 1);
+$histo_avg_minutes ||= 60;
+$histo_avg_minutes = 60 if ($histo_avg_minutes > 60);
+$histo_avg_minutes = 1  if ($histo_avg_minutes < 1);
 my @avgs   = ();
 for (my $i = 0 ; $i < 60 ; $i += $avg_minutes) {
 	push(@avgs, sprintf("%02d", $i));
+}
+my @histo_avgs = ();
+for (my $i = 0 ; $i < 60 ; $i += $histo_avg_minutes) {
+	push(@histo_avgs, sprintf("%02d", $i));
 }
 
 # Set error like log level regex
@@ -1221,7 +1230,9 @@ Arguments:
 Options:
 
     -a | --average minutes : number of minutes to build the average graphs of
-                             queries and connections.
+                             queries and connections. Default 5 minutes.
+    -A | --histo-avg minutes: number of minutes to build the histogram graphs
+                             of queries. Default 60 minutes.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
@@ -6426,28 +6437,45 @@ sub print_time_consuming
 			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
 					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
-				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
 					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+				}
+				foreach my $rd (@histo_avgs) {
+					next if (!exists $hourly_count{"$h:$rd"});
+					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				}
 			}
 		}
 		# Set graph dataset
 		my %graph_data = ();
+		# we need a start date for flotr2 graph, we don't care of it as we just display HH:MM
+		my $etime = timegm_nocheck(0, 0, 0, 18, 4, 80) * 1000;
+		my $ctime = 0;
 		foreach my $h ("00" .. "23") {
-			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
-			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+			foreach my $rd (@histo_avgs) {
+				$ctime = (($h*3600)+($rd*60))*1000 + $etime;
+				$graph_data{count} .= "[$ctime, " . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+				$graph_data{duration} .= "[$ctime, " . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
+			}
 		}
 		$graph_data{count} =~ s/,$//;
 		$graph_data{duration} =~ s/,$//;
 		%hourly_count = ();
 		%hourly_duration = ();
+		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
 		my $query_histo = 
-		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
 
 		print $fh qq{
 				<tr>
@@ -6567,28 +6595,45 @@ sub print_most_frequent
 			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
 					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
 					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+				}
+				foreach my $rd (@histo_avgs) {
+					next if (!exists $hourly_count{"$h:$rd"});
+					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				}
 			}
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
-			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+		# we need a start date for flotr2 graph, we don't care of it as we just display HH:MM
+		my $etime = timegm_nocheck(0, 0, 0, 18, 4, 80) * 1000;
+		my $ctime = 0;
+                foreach my $h ("00" .. "23") {
+			foreach my $rd (@histo_avgs) {
+				$ctime = (($h*3600)+($rd*60))*1000 + $etime;
+				$graph_data{count} .= "[$ctime, " . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+				$graph_data{duration} .= "[$ctime, " . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
+			}
 		}
 		$graph_data{count} =~ s/,$//;
 		$graph_data{duration} =~ s/,$//;
 		%hourly_count = ();
 		%hourly_duration = ();
+		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
                 my $query_histo =
-                &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+                &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
 
                 print $fh qq{
                                 <tr>
@@ -6709,28 +6754,45 @@ sub print_slowest_queries
 			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
 				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
 					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$hourly_count{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{count};
-				$hourly_duration{"$h"} += $normalyzed_info{$k}{chronos}{$d}{$h}{duration};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
 					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+				}
+				foreach my $rd (@histo_avgs) {
+					next if (!exists $hourly_count{"$h:$rd"});
+					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				}
 			}
 		}
 		# Set graph dataset
 		my %graph_data = ();
+		# we need a start date for flotr2 graph, we don't care of it as we just display HH:MM
+		my $etime = timegm_nocheck(0, 0, 0, 18, 4, 80) * 1000;
+		my $ctime = 0;
 		foreach my $h ("00" .. "23") {
-			$graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
-			$graph_data{duration} .= "[$h, " . (int($hourly_duration{"$h"} / ($hourly_count{"$h"} || 1)) || 0) . "],";
+			foreach my $rd (@histo_avgs) {
+				$ctime = (($h*3600)+($rd*60))*1000 + $etime;
+				$graph_data{count} .= "[$ctime, " . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+				$graph_data{duration} .= "[$ctime, " . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
+			}
 		}
 		$graph_data{count} =~ s/,$//;
 		$graph_data{duration} =~ s/,$//;
 		%hourly_count = ();
 		%hourly_duration = ();
+		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
 		my $query_histo =
-		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration});
+		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
 
                 print $fh qq{
                                 <tr>
@@ -7185,20 +7247,35 @@ sub show_error_as_html
 			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
 					&comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
-				$hourly_count{"$h"} += $error_info{$k}{chronos}{$d}{$h}{count};
 				$zday = "";
+				foreach my $m (sort keys %{$error_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $error_info{$k}{chronos}{$d}{$h}{min}{$m};
+				}
+				foreach my $rd (@histo_avgs) {
+					next if (!exists $hourly_count{"$h:$rd"});
+					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+						&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+				}
 			}
 		}
                 # Set graph dataset
                 my %graph_data = ();
+		# we need a start date for flotr2 graph, we don't care of it as we just display HH:MM
+		my $etime = timegm_nocheck(0, 0, 0, 18, 4, 80) * 1000;
+		my $ctime = 0;
                 foreach my $h ("00" .. "23") {
-                        $graph_data{count} .= "[$h, " . (int($hourly_count{"$h"}/$days) || 0) . "],";
+			foreach my $rd (@histo_avgs) {
+				$ctime = (($h*3600)+($rd*60))*1000 + $etime;
+				$graph_data{count} .= "[$ctime, " . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+			}
                 }
-                $graph_data{count} =~ s/,$//;
+		$graph_data{count} =~ s/,$//;
                 %hourly_count = ();
+		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
                 my $error_histo =
-                &flotr2_histograph($graphid++, 'error_graph_'.$rank, $graph_data{count});
+                &flotr2_histograph($graphid++, 'error_graph_'.$rank, $graph_data{count}, '', $etime, $ctime);
 
 		# Escape HTML code in error message
 		$msg = &escape_html($msg);
@@ -7495,6 +7572,9 @@ sub load_stats
 			foreach my $day (keys %{ $_error_info{$q}{chronos} }) {
 				foreach my $hour (keys %{$_error_info{$q}{chronos}{$day}}) {
 					$error_info{$q}{chronos}{$day}{$hour}{count} += $_error_info{$q}{chronos}{$day}{$hour}{count};
+					foreach my $min (keys %{$_error_info{$q}{chronos}{$day}{$hour}{min}}) {
+						$error_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_error_info{$q}{chronos}{$day}{$hour}{min}{$min};
+					}
 				}
 			}
 		}
@@ -7625,6 +7705,14 @@ sub load_stats
 					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{count};
 				$normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration} +=
 					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration};
+				foreach my $min (keys %{$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}} ) {
+					$normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
+						$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}{$min};
+				}
+				foreach my $min (keys %{$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+					$normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
+						$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+				}
 			}
 		}
 
@@ -8655,6 +8743,7 @@ sub store_queries
 
 		# Stores normalized error count per time
 		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
 		# Stores normalized query samples
 		if ($sample > 0) {
@@ -8766,6 +8855,7 @@ sub store_queries
 
 			# Store normalized query count and duration per time
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 			if ($cur_info{$t_pid}{duration}) {
 
 				# Update top slowest queries statistics
@@ -8773,6 +8863,7 @@ sub store_queries
 
 				# Store normalized query total duration
 				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
+				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $cur_info{$t_pid}{duration};
 				# Store min / max duration
 				if (!exists $normalyzed_info{$normalized}{min} || ($normalyzed_info{$normalized}{min} > $cur_info{$t_pid}{duration})) {
 					$normalyzed_info{$normalized}{min} = $cur_info{$t_pid}{duration};
@@ -8876,18 +8967,18 @@ sub average_per_minutes
 	my $val = shift;
 	my $idx = shift;
 
-	my @avgs = ();
+	my @lavgs = ();
 	for (my $i = 0 ; $i < 60 ; $i += $idx) {
-		push(@avgs, sprintf("%02d", $i));
+		push(@lavgs, sprintf("%02d", $i));
 	}
 
-	for (my $i = 0 ; $i <= $#avgs ; $i++) {
-		if ($val == $avgs[$i]) {
-			return "$avgs[$i]";
-		} elsif ($i == $#avgs) {
-			return "$avgs[$i]";
-		} elsif (($val > $avgs[$i]) && ($val < $avgs[$i + 1])) {
-			return "$avgs[$i]";
+	for (my $i = 0 ; $i <= $#lavgs ; $i++) {
+		if ($val == $lavgs[$i]) {
+			return "$lavgs[$i]";
+		} elsif ($i == $#lavgs) {
+			return "$lavgs[$i]";
+		} elsif (($val > $lavgs[$i]) && ($val < $lavgs[$i + 1])) {
+			return "$lavgs[$i]";
 		}
 	}
 	return $val;
@@ -9277,7 +9368,7 @@ EOF
 
 sub flotr2_histograph
 {
-	my ($buttonid, $divid, $data1, $data2) = @_;
+	my ($buttonid, $divid, $data1, $data2, $min, $max) = @_;
 
 	if (!$data1) {
 		return qq{
@@ -9308,8 +9399,10 @@ sub flotr2_histograph
 	$dateTracker_dataopts =~ s/,$//;
 	$dateTracker_dataopts = "[$dateTracker_dataopts]";
 	
-	my $yaxis2 = "y2axis: { mode: \"normal\", title: \"Duration\", min: 0, color: \"#8dbd0f\", tickFormatter: function(val){ return pretty_print_number(val,'duration') }, },";
+	my $yaxis2 = "y2axis: { mode: \"normal\", noTicks: 4, title: \"Duration\", min: 0, color: \"#8dbd0f\", tickFormatter: function(val){ return pretty_print_number(val,'duration') }, },";
 	$yaxis2 = '' if (!$data2);
+
+	my $maxticks = (23*3600)+($histo_avgs[-1]*60);
 
 	return <<EOF;
 <div id="$divid" class="flotr-graph histo-graph"></div>
@@ -9320,12 +9413,12 @@ sub flotr2_histograph
     $data2
     var options = {
         xaxis: {
-            min: 0,
-            max: 23,
-            tickDecimals: 0,
-            noTicks: 24,
-            mode: "normal",
-            labelsAngle: 45
+	    min: $min,
+	    max: $max,
+	    tickDecimals: 0,
+            noTicks: 48,
+            mode: "time",
+            labelsAngle: 45,
         },
         yaxis: {
             mode: "normal",
@@ -10280,19 +10373,28 @@ function dateTracker(obj, gtype, labels, datasets)
 
 function histoHourTracker(obj, labels, datasets) 
 {
+	var dateToDisplay = new Date(parseInt(obj.x)); 
 	var posValue = parseInt(obj.x);
-
-	// position in data arrays is equals to the hours, aka posValue
-        if (datasets == undefined) { 
+ 
+	// look for the position in data arrays 
+	 var pos = 0;
+	 if (datasets != undefined) { 
+		 for (pos=0; pos < datasets[0].length; pos++) {
+			// If timestamp are the same we have found the position
+			 if (datasets[0][pos][0] == posValue) {
+				// get out of here
+				 break;
+			 }
+		 }
+	} else {
 		return '<span class="mfigure">NO DATASET</span>';
-        }
+	 }
 
-	var textToShow = '<div class="mouse-figures">';
-	if (datasets[0] != undefined) {
-		textToShow += '<span class="hfigure">'+pretty_print_number(datasets[0][posValue][1], '')+' <small>'+labels[0]+'</small></span><br>';
-	}
-	if (datasets[1] != undefined) {
-		textToShow += '<span class="hfigure">'+pretty_print_number(datasets[1][posValue][1], 'duration')+' <small>'+labels[1]+'</small></span><br>';
+	var textToShow = '<div class="mouse-figures">At '+dateToDisplay.toGMTString().substr(17, 5);
+	for (var i = 0; i < labels.length; i++) {
+		if (datasets[i] != undefined) {
+			textToShow += '<br><span class="mfigure">'+pretty_print_number(datasets[i][pos][1])+' <small>'+labels[i]+'</small></span>';
+		}
 	}
 	textToShow += '</div>';
 	return textToShow;
@@ -11479,8 +11581,8 @@ button.close{padding:0;cursor:pointer;background:transparent;border:0;-webkit-ap
 }
 .histo-graph {
 
-	width : 90%;
-	height: 80px;
+	width : 100%;
+	height: 140px;
 }
 
 /*

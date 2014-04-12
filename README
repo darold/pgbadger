@@ -16,6 +16,8 @@ SYNOPSIS
 
         -a | --average minutes : number of minutes to build the average graphs of
                                  queries and connections.
+        -A | --histo-avg minutes: number of minutes to build the histogram graphs
+                                 of queries. Default 60 minutes.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
         -c | --dbclient host   : only report on entries for the given client host.
         -C | --nocomment       : remove comments like /* ... */ from queries.
@@ -213,6 +215,10 @@ FEATURE
 
     You can also have incremental reports with one report per day and a
     cumulative report per week.
+
+    Histogram granularity can be adjusted using the -A command line option.
+    By default they will report the mean of each top queries/error occuring
+    per hour, but you can specify the granularity down to the minute.
 
 REQUIREMENT
     pgBadger comes as a single Perl script - you do not need anything other
