@@ -4148,8 +4148,8 @@ sub print_host_connection
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
 				<ul>
-					<li><span class="figure">$main_host[0]</span> <span class="figure-label">Main Host</span></li>
-					<li><span class="figure">$total_count connections</span> <span class="figure-label">Total</span></li>    
+					<li><span class="figure">$main_host[0]</span> <span class="figure-label">Main host with $main_host[1] connections</span></li>
+					<li><span class="figure">$total_count</span> <span class="figure-label">Total connections</span></li>    
 				</ul>
 			</div>
 		</div>
@@ -8284,9 +8284,8 @@ sub parse_query
 	}
 
 	# Stores pre-connection activity
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+) port=(\d+)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/)) {
 		return if ($disable_connection);
-		$current_sessions{$prefix_vars{'t_pid'}} = 1;
 		$conn_received{$t_pid} = $1;
 		return;
 	}
@@ -8307,6 +8306,8 @@ sub parse_query
 		}
 		if ($prefix_vars{'t_query'} =~ / host=([^\s]+)/) {
 			$host = $1;
+		} elsif ($prefix_vars{'t_client'}) {
+			$host = $prefix_vars{'t_client'};
 		}
 		if ($extension eq 'tsung') {
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $db;
@@ -8335,12 +8336,11 @@ sub parse_query
 		}
 		if (exists $conn_received{$t_pid}) {
 			$connection_info{host}{$conn_received{$t_pid}}++;
-			#$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$conn_received{$t_pid}}++;
 			delete $conn_received{$t_pid};
 		} elsif ($host) {
 			$connection_info{host}{$host}++;
-			#$connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{host}{$host}++;
 		}
+
 		return;
 	}
 
