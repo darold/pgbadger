@@ -8460,6 +8460,8 @@ sub parse_query
 		$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{checkpoint_wbuffer} += $1;
 		if ($6 > $overall_checkpoint{checkpoint_write}) {
 			$overall_checkpoint{checkpoint_write} = $6;
+		}
+		if ($7 > $overall_checkpoint{checkpoint_sync}) {
 			$overall_checkpoint{checkpoint_sync} = $7;
 		}
 
@@ -8511,6 +8513,8 @@ sub parse_query
 		$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{checkpoint_wbuffer} += $1;
 		if ($6 > $overall_checkpoint{checkpoint_write}) {
 			$overall_checkpoint{checkpoint_write} = $6;
+		}
+		if ($7 > $overall_checkpoint{checkpoint_sync}) {
 			$overall_checkpoint{checkpoint_sync} = $7;
 		}
 
