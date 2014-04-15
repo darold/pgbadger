@@ -6231,7 +6231,7 @@ sub print_tempfile_report
 			my $avg_size = &pretty_print_size($top_temporary[$i]->[2] / ($top_temporary[$i]->[1] || 1));
 			my $query = &highlight_code($top_temporary[$i]->[0]);
 			my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-temporary-files-examples-rank-$rank">Examples</button></p>};
-			$example = '' if ($count <= 1);
+			$example = '' if (scalar keys %{$normalyzed_info{$top_temporary[$i]->[0]}{samples}} == 0);
 			print $fh qq{
 				<tr>
 				<td>$rank</td>
