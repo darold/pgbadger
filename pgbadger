@@ -10220,7 +10220,7 @@ sub get_week_number
 #              Monday as the first day of week 01.
 
 	# Check if the date is valid first
-	my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $month - 1, $year - 1900);
+	my $datefmt = POSIX::strftime("%Y-%m-%d", 1, 1, 1, $day, $month - 1, $year - 1900);
 	if ($datefmt ne "$year-$month-$day") {
 		return -1;
 	}
@@ -10234,10 +10234,9 @@ sub get_day_of_week
 {
         my ($year, $month, $day) = @_;
 
-#       %u     The day of the week as a decimal, range 1 to 7, Monday being 1.
 #       %w     The day of the week as a decimal, range 0 to 6, Sunday being 0.
 
-	my $weekDay = POSIX::strftime("%u", 1,1,1,$day,--$month,$year-1900);
+	my $weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
 
 	return $weekDay;
 }
@@ -10270,7 +10269,7 @@ sub get_wdays_per_month
 		my $m = $2;
 		foreach my $day ("01" .. "31") {
 			# Check if the date is valid first
-			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $y - 1900);
+			my $datefmt = POSIX::strftime("%Y-%m-%d", 1, 1, 1, $day, $m - 1, $y - 1900);
 			if ($datefmt ne "$y-$m-$day") {
 				next;
 			}
@@ -10295,7 +10294,7 @@ sub get_wdays_per_year
 	foreach my $m ("01" .. "12") {
 		foreach my $day ("01" .. "31") {
 			# Check if the date is valid first
-			my $datefmt = POSIX::strftime("%F", 1, 1, 1, $day, $m - 1, $y - 1900);
+			my $datefmt = POSIX::strftime("%Y-%m-%d", 1, 1, 1, $day, $m - 1, $y - 1900);
 			if ($datefmt ne "$y-$m-$day") {
 				next;
 			}
@@ -10343,11 +10342,11 @@ sub get_calendar
 		$wn =  &get_week_number($year,$month,$d);
 		next if ($wn == -1);
 		if ( !-e "$outdir/$year/$month/$d/index.html" ) {
-			$currow[$wd-1] = "<td>$d</td>";
+			$currow[$wd] = "<td>$d</td>";
 		} else {
-			$currow[$wd-1] = "<td><a href=\"$year/$month/$d/index.html\" target=\"new\">$d</a></td>";
+			$currow[$wd] = "<td><a href=\"$year/$month/$d/index.html\" target=\"new\">$d</a></td>";
 		}
-		if ($wd == 7) {
+		if ($wd == 6) {
 			$week = sprintf("%02d", $wn);
 			if (-e "$outdir/$year/week-$week/index.html") {
 				$week = "<th><a href=\"$year/week-$week/index.html\" target=\"new\">$week</a>&nbsp;</th>";
@@ -10359,7 +10358,7 @@ sub get_calendar
 			@currow = ('','','','','','','');
 		}
 	} 
-	if ( ($wd != 7) || ($currow[0] ne '') ) {
+	if ( ($wd != 6) || ($currow[0] ne '') ) {
 		$week = sprintf("%02d", $wn);
 		if (-e "$outdir/$year/week-$week/index.html") {
 			$week = "<th><a href=\"$year/week-$week/index.html\" target=\"new\">$week</a>&nbsp;</th>";
