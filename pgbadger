@@ -6546,7 +6546,7 @@ sub print_time_consuming
 		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
 		my $query_histo = 
-		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
+		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
 		print $fh qq{
 				<tr>
@@ -6704,7 +6704,7 @@ sub print_most_frequent
 		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
                 my $query_histo =
-                &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
+                &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
                 print $fh qq{
                                 <tr>
@@ -6863,7 +6863,7 @@ sub print_slowest_queries
 		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
 		my $query_histo =
-		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration}, $etime, $ctime);
+		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
                 print $fh qq{
                                 <tr>
@@ -7346,7 +7346,7 @@ sub show_error_as_html
 		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
                 my $error_histo =
-                &flotr2_histograph($graphid++, 'error_graph_'.$rank, $graph_data{count}, '', $etime, $ctime);
+                &flotr2_histograph($graphid++, 'error_graph_'.$rank, $graph_data{count}, '', 'Avg. events', '', $etime, $ctime);
 
 		# Escape HTML code in error message
 		$msg = &escape_html($msg);
@@ -9438,19 +9438,18 @@ EOF
 
 sub flotr2_histograph
 {
-	my ($buttonid, $divid, $data1, $data2, $min, $max) = @_;
+	my ($buttonid, $divid, $data1, $data2, $legend1, $legend2, $min, $max) = @_;
 
 	if (!$data1) {
 		return qq{
 <div id="$divid" class="flotr-graph histo-graph"><blockquote><b>NO DATASET</b></blockquote></div>
 };
 	}
-	my $legend1 = 'Avg. queries';
-	my $legend2 = '';
+	$legend1 ||= 'Avg. queries';
 	my $dateTracker_lblopts = "'$legend1',";
 	$legend1 = "{ data: d1, label: \"$legend1\", color: \"#6e9dc9\", mouse:{track:true}, bars: {show: true,shadowSize: 0}, },";
 	if ($data2) {
-		$legend2 = 'Avg. duration';
+		$legend2 ||= 'Avg. duration';
 		$dateTracker_lblopts .= "'$legend2'";
 		$legend2 = "{ data: d2, label: \"$legend2\", color: \"#8dbd0f\", yaxis: 2},";
 	}
