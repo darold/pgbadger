@@ -2422,7 +2422,7 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db) = @_;
+	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote) = @_;
 
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
@@ -2434,6 +2434,9 @@ sub set_top_error_sample
 			push(@{$error_info{$q}{hint}},      $hint);
 			push(@{$error_info{$q}{error}},     $real_error);
 			push(@{$error_info{$q}{db}},        $db);
+			push(@{$error_info{$q}{user}},      $user);
+			push(@{$error_info{$q}{app}},       $app);
+			push(@{$error_info{$q}{remote}},    $remote);
 		}
 	}
 }
@@ -7403,7 +7406,7 @@ sub show_error_as_html
 				$details .= "Statement: " . &escape_html($error_info{$k}{statement}[$i]) . "<br/>";
 			}
 			if ($error_info{$k}{db}[$i]) {
-				$details .= "Database: " . $error_info{$k}{db}[$i] . "<br/>";
+				$details .= "<b>Database:</b> $error_info{$k}{db}[$i] <b>User:</b> $error_info{$k}{user}[$i] <b>Remote:</b> $error_info{$k}{remote}[$i] <br/>";
 			}
 			print $fh qq{
 								<dt><span class="$error_level_class">$message</span></dt>
@@ -7640,9 +7643,18 @@ sub load_stats
 			}
 		}
 		for (my $i = 0; $i <= $#{$_error_info{$q}{date}}; $i++) {
-			&set_top_error_sample($q, $_error_info{$q}{date}[$i], $_error_info{$q}{error}[$i],
-				$_error_info{$q}{detail}[$i], $_error_info{$q}{context}[$i], $_error_info{$q}{statement}[$i],
-				$_error_info{$q}{hint}[$i], $_error_info{$q}{db}[$i]);
+			&set_top_error_sample(	$q, 
+									$_error_info{$q}{date}[$i], 
+									$_error_info{$q}{error}[$i],
+									$_error_info{$q}{detail}[$i], 
+									$_error_info{$q}{context}[$i], 
+									$_error_info{$q}{statement}[$i],
+									$_error_info{$q}{hint}[$i], 
+									$_error_info{$q}{db}[$i],
+									$_error_info{$q}{user}[$i],
+									$_error_info{$q}{app}[$i],
+									$_error_info{$q}{remote}[$i]
+									);
 		}
 	}
 
@@ -8819,9 +8831,17 @@ sub store_queries
 		if ($sample > 0) {
 			my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 							"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-			&set_top_error_sample(
-				$normalized_error, $cur_last_log_timestamp, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{detail},
-				$cur_info{$t_pid}{context}, $cur_info{$t_pid}{statement}, $cur_info{$t_pid}{hint}, $cur_info{$t_pid}{dbname}
+			&set_top_error_sample(	$normalized_error, 
+									$cur_last_log_timestamp, 
+									$cur_info{$t_pid}{query}, 
+									$cur_info{$t_pid}{detail},
+									$cur_info{$t_pid}{context}, 
+									$cur_info{$t_pid}{statement}, 
+									$cur_info{$t_pid}{hint}, 
+									$cur_info{$t_pid}{dbname}, 
+									$cur_info{$t_pid}{dbuser},
+									$cur_info{$t_pid}{dbappname},
+									$cur_info{$t_pid}{dbclient}
 			);
 		}
 
