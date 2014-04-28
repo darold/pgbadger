@@ -666,6 +666,10 @@ my @pg_keywords = qw(
         VERBOSE WHEN WHERE WINDOW WITH
 );
 
+my @beautify_pg_keywords = qw(
+        ANALYSE ANALYZE CONCURRENTLY FREEZE ILIKE ISNULL LIKE NOTNULL PLACING RETURNING VARIADIC
+);
+
 
 # Highlight variables
 my @KEYWORDS1 = qw(
@@ -1026,7 +1030,7 @@ if (!$incremental) {
 		} else {
 			# Create instance to prettify SQL query
 			if (!$noprettify) {
-				$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+				$sql_prettified = SQL::Beautify->new(keywords => \@beautify_pg_keywords);
 			}
 			&dump_as_html();
 		}
@@ -1095,7 +1099,7 @@ if (!$incremental) {
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
-			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+			$sql_prettified = SQL::Beautify->new(keywords => \@beautify_pg_keywords);
 		}
 		&dump_as_html();
 		$fh->close;
@@ -1142,7 +1146,7 @@ if (!$incremental) {
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
-			$sql_prettified = SQL::Beautify->new(keywords => \@pg_keywords);
+			$sql_prettified = SQL::Beautify->new(keywords => \@beautify_pg_keywords);
 		}
 		&dump_as_html();
 		$fh->close;
@@ -9714,7 +9718,8 @@ sub build_log_line_prefix_regex
 		TRANSLATION TREAT TRIGGER TRIM TRUE UNDER UNDO UNION UNIQUE UNKNOWN UNNEST
 		UNTIL UPDATE UPPER USAGE USER USING VALUE VALUES VARCHAR VARYING VIEW WHEN
 		WHENEVER WHERE WHILE WINDOW WITH WITHIN WITHOUT WORK WRITE YEAR ZONE
-		);
+	);
+
 
 	sub tokenize_sql
 	{
@@ -9782,7 +9787,7 @@ sub build_log_line_prefix_regex
 		$self->{rules}       = {}   unless defined($self->{rules});
 		$self->{uc_keywords} = 0    unless defined $self->{uc_keywords};
 
-		push @{$self->{keywords}}, KEYWORDS;
+		push(@{$self->{keywords}}, KEYWORDS);
 
 		# Initialize internal stuff.
 		$self->{_level} = 0;
