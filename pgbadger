@@ -8309,8 +8309,10 @@ sub parse_query
 	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) /))
 	{
+		$current_sessions{$prefix_vars{'t_pid'}} = 1 if (!$disable_session);
+
 		return if ($disable_connection);
-		$current_sessions{$prefix_vars{'t_pid'}} = 1;
+
 		my $usr = $1;
 		my $db  = 'unknown';
 		my $host  = '';
@@ -8365,10 +8367,11 @@ sub parse_query
 			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+)/))
 	{
 		return if ($disable_session);
+
+		delete $current_sessions{$prefix_vars{'t_pid'}};
 		if ($extension eq 'tsung') {
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
 		}
-		delete $current_sessions{$prefix_vars{'t_pid'}};
 		my $time = $1;
 		my $usr  = $2;
 		my $db   = $3;
