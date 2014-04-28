@@ -6521,12 +6521,14 @@ sub print_time_consuming
 					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				foreach my $rd (@histo_avgs) {
-					next if (!exists $hourly_count{"$h:$rd"});
-					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+					}
 				}
 			}
 		}
@@ -6679,12 +6681,14 @@ sub print_most_frequent
 					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				foreach my $rd (@histo_avgs) {
-					next if (!exists $hourly_count{"$h:$rd"});
-					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+					}
 				}
 			}
 		}
@@ -6838,12 +6842,14 @@ sub print_slowest_queries
 					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				foreach my $rd (@histo_avgs) {
-					next if (!exists $hourly_count{"$h:$rd"});
-					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-						&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-						&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+					}
 				}
 			}
 		}
@@ -7326,10 +7332,12 @@ sub show_error_as_html
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$h:$rd"} += $error_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
-				foreach my $rd (@histo_avgs) {
-					next if (!exists $hourly_count{"$h:$rd"});
-					$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-						&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+					}
 				}
 			}
 		}
