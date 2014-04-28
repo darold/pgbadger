@@ -4723,15 +4723,15 @@ $drawn_graphs{checkpointfiles_graph}
 					"</td><td>" . &comma_numbers($cainf{sync_avg}) . 's' .
 					"</td></tr>";
 			} else {
-				$buffers .= "<td>0</td><td>0</td><td>0</td><td>0</td></tr>";
-				$files .= "<td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>";
+				$buffers .= "<td>0</td><td>0s</td><td>0s</td><td>0s</td></tr>";
+				$files .= "<td>0</td><td>0</td><td>0</td><td>0s</td><td>0s</td><td>0s</td></tr>";
 			}
 			if (exists $cinf{warning}) {
 				$warnings .= "<td>" . &comma_numbers($cinf{warning}) . "</td><td>" .
 					&comma_numbers(sprintf( "%.2f", ($cinf{warning_seconds} || 0) / ($cinf{warning} || 1))) .
 					 "s</td></tr>";
 			} else {
-				$warnings .= "<td>0</td><td>0</td></tr>";
+				$warnings .= "<td>0</td><td>0s</td></tr>";
 			}
 		}
 	}
