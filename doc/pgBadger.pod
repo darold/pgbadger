@@ -96,6 +96,8 @@ Options:
                              You can use this option multiple times.
     --exclude-appname name : exclude entries for the specified application name
                              from report. Example: "pg_dump".
+    --exclude-line regex   : pgbadger will start to exclude any log entry that
+                             will match the given regex. Can be used multiple time.
 
 Examples:
 
