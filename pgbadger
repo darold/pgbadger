@@ -57,6 +57,7 @@ my $tmp_last_parsed = '';
 my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
 my $graphid      = 1;
 my $NODATA       = '<div class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
+my $MAX_QUERY_LENGTH = 20480;
 
 my $pgbadger_logo =
         '<img src="data:image/png;base64,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">';
@@ -7984,7 +7985,7 @@ sub highlight_code
 
 	# Do not try to prettify queries longer
 	# than 10KB as this will take too much time
-	return $code if (length($code) > 10240);
+	return $code if (length($code) > $MAX_QUERY_LENGTH);
 
 	# prettify SQL query
 	if (!$noprettify) {
@@ -8012,8 +8013,9 @@ sub highlight_code
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
 		$code =~ s/\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
-		$code =~ s/(?<!(?-i)STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
+		#$code =~ s/(?<!(?-i)STYLESY0B\$\$)\b$KEYWORDS1[$x]\b/<span class="kw1">$KEYWORDS1[$x]<\/span>/igs;
 	}
+
 	for (my $x = 0 ; $x <= $#KEYWORDS2 ; $x++) {
 		$code =~ s/(?<!:)\b$KEYWORDS2[$x]\b/<span class="kw2">$KEYWORDS2[$x]<\/span>/igs;
 	}
