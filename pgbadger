@@ -10377,7 +10377,7 @@ sub get_calendar
 	my ($year, $month) = @_;
 
 	my $str = "<table class=\"table table-striped table-hover table-condensed\">\n";
-	my @wday = qw(Mo Tu We Th Fr Sa Su);
+	my @wday = qw(Su Mo Tu We Th Fr Sa);
 	#my @wday = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 	my @std_day = qw(Su Mo Tu We Th Fr Sa);
 	my %day_lbl = ();
@@ -10431,7 +10431,7 @@ sub get_calendar
 
 	my %month_name = (
 		'01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
-		'05' => 'May', '06' => 'June', '07' => 'Jully', '08' => 'August',
+		'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
 		'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 	);
 	return qq{
