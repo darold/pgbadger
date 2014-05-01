@@ -1225,8 +1225,8 @@ if (!$incremental) {
 		closedir DIR;
 		my $i = 1;
 		foreach my $m (sort {$a <=> $b } @ymonths) {
-			print $fh "</tr>\n<tr>\n" if ( ($i%4) == 0 );
 			print $fh "<td><span class=\"span3\">", &get_calendar($y, $m), "</span></td>\n";
+			print $fh "</tr>\n<tr>\n" if ( ($i%4) == 0 );
 			$i++;
 		}
 		print $fh qq{
@@ -10227,7 +10227,11 @@ sub split_logfile
 
 	# Real size of the file is unknown, try to find it
 	# bz2 does not report real size
-	if ($logf =~ /\.(gz|zip)/i) {
+	if ($totalsize <= 16777216) { #16MB
+		#If the file is very small, many jobs actually make the parsing take longer
+		#What is an acceptable file size????
+		$queue_size = 0;
+	} elsif ($logf =~ /\.(gz|zip)/i) {
 		$totalsize = 0;
 		my $cmd_file_size = $gzip_uncompress_size;
 		if ($logf =~ /\.zip/i) {
