@@ -1493,6 +1493,127 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">5.1</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2014-05-04</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This new release fixes several issues and adds several new features like:
+</p>
+<pre>
+  * Support to named PREPARE and EXECUTE queries. They are replaced by
+    the real prepare statement and reported into top queries.
+  * Add new --exclude-line command line option for excluding immediately
+    log entries matching any regex.
+  * Included remote and client information into the most frequent events.
+  * pgBadger is now able to parse remote logfiles using a password less
+    ssh connection and generate locally the reports.
+  * Histogram granularity can be adjusted using the -A command line option.
+  * Add new detail information on top queries to show when the query is a
+    bind query.
+  * Support to logfile compressed using the xz compression format.
+  * Change week/day menu in incremental index, it is now represented as
+    usual with a calendar view per month.
+  * Fix various compatibility issue with Windows and Perl 5.8
+</pre>
+<p>
+Here is the full list of changes:
+</p>
+<pre>
+	- fixed calendar display and correct typo. Thanks to brunomgalmeida
+	  for the patch.
+	- revert to single thread if file is small. Thanks to brunomgalmeida
+	  for the patch.
+	- print calendars 4+4+4 instead of 3+4+4+1 when looking at full year.
+	  Thanks to brunomgalmeida for the patch.
+	- Add --exclude-line option for excluding log entries with a regex based
+	  on the full log line. Thanks to ferfebles for the feature request.
+	- Fix SQL keywords that was beautified twice.
+	- Remove duplicate pg_keyword in SQL beautifier.
+	- Fix increment of session when --disable-session is activated.
+	- Fix missing unit in Checkpoints Activity report when time value is
+	  empty. Thanks to Herve Werner for the report.
+	- Fix double information in histogram data when period is the hour.
+	- Add support to named PREPARE and EXECUTE queries. Calls to EXECUTE
+	  statements are now replaced by the prepared query and show samples
+	  with parameters. Thanks to Brian DeRocher for the feature request.
+	- Included Remote and Client information into the most frequent events
+	  examples. Thanks to brunomgalmeida for the patch.
+	- Fix documentation about various awkward phrasings, grammar, and
+	  spelling. Consistently capitalize "pgBadger" as such, except for
+	  command examples which should stay all-lowercase. Thanks to Josh
+	  Kupershmidt for the patch.
+	- Fix incremental mode on Windows by replacing %F and %u POSIX::strftime
+	  format to %Y-%m-%d and %w. Thanks to dthiery for the report.
+	- Remove Examples button when there is no examples available.
+	- Fix label on tips in histogram of errors reports.
+	- Fix error details in incremental mode in Most Frequent Errors/Events
+	  report. Thanks to Herve Werner for the report.
+	- Fix Sync time value in Checkpoints buffers report. Thanks to Herve
+	  Werner for the report.
+	- Fix wrong connections per host count. Thanks to Herve Werner for the
+	  report.
+	- Allow pgBadger to parse remote log file using a password less ssh
+	  connection. Thanks to Orange OLPS department for the feature request.
+	- Histogram granularity can be adjusted using the -A command line
+	  option. By default they will report the mean of each top queries or
+	  errors occurring per hour. You can now specify the granularity down to
+	  the minute. Thanks to Orange OLPS department for the feature request.
+	- Add new detail information on top queries to show when the query is
+	  a bind query. Thanks to Orange OLPS department for the feature request.
+	- Fix queries that exceed the size of the container.
+	- Add unit (seconds) to checkpoint write/sync time in the checkpoints
+	  activity report. Thanks to Orange OLPS department for the report.
+	- Fix missing -J option in usage.
+	- Fix incomplete lines in split logfile to rewind to the beginning of
+	  the line. Thanks to brunomgalmeida for the patch.
+	- Fix tsung output and add tsung xml header sample to output file.
+	- Make it possible to do --sample 0 (prior it was falling back to the
+	  default of 3). Thanks to William Moran for the patch.
+	- Fix xz command to be script readable and always have size in bytes:
+	  xz --robot -l %f | grep totals | awk "{print $5}"
+	- Add support to logfile compressed by the xz compression format.
+	  Thanks to Adrien Nayrat for the patch.
+	- Do not increment queries duration histogram when prepare|parse|bind
+	  log are found, but only with execute log. Thanks to Josh Berkus for
+	  the report.
+	- Fix normalization of error message about unique violation when
+	  creating intermediate dirs. Thanks to Tim Sampson for the report.
+	- Allow use of Perl metacharacters like [..] in application name.
+	  Thanks to Magnus Persson for the report.
+	- Fix dataset tip to be displayed above image control button. Thanks
+	  to Ronan Dunklau for the fix.
+	- Renamed the Reset bouton to "To Chart" to avoid confusion with unzoom
+	  feature.
+	- Fix writing of empty incremental last parsed file.
+	- Fix several other graphs
+	- Fix additional message at end of query or error when it was logged
+	  from application output. Thanks to Herve Werner for the report.
+	- Fix checkpoint and vacuum graphs when all dataset does not have all
+	  values. Thanks to Herve Werner for the report.
+	- Fix week numbered -1 in calendar view.
+	- Change week/day menu in incremental index, it is now represented as
+	  usual with a calendar view per month. Thanks to Thom Brown for the
+	  feature request.
+	- Load FileHandle to fix error: Can not locate object method "seek"
+	  via package "IO::Handle" with perl 5.8. Thanks to hkrizek for the
+	  report.
+	- Fix count of queries in progress bar when there is compressed file
+	  and multiprocess is enabled. Thanks to Johnny Tan for the report.
+	- Fix debug message "Start parsing at offset"
+	- Add ordering in queries times histogram. Thanks to Ulf Renman for
+	  the report.
+	- Fix various typos. Thanks to Thom Brown for the patch.
+	- Fix Makefile error, "WriteMakefile: Need even number of args at
+	  Makefile.PL" with Perl 5.8. Thanks to Fangr Zhang for the report.
+	- Fix some typo in Changelog
+</pre>
+		</div>
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">5.0</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2014-02-05</span> <span class="figure-label">Date</span></li>    
 				</ul>
