@@ -1,3 +1,8 @@
+2014-05-05 version 5.1-1
+
+	- Fix parsing of remote log file, forgot to apply some patches.
+	  Thank to Herve Werner for the report.
+
 2014-05-04 version 5.1
 
 This new release fixes several issues and adds several new features like:
