@@ -324,14 +324,25 @@ if ($remote_host) {
 # Log files to be parsed are passed as command line arguments
 if ($#ARGV >= 0) {
 	foreach my $file (@ARGV) {
-		if (($file ne '-') && !$remote_host) {
-			die "FATAL: logfile $file must exist!\n" if not -f $file;
-			if (-z $file) {
-				print "WARNING: file $file is empty\n";
-				next;
+		if ($file ne '-') {
+			if (!$remote_host) {
+				die "FATAL: logfile $file must exist!\n" if not -f $file;
+				if (-z $file) {
+					print "WARNING: file $file is empty\n";
+					next;
+				}
+				push(@log_files, $file);
+			} else {
+				# Get files from remote host
+				&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
+				my @rfiles = `$ssh_command "ls $file"`;
+				foreach my $f (@rfiles) {
+					push(@log_files, $f);
+				}
 			}
+		} else {
+			push(@log_files, $file);
 		}
-		push(@log_files, $file);
 	}
 }
 
@@ -10184,7 +10195,12 @@ sub get_log_file
 
 	# Open a file handle
 	if ($logf !~ /\.(gz|bz2|zip|xz)/i) {
-		open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
+		if (!$remote_host) {
+			open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
+		} else {
+			# Open a pipe to zcat program for compressed log
+			open($lfile,"$ssh_command \"cat $logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n";
+		}
 		$totalsize = 0 if ($lfile eq '-');
 		$iscompressed = 0;
 	} else {
