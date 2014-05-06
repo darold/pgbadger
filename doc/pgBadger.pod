@@ -155,7 +155,7 @@ pgBadger is a PostgreSQL log analyzer build for speed with fully detailed report
 
 It is written in pure Perl language and uses a javascript library (flotr2) to draw graphs so that you don't need to install any additional Perl modules or other packages. Furthermore, this library gives us more features such as zooming. pgBadger also uses the Bootstrap javascript library and the FontAwesome webfont for better design. Everything is embedded.
 
-pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files as well as gzip compressed file. See a complete list of features below.
+pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files as well as gzip compressed file. See a complete list of features below. Supported compressed format are gzip, bzip2 and xz. For the last one you must have a xz version upper than 5.05 that support the --robot option.
 
 All charts are zoomable and can be saved as PNG images.
 
@@ -211,27 +211,30 @@ specify the granularity down to the minute.
 
 =head1 REQUIREMENT
 
-pgBadger comes as a single Perl script - you do not need anything other than a modern Perl distribution. Charts are rendered using a Javascript library so you don't need anything. Your browser will do all the work.
+pgBadger comes as a single Perl script - you do not need anything other than a modern
+Perl distribution. Charts are rendered using a Javascript library so you don't need
+anything. Your browser will do all the work.
 
 If you planned to parse PostgreSQL CSV log files you might need some Perl Modules:
 
 	Text::CSV_XS - to parse PostgreSQL CSV log files.
 
-This module is optional, if you don't have PostgreSQL log in the CSV format you don't need to install it.
+This module is optional, if you don't have PostgreSQL log in the CSV format you don't
+need to install it.
 
-Compressed log file format is autodetected from the file exension. If pgBadger find a gz extension
-it will use the zcat utility, with a bz2 extension it will use bzcat and if the file extension is zip
-then the unzip utility will be used.
+Compressed log file format is autodetected from the file exension. If pgBadger find
+a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat
+and if the file extension is zip or xz then the unzip or xz utilities will be used.
 
-If those utilities are not found in the PATH environment variable then use the --zcat command line option
-to change this path. For example:
+If those utilities are not found in the PATH environment variable then use the --zcat
+command line option to change this path. For example:
 
 	--zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
 	--zcat="C:\tools\unzip -p"
 
 By default pgBadger will use the zcat, bzcat and unzip utilities following the
 file extension. If you use the default autodetection compress format you can
-mixed gz, bz2 or zip files. Specifying a custom value to --zcat option will
+mixed gz, bz2, xz or zip files. Specifying a custom value to --zcat option will
 remove this feature of mixed compressed format.
 
 Note that multiprocessing can not be used with compressed files or CSV files as
