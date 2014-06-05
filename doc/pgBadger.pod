@@ -436,12 +436,12 @@ cumulative reports. For example, if you want to refresh a pgbadger report
 each hour from a daily PostgreSQl log file, you can proceed by running each
 hour the following commands:
 
-    pgbadder --last-parsed .pgbadger_last_state_file -o sunday/hourX.bin /var/log/pgsql/postgresql-Sun.log
+    pgbadger --last-parsed .pgbadger_last_state_file -o sunday/hourX.bin /var/log/pgsql/postgresql-Sun.log
 
 to generate the incremental data files in binary format. And to generate the fresh HTML
 report from that binary file:
 
-    pgbadder sunday/*.bin
+    pgbadger sunday/*.bin
 
 Or an other example, if you have one log file per hour and you want a reports to be
 rebuild each time the log file is switched. Proceed as follow:
