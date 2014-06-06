@@ -55,7 +55,7 @@ my $parent_pid   = $$;
 my $interrupt    = 0;
 my $tmp_last_parsed = '';
 my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
-my @LATENCY_PERCENTILE = (99,95,90);
+my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
 my $MAX_QUERY_LENGTH = 20480;
@@ -3458,7 +3458,6 @@ sub print_general_activity
 				$cur_period_info{duration} += ($per_minute_info{$d}{$h}{$m}{query}{duration} || 0);
 				$cur_period_info{min} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{min} || ($per_minute_info{$d}{$h}{$m}{query}{duration} < $cur_period_info{min}));
 				$cur_period_info{max} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{max} || ($per_minute_info{$d}{$h}{$m}{query}{duration} > $cur_period_info{max}));
-                                #hima
                                 push(@{$all_query_duration{'query'}}, $per_minute_info{$d}{$h}{$m}{query}{duration}||0);
 
 				foreach my $a (@SQL_ACTION) {
@@ -3490,15 +3489,15 @@ sub print_general_activity
                         my %percentile =  ();
 			foreach my $lp (@LATENCY_PERCENTILE) {
 		 		$cur_period_info{$lp}{percentileindex} = int(@{$all_query_duration{'query'}} * $lp / 100) ;
-                        	@{$all_query_duration{'query'}}=sort(@{$all_query_duration{'query'}});
+                        	@{$all_query_duration{'query'}}= sort{ $a <=> $b } @{$all_query_duration{'query'}};
                         	$cur_period_info{$lp}{percentile} = $all_query_duration{'query'}[$cur_period_info{$lp}{percentileindex}];				                    			     $percentile{$lp} =  &convert_time($cur_period_info{$lp}{percentile});
 
                         	$cur_period_info{'SELECT'}{$lp}{percentileindex} = int(@{$all_query_duration{'SELECT'}} * $lp / 100) ;
-                        	@{$all_query_duration{'SELECT'}}=sort(@{$all_query_duration{'SELECT'}});
+                        	@{$all_query_duration{'SELECT'}}= sort{ $a <=> $b } @{$all_query_duration{'SELECT'}};
                         	$cur_period_info{'SELECT'}{$lp}{percentile} = $all_query_duration{'SELECT'}[$cur_period_info{'SELECT'}{$lp}{percentileindex}];
 				$percentile{'SELECT'}{$lp} =  &convert_time($cur_period_info{'SELECT'}{$lp}{percentile});
 
-				@{$all_query_duration{'WRITE'}}=sort(@{$all_query_duration{'INSERT'}},@{$all_query_duration{'UPDATE'}},@{$all_query_duration{'DELETE'}});
+				@{$all_query_duration{'WRITE'}}=  sort{ $a <=> $b } (@{$all_query_duration{'INSERT'}},@{$all_query_duration{'UPDATE'}},@{$all_query_duration{'DELETE'}});
                         	$cur_period_info{'WRITE'}{$lp}{percentileindex} = int(@{$all_query_duration{'WRITE'}} * $lp / 100) ;
                         	$cur_period_info{'WRITE'}{$lp}{percentile} = $all_query_duration{'WRITE'}[$cur_period_info{'WRITE'}{$lp}{percentileindex}];
 				$percentile{'WRITE'}{$lp} =  &convert_time($cur_period_info{'WRITE'}{$lp}{percentile});	
@@ -3616,9 +3615,9 @@ sub print_general_activity
 							<th>Min duration</th>
 							<th>Max duration</th>
 							<th>Avg duration</th>
-							<th>Latency Percentile(99)</th>
-							<th>Latency Percentile(95)</th>
 							<th>Latency Percentile(90)</th>
+							<th>Latency Percentile(95)</th>
+							<th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$queries
@@ -3633,9 +3632,9 @@ sub print_general_activity
 							<th>Hour</th>
 							<th>Count</th>
 							<th>Average Duration</th>
-							<th>Latency Percentile(99)</th>
+							<th>Latency Percentile(90)</th>
 							<th>Latency Percentile(95)</th>
-                                                        <th>Latency Percentile(90)</th>
+                                                        <th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$select_queries
@@ -3652,9 +3651,9 @@ sub print_general_activity
 							<th>UPDATE</th>
 							<th>DELETE</th>
 							<th>Average Duration</th>
-							<th>Latency Percentile(99)</th>
+							<th>Latency Percentile(90)</th>
 							<th>Latency Percentile(95)</th>
-                                                        <th>Latency Percentile(90)</th>
+                                                        <th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$write_queries
