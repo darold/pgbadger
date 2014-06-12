@@ -55,6 +55,7 @@ my $parent_pid   = $$;
 my $interrupt    = 0;
 my $tmp_last_parsed = '';
 my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
 my $MAX_QUERY_LENGTH = 20480;
@@ -3451,14 +3452,18 @@ sub print_general_activity
 			my %cur_period_info = ();
 			my $write_average_duration = 0;
 			my $write_average_count = 0;
+			my %all_query_duration=();
 			foreach my $m (keys %{$per_minute_info{$d}{$h}}) {
 				$cur_period_info{count} += ($per_minute_info{$d}{$h}{$m}{query}{count} || 0);
 				$cur_period_info{duration} += ($per_minute_info{$d}{$h}{$m}{query}{duration} || 0);
 				$cur_period_info{min} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{min} || ($per_minute_info{$d}{$h}{$m}{query}{duration} < $cur_period_info{min}));
 				$cur_period_info{max} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{max} || ($per_minute_info{$d}{$h}{$m}{query}{duration} > $cur_period_info{max}));
+                                push(@{$all_query_duration{'query'}}, $per_minute_info{$d}{$h}{$m}{query}{duration}||0);
+
 				foreach my $a (@SQL_ACTION) {
 					$cur_period_info{$a}{count} += ($per_minute_info{$d}{$h}{$m}{$a}{count} || 0);
 					$cur_period_info{$a}{duration} += ($per_minute_info{$d}{$h}{$m}{$a}{duration} || 0);
+					push(@{$all_query_duration{$a}}, $per_minute_info{$d}{$h}{$m}{$a}{duration}||0);
 					$cur_period_info{usual} += ($per_minute_info{$d}{$h}{$m}{$a}{count} || 0);
 				}
 				$cur_period_info{prepare} += ($per_minute_info{$d}{$h}{$m}{prepare} || 0);
@@ -3467,6 +3472,7 @@ sub print_general_activity
 
 			$cur_period_info{average} = $cur_period_info{duration} / ($cur_period_info{count} || 1);
 			$cur_period_info{'SELECT'}{average} = $cur_period_info{'SELECT'}{duration} / ($cur_period_info{'SELECT'}{count} || 1);
+
 			$write_average_duration = ($cur_period_info{'INSERT'}{duration} +
 					$cur_period_info{'UPDATE'}{duration} +
 					$cur_period_info{'DELETE'}{duration});
@@ -3480,6 +3486,22 @@ sub print_general_activity
 			my $min = &convert_time($cur_period_info{min});
 			my $max = &convert_time($cur_period_info{max});
 			my $average = &convert_time($cur_period_info{average});
+                        my %percentile =  ();
+			foreach my $lp (@LATENCY_PERCENTILE) {
+		 		$cur_period_info{$lp}{percentileindex} = int(@{$all_query_duration{'query'}} * $lp / 100) ;
+                        	@{$all_query_duration{'query'}}= sort{ $a <=> $b } @{$all_query_duration{'query'}};
+                        	$cur_period_info{$lp}{percentile} = $all_query_duration{'query'}[$cur_period_info{$lp}{percentileindex}];				                    			     $percentile{$lp} =  &convert_time($cur_period_info{$lp}{percentile});
+
+                        	$cur_period_info{'SELECT'}{$lp}{percentileindex} = int(@{$all_query_duration{'SELECT'}} * $lp / 100) ;
+                        	@{$all_query_duration{'SELECT'}}= sort{ $a <=> $b } @{$all_query_duration{'SELECT'}};
+                        	$cur_period_info{'SELECT'}{$lp}{percentile} = $all_query_duration{'SELECT'}[$cur_period_info{'SELECT'}{$lp}{percentileindex}];
+				$percentile{'SELECT'}{$lp} =  &convert_time($cur_period_info{'SELECT'}{$lp}{percentile});
+
+				@{$all_query_duration{'WRITE'}}=  sort{ $a <=> $b } (@{$all_query_duration{'INSERT'}},@{$all_query_duration{'UPDATE'}},@{$all_query_duration{'DELETE'}});
+                        	$cur_period_info{'WRITE'}{$lp}{percentileindex} = int(@{$all_query_duration{'WRITE'}} * $lp / 100) ;
+                        	$cur_period_info{'WRITE'}{$lp}{percentile} = $all_query_duration{'WRITE'}[$cur_period_info{'WRITE'}{$lp}{percentileindex}];
+				$percentile{'WRITE'}{$lp} =  &convert_time($cur_period_info{'WRITE'}{$lp}{percentile});	
+			}
 			$queries .= qq{
 					<tr>
 						<td>$zday</td>
@@ -3487,8 +3509,13 @@ sub print_general_activity
 						<td>$count</td>
 						<td>$min</td>
 						<td>$max</td>
-						<td>$average</td>
-					</tr>};
+						<td>$average</td>} ;
+						foreach my $lp (@LATENCY_PERCENTILE) {
+						$queries .=
+						qq{
+						<td>$percentile{$lp}</td> };
+						};
+					$queries .= qq{</tr>};
 			$count = &comma_numbers($cur_period_info{'SELECT'}{count});
 			$average = &convert_time($cur_period_info{'SELECT'}{average});
 			$select_queries .= qq{
@@ -3496,8 +3523,13 @@ sub print_general_activity
 						<td>$zday</td>
 						<td>$h</td>
 						<td>$count</td>
-						<td>$average</td>
-					</tr>};
+						<td>$average</td>} ;
+                                                foreach my $lp (@LATENCY_PERCENTILE) {
+                                                $select_queries .=
+                                                qq{
+                                                <td>$percentile{'SELECT'}{$lp}</td> };
+                                                };
+                                        $select_queries .= qq{</tr>};
 			my $insert_count = &comma_numbers($cur_period_info{'INSERT'}{count});
 			my $update_count = &comma_numbers($cur_period_info{'UPDATE'}{count});
 			my $delete_count = &comma_numbers($cur_period_info{'DELETE'}{count});
@@ -3509,8 +3541,13 @@ sub print_general_activity
 						<td>$insert_count</td>
 						<td>$update_count</td>
 						<td>$delete_count</td>
-						<td>$write_average</td>
-					</tr>};
+						<td>$write_average</td>} ;
+                                                foreach my $lp (@LATENCY_PERCENTILE) {
+                                                $write_queries .=
+                                                qq{
+                                                <td>$percentile{'WRITE'}{$lp}</td> };
+                                                };
+                                        $write_queries .= qq{</tr>};
 			my $prepare_count = &comma_numbers($cur_period_info{prepare});
 			my $execute_count = &comma_numbers($cur_period_info{execute});
 			my $bind_prepare = &comma_numbers(sprintf("%.2f", $cur_period_info{execute}/($cur_period_info{prepare}||1)));
@@ -3578,6 +3615,9 @@ sub print_general_activity
 							<th>Min duration</th>
 							<th>Max duration</th>
 							<th>Avg duration</th>
+							<th>Latency Percentile(90)</th>
+							<th>Latency Percentile(95)</th>
+							<th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$queries
@@ -3592,6 +3632,9 @@ sub print_general_activity
 							<th>Hour</th>
 							<th>Count</th>
 							<th>Average Duration</th>
+							<th>Latency Percentile(90)</th>
+							<th>Latency Percentile(95)</th>
+                                                        <th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$select_queries
@@ -3608,6 +3651,9 @@ sub print_general_activity
 							<th>UPDATE</th>
 							<th>DELETE</th>
 							<th>Average Duration</th>
+							<th>Latency Percentile(90)</th>
+							<th>Latency Percentile(95)</th>
+                                                        <th>Latency Percentile(99)</th>
 						</tr>
 					</thead>
 					<tbody>$write_queries
