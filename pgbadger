@@ -5226,9 +5226,9 @@ sub print_vacuum
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
 			<ul>
-				<li><span class="figure">$autovacuum_info{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">More CPU costly vacuum <br />Table $autovacuum_info{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
+				<li><span class="figure">$autovacuum_info{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">Highest CPU-cost vacuum <br />Table $autovacuum_info{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
 				<li><span class="figure">$autovacuum_info{peak}{system_usage}{date}</span> <span class="figure-label">Date</span></li>
-				<li><span class="figure">$autoanalyze_info{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">More CPU costly analyze <br />Table $autoanalyze_info{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
+				<li><span class="figure">$autoanalyze_info{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">Highest CPU-cost analyze <br />Table $autoanalyze_info{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
 				<li><span class="figure">$autoanalyze_info{peak}{system_usage}{date}</span> <span class="figure-label">Date</span></li>
 			</ul>
 		</div>
