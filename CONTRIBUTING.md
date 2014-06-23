@@ -6,4 +6,4 @@
 
 2. Look at the [closed issues](https://github.com/dalibo/pgbadger/issues?state=closed), we may have already answered a similar problem
 
-3. [Read the doc](http://dalibo.github.com/pgbadger/documentation.html). It is short and useful.
+3. [Read the doc](http://dalibo.github.com/pgbadger/). It is short and useful.
