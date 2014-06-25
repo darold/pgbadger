@@ -1612,55 +1612,60 @@ sub process_file
 			next if ($row->[11] !~ $parse_regex);
 
 			# Extract the date
-			$row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/;
-			my $milli = $7 || 0;
-			($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
-			$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
+			if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
 
-			# Skip unwanted lines
-			next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-			if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
-				if ($tmpoutfile) {
-					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
-					$old_queries_count = $overall_stat{'queries_number'};
-					$old_errors_count = $overall_stat{'errors_number'};
-					$cursize = 0;
+				# Remove newline characters from queries
+				map { s/[\r\n]+/ /gs; } @$row;
+
+				my $milli = $7 || 0;
+				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
+				$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
+
+				# Skip unwanted lines
+				next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+				if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
+					if ($tmpoutfile) {
+						$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+						$old_queries_count = $overall_stat{'queries_number'};
+						$old_errors_count = $overall_stat{'errors_number'};
+						$cursize = 0;
+					}
+					$getout = 2;
+					last;
 				}
-				$getout = 2;
-				last;
-			}
 
-			# Jump to the last line parsed if required
-			next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
 
-			# Store the current timestamp of the log line
-			&store_current_timestamp($prefix_vars{'t_timestamp'});
+				# Store the current timestamp of the log line
+				&store_current_timestamp($prefix_vars{'t_timestamp'});
 
-			# Set query parameters as global variables
-			$prefix_vars{'t_dbuser'}  = $row->[1] || '';
-			$prefix_vars{'t_dbname'}  = $row->[2] || '';
-			$prefix_vars{'t_appname'} = $row->[22] || '';
-			$prefix_vars{'t_client'}  = $row->[4] || '';
-			$prefix_vars{'t_client'}  =~ s/:.*//;
-			$prefix_vars{'t_host'}    = 'csv';
-			$prefix_vars{'t_pid'}     = $row->[3];
-			$prefix_vars{'t_session_line'} = $row->[5];
-			$prefix_vars{'t_session_line'} =~ s/\..*//;
-			$prefix_vars{'t_loglevel'} = $row->[11];
-			$prefix_vars{'t_query'}    = $row->[13];
-			# Set ERROR additional information
-			$prefix_vars{'t_detail'} = $row->[14];
-			$prefix_vars{'t_hint'} = $row->[15];
-			$prefix_vars{'t_context'} = $row->[18];
-			$prefix_vars{'t_statement'} = $row->[19];
+				# Set query parameters as global variables
+				$prefix_vars{'t_dbuser'}  = $row->[1] || '';
+				$prefix_vars{'t_dbname'}  = $row->[2] || '';
+				$prefix_vars{'t_appname'} = $row->[22] || '';
+				$prefix_vars{'t_client'}  = $row->[4] || '';
+				$prefix_vars{'t_client'}  =~ s/:.*//;
+				$prefix_vars{'t_host'}    = 'csv';
+				$prefix_vars{'t_pid'}     = $row->[3];
+				$prefix_vars{'t_session_line'} = $row->[5];
+				$prefix_vars{'t_session_line'} =~ s/\..*//;
+				$prefix_vars{'t_loglevel'} = $row->[11];
+				$prefix_vars{'t_query'}    = $row->[13];
+				# Set ERROR additional information
+				$prefix_vars{'t_detail'} = $row->[14];
+				$prefix_vars{'t_hint'} = $row->[15];
+				$prefix_vars{'t_context'} = $row->[18];
+				$prefix_vars{'t_statement'} = $row->[19];
 
-			# Check if the log line should be excluded from the report
-			if (&validate_log_line($prefix_vars{'t_pid'})) {
+				# Check if the log line should be excluded from the report
+				if (&validate_log_line($prefix_vars{'t_pid'})) {
 
-				# Parse the query now
-				&parse_query();
-				&store_queries($prefix_vars{'t_pid'});
-				delete $cur_info{$prefix_vars{'t_pid'}};
+					# Parse the query now
+					&parse_query();
+					&store_queries($prefix_vars{'t_pid'});
+					delete $cur_info{$prefix_vars{'t_pid'}};
+				}
 			}
 		}
 		if (!$getout) {
@@ -1988,7 +1993,7 @@ sub process_file
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
-		$last_line{current_pos} = $current_offset if ($last_parsed &&  ($#given_log_files == 0));
+		$last_line{current_pos} = $current_offset if ($last_parsed && ($#given_log_files == 0));
 
 	}
 	close $lfile;
@@ -2079,6 +2084,7 @@ sub process_file
 		if (open(OUT, ">>$tmp_last_parsed")) {
 			flock(OUT, 2) || return $getout;
 			$last_line{current_pos} ||= 0;
+
 			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 			close(OUT);
 		} else {
@@ -8499,7 +8505,26 @@ sub parse_query
 		$autovacuum_info{tables}{$1}{idxscans} += $2;
 		$autovacuum_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{count}++;
+
 		$cur_info{$t_pid}{vacuum} = $1;
+
+		if ($format eq 'csv') {
+			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
+				$autovacuum_info{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $1;
+			}
+			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
+				$autovacuum_info{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $1;
+			}
+			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* sec elapsed (.*) sec#) {
+				if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
+					$autovacuum_info{peak}{system_usage}{elapsed} = $1;
+					$autovacuum_info{peak}{system_usage}{table} = $cur_info{$t_pid}{vacuum};
+					$autovacuum_info{peak}{system_usage}{date} = 
+						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
+						"$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				}
+			}
+		}
 		$cur_info{$t_pid}{year}   = $prefix_vars{'t_year'};
 		$cur_info{$t_pid}{month}  = $prefix_vars{'t_month'};
 		$cur_info{$t_pid}{day}    = $prefix_vars{'t_day'};
