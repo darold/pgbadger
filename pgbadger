@@ -476,8 +476,7 @@ if ($extension eq 'tsung') {
 	if (not defined $fh) {
 		die "FATAL: can't write to $outfile, $!\n";
 	}
-	print $fh qq{
-<?xml version="1.0"?>
+	print $fh qq{<?xml version="1.0"?>
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
 <tsung loglevel="notice" version="1.0">
 
@@ -8827,7 +8826,7 @@ sub store_tsung_session
 		die "FATAL: can't write to $outfile, $!\n";
 	}
 	if ($pid) {
-		print $fh "  <session probability=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
+		print $fh "  <session weight=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
 		if (exists $tsung_session{$pid}{connection}{database}) {
 			print $fh qq{    <transaction name="connection">
       <request><pgsql type="connect" database="$tsung_session{$pid}{connection}{database}" username="$tsung_session{$pid}{connection}{user}" /></request>
