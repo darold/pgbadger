@@ -1332,7 +1332,8 @@ Options:
     -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
-                             on the output format: out.html, out.txt or out.tsung.
+                             on the output format: out.html, out.txt, out.bin,
+                             out.json or out.tsung.
                              With module JSON::XS installed, you can output file
                              in JSON format either.
                              To dump output to stdout use - as filename.
@@ -1356,7 +1357,8 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
-    -x | --extension       : output format. Values: text, html or tsung. Default: html
+    -x | --extension       : output format. Values: text, html, bin, json or
+                             tsung. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                              zcat or bzcat or unzip is not in your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.

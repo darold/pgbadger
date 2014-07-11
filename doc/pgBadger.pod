@@ -44,7 +44,8 @@ Options:
     -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
-                             on the output format: out.html, out.txt or out.tsung.
+                             on the output format: out.html, out.txt, out.bin,
+                             out.json or out.tsung.
                              To dump output to stdout use - as filename.
     -O | --outdir path     : directory where out file must be saved.
     -p | --prefix string   : the value of your custom log_line_prefix as
@@ -66,7 +67,8 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
-    -x | --extension       : output format. Values: text, html or tsung. Default: html
+    -x | --extension       : output format. Values: text, html, binary, json or
+                             tsung. Default: html
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                              zcat or bzcat or unzip is not in your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
@@ -244,6 +246,13 @@ If you planned to parse PostgreSQL CSV log files you might need some Perl Module
 This module is optional, if you don't have PostgreSQL log in the CSV format you don't
 need to install it.
 
+If you want to export statistics as JSON file you need an additional Perl module:
+
+	JSON::XS - JSON serialising/deserialising, done correctly and fast
+
+This module is optional, if you don't select the json output format you don't
+need to install it.
+
 Compressed log file format is autodetected from the file exension. If pgBadger find
 a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat
 and if the file extension is zip or xz then the unzip or xz utilities will be used.
@@ -266,8 +275,8 @@ well as under Windows platform.
 
 Download the tarball from github and unpack the archive as follow:
 
-	tar xzf pgbadger-4.x.tar.gz
-	cd pgbadger-4.x/
+	tar xzf pgbadger-5.x.tar.gz
+	cd pgbadger-5.x/
 	perl Makefile.PL
 	make && sudo make install
 
@@ -457,6 +466,12 @@ is generated, just do the following:
 	pgbadger -o day1_report.html day1/*.bin
 
 Adjust the commands following your needs.
+
+=head1 JSON FORMAT
+
+JSON format is good for sharing data with other languages, which makes it
+easy to integrate pgBadger's result into other monitoring tools like Cacti
+or Graphite.
 
 =head1 AUTHORS
 
