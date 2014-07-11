@@ -6690,7 +6690,7 @@ sub print_time_consuming
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{details}" if ($normalyzed_info{$k}{samples}{$d}{details});
+			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -6850,7 +6850,7 @@ sub print_most_frequent
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{details}" if ($normalyzed_info{$k}{samples}{$d}{details});
+			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -7011,7 +7011,7 @@ sub print_slowest_queries
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{details}" if ($normalyzed_info{$k}{samples}{$d}{details});
+			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
