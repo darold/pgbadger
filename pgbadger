@@ -405,6 +405,13 @@ $top ||= 20;
 if (!$extension) {
 	if ($outfile =~ /\.bin/i) {
 		$extension = 'binary';
+	} elsif ($outfile =~ /\.json/i) {
+		if (eval {require JSON::XS;1;} ne 1) {
+			die("Can not save output in json format, please install Perl module JSON::XS first.\n");
+		} else {
+			JSON::XS->import();
+		}
+		$extension = 'json';
 	} elsif ($outfile =~ /\.tsung/i) {
 		$extension = 'tsung';
 	} elsif ($outfile =~ /\.htm[l]*/i) {
@@ -453,7 +460,7 @@ if ($outfile ne '-') {
 }
 
 # Remove graph support if output is not html
-$graph = 0 unless ($extension eq 'html' or $extension eq 'binary' );
+$graph = 0 unless ($extension eq 'html' or $extension eq 'binary' or $extension eq 'json');
 $graph = 0 if ($nograph);
 
 # Set some default values
@@ -1039,6 +1046,8 @@ if (!$incremental) {
 			} else {
 				&dump_as_text();
 			}
+		} elsif ($extension eq 'json') {
+			&dump_as_json();
 		} elsif ($extension eq 'binary') {
 			&dump_as_binary($fh);
 		} else {
@@ -1324,6 +1333,8 @@ Options:
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html, out.txt or out.tsung.
+                             With module JSON::XS installed, you can output file
+                             in JSON format either.
                              To dump output to stdout use - as filename.
     -O | --outdir path     : directory where out file must be saved.
     -p | --prefix string   : the value of your custom log_line_prefix as
@@ -8051,6 +8062,37 @@ sub dump_as_binary
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
 	}, $lfh) || die ("Couldn't save binary data to «$outfile»!\n");
+}
+
+sub dump_as_json
+{
+	my $json = encode_json({
+		'overall_stat' => \%overall_stat,
+		'overall_checkpoint' => \%overall_checkpoint,
+		'normalyzed_info' => \%normalyzed_info,
+		'error_info' => \%error_info,
+		'connection_info' => \%connection_info,
+		'database_info' => \%database_info,
+		'application_info' => \%application_info,
+		'user_info' => \%user_info,
+		'host_info' => \%host_info,
+		'checkpoint_info' => \%checkpoint_info,
+		'session_info' => \%session_info,
+		'tempfile_info' => \%tempfile_info,
+		'error_info' => \%error_info,
+		'logs_type' => \%logs_type,
+		'lock_info' => \%lock_info,
+		'per_minute_info' => \%per_minute_info,
+		'top_slowest' => \@top_slowest,
+		'nlines' => $nlines,
+		'log_files' => \@log_files,
+		'autovacuum_info' => \%autovacuum_info,
+		'autoanalyze_info' => \%autoanalyze_info,
+		'top_tempfile_info' => \@top_tempfile_info,
+		'top_locked_info' => \@top_locked_info,
+	}) || die ("Encode object to JSON failed!\n");
+
+	print $fh $json;
 }
 
 # Highlight SQL code
