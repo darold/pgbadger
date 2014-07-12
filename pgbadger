@@ -8320,6 +8320,16 @@ sub parse_query
 		}
 	}
 
+	# Remove session failure from current workload because there is no disconnection entry
+	if (   ($prefix_vars{'t_loglevel'} eq 'FATAL')
+		&& ($prefix_vars{'t_query'} =~ /^(database|role) "[^"]+" does not exist$/))
+	{
+		delete $current_sessions{$prefix_vars{'t_pid'}} if (!$disable_session);
+		if ($extension eq 'tsung') {
+			delete $tsung_session{$prefix_vars{'t_pid'}}
+		}
+	}
+
 	# Do not parse lines that are not an error message when error only report is requested
 	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
 		return;
@@ -8357,7 +8367,7 @@ sub parse_query
 				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
 
 	# set current session workload
-	if (!$disable_session) {
+	if ( !$disable_session ) {
 		my $sess_count = scalar keys %current_sessions;
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{session} = $sess_count;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{count} = $sess_count;
@@ -8467,7 +8477,6 @@ sub parse_query
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $usr;
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
 			return;
-
 		}
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{connection}++;
 
