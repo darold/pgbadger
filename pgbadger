@@ -854,6 +854,7 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 # Main loop reading log files
 my $global_totalsize = 0;
 my @given_log_files = ( @log_files );
+chomp(@given_log_files);
 
 # Verify that the file has not changed for incremental move
 if (!$remote_host) {
