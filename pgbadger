@@ -217,8 +217,8 @@ sub wait_child
 			unlink("$f->[1]") if (-e "$f->[1]");
 		}
 	}
-	if ($last_parsed && -e $tmp_last_parsed) {
-		unlink("$tmp_last_parsed");
+	if ($last_parsed && -e "$TMP_DIR/$tmp_last_parsed") {
+		unlink("$TMP_DIR/$tmp_last_parsed");
 	}
 	if ($last_parsed && -e "$last_parsed.tmp") {
 		unlink("$last_parsed.tmp");
@@ -808,6 +808,7 @@ my $t0 = Benchmark->new;
 
 # Automatically set parameters with incremental mode
 if ($incremental) {
+
 	# In incremental mode an output directory must be set
 	if (!$outdir) {
 		die "FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n"
@@ -995,7 +996,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
 # Get last line parsed from all process
 if ($last_parsed) {
-	if (open(IN, "$tmp_last_parsed") ) {
+	if (open(IN, "$TMP_DIR/$tmp_last_parsed") ) {
 		while (my $line = <IN>) {
 			chomp($line);
 			my ($d, $p, $l) = split(/\t/, $line, 3);
@@ -1011,7 +1012,7 @@ if ($last_parsed) {
 		}
 		close(IN);
 	}
-	unlink("$tmp_last_parsed");
+	unlink("$TMP_DIR/$tmp_last_parsed");
 }
 
 # Save last line parsed
@@ -2094,14 +2095,14 @@ sub process_file
 
 	# Save last line into temporary file
 	if ($last_parsed && scalar keys %last_line) {
-		if (open(OUT, ">>$tmp_last_parsed")) {
+		if (open(OUT, ">>$TMP_DIR/$tmp_last_parsed")) {
 			flock(OUT, 2) || return $getout;
 			$last_line{current_pos} ||= 0;
 
 			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 			close(OUT);
 		} else {
-			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
+			&logmsg('ERROR', "can't save last parsed line into $TMP_DIR/$tmp_last_parsed, $!");
 		}
 	}
 
