@@ -217,8 +217,8 @@ sub wait_child
 			unlink("$f->[1]") if (-e "$f->[1]");
 		}
 	}
-	if ($last_parsed && -e "$TMP_DIR/$tmp_last_parsed") {
-		unlink("$TMP_DIR/$tmp_last_parsed");
+	if ($last_parsed && -e "$tmp_last_parsed") {
+		unlink("$tmp_last_parsed");
 	}
 	if ($last_parsed && -e "$last_parsed.tmp") {
 		unlink("$last_parsed.tmp");
@@ -850,6 +850,7 @@ if ($last_parsed && -e $last_parsed) {
 	}
 }
 $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
+$tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 
 
 # Main loop reading log files
@@ -859,9 +860,21 @@ chomp(@given_log_files);
 
 # Verify that the file has not changed for incremental move
 if (!$remote_host) {
-	if ( ($saved_last_line{current_pos} > 0) && ($#given_log_files == 0)) {
-		$saved_last_line{current_pos} = 0 if (&check_file_changed($given_log_files[0], $saved_last_line{datetime}));
-		$saved_last_line{current_pos}++ if ($saved_last_line{current_pos} > 0);
+	if ($saved_last_line{current_pos} > 0) {
+		my @tmpfilelist = ();
+		# Removed files that have already been parsed during previous runs
+		foreach my $f (@given_log_files) {
+			if (!&check_file_changed($f, $saved_last_line{datetime})) {
+				&logmsg('DEBUG', "this file has already been parsed: $f");
+				next;
+			} else {
+				push(@tmpfilelist, $f);
+				$saved_last_line{current_pos} = 0;
+			}
+		}
+		@given_log_files = ();
+		push(@given_log_files, @tmpfilelist);
+		$saved_last_line{current_pos}++;
 	}
 } else {
 	# Disable multi process when using ssh to parse remote log
@@ -877,11 +890,11 @@ if ($format eq 'binary') {
 
 my $pipe;
 
-# Seeking to an old log position is not possible when multiple file are provided
-$saved_last_line{current_pos} = 0 if (!$last_parsed && ($#given_log_files > 0));
+# Seeking to an old log position is not possible outside incremental mode
+$saved_last_line{current_pos} = 0 if (!$last_parsed);
 
 # Start parsing all given files using multiprocess
-if ( ($queue_size > 1) || ($job_per_file > 1) ) {
+if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 	# Number of running process
 	my $child_count = 0;
@@ -996,7 +1009,7 @@ if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 
 # Get last line parsed from all process
 if ($last_parsed) {
-	if (open(IN, "$TMP_DIR/$tmp_last_parsed") ) {
+	if (open(IN, "$tmp_last_parsed") ) {
 		while (my $line = <IN>) {
 			chomp($line);
 			my ($d, $p, $l) = split(/\t/, $line, 3);
@@ -1012,7 +1025,7 @@ if ($last_parsed) {
 		}
 		close(IN);
 	}
-	unlink("$TMP_DIR/$tmp_last_parsed");
+	unlink("$tmp_last_parsed");
 }
 
 # Save last line parsed
@@ -2007,7 +2020,7 @@ sub process_file
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
-		$last_line{current_pos} = $current_offset if ($last_parsed && ($#given_log_files == 0));
+		$last_line{current_pos} = $current_offset if ($last_parsed);
 
 	}
 	close $lfile;
@@ -2095,14 +2108,14 @@ sub process_file
 
 	# Save last line into temporary file
 	if ($last_parsed && scalar keys %last_line) {
-		if (open(OUT, ">>$TMP_DIR/$tmp_last_parsed")) {
+		if (open(OUT, ">>$tmp_last_parsed")) {
 			flock(OUT, 2) || return $getout;
 			$last_line{current_pos} ||= 0;
 
 			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 			close(OUT);
 		} else {
-			&logmsg('ERROR', "can't save last parsed line into $TMP_DIR/$tmp_last_parsed, $!");
+			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
 		}
 	}
 
@@ -2172,6 +2185,7 @@ sub check_file_changed
 				}
 				$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				# This file has already been parsed
 				if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 					close($lfile);
 					return 0;
@@ -2193,6 +2207,7 @@ sub check_file_changed
 					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
 				}
 			}
+			# This file has already been parsed
 			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 				close($lfile);
 				return 0;
