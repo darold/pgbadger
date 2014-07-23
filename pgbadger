@@ -1046,7 +1046,7 @@ my $td = timediff($t1, $t0);
 # Global output filehandle
 my $fh = undef;
 
-if (!$incremental) {
+if (!$incremental && ($#given_log_files >= 0) ) {
 
 	&logmsg('LOG', "Ok, generating $extension report...");
 
@@ -2162,7 +2162,11 @@ sub check_file_changed
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
 
 	%prefix_vars = ();
+	$lfile->seek($saved_last_line{current_pos} || 0, 0);
+	my $more_lines = 0;
 	while (my $line = <$lfile>) {
+
+		$more_lines++;
 
 		if ($format =~ /syslog/) {
 
@@ -2217,6 +2221,11 @@ sub check_file_changed
 		}
 	}
 	close($lfile);
+
+	if (!$more_lines) {
+		close($lfile);
+		return 0;
+	}
 
 	return 1;
 }
