@@ -2151,10 +2151,7 @@ sub check_file_changed
 	if ($iscompressed) {
 		close($lfile);
 		return 1;
-	# do not seek if filesize is smaller than the seek position
-	} elsif ($saved_last_line{current_pos} > $totalsize) {
-		close($lfile);
-		return 1;
+		
 	}
 
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
@@ -2162,7 +2159,10 @@ sub check_file_changed
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
 
 	%prefix_vars = ();
-	$lfile->seek($saved_last_line{current_pos} || 0, 0);
+	# do not seek if filesize is smaller than the seek position
+	if ($saved_last_line{current_pos} < $totalsize) {
+		$lfile->seek($saved_last_line{current_pos} || 0, 0);
+	}
 	my $more_lines = 0;
 	while (my $line = <$lfile>) {
 
