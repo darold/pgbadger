@@ -874,7 +874,7 @@ if (!$remote_host) {
 		}
 		@given_log_files = ();
 		push(@given_log_files, @tmpfilelist);
-		$saved_last_line{current_pos}++;
+		$saved_last_line{current_pos}++ if ($saved_last_line{current_pos});
 	}
 } else {
 	# Disable multi process when using ssh to parse remote log
@@ -934,7 +934,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Do not use split method with compressed files
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip)/i) ) {
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) ) {
 			# Create multiple processes to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			for (my $i = 0; $i < $#chunks; $i++) {
@@ -1100,7 +1100,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		&logmsg('WARNING', "can't read file $last_parsed.tmp, $!");
 		&logmsg('HINT', "maybe there's no new entries in your log since last run.");
 	}
-	foreach $incr_date (@build_directories) {
+	foreach $incr_date (sort @build_directories) {
 
 		$last_incr_date = $incr_date;
 
@@ -2020,7 +2020,9 @@ sub process_file
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
-		$last_line{current_pos} = $current_offset if ($last_parsed);
+		if ($last_parsed) {
+			$last_line{current_pos} = $current_offset;
+		}
 
 	}
 	close $lfile;
@@ -2211,6 +2213,7 @@ sub check_file_changed
 					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
 				}
 			}
+			next if (!$prefix_vars{'t_timestamp'});
 			# This file has already been parsed
 			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 				close($lfile);
@@ -10330,8 +10333,8 @@ sub get_log_file
 	my $totalsize = 0;
 	if (!$remote_host) {
 		$totalsize = (stat("$logf"))[7] || 0;
-	} elsif ($logf !~ /\.(gz|bz2|zip|xz)/i) {
-		&logmsg('DEBUG', "Looking for remote file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
+	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
+		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
 		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
 		chomp($totalsize);
 		if (!$totalsize) {
@@ -10342,7 +10345,7 @@ sub get_log_file
 	my $iscompressed = 1;
 
 	# Open a file handle
-	if ($logf !~ /\.(gz|bz2|zip|xz)/i) {
+	if ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
 			open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
 		} else {
@@ -10375,16 +10378,16 @@ sub get_log_file
 		# Real size of the file is unknown, try to find it
 		# bz2 does not report real size
 		$totalsize = 0;
-		if ($logf =~ /\.(gz|zip|xz)/i) {
+		if ($logf =~ /\.(gz|zip|xz)$/i) {
 			my $cmd_file_size = $gzip_uncompress_size;
-			if ($logf =~ /\.zip/i) {
+			if ($logf =~ /\.zip$/i) {
 				$cmd_file_size = $zip_uncompress_size;
-			} elsif ($logf =~ /\.xz/i) {
+			} elsif ($logf =~ /\.xz$/i) {
 				$cmd_file_size = $xz_uncompress_size;
 			}			
 			$cmd_file_size =~ s/\%f/$logf/g;
 			if (!$remote_host) {
-				&logmsg('DEBUG', "Looking for remote file size using command: $cmd_file_size");
+				&logmsg('DEBUG', "Looking for file size using command: $cmd_file_size");
 				$totalsize = `$cmd_file_size`;
 			} else {
 				&logmsg('DEBUG', "Looking for remote file size using command: $ssh_command $cmd_file_size");
@@ -10420,17 +10423,19 @@ sub split_logfile
 		#If the file is very small, many jobs actually make the parsing take longer
 		#What is an acceptable file size????
 		$queue_size = 0;
-	} elsif ($logf =~ /\.(gz|zip)/i) {
+	} elsif ($logf =~ /\.(gz|zip|xz)$/i) {
 		$totalsize = 0;
 		my $cmd_file_size = $gzip_uncompress_size;
-		if ($logf =~ /\.zip/i) {
+		if ($logf =~ /\.zip$/i) {
 			$cmd_file_size = $zip_uncompress_size;
+		} elsif ($logf =~ /\.xz$/i) {
+			$cmd_file_size = $xz_uncompress_size;
 		}
 		$cmd_file_size =~ s/\%f/$logf/g;
 		$totalsize = `$cmd_file_size`;
 		chomp($totalsize);
 		$queue_size = 0;
-	} elsif ($logf =~ /\.bz2/i) {
+	} elsif ($logf =~ /\.bz2$/i) {
 		$totalsize = 0;
 		$queue_size = 0;
 	}
@@ -10439,7 +10444,7 @@ sub split_logfile
 
 	my @chunks = (0);
 	my $i = 1;
-	if ($last_parsed && $saved_last_line{current_pos} && ($#given_log_files == 0)) {
+	if ($last_parsed && $saved_last_line{current_pos} && ($saved_last_line{current_pos} < $totalsize)) {
 		$chunks[0] = $saved_last_line{current_pos};
 		$i = $saved_last_line{current_pos};
 	}
