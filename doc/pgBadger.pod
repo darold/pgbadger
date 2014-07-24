@@ -69,6 +69,8 @@ Options:
     -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text, html, binary, json or
                              tsung. Default: html
+    -X | --extra-files     : in incremetal mode allow pgbadger to write CSS and JS
+                             files in the output directory as separate files.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                              zcat or bzcat or unzip is not in your path.
     --pie-limit num        : pie data lower than num% will show a sum instead.
@@ -437,6 +439,11 @@ output directory, so you don't have to use the -l option unless you want
 to change the path of that file. This mean that you can run pgBadger in
 this mode each days on a log file rotated each week, it will not count
 the log entries twice.
+
+To save disk space you may want to use the -X or --extra-files command line
+option to force pgBadger to write javascript and css to separate files in
+the output directory. The resources will then be loaded using script and
+link tag.
 
 =head1 BINARY FORMAT
 
