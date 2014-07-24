@@ -879,12 +879,10 @@ if (!$remote_host) {
 				next;
 			} else {
 				push(@tmpfilelist, $f);
-				$saved_last_line{current_pos} = 0;
 			}
 		}
 		@given_log_files = ();
 		push(@given_log_files, @tmpfilelist);
-		$saved_last_line{current_pos}++ if ($saved_last_line{current_pos});
 	}
 } else {
 	# Disable multi process when using ssh to parse remote log
@@ -2123,7 +2121,7 @@ sub process_file
 				if (($stop_offset > 0) && ($format ne 'csv')) {
 					print STDERR &progress_bar($cursize - $start_offset, $stop_offset, 25, '=',$overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
 				} else {
-					print STDERR &progress_bar($cursize, $totalsize, 25, '=', $overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
+					print STDERR &progress_bar($cursize+$start_offset, $totalsize, 25, '=', $overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
 				}
 				print STDERR "\n";
 			}
@@ -2285,6 +2283,7 @@ sub check_file_changed
 			next if (!$prefix_vars{'t_timestamp'});
 			# This file has already been parsed
 			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+		print STDERR "BBBBBBBBBBB found at offset $saved_last_line{current_pos}: ($saved_date gt $prefix_vars{'t_timestamp'})\n";
 				close($lfile);
 				return 0;
 			} else {
