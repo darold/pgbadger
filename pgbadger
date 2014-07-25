@@ -6294,13 +6294,14 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
-				<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+				<div id="query-a-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank')"></i>$query</div>
 				 $example
 			<!-- Examples collapse -->
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
 				<dl>
 };
 		if ($normalyzed_info{$k}{count} > 1) {
+			my $idx = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 				my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
@@ -6312,9 +6313,12 @@ sub print_lock_queries_report
 				$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$details .= " ]";
 				print $fh qq{
-					<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
+					<dt>
+						<div id="query-a-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank-$idx')"></li>$query</div>
+					</dt>
 					<pre>$details</pre>
 };
+				$idx++;
 
 			}
 			print $fh qq{
@@ -6373,7 +6377,7 @@ sub print_lock_queries_report
 				<td>$rank</td>
 				<td>$time</td>
 				<td id="queries-that-waited-most-examples-details-rank-$rank">
-					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+					<div id="query-b-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-b-$rank')"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6442,7 +6446,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
-					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+					<div id="query-c-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank')"></i>$query</div>
 					$example
 				<!-- Examples collapse -->
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
@@ -6450,6 +6454,7 @@ sub print_tempfile_report
 };
 			my $k = $top_temporary[$i]->[0];
 			if ($normalyzed_info{$k}{count} > 1) {
+				my $idx = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 					my $details = "Duration: " . &convert_time($d) . "<br />";
@@ -6459,12 +6464,16 @@ sub print_tempfile_report
 					$details .= "Application: $normalyzed_info{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$k}{samples}{$d}{app});
 					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					print $fh qq{
-						<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
+						<dt>
+						<div id="query-c-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank-$idx')"></i>$query</div>
+						
+						</dt>
 						<pre>$details</pre>
 };
+				$idx++
 
 				}
-			print $fh qq{
+				print $fh qq{
 					</dl>
 					<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-temporary-files-examples-rank-$rank">x Hide</button></p>
 				</div>
@@ -6519,7 +6528,7 @@ sub print_tempfile_report
 				<td>$rank</td>
 				<td>$size</td>
 				<td id="queries-generating-largest-temporary-files-examples-details-rank-$rank">
-					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+					<div id="query-d-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank')"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6631,6 +6640,7 @@ sub print_slowest_individual_queries
 				<tbody>
 };
 
+	my $idx = 1;
 	for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
 		my $rank = $i + 1;
 		my $duration = &convert_time($top_slowest[$i]->[0]);
@@ -6648,12 +6658,13 @@ sub print_slowest_individual_queries
 				<td>$rank</td>
 				<td>$duration</td>
 				<td id="slowest-individual-queries-examples-rank-$rank">
-					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+					<div id="query-d-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank-$idx')"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
 
 			};
+		$idx++;
 	}
 	if ($#top_slowest == -1) {
 		print $fh qq{<tr><td colspan="3">$NODATA</td></tr>};
@@ -6762,7 +6773,7 @@ sub print_time_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-queries-examples-details-rank-$rank">
-					<div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+					<div id="query-e-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank')"></i>$query</div>
 						<!-- Details collapse -->
 					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6789,6 +6800,7 @@ sub print_time_consuming
 							<dl>
 };
 
+		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
@@ -6800,9 +6812,12 @@ sub print_time_consuming
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
+								<dt>
+								<div id="query-e-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank-$idx')"></i>$query</div>
+								</dt>
 								<pre>$details</pre>
 };
+			$idx++;
 		}
 		print $fh qq{
 							</dl>
@@ -6922,7 +6937,7 @@ sub print_most_frequent
                                 <td>$max</td>
                                 <td>$avg</td>
                                 <td id="most-frequent-queries-examples-details-rank-$rank">
-                                        <div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+                                        <div id="query-f-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank')"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="most-frequent-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6949,6 +6964,7 @@ sub print_most_frequent
 							<dl>
 };
 
+		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
@@ -6960,9 +6976,12 @@ sub print_most_frequent
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
+								<dt>
+								<div id="query-f-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank-$idx')"></i>$query</div>
+								</dt>
 								<pre>$details</pre>
 };
+			$idx++;
 		}
                 print $fh qq{
 							</dl>
@@ -7083,7 +7102,7 @@ sub print_slowest_queries
                                 </td>
                                 <td>$duration</td>
                                 <td id="normalized-slowest-queries-examples-details-rank-$rank">
-                                        <div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div>
+                                        <div id="query-g-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank')"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="normalized-slowest-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -7110,6 +7129,7 @@ sub print_slowest_queries
 							<dl>
 };
 
+		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
@@ -7121,9 +7141,12 @@ sub print_slowest_queries
 			$details .= " ]";
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
-								<dt><div class="sql sql-largesize" ondblclick="sql_format(this)">$query</div></dt>
+								<dt>
+								<div id="query-g-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank-$idx')"></i>$query</div>
+								</dt>
 								<pre>$details</pre>
 };
+			$idx++;
 		}
                 print $fh qq{
 							</dl>
@@ -10756,6 +10779,23 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 WRFILE: pgbadger.js
 
 /* <![CDATA[ */
+function sql_select (objid)
+{
+	var obj = document.getElementById( objid );
+	if (window.getSelection) {
+		var sel = window.getSelection();
+		sel.removeAllRanges();
+		var range = document.createRange();
+		range.selectNodeContents(obj);
+		sel.addRange(range);
+	} else if (document.selection) {
+		var textRange = document.body.createTextRange();
+		textRange.moveToElementText(obj);
+		textRange.select();
+	}
+}
+
+
 function sql_format (obj)
 {
 	if (obj.style == undefined || obj.style.whiteSpace == 'pre') {
