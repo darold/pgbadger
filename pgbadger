@@ -195,7 +195,7 @@ $num_sep = ' ' if ($n =~ /,/);
 # Inform the parent that it should stop iterate on parsing other files
 sub stop_parsing
 {
-	print STDERR "DEBUG: Received interrupt signal";
+	&logmsg('DEBUG', "Received interrupt signal");
 	$interrupt = 1;
 }
 
@@ -6294,7 +6294,7 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
-				<div id="query-a-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank')"></i>$query</div>
+				<div id="query-a-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank')" title="Click to select query"></i>$query</div>
 				 $example
 			<!-- Examples collapse -->
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
@@ -6314,7 +6314,7 @@ sub print_lock_queries_report
 				$details .= " ]";
 				print $fh qq{
 					<dt>
-						<div id="query-a-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank-$idx')"></li>$query</div>
+						<div id="query-a-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank-$idx')" title="Click to select query"></li>$query</div>
 					</dt>
 					<pre>$details</pre>
 };
@@ -6377,7 +6377,7 @@ sub print_lock_queries_report
 				<td>$rank</td>
 				<td>$time</td>
 				<td id="queries-that-waited-most-examples-details-rank-$rank">
-					<div id="query-b-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-b-$rank')"></i>$query</div>
+					<div id="query-b-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-b-$rank')" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6446,7 +6446,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
-					<div id="query-c-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank')"></i>$query</div>
+					<div id="query-c-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank')" title="Click to select query"></i>$query</div>
 					$example
 				<!-- Examples collapse -->
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
@@ -6465,7 +6465,7 @@ sub print_tempfile_report
 					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					print $fh qq{
 						<dt>
-						<div id="query-c-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank-$idx')"></i>$query</div>
+						<div id="query-c-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank-$idx')" title="Click to select query"></i>$query</div>
 						
 						</dt>
 						<pre>$details</pre>
@@ -6528,7 +6528,7 @@ sub print_tempfile_report
 				<td>$rank</td>
 				<td>$size</td>
 				<td id="queries-generating-largest-temporary-files-examples-details-rank-$rank">
-					<div id="query-d-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank')"></i>$query</div>
+					<div id="query-d-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank')" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6658,7 +6658,7 @@ sub print_slowest_individual_queries
 				<td>$rank</td>
 				<td>$duration</td>
 				<td id="slowest-individual-queries-examples-rank-$rank">
-					<div id="query-d-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank-$idx')"></i>$query</div>
+					<div id="query-d-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank-$idx')" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6773,7 +6773,7 @@ sub print_time_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-queries-examples-details-rank-$rank">
-					<div id="query-e-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank')"></i>$query</div>
+					<div id="query-e-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank')" title="Click to select query"></i>$query</div>
 						<!-- Details collapse -->
 					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6813,7 +6813,7 @@ sub print_time_consuming
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-e-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank-$idx')"></i>$query</div>
+								<div id="query-e-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank-$idx')" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
@@ -6937,7 +6937,7 @@ sub print_most_frequent
                                 <td>$max</td>
                                 <td>$avg</td>
                                 <td id="most-frequent-queries-examples-details-rank-$rank">
-                                        <div id="query-f-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank')"></i>$query</div>
+                                        <div id="query-f-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank')" title="Click to select query"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="most-frequent-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -6977,7 +6977,7 @@ sub print_most_frequent
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-f-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank-$idx')"></i>$query</div>
+								<div id="query-f-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank-$idx')" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
@@ -7102,7 +7102,7 @@ sub print_slowest_queries
                                 </td>
                                 <td>$duration</td>
                                 <td id="normalized-slowest-queries-examples-details-rank-$rank">
-                                        <div id="query-g-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank')"></i>$query</div>
+                                        <div id="query-g-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank')" title="Click to select query"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="normalized-slowest-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -7142,7 +7142,7 @@ sub print_slowest_queries
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-g-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank-$idx')"></i>$query</div>
+								<div id="query-g-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank-$idx')" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
