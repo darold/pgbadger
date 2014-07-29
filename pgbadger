@@ -2033,8 +2033,13 @@ sub process_file
 				} elsif ($cur_pid && ($line !~ $orphan_stderr_line)) {
 
 					if ($line =~ s/^(STATEMENT|DETAIL|HINT):\s+//) {
+						my $lbl = lc($1);
 						$line =~ s/ERROR:\s+//;
-						$cur_info{$cur_pid}{"\L$1\E"} = $line;
+						if (exists $cur_temp_info{$cur_pid}{size}) {
+							$cur_temp_info{$cur_pid}{query} .= $line;
+						} else {
+							$cur_info{$cur_pid}{$lbl} = $line;
+						}
 						next;
 					} elsif ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
 						if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
@@ -2059,7 +2064,7 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ / LOG:  /);
 
-					if (exists $cur_temp_info{$cur_pid}{query}) {
+					if (exists $cur_temp_info{$cur_pid}{size}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
@@ -2100,10 +2105,12 @@ sub process_file
 		&store_queries($pid);
 
 	}
+
 	# Stores last temporary files and lock information
 	foreach my $pid (keys %cur_temp_info) {
 		&store_temporary_and_lock_infos($pid);
 	}
+	
 	# Stores last temporary files and lock information
 	foreach my $pid (keys %cur_lock_info) {
 		&store_temporary_and_lock_infos($pid);
@@ -8525,8 +8532,19 @@ sub parse_query
 		return;
 	}
 
+	# Stores query related to temporary file information
+	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid}{size}) {
+		$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+		$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+		$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+		$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+		$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		return;
+	}
+
 	# Stores query related to last lock information
-	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_lock_info{$t_pid}) {
+	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_lock_info{$t_pid}{wait}) {
 		$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_query'};
 		$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 		$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
@@ -9325,7 +9343,7 @@ sub store_temporary_and_lock_infos
 	}
 
 	# Store normalized query that waited the most if required
-	if (exists $cur_lock_info{$t_pid} && ($cur_lock_info{$t_pid}{query} ne '') && $cur_lock_info{$t_pid}{wait}) {
+	if (exists $cur_lock_info{$t_pid}{wait} && ($cur_lock_info{$t_pid}{query} ne '')) {
 
 		# Add a semi-colon at end of the query
 		$cur_lock_info{$t_pid}{query} .= ';' if (substr($cur_lock_info{$t_pid}{query}, -1, 1) ne ';');
