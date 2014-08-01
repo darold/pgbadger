@@ -2290,7 +2290,6 @@ sub check_file_changed
 			next if (!$prefix_vars{'t_timestamp'});
 			# This file has already been parsed
 			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
-		print STDERR "BBBBBBBBBBB found at offset $saved_last_line{current_pos}: ($saved_date gt $prefix_vars{'t_timestamp'})\n";
 				close($lfile);
 				return 0;
 			} else {
