@@ -59,6 +59,7 @@ my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
 my $MAX_QUERY_LENGTH = 20480;
+my $terminate = 0;
 
 my $pgbadger_logo =
         '<img src="data:image/png;base64,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">';
@@ -164,7 +165,8 @@ my $csv_sep_char            = ',';
 my %current_sessions        = ();
 my $incr_date               = '';
 my $last_incr_date          = '';
-my $anonymize                = 0;
+my $anonymize               = 0;
+my $noclean                 = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -303,7 +305,8 @@ my $result = GetOptions(
         'ssh-option=s'             => \$ssh_options,
         'ssh-user=s'               => \$ssh_user,
         'ssh-timeout=i'            => \$ssh_timeout,
-	'anonymize!'                => \$anonymize,
+	'anonymize!'               => \$anonymize,
+	'noclean!'                 => \$noclean,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -872,6 +875,59 @@ if ($last_parsed && -e $last_parsed) {
 $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 
+# Clean the incremental directory if the feature is not disabled
+if (!$noclean && $saved_last_line{datetime}) {
+
+	# Search the current week following the last parse date
+	$saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /;
+	my $last_year  = $1;
+	my $last_month = $2;
+	my $last_day   = $3;
+	# Get the week number following the date
+	my $wn = &get_week_number($last_year, $last_month, $last_day);
+	# Get the deys of the current week where binary files must be preserved
+	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
+	# Find obsolete dir days that shoud be cleaned
+	unless(opendir(DIR, "$outdir")) {
+		die "Error: can't opendir $outdir: $!";
+	}
+	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
+	closedir DIR;
+	my @obsolete_days = ();
+	foreach my $y (sort { $a <=> $b } @dyears) {
+		unless(opendir(DIR, "$outdir/$y")) {
+			die "Error: can't opendir $outdir/$y: $!";
+		}
+		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
+		closedir DIR;
+		foreach my $m (sort { $a <=> $b } @dmonths) {
+			unless(opendir(DIR, "$outdir/$y/$m")) {
+				die "Error: can't opendir $outdir/$y/$m: $!";
+			}
+			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+			closedir DIR;
+			foreach my $d (sort { $a <=> $b } @ddays) {
+				if ("$y-$m-$d" lt $wdays[0]) {
+					push(@obsolete_days, "$outdir/$y/$m/$d");
+				}
+			}
+		}
+	}
+	foreach my $p (@obsolete_days) {
+		unless(opendir(DIR, "$p")) {
+			die "Error: can't opendir $p: $!";
+		}
+		my @hfiles = grep { $_ =~ /\.(html|txt|tsung|json)$/i } readdir(DIR);
+		next if ($#hfiles == -1); # do not remove files if report file has not been generated
+		seekdir(DIR, 0);
+		my @bfiles = grep { $_ =~ /\.bin$/i } readdir(DIR);
+		closedir DIR;
+		foreach my $f (@bfiles) {
+			&logmsg('DEBUG', "Removing obsolete binary file: $p/$f");
+			unlink("$p/$f");
+		}
+	}
+}
 
 # Main loop reading log files
 my $global_totalsize = 0;
@@ -1012,7 +1068,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 	foreach my $f (@tempfiles) {
 		next if (!-e "$f->[1]" || -z "$f->[1]");
 		my $fht = new IO::File;
-		$fht->open("< $f->[1]") or die "FATAL: can't open file $f->[1], $!\n";
+		$fht->open("< $f->[1]") or die "FATAL: can't open temp file $f->[1], $!\n";
 		&load_stats($fht);
 		$fht->close();
 	}
@@ -1056,6 +1112,8 @@ if ($last_parsed && $last_line{datetime} && $last_line{orig}) {
 		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
 	}
 }
+
+exit 0 if ($terminate);
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
@@ -1173,7 +1231,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		foreach $incr_date (@wdays) {
 			my $bpath = $incr_date;
 			$bpath =~ s/\-/\//g;
-			$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
+			$incr_date =~ /^(\d+)\-(\d+)\-(\d+)$/;
 			$wdir = "$1/week-$wn";
 
 			# Load all data gathered by all the differents processes
@@ -1657,9 +1715,8 @@ sub process_file
 		&logmsg('DEBUG', "Starting to parse remote log file: $remote_host:$logfile");
 	}
 
-	my $terminate = 0;
-	local $SIG{INT} = sub { $terminate = 1 };
-	local $SIG{TERM} = sub { $terminate = 1 };
+	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; $terminate = 1; };
+	local $SIG{TERM} = sub { print STDERR "Received SIGTERM abort parsing...\n"; $terminate = 1 };
 
 	my $curdate = localtime(time);
 
@@ -2109,6 +2166,12 @@ sub process_file
 
 	}
 	close $lfile;
+
+	# Inform the parent that it should stop parsing other files
+	if ($terminate) {
+		kill(12, $parent_pid);
+		return $terminate;
+	}
 
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
@@ -10726,27 +10789,6 @@ sub get_wdays_per_month
 	}
 
 	return @retdays;
-}
-
-# Returns all days following the week number
-sub get_wdays_per_year
-{
-	my $y = shift;
-	my %result = ();
-
-	foreach my $m ("01" .. "12") {
-		foreach my $day ("01" .. "31") {
-			# Check if the date is valid first
-			my $datefmt = POSIX::strftime("%Y-%m-%d", 1, 1, 1, $day, $m - 1, $y - 1900);
-			if ($datefmt ne "$y-$m-$day") {
-				next;
-			}
-			my $weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $m - 1, $y - 1900);
-			push(@{$result{$weekNumber}}, "$y-$m-$day");
-		}
-	}
-
-	return %result;
 }
 
 sub IsLeapYear
