@@ -181,6 +181,14 @@ my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
 
+# List of regex that match fatal error message that do not
+# generate disconnection line in log. This is to prevent
+# sessions in the sessions charts to increase continually.
+# See issue #176 on github
+my @session_closed_msg = (
+	qr/^(database|role) "[^"]+" does not exist$/,
+	qr/^no pg_hba.conf entry for/,
+);
 
 my $sql_prettified;
 
@@ -8476,6 +8484,13 @@ sub parse_log_prefix
 	}
 }
 
+sub is_session_closed
+{
+	map { return 1 if ($_[0] =~ $_); } @session_closed_msg;
+
+	return 0;
+}
+
 sub parse_query
 {
 
@@ -8497,7 +8512,7 @@ sub parse_query
 
 	# Remove session failure from current workload because there is no disconnection entry
 	if (   ($prefix_vars{'t_loglevel'} eq 'FATAL')
-		&& ($prefix_vars{'t_query'} =~ /^(database|role) "[^"]+" does not exist$/))
+		&& &is_session_closed($prefix_vars{'t_query'}) )
 	{
 		delete $current_sessions{$prefix_vars{'t_pid'}} if (!$disable_session);
 		if ($extension eq 'tsung') {
