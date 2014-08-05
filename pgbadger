@@ -164,6 +164,7 @@ my $csv_sep_char            = ',';
 my %current_sessions        = ();
 my $incr_date               = '';
 my $last_incr_date          = '';
+my $anonymize                = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -294,6 +295,7 @@ my $result = GetOptions(
         'ssh-option=s'             => \$ssh_options,
         'ssh-user=s'               => \$ssh_user,
         'ssh-timeout=i'            => \$ssh_timeout,
+	'anonymize!'                => \$anonymize,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1420,6 +1422,7 @@ Options:
 			     from report. Example: "pg_dump".
     --exclude-line regex   : pgbadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple time.
+    --anonymize            : obscure all literals in queries to hide confidential data.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2437,6 +2440,39 @@ sub normalize_query
 	return $orig_query;
 }
 
+# Simply genreate a random string, thanks to Perlmonks
+sub generate_fake_string
+{
+	return join('', @_[ map{ rand @_ } 1 .. shift ]);
+}
+
+# Anonymize litteral in SQL queries by replacing parameters with fake values
+sub anonymize_query
+{
+	my $orig_query = shift;
+
+	return if (!$orig_query);
+
+	# Remove comments
+	$orig_query =~ s/\/\*(.*?)\*\///gs;
+
+	# Clean query
+	$orig_query =~ s/\\'//g;
+	$orig_query =~ s/('')+//g;
+
+	# Prevent date to be anonymized
+	$orig_query =~ s/'([\d\/\-\:\s]+)'/DATEBOUNDARY$1DATEBOUNDARY/g;
+
+	# Anonymize each values
+	$orig_query =~ s/'[^']*'/"'".&generate_fake_string(10, 'A'..'Z', 0..9, 'a'..'z', '-', '_', '.')."'"/eg;
+
+	# Restore quote around date values
+	$orig_query =~ s/DATEBOUNDARY/'/g;
+
+	return $orig_query;
+}
+
+
 # Format numbers with comma for better reading
 sub comma_numbers
 {
@@ -2582,6 +2618,12 @@ sub set_top_error_sample
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
 		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$q}{error}})) ) {
+			if ($anonymize) {
+				$context = &anonymize_query($context);
+				$statement = &anonymize_query($statement);
+				$detail = &anonymize_query($detail);
+			}
+
 			push(@{$error_info{$q}{date}},      $date);
 			push(@{$error_info{$q}{detail}},    $detail);
 			push(@{$error_info{$q}{context}},   $context);
@@ -9071,6 +9113,11 @@ sub store_queries
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
 	}
 
+	# Anonymize query if requested by the user
+	if ($anonymize) {
+		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
+	}
+
 	# Stores temporary files and lock information
 	&store_temporary_and_lock_infos($t_pid);
 
@@ -9324,6 +9371,11 @@ sub store_temporary_and_lock_infos
 		# Add a semi-colon at end of the query
 		$cur_temp_info{$t_pid}{query} .= ';' if (substr($cur_temp_info{$t_pid}{query}, -1, 1) ne ';');
 
+		# Anonymize query if requested by the user
+		if ($anonymize) {
+			$cur_temp_info{$t_pid}{query} = &anonymize_query($cur_temp_info{$t_pid}{query});
+		}
+
 		# Normalize query
 		my $normalized = &normalize_query($cur_temp_info{$t_pid}{query});
 
@@ -9346,6 +9398,11 @@ sub store_temporary_and_lock_infos
 
 		# Add a semi-colon at end of the query
 		$cur_lock_info{$t_pid}{query} .= ';' if (substr($cur_lock_info{$t_pid}{query}, -1, 1) ne ';');
+
+		# Anonymize query if requested by the user
+		if ($anonymize) {
+			$cur_temp_info{$t_pid}{query} = &anonymize_query($cur_temp_info{$t_pid}{query});
+		}
 
 		# Normalize query
 		my $normalized = &normalize_query($cur_lock_info{$t_pid}{query});

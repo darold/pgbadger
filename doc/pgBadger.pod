@@ -104,6 +104,7 @@ Options:
 			     from report. Example: "pg_dump".
     --exclude-line regex   : pgbadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple time.
+    --anonymize            : obscure all literals in queries to hide confidential data.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
