@@ -10696,15 +10696,16 @@ sub split_logfile
 	my $i = 1;
 	if ($last_parsed && $saved_last_line{current_pos} && ($saved_last_line{current_pos} < $totalsize)) {
 		$chunks[0] = $saved_last_line{current_pos};
-		$i = $saved_last_line{current_pos};
 	}
 	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
 	while ($i < $queue_size) {
 		my $pos = int(($totalsize/$queue_size) * $i);
-		$lfile->seek($pos, 0);
-		#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
-		$pos= $pos + length(<$lfile>) - 1;
-		push(@chunks, $pos);
+		if ($pos > $chunks[0]) {
+			$lfile->seek($pos, 0);
+			#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
+			$pos= $pos + length(<$lfile>) - 1;
+			push(@chunks, $pos);
+		}
 		$i++;
 	}
 	$lfile->close();
