@@ -167,6 +167,7 @@ my $incr_date               = '';
 my $last_incr_date          = '';
 my $anonymize               = 0;
 my $noclean                 = 0;
+my $retention               = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -267,6 +268,7 @@ my $result = GetOptions(
 	"P|no-prettify!"           => \$noprettify,
 	"q|quiet!"                 => \$quiet,
 	"r|remote-host=s"          => \$remote_host,
+        'R|retention=i'            => \$retention,
 	"s|sample=i"               => \$sample,
 	"S|select-only!"           => \$select_only,
 	"t|top=i"                  => \$top,
@@ -877,7 +879,7 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 
 # Clean the incremental directory if the feature is not disabled
-if (!$noclean && $saved_last_line{datetime}) {
+if (!$noclean && $saved_last_line{datetime} && $outdir) {
 
 	# Search the current week following the last parse date
 	$saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /;
@@ -886,7 +888,7 @@ if (!$noclean && $saved_last_line{datetime}) {
 	my $last_day   = $3;
 	# Get the week number following the date
 	my $wn = &get_week_number($last_year, $last_month, $last_day);
-	# Get the deys of the current week where binary files must be preserved
+	# Get the days of the current week where binary files must be preserved
 	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
 	# Find obsolete dir days that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
@@ -928,6 +930,83 @@ if (!$noclean && $saved_last_line{datetime}) {
 			unlink("$p/$f");
 		}
 	}
+}
+
+# Clear storage when a retention is specified in incremental mode
+if ( $saved_last_line{datetime} && $outdir && $retention) {
+
+	# Search the current week following the last parse date
+	$saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /;
+	my $last_year  = $1;
+	my $last_month = $2;
+	my $last_day   = $3;
+	# Get the current week number
+	my $wn = &get_week_number($last_year, $last_month, $last_day);
+	my $limit = $last_year;
+	if (($wn - $retention) < 1) {
+		$limit--;
+		$limit .= "52";
+	} else {
+		$limit .= sprintf("%02d", $wn - $retention);
+	}
+
+	# Find obsolete weeks dir that shoud be cleaned
+	unless(opendir(DIR, "$outdir")) {
+		die "Error: can't opendir $outdir: $!";
+	}
+	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
+	closedir DIR;
+	my @obsolete_weeks = ();
+	foreach my $y (sort { $a <=> $b } @dyears) {
+		unless(opendir(DIR, "$outdir/$y")) {
+			die "Error: can't opendir $outdir/$y: $!";
+		}
+		my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
+		closedir DIR;
+		foreach my $w (sort { $a <=> $b } @weeks) {
+			$w =~ /^week-(\d+)$/;
+			if ("$y$1" lt $limit) {
+				&logmsg('DEBUG', "Removing obsolete week directory $outdir/$y/week-$1");
+				&cleanup_directory("$outdir/$y/week-$1", 1);
+				push(@obsolete_weeks, "$y$1");
+			}
+		}
+	}
+	# Now removed the corresponding days 
+	foreach my $y (sort { $a <=> $b } @dyears) {
+		unless(opendir(DIR, "$outdir/$y")) {
+			die "Error: can't opendir $outdir/$y: $!";
+		}
+		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
+		closedir DIR;
+		my @rmmonths = ();
+		foreach my $m (sort { $a <=> $b } @dmonths) {
+			unless(opendir(DIR, "$outdir/$y/$m")) {
+				die "Error: can't opendir $outdir/$y/$m: $!";
+			}
+			my @rmdays = ();
+			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+			closedir DIR;
+			foreach my $d (sort { $a <=> $b } @ddays) {
+				my $weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+				if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
+					&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
+					&cleanup_directory("$outdir/$y/$m/$d", 1);
+					push(@rmdays, $d);
+				}
+			}
+			if ($#ddays == $#rmdays) {
+				&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y/$m");
+				rmdir("$outdir/$y/$m");
+				push(@rmmonths, $m);
+			}
+		}
+		if ($#dmonths == $#rmmonths) {
+			&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y");
+			rmdir("$outdir/$y");
+		}
+	}
+
 }
 
 # Main loop reading log files
@@ -1442,6 +1521,10 @@ Options:
     -q | --quiet           : don't print anything to stdout, not even a progress bar.
     -r | --remote-host ip  : set the host where to execute the cat command on remote
                              logfile to parse localy the file.
+    -R | --retention N     : number of week to keep in incremental mode. Default 0,
+                             disabled. Used to set the number of weel to keep in
+                             output directory. Older week end day directory are
+                             automatically removed.
     -s | --sample number   : number of query samples to store/display. Default: 3
     -S | --select-only     : only report SELECT queries.
     -t | --top number      : number of queries to store/display. Default: 20
@@ -1546,6 +1629,11 @@ Or better, use the auto-generated incremental reports:
 
 will generate a report per day and per week.
 
+In incremental mode, you can also specify the number of week to keep in the reports:
+
+    /usr/bin/pgbadger --retention 2 -I -q /var/log/postgresql/postgresql.log.1 \
+	-O /var/www/pg_reports/
+
 If you have a pg_dump at 23:00 and 13:00 each day during half an hour, you can
 use pgbadger as follow to exclude these period from the report:
 
@@ -1559,6 +1647,20 @@ solve this problem in a simpler way.
 
 	exit 0;
 }
+
+sub cleanup_directory
+{
+	my ($dir, $remove_dir) = @_;
+
+	unless(opendir(DIR, "$dir")) {
+		die "Error: can't opendir $dir: $!";
+	}
+	my @todel = grep { !/^\./ } readdir(DIR);
+	closedir DIR;
+	map { unlink("$dir/$_"); } @todel;
+	rmdir("$dir") if ($remove_dir);
+}
+
 
 sub write_resources
 {
