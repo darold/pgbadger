@@ -1701,8 +1701,8 @@ sub process_file
 
 	my $old_queries_count = 0;
 	my $old_errors_count  = 0;
-	my $current_offset    = $start_offset || 0;
 	my $getout            = 0;
+	$start_offset       ||= 0;
 
 	$0 = 'pgbadger parser';
 
@@ -1740,14 +1740,21 @@ sub process_file
 				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
 				$start_offset = 0;
 			}
-			# In non multiprocess mode, the progress bar must start at the offset
-			$cursize += $start_offset if (!$tmpoutfile);
+			$cursize = $start_offset;
 		}
+	} else {
+		$start_offset = 0;
+		$stop_offset = 0;
 	}
 
 	if ($stop_offset > 0) {
 		$totalsize = $stop_offset - $start_offset;
 	}
+
+	my $current_offset = $start_offset || 0;
+
+	# Forward the progress bar to the starting point in MP mode
+	#$cursize = $start_offset if ($chunk_pos == 0);
 
 	if (!$remote_host) {
 		&logmsg('DEBUG', "Starting reading file $logfile...");
@@ -1862,7 +1869,6 @@ sub process_file
 		if ($#exclude_line >= 0) {
 			$has_exclusion = 1;
 		}
-		$start_offset ||= 0;
 		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile to $stop_offset");
 		if ($start_offset) {
 			# Move to the starting offset position in file
@@ -2185,10 +2191,6 @@ sub process_file
 		}
 		if ($last_parsed) {
 			$last_line{current_pos} = $current_offset;
-		}
-		# Forward the progress bar to the ending point in multiprocess mode
-		if ($progress && $tmpoutfile) {
-			$pipe->print("$start_offset 0 0\n");
 		}
 
 	}
