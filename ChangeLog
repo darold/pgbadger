@@ -1,3 +1,107 @@
+2014-08-08 version 6.0
+
+This new major release adds some new features like automatic cleanup of binary
+files in incremental mode or maximum number of weeks for reports retention.
+It improve the incremental mode with allowing the use of multiprocessing with
+multiple log file.
+
+It also adds report of query latency percentile on the general activity table
+(percentiles are 90, 95, 99).
+
+There's also a new output format: JSON. This format is good for sharing data
+with other languages, which makes it easy to integrate pgBadger's result into
+other monitoring tools.
+
+You may want to expose your reports but not the data, using the --anonymize
+option pgBadger will be able to anonymize all literal values in the queries.
+
+Sometime select to copy a query from the report could be a pain. There's now
+a click-to-select button in front of each query that allow you to just use
+Ctrl+C to copy it on clipboard
+
+The use of the new -X option also allow pgBadger to write out extra files to
+the outdir when creating incremental reports. Those files are the CSS and
+Javascript code normally repeated in each HTLM files.
+
+Warning: the behavior of pgBadger in incremental mode has changed. It will now
+always cleanup the output directory of all the obsolete binary file. If you were
+using those files to build you won reports, you can prevent pgBadger to remove
+them by using the --noclean option. Note that if you use the retention feature,
+all those files in obsolete directories will be removed too.
+
+Here is the complete list of changes.
+
+
+	- Javascript improvement to use only one call of sql_select and
+	  sql_format. Use jQuery selector instead of getElementById to
+	  avoid js errors when not found. Thanks to Julien Rouhaud for the
+	  patches.
+	- Add -R | --retention command line option to set the maximum number of
+	  week reports to preserve in the output directory for incremental mode.
+	  Thanks to Kong Man for the feature request.
+	- Session count is immediately decreased when a FATAL error is received
+	  in the current session to prevent overcount of simultaneous session
+	  number. Thanks to Josh Berkus for the report.
+	- Fix issue in incremental mode when parsing is stopped after rotating
+	  log and rotated log has new lines. The new file was not parsed at all.
+	  Thanks to CZAirwolf for the report.
+	- Fix revert to single thread when last_line_parsed exists. Thanks to
+	  Bruno Almeida for the report.
+	- Fix issue in handling SIGTERM/SIGINT that cause pgbadger to continue.
+	- Add autoclean feature to pgbadger in incremental mode. pgbadger will
+	  now removed automatically obsolete binary files unless you specify
+	  --noclean at command line.
+	- Add new command line option --anonymize to obscure all literals in
+	  queries/errors to hide confidential data. Thanks to wmorancfi for the
+	  feature request.
+	- Fix single "SELECT;" as a query in a report. Thanks to Marc Cousin for
+	  the report.
+	- Add a copy icon in front of each query in the report to select the
+	  entire query. Thanks to Josh Berkus for the feature request.
+	- Fix wrong move to beginning of a file if the file was modified after
+	  have been parsed a time. Thanks to Herve Werner for the report.
+	- Allow pgBadger to write out extra files to outdir when creating
+	  incremental reports. Require the use of the -X or --extra-files option
+	  in incremental mode. Thanks to Matthew Musgrove for the feature request.
+	- Fix incomplete handling of XZ compressed format.
+	- Fix move to offset in incremental mode with multiprocess and incomplete
+	  condition when file is smaller than the last offset. Thanks to Herve
+	  Werner for the report.
+	- Allow/improve incremental mode with multiple log file and multiprocess.
+	- Fix incorrect location of temporary file storing last parsed line in
+	  multiprocess+incremental mode. Thanks to Herve Werner for the report.
+	- Fix remote ssh command error sh: 2: Syntax error: "|" unexpected.
+	  Thanks to Herve Werner for the report.
+	- Fix missing database name in samples of top queries reports. Thanks to
+	  Thomas Reiss for the report.
+	- Add minimal documentation about JSON output format.
+	- Add execute attribute to pgbadger in the source repository, some may
+	  find this more helpful when pgbadger is not installed and executed
+	  directly from this repository.
+	- Fix issue with csv log format and incremental mode. Thanks to Suya for
+	  the report and the help to solve the issue. There also a fix to support
+	  autovacuum statistic with csv format.
+	- Fix bad URL to documentation. Thanks to Rodolphe Quiedeville for the report.
+	- Two minor change to made easier to use Tsung scenario: Remove the first
+	  empty line and replace probability by weight. Now it is possible to use
+	  the scenario as is with Tsung 1.5.
+	- Fix incremental mode where weeks on index page start on sunday and week
+	  reports start on monday. Thanks to flopma and birkosan for the report.
+	- Replace label "More CPU costly" by "Highest CPU-cost". Thanks to Marc
+	  Cousin for the suggestion.
+	- Add query latency percentile to General Activity table (percentiles are
+	  90, 95, 99). Thanks to Himanchali for the patch.
+	- Fix typon pgbadger call. Thanks to Guilhem Rambal for the report.
+	- Add JSON support for output format.  JSON format is good for sharing data
+	  with other languages, which makes it easy to integrate pgBadger's result
+	  into other monitoring tools like Cacti or Graphite. Thanks to Shanzhang
+	  Lan for the patch.
+	- Update documentation about remote mode feature.
+	- Update documentation to inform that the xz utility should be at least in
+	  version 5.05 to support the --robot command line option. Thanks to Xavier
+	  Millies-Lacroix for the report.
+	- Fix remote logfile parsing. Thanks to Herve Werner for the report.
+
 2014-05-05 version 5.1-1
 
 	- Fix parsing of remote log file, forgot to apply some patches.
