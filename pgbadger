@@ -6599,7 +6599,7 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
-				<div id="query-a-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank')" title="Click to select query"></i>$query</div>
+				<div id="query-a-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 				 $example
 			<!-- Examples collapse -->
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
@@ -6619,7 +6619,7 @@ sub print_lock_queries_report
 				$details .= " ]";
 				print $fh qq{
 					<dt>
-						<div id="query-a-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-a-$rank-$idx')" title="Click to select query"></li>$query</div>
+						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></li>$query</div>
 					</dt>
 					<pre>$details</pre>
 };
@@ -6682,7 +6682,7 @@ sub print_lock_queries_report
 				<td>$rank</td>
 				<td>$time</td>
 				<td id="queries-that-waited-most-examples-details-rank-$rank">
-					<div id="query-b-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-b-$rank')" title="Click to select query"></i>$query</div>
+					<div id="query-b-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6751,7 +6751,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
-					<div id="query-c-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank')" title="Click to select query"></i>$query</div>
+					<div id="query-c-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 					$example
 				<!-- Examples collapse -->
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
@@ -6770,7 +6770,7 @@ sub print_tempfile_report
 					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					print $fh qq{
 						<dt>
-						<div id="query-c-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-c-$rank-$idx')" title="Click to select query"></i>$query</div>
+						<div id="query-c-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 						
 						</dt>
 						<pre>$details</pre>
@@ -6833,7 +6833,7 @@ sub print_tempfile_report
 				<td>$rank</td>
 				<td>$size</td>
 				<td id="queries-generating-largest-temporary-files-examples-details-rank-$rank">
-					<div id="query-d-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank')" title="Click to select query"></i>$query</div>
+					<div id="query-d-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -6963,7 +6963,7 @@ sub print_slowest_individual_queries
 				<td>$rank</td>
 				<td>$duration</td>
 				<td id="slowest-individual-queries-examples-rank-$rank">
-					<div id="query-d-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-d-$rank-$idx')" title="Click to select query"></i>$query</div>
+					<div id="query-d-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 					<pre>$details</pre>
 				</td>
 				</tr>
@@ -7078,7 +7078,7 @@ sub print_time_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-queries-examples-details-rank-$rank">
-					<div id="query-e-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank')" title="Click to select query"></i>$query</div>
+					<div id="query-e-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 						<!-- Details collapse -->
 					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
 						<h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -7118,7 +7118,7 @@ sub print_time_consuming
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-e-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-e-$rank-$idx')" title="Click to select query"></i>$query</div>
+								<div id="query-e-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
@@ -7242,7 +7242,7 @@ sub print_most_frequent
                                 <td>$max</td>
                                 <td>$avg</td>
                                 <td id="most-frequent-queries-examples-details-rank-$rank">
-                                        <div id="query-f-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank')" title="Click to select query"></i>$query</div>
+                                        <div id="query-f-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="most-frequent-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -7282,7 +7282,7 @@ sub print_most_frequent
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-f-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-f-$rank-$idx')" title="Click to select query"></i>$query</div>
+								<div id="query-f-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
@@ -7407,7 +7407,7 @@ sub print_slowest_queries
                                 </td>
                                 <td>$duration</td>
                                 <td id="normalized-slowest-queries-examples-details-rank-$rank">
-                                        <div id="query-g-$rank" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank')" title="Click to select query"></i>$query</div>
+                                        <div id="query-g-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
                                                 <!-- Details collapse -->
                                             <div id="normalized-slowest-queries-details-rank-$rank" class="collapse">
                                                 <h3>Times Reported <small>Time consuming queries #$rank</small></h3>
@@ -7447,7 +7447,7 @@ sub print_slowest_queries
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			print $fh qq{
 								<dt>
-								<div id="query-g-$rank-$idx" class="sql sql-largesize" ondblclick="sql_format(this)"><i class="icon-copy" onclick="sql_select('query-g-$rank-$idx')" title="Click to select query"></i>$query</div>
+								<div id="query-g-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>
 								</dt>
 								<pre>$details</pre>
 };
@@ -9989,10 +9989,10 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
     Flotr.EventAdapter.observe(container, "flotr:click", function() {
         drawGraph();
     });
-    document.getElementById('reset$buttonid').onclick = function() {
+    jQuery("#reset$buttonid").click( function() {
       graph.download.restoreCanvas();
-    };
-    document.getElementById('download$buttonid').onclick = function(){
+    });
+    jQuery("#download$buttonid").click( function(){
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10000,8 +10000,8 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
 		);
 	}
       graph.download.saveImage('$img_format');
-    };
-    document.getElementById('toimage$buttonid').onclick = function() {
+    });
+    jQuery("#toimage$buttonid").click( function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10009,7 +10009,7 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
 		);
 	}
       graph.download.saveImage('$img_format', null, null, true);
-    };
+    });
 
 })(document.getElementById("$divid"));
 /* ]]> */
@@ -10085,10 +10085,10 @@ document.writeln('<div class="btn-group pull-right"><input type="button" class="
 	    backgroundOpacity: 0.4
         }
     });
-    document.getElementById('reset$buttonid').onclick = function() {
+    jQuery("#reset$buttonid").click( function() {
       graph.download.restoreCanvas();
-    };
-    document.getElementById('download$buttonid').onclick = function(){
+    });
+    jQuery("#download$buttonid").click( function(){
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10096,8 +10096,8 @@ document.writeln('<div class="btn-group pull-right"><input type="button" class="
 		);
 	}
       graph.download.saveImage('$img_format');
-    };
-    document.getElementById('toimage$buttonid').onclick = function() {
+    });
+    jQuery("#toimage$buttonid").click( function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10105,7 +10105,7 @@ document.writeln('<div class="btn-group pull-right"><input type="button" class="
 		);
 	}
       graph.download.saveImage('$img_format', null, null, true);
-    };
+    });
 
 
 })(document.getElementById("$divid"));
@@ -10231,10 +10231,10 @@ sub flotr2_histograph
     Flotr.EventAdapter.observe(container, "flotr:click", function() {
         drawGraph();
     });
-    document.getElementById('reset$buttonid').onclick = function() {
+    jQuery("#reset$buttonid").click( function() {
       graph.download.restoreCanvas();
-    };
-    document.getElementById('download$buttonid').onclick = function(){
+    });
+    jQuery("#download$buttonid").click( function(){
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10242,8 +10242,8 @@ sub flotr2_histograph
 		);
 	}
       graph.download.saveImage('$img_format');
-    };
-    document.getElementById('toimage$buttonid').onclick = function() {
+    });
+    jQuery("#toimage$buttonid").click( function() {
 	if (Flotr.isIE && Flotr.isIE < 9) {
 		alert(
 		"Your browser doesn't allow you to get a bitmap image from the plot, " +
@@ -10251,7 +10251,7 @@ sub flotr2_histograph
 		);
 	}
       graph.download.saveImage('$img_format', null, null, true);
-    };
+    });
 
 })(document.getElementById("$divid"));
 /* ]]> */
@@ -11097,31 +11097,6 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 WRFILE: pgbadger.js
 
 /* <![CDATA[ */
-function sql_select (objid)
-{
-	var obj = document.getElementById( objid );
-	if (window.getSelection) {
-		var sel = window.getSelection();
-		sel.removeAllRanges();
-		var range = document.createRange();
-		range.selectNodeContents(obj);
-		sel.addRange(range);
-	} else if (document.selection) {
-		var textRange = document.body.createTextRange();
-		textRange.moveToElementText(obj);
-		textRange.select();
-	}
-}
-
-
-function sql_format (obj)
-{
-	if (obj.style == undefined || obj.style.whiteSpace == 'pre') {
-		obj.style.whiteSpace ='normal';
-	} else {
-		obj.style.whiteSpace = 'pre';
-	}
-}
 
 function dateTracker(obj, gtype, labels, datasets) 
 {
@@ -12535,3 +12510,26 @@ jQuery(function (){
 	});
 });
 
+jQuery(document).ready(function () {
+    jQuery('.sql').dblclick(function () {
+        if (this.style == undefined || this.style.whiteSpace == 'pre') {
+            this.style.whiteSpace ='normal';
+        } else {
+            this.style.whiteSpace = 'pre';
+        }
+    });
+    jQuery('.icon-copy').click(function () {
+        var obj = $(this).parent()[0];
+        if (window.getSelection) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            var range = document.createRange();
+            range.selectNodeContents(obj);
+            sel.addRange(range);
+        } else if (document.selection) {
+            var textRange = document.body.createTextRange();
+            textRange.moveToElementText(obj);
+            textRange.select();
+        }
+    });
+});
