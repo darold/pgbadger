@@ -3110,7 +3110,7 @@ Report not supported by text format
 			last if ($i > $end_top);
 			print $fh ($i + 1), ")   ", $top_locked_queries[$i]->[1], " - ", &convert_time($top_locked_queries[$i]->[2]),
 			" - ", &convert_time($top_locked_queries[$i]->[3]), "/", &convert_time($top_locked_queries[$i]->[4]), "/",
-			&convert_time(($top_locked_queries[$i]->[4] / $top_locked_queries[$i]->[1])),
+			&convert_time(($top_locked_queries[$i]->[2] / $top_locked_queries[$i]->[1])),
 			" - ", $top_locked_queries[$i]->[0], "\n";
 			print $fh "--\n";
 			my $k = $top_locked_queries[$i]->[0];
@@ -6531,7 +6531,7 @@ sub print_lock_queries_report
 		my $total_time = &convert_time($top_locked_queries[$i]->[2]);
 		my $min_time = &convert_time($top_locked_queries[$i]->[3]);
 		my $max_time = &convert_time($top_locked_queries[$i]->[4]);
-		my $avg_time = &convert_time($top_locked_queries[$i]->[4] / ($top_locked_queries[$i]->[1] || 1));
+		my $avg_time = &convert_time($top_locked_queries[$i]->[2] / ($top_locked_queries[$i]->[1] || 1));
 		my $query = &highlight_code($top_locked_queries[$i]->[0]);
 		my $k = $top_locked_queries[$i]->[0];
 		my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-most-frequent-waiting-examples-rank-$rank">Examples</button></p>};
