@@ -10048,7 +10048,7 @@ sub flotr2_piegraph
 
 document.writeln('<div class="btn-group pull-right"><input type="button" class="btn" value="To Image" id="toimage$buttonid" onclick="return false;">'+
 	'<input type="button" class="btn" value="Download" id="download$buttonid" onclick="return false;">' +
-	'<input type="button" class="btn" value="Reset" id="reset$buttonid" onclick="return false;"></div>'
+	'<input type="button" class="btn" value="To chart" id="reset$buttonid" onclick="return false;"></div>'
 	);
 
     @datadef
