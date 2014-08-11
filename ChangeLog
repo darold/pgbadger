@@ -25,7 +25,7 @@ Javascript code normally repeated in each HTLM files.
 
 Warning: the behavior of pgBadger in incremental mode has changed. It will now
 always cleanup the output directory of all the obsolete binary file. If you were
-using those files to build you won reports, you can prevent pgBadger to remove
+using those files to build your own reports, you can prevent pgBadger to remove
 them by using the --noclean option. Note that if you use the retention feature,
 all those files in obsolete directories will be removed too.
 
