@@ -21,6 +21,7 @@ Options:
     -A | --histo-avg minutes: number of minutes to build the histogram graphs
                              of queries. Default 60 minutes.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -B | --bar-graph       : use bar graph instead of line by default.
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.

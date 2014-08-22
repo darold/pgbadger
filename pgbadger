@@ -222,6 +222,7 @@ my $last_incr_date          = '';
 my $anonymize               = 0;
 my $noclean                 = 0;
 my $retention               = 0;
+my $bar_graph               = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -301,6 +302,7 @@ my $result = GetOptions(
 	"a|average=i"              => \$avg_minutes,
 	"A|histo-average=i"        => \$histo_avg_minutes,
 	"b|begin=s"                => \$from,
+	"B|bar-graph!"             => \$bar_graph,
 	"c|dbclient=s"             => \@dbclient,
 	"C|nocomment!"             => \$remove_comment,
 	"d|dbname=s"               => \@dbname,
@@ -1536,6 +1538,7 @@ Options:
     -A | --histo-avg minutes: number of minutes to build the histogram graphs
                              of queries. Default 60 minutes.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -B | --bar-graph       : use bar graph instead of line by default.
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
@@ -5114,7 +5117,7 @@ sub print_checkpoint
 		);
 	$drawn_graphs{checkpointfiles_graph} =
 		&flotr2_graph($graphid++, 'checkpointfiles_graph', $graph_data{file_added},
-			$graph_data{file_removed}, $graph_data{file_recycled}, 'Checkpoint Wal files usage',
+			$graph_data{file_removed}, $graph_data{file_recycled}, 'Checkpoint Wal files usage (' . $avg_minutes . ' minutes period)',
 			'Number of files', 'Added', 'Removed', 'Recycled'
 		);
 
@@ -5170,7 +5173,7 @@ $drawn_graphs{checkpointwritebuffers_graph}
 		</div>
 	</div>
 	<div class="span8">
-		<h3 class="">Checkpoint Wal files usage</h3>
+		<h3 class="">Checkpoint Wal files usage ($avg_minutes minutes average)</h3>
 $drawn_graphs{checkpointfiles_graph}
 		</div>
 	</div><!-- end of Checkpoints Files -->
@@ -9902,6 +9905,18 @@ sub flotr2_graph
 		$type = 'duration';
 	}
 
+	my $barwidth = $avg_minutes * 60 * 1000;
+	my $bar_def = '';
+	if ($bar_graph) {
+		$bar_def = qq{
+        bars: {
+            show: true,
+            horizontal: false,
+            shadowSize: 0,
+	    barWidth: $barwidth,
+        },
+};
+	}
 	return <<EOF;
 <div id="$divid" class="flotr-graph"></div>
 <script type="text/javascript">
@@ -9917,6 +9932,7 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
     $data3
     $data4
     var options = {
+	$bar_def
         xaxis: {
             min: $t_min,
             max: $t_max,
