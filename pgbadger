@@ -2789,13 +2789,26 @@ sub convert_time
 	$time -= ($hours * 3600000);
 	my $minutes = int($time / 60000);
 	$time -= ($minutes * 60000);
-	my $seconds = sprintf("%0.3f", $time / 1000);
+	my $seconds = int($time / 1000);
+	$time -= ($seconds * 1000);
+	my $milliseconds = sprintf("%.3d", $time);
 
 	$days    = $days < 1    ? '' : $days . 'd';
 	$hours   = $hours < 1   ? '' : $hours . 'h';
 	$minutes = $minutes < 1 ? '' : $minutes . 'm';
-	$seconds =~ s/\.\d+$// if ($minutes);
-	$time    = $days . $hours . $minutes . $seconds . 's';
+	$seconds = $seconds < 1 ? '' : $seconds . 's';
+	$milliseconds = $milliseconds < 1 ? '' : $milliseconds . 'ms';
+
+	if ($days || $hours || $minutes) {
+		$milliseconds = '';
+	} elsif ($seconds) {
+		$milliseconds =~ s/\.\d+//;
+	}
+	$milliseconds =~ s/^[0]+// if ($milliseconds !~ /\./);
+	
+
+	$time = $days . $hours . $minutes . $seconds . $milliseconds;
+	$time = '0s' if ($time eq '');
 
 	return $time;
 }
@@ -3884,8 +3897,8 @@ sub print_general_activity
 			foreach my $m (keys %{$per_minute_info{$d}{$h}}) {
 				$cur_period_info{count} += ($per_minute_info{$d}{$h}{$m}{query}{count} || 0);
 				$cur_period_info{duration} += ($per_minute_info{$d}{$h}{$m}{query}{duration} || 0);
-				$cur_period_info{min} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{min} || ($per_minute_info{$d}{$h}{$m}{query}{duration} < $cur_period_info{min}));
-				$cur_period_info{max} = $per_minute_info{$d}{$h}{$m}{query}{duration} if (!exists $cur_period_info{max} || ($per_minute_info{$d}{$h}{$m}{query}{duration} > $cur_period_info{max}));
+				$cur_period_info{min} = $per_minute_info{$d}{$h}{$m}{query}{min} if (!exists $cur_period_info{min} || ($per_minute_info{$d}{$h}{$m}{query}{min} < $cur_period_info{min}));
+				$cur_period_info{max} = $per_minute_info{$d}{$h}{$m}{query}{max} if (!exists $cur_period_info{max} || ($per_minute_info{$d}{$h}{$m}{query}{max} > $cur_period_info{max}));
                                 push(@{$all_query_duration{'query'}}, $per_minute_info{$d}{$h}{$m}{query}{duration}||0);
 
 				foreach my $a (@SQL_ACTION) {
@@ -4340,10 +4353,10 @@ sub compute_query_graphs
 
 						# Search minimum and maximum during this minute
 						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{query}{second}}) {
-							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
-								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} > $q_dataavg{max}{"$rd"});
-							$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
-								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} < $q_dataavg{min}{"$rd"});
+							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{max}
+								if ($per_minute_info{$tm}{$h}{$m}{query}{max} > $q_dataavg{max}{"$rd"});
+							$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{min}
+								if ($per_minute_info{$tm}{$h}{$m}{query}{min} < $q_dataavg{min}{"$rd"});
 						}
 
 						if (!$disable_query) {
@@ -8209,6 +8222,8 @@ sub load_stats
 				$per_minute_info{$day}{$hour}{$min}{query}{count} +=
 					($_per_minute_info{$day}{$hour}{$min}{query}{count} || 0);
 				$per_minute_info{$day}{$hour}{$min}{query}{duration} += $_per_minute_info{$day}{$hour}{$min}{query}{duration};
+				$per_minute_info{$day}{$hour}{$min}{query}{min} = $_per_minute_info{$day}{$hour}{$min}{query}{min} if (!exists $per_minute_info{$day}{$hour}{$min}{query}{min} || ($per_minute_info{$day}{$hour}{$min}{query}{min} > $_per_minute_info{$day}{$hour}{$min}{query}{min}));
+				$per_minute_info{$day}{$hour}{$min}{query}{max} = $_per_minute_info{$day}{$hour}{$min}{query}{max} if (!exists $per_minute_info{$day}{$hour}{$min}{query}{max} || ($per_minute_info{$day}{$hour}{$min}{query}{max} < $_per_minute_info{$day}{$hour}{$min}{query}{max}));
 
 				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{connection}{second} }) {
 					$per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} +=
@@ -9519,11 +9534,11 @@ sub store_queries
 			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{second}{$cur_info{$t_pid}{sec}}++;
 			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			# Store min / max duration
-			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{min} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{min} > $cur_info{$t_pid}{duration})) {
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{min} = $cur_info{$t_pid}{duration};
+			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} > $cur_info{$t_pid}{duration})) {
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} = $cur_info{$t_pid}{duration};
 			}
-			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{max} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{max} < $cur_info{$t_pid}{duration})) {
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{max} = $cur_info{$t_pid}{duration};
+			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} < $cur_info{$t_pid}{duration})) {
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} = $cur_info{$t_pid}{duration};
 			}
 		}
 
