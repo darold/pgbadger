@@ -2955,12 +2955,11 @@ sub dump_slowest_queries
 
 	my $query = $top_slowest[$i]->[2];
 
-
 	my @KEYWORDS = qw(
            FROM INNER WHERE ORDER RETURNING); 
 
-	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
-	    $query =~ s/\s$KEYWORDS1/\n$KEYWORDS/igs;
+	for (my $x = 0 ; $x <= $#KEYWORDS ; $x++) {
+	    $query =~ s/\s$KEYWORDS[$x]/\n$KEYWORDS[$x]/igs;
 	}
 
 	$query =~ s/\)\sVALUES\s\(/\)\nVALUES\n\(/g;
