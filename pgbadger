@@ -272,7 +272,7 @@ sub wait_child
 {
         my $sig = shift;
 
-	$interrupt = 1;
+	$interrupt = 2;
 
         print STDERR "Received terminating signal ($sig).\n";
 	if ($^O !~ /MSWin32|dos/i) {
@@ -1095,7 +1095,6 @@ if (!$remote_host) {
 if ($format eq 'binary') {
 	$queue_size = 1;
 	$job_per_file = 1;
-	@log_files = ();
 }
 
 my $pipe;
@@ -1157,7 +1156,8 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 					}
 					sleep(1);
 				}
-				die "FATAL: Abort signal received when processing to next chunk\n" if ($interrupt);
+				die "FATAL: Abort signal received when processing to next chunk\n" if ($interrupt == 2);
+				last if ($interrupt);
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 				spawn sub {
 					&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
@@ -1176,7 +1176,8 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		}
 
-		die "FATAL: Abort signal received when processing next file\n" if ($interrupt);
+		die "FATAL: Abort signal received when processing next file\n" if ($interrupt == 2);
+		last if ($interrupt);
 	}
 
 	my $minproc = 1;
