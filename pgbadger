@@ -10012,7 +10012,8 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
             },
             yaxis: {
                 min: area.y1,
-                max: area.y2
+                max: area.y2,
+                tickFormatter: function(val){ return pretty_print_number(val,'$type') }
             }
         });
     });
@@ -10254,7 +10255,8 @@ sub flotr2_histograph
             },
             yaxis: {
                 min: area.y1,
-                max: area.y2
+                max: area.y2,
+                tickFormatter: function(val){ return pretty_print_number(val,'') }
             }
         });
     });
