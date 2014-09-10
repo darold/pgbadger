@@ -13,15 +13,25 @@
 # See README.tools for more explanations.
 #
 #------------------------------------------------------------------------------
+use vars qw($VERSION);
+
 use strict;
 
 use Getopt::Long qw(:config no_ignore_case bundling);
+use File::Spec qw/ tmpdir /;
+use File::Temp qw/ tempfile /;
 use IO::File;
+use IO::Handle;
 use Storable qw(store_fd fd_retrieve);
+
+$VERSION = '1.0';
+
+my $PSQL_BIN     = 'psql';
+my $TMP_DIR      = File::Spec->tmpdir() || '/tmp';
 
 my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
 
-# Where statistics are stored
+# Where statistics are stored in pgbadger binary files
 my %overall_stat        = ();
 my %overall_checkpoint  = ();
 my @top_slowest         = ();
@@ -57,19 +67,30 @@ my $top                 = 0;
 # Add your own option
 ##################################################################
 # General options
-my $help  = 0;
-my $quiet = 0;
-my $debug = 0;
+my $help   = 0;
+my $quiet  = 0;
+my $debug  = 0;
+my $pghost = '';
+my $pgport = '';
+my $pguser = '';
+my $pgdb   = '';
+
 # Tools related option
 my $explain_slowest = 0;
-my $analyze = 0;
+my $analyze         = 0;
+my $max_duration    = 0;
 
 my $result = GetOptions(
-        'h|help!'          => \$help,
+	'h|host=s'         => \$pghost,
+	'p|port=i'         => \$pgport,
+	'U|username=s'     => \$pguser,
+	'd|dbname=s'       => \$pgdb,
 	'q|quiet!'         => \$quiet,
 	'v|verbose!'       => \$debug,
+        'help!'            => \$help,
 	'explain-slowest!' => \$explain_slowest,
 	'analyze!'         => \$analyze,
+	'max-duration=i'   => \$max_duration,
 );
 
 # Show help an exit
@@ -95,6 +116,16 @@ foreach my $f (@file_list) {
 	$fht->close();
 }
 
+# Set the psql command follwing the option
+my $psql_cmd = '';
+$psql_cmd   .= " -h $pghost" if ($pghost);
+$psql_cmd   .= " -p $pgport" if ($pgport);
+$psql_cmd   .= " -U $pguser" if ($pguser);
+$psql_cmd   .= " -d $pgdb"   if ($pgdb  );
+if ($psql_cmd) {
+	$psql_cmd = $PSQL_BIN . ' ' . $psql_cmd;
+}
+
 ####################################################################
 # 1srt tool: Dump top slowest queries inside explain statement. Will
 # be executed when option --explain-slowest is set at command line
@@ -117,22 +148,52 @@ sub usage
 {
 
 	print qq{
-Usage: pgbadger_tools BINARY_FILE
+Usage: pgbadger_tools [options] [options tools] BINARY_FILE
 
-    -h | --help       : Show this message
-    -q | --quiet      : do not print any information
-    -v | --verbose    : show debug information
+Options:
 
-Tools:
+    -d | --dbname DBNAME : same as in psql command, see psql --help
+    -h | --host HOST     : same as in psql command, see psql --help
+    -p | --port PORT     : same as in psql command, see psql --help
+    -q | --quiet         : do not print any information
+    -U | --username NAME : same as in psql command, see psql --help
+    -v | --verbose       : show debug information
+    --help               : Show this message
+
+Note: option -d, -h, -p and -U are passed directly to the psql command.
+The psql command must be in the PATH environment variable. If you have
+authentication for the connection, use .pgpass. This allow to execute
+queries to a PostgreSQL backend and get the output.
+
+Options Tools:
+
+  Generate EXPLAIN statements
+  ---------------------------
+
+  This tool allow to generate EXPLAIN statements with the top slowest queries
+  reported by pgBadger. Here are the supported options, only the first one is
+  mandatory:
 
     --explain-slowest : generate explain statements of slowest queries
 
 	./pgbadger_tools --explain-slowest out.bin
 
-    --explain-slowest --analyze : generate explain analyze statements of
-				  slowest queries
+    --analyze         : generate explain analyze statements of slowest queries
 
 	./pgbadger_tools --explain-slowest --analyze out.bin
+
+    --max-duration MS : set the number of milliseconds above which queries
+			will not be reported. Use it if you want to auto
+			execute explain statements.
+
+
+  To automatically execute those EXPLAIN statements and get the results with
+  the queries, you just have to set at least one of the -d, -h, -p or -U
+  command. For example, if the PostgreSQL instance is local and use peer as
+  authent method for the postgres user and listen on default port:
+
+	./pgbadger_tools --explain-slowest --analyze -d postgres out.bin
+
 
 };
 	exit 0;
@@ -661,7 +722,11 @@ sub dump_slowest_queries
 
 	for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
 
-		my $head = "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
+		# Do not process request that are slower than $max_duration
+		next if ( $max_duration && ($top_slowest[$i]->[0] > $max_duration) );
+
+		my $head = "-- duration: $top_slowest[$i]->[0]\n" if ($top_slowest[$i]->[0]);
+		$head .= "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
 		$head .= "-- user: $top_slowest[$i]->[4]\n" if ($top_slowest[$i]->[4]);
 		$head .= "-- remote: $top_slowest[$i]->[5]\n" if ($top_slowest[$i]->[5]);
 		$head .= "-- app: $top_slowest[$i]->[6]\n" if ($top_slowest[$i]->[6]);
@@ -675,9 +740,39 @@ sub dump_slowest_queries
 };
 
 		print $head;
-		(!$analyze) ? print "EXPLAIN\n" : print "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
-		print "$top_slowest[$i]->[2]\n";
-		print "ROLLBACK;\n" if ($analyze);
-
+		my $explain = "EXPLAIN\n";
+		if ($analyze) {
+			$explain = "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
+		}
+		$explain .= "$top_slowest[$i]->[2]\n";
+		$explain .= "ROLLBACK;\n" if ($analyze);
+$explain = qq{
+BEGIN;
+EXPLAIN (ANALYZE, VERBOSE, BUFFERS)
+SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' END as "Type",
+  pg_catalog.pg_get_userbyid(c.relowner) as "Owner"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r','v','m','S','f','')
+      AND n.nspname <> 'pg_catalog'
+      AND n.nspname <> 'information_schema'
+      AND n.nspname !~ '^pg_toast'
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1,2;
+ROLLBACK;
+};
+		print $explain;
+		if ($psql_cmd) {
+			my @tmpfile = tempfile('tmp_pgbadgeri_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
+			my $fht = new IO::File;
+			$fht->open("> $tmpfile[1]") or die "FATAL: can't open temp file $tmpfile[1], $!\n";
+			$fht->print("$explain");
+			$fht->close();
+			print `$psql_cmd -f $tmpfile[1]`;
+			unlink($tmpfile[1]);
+		}
+		last;
 	}
 }
