@@ -223,6 +223,7 @@ my $anonymize               = 0;
 my $noclean                 = 0;
 my $retention               = 0;
 my $bar_graph               = 0;
+my $outfile_slowest         = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -366,6 +367,7 @@ my $result = GetOptions(
         'ssh-timeout=i'            => \$ssh_timeout,
 	'anonymize!'               => \$anonymize,
 	'noclean!'                 => \$noclean,
+        'outfile-slowest'          => \$outfile_slowest,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1296,6 +1298,12 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		$fh->close();
 	}
 
+	if ($outfile_slowest) {
+	    &logmsg('LOG', "Ok, output each slowest queries in file");
+	    &dump_slowest_queries();
+	}
+
+
 } else {
 
 	# Build a report per day
@@ -1629,6 +1637,8 @@ Options:
 			     from report. Example: "pg_dump".
     --exclude-line regex   : pgbadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple time.
+    --outfile-slowest      : output each slowest queries in a text file started by 
+                             the EXPLAIN command.
     --anonymize            : obscure all literals in queries to hide confidential data.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
@@ -2911,6 +2921,56 @@ sub set_top_error_sample
 		}
 	}
 }
+
+sub dump_slowest_queries
+{
+    # Global information
+    my $curdate    = localtime(time);
+    my $logfile_str = $log_files[0];
+    if ($#log_files > 0) {
+	$logfile_str .= ', ..., ' . $log_files[-1];
+    }
+
+    for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
+	my $outfile = "query_$i.sql";
+	$fh = new IO::File ">$outfile";
+	if (not defined $fh) {
+	    die "FATAL: can't write to $outfile, $!\n";
+	}
+
+	my $head = "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
+	$head .= "-- user: $top_slowest[$i]->[4]\n" if ($top_slowest[$i]->[4]);
+	$head .= "-- remote: $top_slowest[$i]->[5]\n" if ($top_slowest[$i]->[5]);
+	$head .= "-- app: $top_slowest[$i]->[6]\n" if ($top_slowest[$i]->[6]);
+	$head .= "--, bind query: yes\n" if ($top_slowest[$i]->[7]);
+	$head =~ s/^, //;
+
+	print $fh qq{-- Generated on $curdate
+-- Log file: $logfile_str
+-- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+--
+};
+
+	print $fh $head;
+	print $fh "EXPLAIN\n";
+
+	my $query = $top_slowest[$i]->[2];
+
+	my @KEYWORDS = qw(
+           FROM INNER WHERE ORDER RETURNING); 
+
+	for (my $x = 0 ; $x <= $#KEYWORDS ; $x++) {
+	    $query =~ s/\s$KEYWORDS[$x]/\n$KEYWORDS[$x]/igs;
+	}
+
+	$query =~ s/\)\sVALUES\s\(/\)\nVALUES\n\(/g;
+
+	print $fh $query;
+	print $fh "\n";
+	$fh->close();
+    }
+}
+
 
 sub dump_as_text
 {
