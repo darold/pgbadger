@@ -1,0 +1,664 @@
+#!/usr/bin/env perl
+#------------------------------------------------------------------------------
+#
+# pgbadger_tools.pl - Tools based on pgBadger binary files
+#
+# This program is open source, licensed under the PostgreSQL Licence.
+# For license terms, see the LICENSE file.
+#------------------------------------------------------------------------------
+#
+# This program is first used to demonstrate how to deal with pgBadger binary
+# files to build your own tool.
+#
+# See README.tools for more explanations.
+#
+#------------------------------------------------------------------------------
+use strict;
+
+use Getopt::Long qw(:config no_ignore_case bundling);
+use IO::File;
+use Storable qw(store_fd fd_retrieve);
+
+my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+
+# Where statistics are stored
+my %overall_stat        = ();
+my %overall_checkpoint  = ();
+my @top_slowest         = ();
+my %normalyzed_info     = ();
+my %error_info          = ();
+my %logs_type           = ();
+my %per_minute_info     = ();
+my %lock_info           = ();
+my %tempfile_info       = ();
+my %connection_info     = ();
+my %database_info       = ();
+my %application_info    = ();
+my %user_info           = ();
+my %host_info           = ();
+my %session_info        = ();
+my %conn_received       = ();
+my %checkpoint_info     = ();
+my %autovacuum_info     = ();
+my %autoanalyze_info    = ();
+my %cur_info            = ();
+my %cur_temp_info       = ();
+my %cur_lock_info       = ();
+my %tsung_session       = ();
+my @top_locked_info     = ();
+my @top_tempfile_info   = ();
+my @log_files           = ();
+my $nlines              = 0;
+my $sample              = 3;
+my $top                 = 0;
+
+# Get the command line parameters
+my $help = 0;
+my $explain_slowest = 0;
+my $quiet = 0;
+my $debug = 0;
+my $result = GetOptions(
+        'h|help!'          => \$help,
+	'q|quiet!'         => \$quiet,
+	'v|verbose!'       => \$debug,
+	'explain-slowest!' => \$explain_slowest,
+);
+
+# Show help an exit
+if ($help) {
+	&usage();
+}
+
+# Read binary files to load from command line
+my @file_list = ();
+foreach my $f (@ARGV) {
+	push(@file_list, $f) if (-e $f && ($f =~ /\.bin$/));
+}
+
+die "FATAL: no binary file found, see usage (--help).\n" if ($#file_list == -1);
+
+# Load all data gathered by all the different processes
+foreach my $f (@file_list) {
+	next if (-z "$f");
+	my $fht = new IO::File;
+	$fht->open("< $f") or die "FATAL: can't open temp file $f, $!\n";
+	&load_stats($fht);
+	$fht->close();
+}
+
+# 1srt tool: Dump top slowest queries inside explain statement
+# Will be executed when option --explain-slowest is set at command line
+if ($explain_slowest) {
+    &logmsg('LOG', "Output each slowest queries within explain statement.");
+    &dump_slowest_queries(); # See TOOL FUNCTIONS bellow 
+}
+
+# Add your own bellow
+
+exit 0;
+
+##################################################################
+# Display pgbadger_tools.pl usage with the list of options
+# Add your own in the tools section.
+##################################################################
+sub usage
+{
+
+	print qq{
+Usage: pgbadger_tool.pl BINARY_FILE
+
+    -h | --help       : Show this message
+    -q | --quiet      : do not print any information
+    -v | --verbose    : show debug information
+
+Tools:
+
+    --explain-slowest : generate explain analyze with slowest queries
+
+	./pgbadger_tool.pl --explain-slowest out.bin
+
+};
+	exit 0;
+}
+
+##################################################################
+# Internal method, do not edit unless you know what you are doing
+##################################################################
+
+####
+# Display message following the log level
+####
+sub logmsg
+{
+	my ($level, $str) = @_;
+
+	return if ($quiet && ($level ne 'FATAL'));
+	return if (!$debug && ($level eq 'DEBUG'));
+
+	if ($level =~ /(\d+)/) {
+		print STDERR "\t" x $1;
+	}
+
+	print STDERR "$level: $str\n";
+}
+
+####
+# Stores top N error sample queries
+####
+sub set_top_error_sample
+{
+	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote) = @_;
+
+	# Stop when we have our number of samples
+	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
+		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$q}{error}})) ) {
+			push(@{$error_info{$q}{date}},      $date);
+			push(@{$error_info{$q}{detail}},    $detail);
+			push(@{$error_info{$q}{context}},   $context);
+			push(@{$error_info{$q}{statement}}, $statement);
+			push(@{$error_info{$q}{hint}},      $hint);
+			push(@{$error_info{$q}{error}},     $real_error);
+			push(@{$error_info{$q}{db}},        $db);
+			push(@{$error_info{$q}{user}},      $user);
+			push(@{$error_info{$q}{app}},       $app);
+			push(@{$error_info{$q}{remote}},    $remote);
+		}
+	}
+}
+
+####
+# Load statistics from binary file into memory
+####
+sub load_stats
+{
+
+	my $fd = shift;
+
+	my %stats = %{ fd_retrieve($fd) };
+	my %_overall_stat = %{$stats{overall_stat}};
+	my %_overall_checkpoint = %{$stats{overall_checkpoint}};
+	my %_normalyzed_info = %{$stats{normalyzed_info}};
+	my %_error_info = %{$stats{error_info}};
+	my %_connection_info = %{$stats{connection_info}};
+	my %_database_info = %{$stats{database_info}};
+	my %_application_info = %{$stats{application_info}};
+	my %_user_info = %{$stats{user_info}};
+	my %_host_info = %{$stats{host_info}};
+	my %_checkpoint_info = %{$stats{checkpoint_info}};
+	my %_session_info = %{$stats{session_info}};
+	my %_tempfile_info = %{$stats{tempfile_info}};
+	my %_logs_type = %{$stats{logs_type}};
+	my %_lock_info = %{$stats{lock_info}};
+	my %_per_minute_info = %{$stats{per_minute_info}};
+	my @_top_slowest = @{$stats{top_slowest}};
+	my $_nlines = $stats{nlines};
+	my $_first_log_timestamp = $stats{first_log_timestamp};
+	my $_last_log_timestamp = $stats{last_log_timestamp};
+	my @_log_files = @{$stats{log_files}};
+	my %_autovacuum_info = %{$stats{autovacuum_info}};
+	my %_autoanalyze_info = %{$stats{autoanalyze_info}};
+	my @_top_locked_info = @{$stats{top_locked_info}};
+	my @_top_tempfile_info = @{$stats{top_tempfile_info}};
+
+	### overall_stat ###
+
+	$overall_stat{queries_number} += $_overall_stat{queries_number};
+
+	if ($_overall_stat{'first_log_ts'}) {
+		$overall_stat{'first_log_ts'} = $_overall_stat{'first_log_ts'}
+			if (!$overall_stat{'first_log_ts'} || 
+				($overall_stat{'first_log_ts'} gt $_overall_stat{'first_log_ts'}));
+	}
+
+	$overall_stat{'last_log_ts'} = $_overall_stat{'last_log_ts'}
+		if not $overall_stat{'last_log_ts'}
+			or $overall_stat{'last_log_ts'} lt $_overall_stat{'last_log_ts'};
+
+	if ($_overall_stat{'first_query_ts'}) {
+		$overall_stat{'first_query_ts'} = $_overall_stat{'first_query_ts'}
+			if (!$overall_stat{'first_query_ts'} ||
+				($overall_stat{'first_query_ts'} gt $_overall_stat{'first_query_ts'}));
+	}
+
+	$overall_stat{'last_query_ts'} = $_overall_stat{'last_query_ts'}
+		if not $overall_stat{'last_query_ts'} 
+			or $overall_stat{'last_query_ts'} lt $_overall_stat{'last_query_ts'};
+
+	$overall_stat{errors_number} += $_overall_stat{errors_number};
+	$overall_stat{queries_duration} += $_overall_stat{queries_duration};
+
+	$overall_stat{DELETE} += $_overall_stat{DELETE}
+		if exists $_overall_stat{DELETE};
+	$overall_stat{UPDATE} += $_overall_stat{UPDATE}
+		if exists $_overall_stat{UPDATE};
+	$overall_stat{INSERT} += $_overall_stat{INSERT}
+		if exists $_overall_stat{INSERT};
+	$overall_stat{SELECT} += $_overall_stat{SELECT}
+		if exists $_overall_stat{SELECT};
+
+	$overall_checkpoint{checkpoint_warning} += $_overall_checkpoint{checkpoint_warning};
+	$overall_checkpoint{checkpoint_write} = $_overall_checkpoint{checkpoint_write}
+		if ($_overall_checkpoint{checkpoint_write} > $overall_checkpoint{checkpoint_write});
+	$overall_checkpoint{checkpoint_sync} = $_overall_checkpoint{checkpoint_sync}
+		if ($_overall_checkpoint{checkpoint_sync} > $overall_checkpoint{checkpoint_sync});
+	foreach my $k (keys %{$_overall_stat{peak}}) {
+		$overall_stat{peak}{$k}{query} += $_overall_stat{peak}{$k}{query};
+		$overall_stat{peak}{$k}{select} += $_overall_stat{peak}{$k}{select};
+		$overall_stat{peak}{$k}{write} += $_overall_stat{peak}{$k}{write};
+		$overall_stat{peak}{$k}{connection} += $_overall_stat{peak}{$k}{connection};
+		$overall_stat{peak}{$k}{session} += $_overall_stat{peak}{$k}{session};
+		$overall_stat{peak}{$k}{tempfile_size} += $_overall_stat{peak}{$k}{tempfile_size};
+		$overall_stat{peak}{$k}{tempfile_count} += $_overall_stat{peak}{$k}{tempfile_count};
+	}
+
+	foreach my $k (keys %{$_overall_stat{histogram}{query_time}}) {
+		$overall_stat{histogram}{query_time}{$k} += $_overall_stat{histogram}{query_time}{$k};
+	}
+	$overall_stat{histogram}{total} += $_overall_stat{histogram}{total};
+
+	foreach my $k ('prepare', 'bind','execute') {
+		$overall_stat{$k} += $_overall_stat{$k};
+	}
+
+	foreach my $k (keys %{$_overall_checkpoint{peak}}) {
+		$overall_checkpoint{peak}{$k}{checkpoint_wbuffer} += $_overall_checkpoint{peak}{$k}{checkpoint_wbuffer};
+		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
+	}
+
+	### Logs level ###
+	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
+		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
+	}
+
+	### database_info ###
+
+	foreach my $db (keys %_database_info) {
+		foreach my $k (keys %{ $_database_info{$db} }) {
+			$database_info{$db}{$k} += $_database_info{$db}{$k};
+		}
+	}
+
+	### application_info ###
+
+	foreach my $app (keys %_application_info) {
+		foreach my $k (keys %{ $_application_info{$app} }) {
+			$application_info{$app}{$k} += $_application_info{$app}{$k};
+		}
+	}
+
+	### user_info ###
+
+	foreach my $u (keys %_user_info) {
+		foreach my $k (keys %{ $_user_info{$u} }) {
+			$user_info{$u}{$k} += $_user_info{$u}{$k};
+		}
+	}
+
+	### host_info ###
+
+	foreach my $h (keys %_host_info) {
+		foreach my $k (keys %{ $_host_info{$h} }) {
+			$host_info{$h}{$k} += $_host_info{$h}{$k};
+		}
+	}
+
+
+	### connection_info ###
+
+	foreach my $db (keys %{ $_connection_info{database} }) {
+		$connection_info{database}{$db} += $_connection_info{database}{$db};
+	}
+
+	foreach my $db (keys %{ $_connection_info{database_user} }) {
+		foreach my $user (keys %{ $_connection_info{database_user}{$db} }) {
+			$connection_info{database_user}{$db}{$user} += $_connection_info{database_user}{$db}{$user};
+		}
+	}
+
+	foreach my $user (keys %{ $_connection_info{user} }) {
+		$connection_info{user}{$user} += $_connection_info{user}{$user};
+	}
+
+	foreach my $host (keys %{ $_connection_info{host} }) {
+		$connection_info{host}{$host} += $_connection_info{host}{$host};
+	}
+
+	$connection_info{count} += $_connection_info{count};
+
+	foreach my $day (keys %{ $_connection_info{chronos} }) {
+		foreach my $hour (keys %{ $_connection_info{chronos}{$day} }) {
+
+			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count}
+
+		}
+	}
+
+        ### log_files ###
+
+        foreach my $f (@_log_files) {
+                push(@log_files, $f) if (!grep(m#^$f$#, @_log_files));
+        }
+
+	### error_info ###
+
+	foreach my $q (keys %_error_info) {
+		$error_info{$q}{count} += $_error_info{$q}{count};
+		foreach my $day (keys %{ $_error_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_error_info{$q}{chronos}{$day}}) {
+				$error_info{$q}{chronos}{$day}{$hour}{count} += $_error_info{$q}{chronos}{$day}{$hour}{count};
+				foreach my $min (keys %{$_error_info{$q}{chronos}{$day}{$hour}{min}}) {
+					$error_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_error_info{$q}{chronos}{$day}{$hour}{min}{$min};
+				}
+			}
+		}
+		for (my $i = 0; $i <= $#{$_error_info{$q}{date}}; $i++) {
+			&set_top_error_sample(	$q, 
+									$_error_info{$q}{date}[$i], 
+									$_error_info{$q}{error}[$i],
+									$_error_info{$q}{detail}[$i], 
+									$_error_info{$q}{context}[$i], 
+									$_error_info{$q}{statement}[$i],
+									$_error_info{$q}{hint}[$i], 
+									$_error_info{$q}{db}[$i],
+									$_error_info{$q}{user}[$i],
+									$_error_info{$q}{app}[$i],
+									$_error_info{$q}{remote}[$i]
+									);
+		}
+	}
+
+	### per_minute_info ###
+
+	foreach my $day (keys %_per_minute_info) {
+		foreach my $hour (keys %{ $_per_minute_info{$day} }) {
+			foreach my $min (keys %{ $_per_minute_info{$day}{$hour} }) {
+				$per_minute_info{$day}{$hour}{$min}{connection}{count} +=
+					($_per_minute_info{$day}{$hour}{$min}{connection}{count} || 0);
+				$per_minute_info{$day}{$hour}{$min}{session}{count} +=
+					($_per_minute_info{$day}{$hour}{$min}{session}{count} || 0);
+				$per_minute_info{$day}{$hour}{$min}{query}{count} +=
+					($_per_minute_info{$day}{$hour}{$min}{query}{count} || 0);
+				$per_minute_info{$day}{$hour}{$min}{query}{duration} += $_per_minute_info{$day}{$hour}{$min}{query}{duration};
+				$per_minute_info{$day}{$hour}{$min}{query}{min} = $_per_minute_info{$day}{$hour}{$min}{query}{min} if (!exists $per_minute_info{$day}{$hour}{$min}{query}{min} || ($per_minute_info{$day}{$hour}{$min}{query}{min} > $_per_minute_info{$day}{$hour}{$min}{query}{min}));
+				$per_minute_info{$day}{$hour}{$min}{query}{max} = $_per_minute_info{$day}{$hour}{$min}{query}{max} if (!exists $per_minute_info{$day}{$hour}{$min}{query}{max} || ($per_minute_info{$day}{$hour}{$min}{query}{max} < $_per_minute_info{$day}{$hour}{$min}{query}{max}));
+
+				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{connection}{second} }) {
+					$per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} +=
+						($_per_minute_info{$day}{$hour}{$min}{connection}{second}{$sec} || 0);
+				}
+				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{session}{second} }) {
+					$per_minute_info{$day}{$hour}{$min}{session}{second}{$sec} +=
+						($_per_minute_info{$day}{$hour}{$min}{session}{second}{$sec} || 0);
+				}
+				foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{query}{second} }) {
+					$per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} +=
+						($_per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} || 0);
+				}
+				foreach my $action (@SQL_ACTION) {
+					if (exists $_per_minute_info{$day}{$hour}{$min}{$action}) {
+						$per_minute_info{$day}{$hour}{$min}{$action}{count} += $_per_minute_info{$day}{$hour}{$min}{$action}{count};
+						$per_minute_info{$day}{$hour}{$min}{$action}{duration} += $_per_minute_info{$day}{$hour}{$min}{$action}{duration};
+						foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
+							$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
+								($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
+						}
+					}
+				}
+				foreach my $k ('prepare', 'bind','execute') {
+					if (exists $_per_minute_info{$day}{$hour}{$min}{$k}) {
+						$per_minute_info{$day}{$hour}{$min}{$k} += $_per_minute_info{$day}{$hour}{$min}{$k};
+					}
+				}
+
+				$per_minute_info{$day}{$hour}{$min}{tempfile}{count} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{count}
+						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{count};
+				$per_minute_info{$day}{$hour}{$min}{tempfile}{size} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{size}
+						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{size};
+
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{file_removed} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{file_removed};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{wbuffer} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{wbuffer};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{file_recycled} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{file_recycled};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{total} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{total};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{file_added} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{file_added};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{write} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{write};
+				$per_minute_info{$day}{$hour}{$min}{autovacuum}{count} += $_per_minute_info{$day}{$hour}{$min}{autovacuum}{count};
+				$per_minute_info{$day}{$hour}{$min}{autoanalyze}{count} += $_per_minute_info{$day}{$hour}{$min}{autoanalyze}{count};
+
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_files} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_files};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest}
+					if ($_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} > $per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest});
+			}
+		}
+	}
+
+	### lock_info ###
+
+	foreach my $lock (keys %_lock_info) {
+		$lock_info{$lock}{count} += $_lock_info{$lock}{count};
+
+		foreach my $day (keys %{ $_lock_info{chronos} }) {
+			foreach my $hour (keys %{ $_lock_info{chronos}{$day} }) {
+				$lock_info{chronos}{$day}{$hour}{count} += $_lock_info{chronos}{$day}{$hour}{count};
+				$lock_info{chronos}{$day}{$hour}{duration} += $_lock_info{chronos}{$day}{$hour}{duration};
+			}
+		}
+
+		$lock_info{$lock}{duration} += $_lock_info{$lock}{duration};
+
+		foreach my $type (keys %{$_lock_info{$lock}}) {
+			next if $type =~ /^(count|chronos|duration)$/;
+
+			$lock_info{$lock}{$type}{count} += $_lock_info{$lock}{$type}{count};
+			$lock_info{$lock}{$type}{duration} += $_lock_info{$lock}{$type}{duration};
+		}
+	}
+
+	### nlines ###
+
+	$nlines += $_nlines;
+
+	### normalyzed_info ###
+
+	foreach my $stmt (keys %_normalyzed_info) {
+
+		foreach my $dt (keys %{$_normalyzed_info{$stmt}{samples}} ) {
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{samples}{$dt}} ) {
+				$normalyzed_info{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$stmt}{samples}{$dt}{$k};
+			}
+		}
+
+		$normalyzed_info{$stmt}{count} += $_normalyzed_info{$stmt}{count};
+
+		# Set min / max duration for this query
+		if (!exists $normalyzed_info{$stmt}{min} || ($normalyzed_info{$stmt}{min} > $_normalyzed_info{$stmt}{min})) { 
+			$normalyzed_info{$stmt}{min} = $_normalyzed_info{$stmt}{min};
+		}
+		if (!exists $normalyzed_info{$stmt}{max} || ($normalyzed_info{$stmt}{max} < $_normalyzed_info{$stmt}{max})) { 
+			$normalyzed_info{$stmt}{max} = $_normalyzed_info{$stmt}{max};
+		}
+
+		foreach my $day (keys %{$_normalyzed_info{$stmt}{chronos}} ) {
+			foreach my $hour (keys %{$_normalyzed_info{$stmt}{chronos}{$day}} ) {
+				$normalyzed_info{$stmt}{chronos}{$day}{$hour}{count} +=
+					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{count};
+				$normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration} +=
+					$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{duration};
+				foreach my $min (keys %{$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}} ) {
+					$normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
+						$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min}{$min};
+				}
+				foreach my $min (keys %{$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+					$normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
+						$_normalyzed_info{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+				}
+			}
+		}
+
+		$normalyzed_info{$stmt}{duration} += $_normalyzed_info{$stmt}{duration};
+
+		if (exists $_normalyzed_info{$stmt}{locks}) {
+			$normalyzed_info{$stmt}{locks}{count} += $_normalyzed_info{$stmt}{locks}{count};
+			$normalyzed_info{$stmt}{locks}{wait} += $_normalyzed_info{$stmt}{locks}{wait};
+			if (!exists $normalyzed_info{$stmt}{locks}{minwait} || ($normalyzed_info{$stmt}{locks}{minwait} > $_normalyzed_info{$stmt}{locks}{minwait})) { 
+				$normalyzed_info{$stmt}{locks}{minwait} = $_normalyzed_info{$stmt}{locks}{minwait};
+			}
+			if (!exists $normalyzed_info{$stmt}{locks}{maxwait} || ($normalyzed_info{$stmt}{locks}{maxwait} < $_normalyzed_info{$stmt}{locks}{maxwait})) { 
+				$normalyzed_info{$stmt}{locks}{maxwait} = $_normalyzed_info{$stmt}{locks}{maxwait};
+			}
+		}
+
+		if (exists $_normalyzed_info{$stmt}{tempfiles}) {
+			$normalyzed_info{$stmt}{tempfiles}{count} += $_normalyzed_info{$stmt}{tempfiles}{count};
+			$normalyzed_info{$stmt}{tempfiles}{size} += $_normalyzed_info{$stmt}{tempfiles}{size};
+			if (!exists $normalyzed_info{$stmt}{tempfiles}{minsize} || ($normalyzed_info{$stmt}{tempfiles}{minsize} > $_normalyzed_info{$stmt}{tempfiles}{minsize})) { 
+				$normalyzed_info{$stmt}{tempfiles}{minsize} = $_normalyzed_info{$stmt}{tempfiles}{minsize};
+			}
+			if (!exists $normalyzed_info{$stmt}{tempfiles}{maxsize} || ($normalyzed_info{$stmt}{tempfiles}{maxsize} < $_normalyzed_info{$stmt}{tempfiles}{maxsize})) { 
+				$normalyzed_info{$stmt}{tempfiles}{maxsize} = $_normalyzed_info{$stmt}{tempfiles}{maxsize};
+			}
+		}
+	}
+
+	### session_info ###
+
+	foreach my $db (keys %{ $_session_info{database}}) {
+		$session_info{database}{$db}{count} += $_session_info{database}{$db}{count};
+		$session_info{database}{$db}{duration} += $_session_info{database}{$db}{duration};
+	}
+
+	$session_info{count} += $_session_info{count};
+
+	foreach my $day (keys %{ $_session_info{chronos}}) {
+		foreach my $hour (keys %{ $_session_info{chronos}{$day}}) {
+			$session_info{chronos}{$day}{$hour}{count} += $_session_info{chronos}{$day}{$hour}{count};
+			$session_info{chronos}{$day}{$hour}{duration} += $_session_info{chronos}{$day}{$hour}{duration};
+		}
+	}
+
+	foreach my $user (keys %{ $_session_info{user}}) {
+		$session_info{user}{$user}{count}    += $_session_info{user}{$user}{count};
+		$session_info{user}{$user}{duration} += $_session_info{user}{$user}{duration};
+	}
+
+	$session_info{duration} += $_session_info{duration};
+
+	foreach my $host (keys %{ $_session_info{host}}) {
+		$session_info{host}{$host}{count}    += $_session_info{host}{$host}{count};
+		$session_info{host}{$host}{duration} += $_session_info{host}{$host}{duration};
+	}
+
+	### tempfile_info ###
+
+	$tempfile_info{count} += $_tempfile_info{count}
+		if defined $_tempfile_info{count};
+	$tempfile_info{size} += $_tempfile_info{size}
+		if defined $_tempfile_info{size};
+	$tempfile_info{maxsize} = $_tempfile_info{maxsize}
+		if defined $_tempfile_info{maxsize} and ( not defined $tempfile_info{maxsize}
+			or $tempfile_info{maxsize} < $_tempfile_info{maxsize} );
+
+	### top_slowest ###
+	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} (@top_slowest, @_top_slowest);
+	@top_slowest = ();
+	for (my $i = 0; $i <= $#tmp_top_slowest; $i++) {
+		push(@top_slowest, $tmp_top_slowest[$i]);
+	}
+
+	### top_locked ###
+	my @tmp_top_locked_info = sort {$b->[0] <=> $a->[0]} (@top_locked_info, @_top_locked_info);
+	@top_locked_info = ();
+	for (my $i = 0; $i <= $#tmp_top_locked_info; $i++) {
+		push(@top_locked_info, $tmp_top_locked_info[$i]);
+	}
+
+	### top_tempfile ###
+	my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} (@top_tempfile_info, @_top_tempfile_info);
+	@top_tempfile_info = ();
+	for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++) {
+		push(@top_tempfile_info, $tmp_top_tempfile_info[$i]);
+	}
+
+	### checkpoint_info ###
+	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
+	$checkpoint_info{sync} += $_checkpoint_info{sync};
+	$checkpoint_info{wbuffer} += $_checkpoint_info{wbuffer};
+	$checkpoint_info{file_recycled} += $_checkpoint_info{file_recycled};
+	$checkpoint_info{total} += $_checkpoint_info{total};
+	$checkpoint_info{file_added} += $_checkpoint_info{file_added};
+	$checkpoint_info{write} += $_checkpoint_info{write};
+
+	#### Autovacuum info ####
+
+	$autovacuum_info{count} += $_autovacuum_info{count};
+
+	foreach my $day (keys %{ $_autovacuum_info{chronos} }) {
+		foreach my $hour (keys %{ $_autovacuum_info{chronos}{$day} }) {
+			$autovacuum_info{chronos}{$day}{$hour}{count} += $_autovacuum_info{chronos}{$day}{$hour}{count};
+		}
+	}
+	foreach my $table (keys %{ $_autovacuum_info{tables} }) {
+		$autovacuum_info{tables}{$table}{vacuums} += $_autovacuum_info{tables}{$table}{vacuums};
+		$autovacuum_info{tables}{$table}{idxscans} += $_autovacuum_info{tables}{$table}{idxscans};
+		$autovacuum_info{tables}{$table}{tuples}{removed} += $_autovacuum_info{tables}{$table}{tuples}{removed};
+		$autovacuum_info{tables}{$table}{pages}{removed} += $_autovacuum_info{tables}{$table}{pages}{removed};
+	}
+	if ($_autovacuum_info{peak}{system_usage}{elapsed} > $autovacuum_info{peak}{system_usage}{elapsed}) {
+		$autovacuum_info{peak}{system_usage}{elapsed} = $_autovacuum_info{peak}{system_usage}{elapsed};
+		$autovacuum_info{peak}{system_usage}{table} = $_autovacuum_info{peak}{system_usage}{table};
+		$autovacuum_info{peak}{system_usage}{date} = $_autovacuum_info{peak}{system_usage}{date};
+	}
+	#### Autoanalyze info ####
+
+	$autoanalyze_info{count} += $_autoanalyze_info{count};
+
+	foreach my $day (keys %{ $_autoanalyze_info{chronos} }) {
+		foreach my $hour (keys %{ $_autoanalyze_info{chronos}{$day} }) {
+			$autoanalyze_info{chronos}{$day}{$hour}{count} += $_autoanalyze_info{chronos}{$day}{$hour}{count};
+		}
+	}
+	foreach my $table (keys %{ $_autoanalyze_info{tables} }) {
+		$autoanalyze_info{tables}{$table}{analyzes} += $_autoanalyze_info{tables}{$table}{analyzes};
+	}
+	if ($_autoanalyze_info{peak}{system_usage}{elapsed} > $autoanalyze_info{peak}{system_usage}{elapsed}) {
+		$autoanalyze_info{peak}{system_usage}{elapsed} = $_autoanalyze_info{peak}{system_usage}{elapsed};
+		$autoanalyze_info{peak}{system_usage}{table} = $_autoanalyze_info{peak}{system_usage}{table};
+		$autoanalyze_info{peak}{system_usage}{date} = $_autoanalyze_info{peak}{system_usage}{date};
+	}
+
+	return;
+}
+
+###############################################################################
+# TOOL FUNCTIONS
+###############################################################################
+
+# Dump top slowest queries as EXPLAIN statement.
+sub dump_slowest_queries
+{
+	# Global information
+	my $curdate    = localtime(time);
+	my $logfile_str = join(',', @log_files);
+
+	for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
+
+		my $head = "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
+		$head .= "-- user: $top_slowest[$i]->[4]\n" if ($top_slowest[$i]->[4]);
+		$head .= "-- remote: $top_slowest[$i]->[5]\n" if ($top_slowest[$i]->[5]);
+		$head .= "-- app: $top_slowest[$i]->[6]\n" if ($top_slowest[$i]->[6]);
+		$head .= "--, bind query: yes\n" if ($top_slowest[$i]->[7]);
+		$head =~ s/^, //;
+
+		print qq{-- Generated on $curdate
+-- Log file: $logfile_str
+-- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+--
+};
+
+		print $head;
+		print "EXPLAIN\n";
+		print "$top_slowest[$i]->[2]\n";
+
+	}
+}

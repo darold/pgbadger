@@ -1,0 +1,52 @@
+------------------------------------------------------------------------------
+
+ pgbadger_tools - Tools based on pgBadger binary files
+
+ This program is open source, licensed under the PostgreSQL Licence.
+ For license terms, see the LICENSE file.
+------------------------------------------------------------------------------
+
+This program is first used to demonstrate how to deal with pgBadger binary
+files to build your own tool. If you don't want to rewrite all, you can
+post pull request of this tool with your own option so that pgbadger_tools
+will do what your need.
+
+All statistics and data gathered by pgBadger binary file is load into memory
+using method load_stat(). To generate a binary file you simply have to set
+the output file extension to .bin. Note that if you use incremental mode with
+pgbadger it already generate binary file in daily directories.
+
+    example: pgbadger -o out.bin /var/log/postgresql/postgresql.log
+
+The first option added is --explain-slowest that dump top slowest queries in
+an explain analyze statement, ready to be executed. An extended version could
+be created to automatically execute those explain statement on the database.
+
+    ./pgbadger_tools --explain-slowest out.bin
+
+You can use several binary file as input, for example from an incremental
+output directory:
+
+    ./pgbadger_tools --explain-slowest /var/www/pgbadger/2014/09/03/*.bin
+
+The explain tool is base on an original work of Rodolphe Quiedeville, that was
+first sent as a pull request on pgbadger. But we need to keep pgBadger simple
+so the place of this kind of addons are more in peripheral tools. It is possible
+that in future, the tsung and json output will be removed from pgbadger and put
+in pgbadger_tools
+
+If you want to chain tools and HTML report, you can proceed as follow:
+
+    pgbadger -o out.bin /var/log/postgresql/postgresql.log
+    ./pgbadger_tools --explain-slowest out.bin > explain_top_slowest.sql
+    pgbadger -o report.html out.bin
+
+Feel free to extend pgbadger_tools of new feature. To see how to integrate
+you Perl code in this  program, search for "Add your own" string in the code
+and look at the example searching on explain_slowest.
+
+Regards,
+
+--
+Team Dalibo
+
