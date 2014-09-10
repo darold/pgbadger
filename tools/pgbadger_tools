@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #------------------------------------------------------------------------------
 #
-# pgbadger_tools.pl - Tools based on pgBadger binary files
+# pgbadger_tools - Tools based on pgBadger binary files
 #
 # This program is open source, licensed under the PostgreSQL Licence.
 # For license terms, see the LICENSE file.
@@ -52,16 +52,24 @@ my $nlines              = 0;
 my $sample              = 3;
 my $top                 = 0;
 
+##################################################################
 # Get the command line parameters
-my $help = 0;
-my $explain_slowest = 0;
+# Add your own option
+##################################################################
+# General options
+my $help  = 0;
 my $quiet = 0;
 my $debug = 0;
+# Tools related option
+my $explain_slowest = 0;
+my $analyze = 0;
+
 my $result = GetOptions(
         'h|help!'          => \$help,
 	'q|quiet!'         => \$quiet,
 	'v|verbose!'       => \$debug,
 	'explain-slowest!' => \$explain_slowest,
+	'analyze!'         => \$analyze,
 );
 
 # Show help an exit
@@ -69,7 +77,7 @@ if ($help) {
 	&usage();
 }
 
-# Read binary files to load from command line
+# Lookup for binary files to load from command line
 my @file_list = ();
 foreach my $f (@ARGV) {
 	push(@file_list, $f) if (-e $f && ($f =~ /\.bin$/));
@@ -77,7 +85,8 @@ foreach my $f (@ARGV) {
 
 die "FATAL: no binary file found, see usage (--help).\n" if ($#file_list == -1);
 
-# Load all data gathered by all the different processes
+# Load all data gathered by all the different processes. This function
+# is responsible of loading pgbadger statistics from binary files
 foreach my $f (@file_list) {
 	next if (-z "$f");
 	my $fht = new IO::File;
@@ -86,8 +95,11 @@ foreach my $f (@file_list) {
 	$fht->close();
 }
 
-# 1srt tool: Dump top slowest queries inside explain statement
-# Will be executed when option --explain-slowest is set at command line
+####################################################################
+# 1srt tool: Dump top slowest queries inside explain statement. Will
+# be executed when option --explain-slowest is set at command line
+# Add your own condition.
+##################################################################
 if ($explain_slowest) {
     &logmsg('LOG', "Output each slowest queries within explain statement.");
     &dump_slowest_queries(); # See TOOL FUNCTIONS bellow 
@@ -98,14 +110,14 @@ if ($explain_slowest) {
 exit 0;
 
 ##################################################################
-# Display pgbadger_tools.pl usage with the list of options
-# Add your own in the tools section.
+# Display pgbadger_tools usage with the list of options
+# Add your own in the Tools section with a sample.
 ##################################################################
 sub usage
 {
 
 	print qq{
-Usage: pgbadger_tool.pl BINARY_FILE
+Usage: pgbadger_tools BINARY_FILE
 
     -h | --help       : Show this message
     -q | --quiet      : do not print any information
@@ -113,9 +125,14 @@ Usage: pgbadger_tool.pl BINARY_FILE
 
 Tools:
 
-    --explain-slowest : generate explain analyze with slowest queries
+    --explain-slowest : generate explain statements of slowest queries
 
-	./pgbadger_tool.pl --explain-slowest out.bin
+	./pgbadger_tools --explain-slowest out.bin
+
+    --explain-slowest --analyze : generate explain analyze statements of
+				  slowest queries
+
+	./pgbadger_tools --explain-slowest --analyze out.bin
 
 };
 	exit 0;
@@ -632,6 +649,7 @@ sub load_stats
 
 ###############################################################################
 # TOOL FUNCTIONS
+# Add your own below
 ###############################################################################
 
 # Dump top slowest queries as EXPLAIN statement.
@@ -657,8 +675,9 @@ sub dump_slowest_queries
 };
 
 		print $head;
-		print "EXPLAIN\n";
+		(!$analyze) ? print "EXPLAIN\n" : print "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
 		print "$top_slowest[$i]->[2]\n";
+		print "ROLLBACK;\n" if ($analyze);
 
 	}
 }
