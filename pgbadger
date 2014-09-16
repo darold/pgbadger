@@ -10805,10 +10805,13 @@ sub get_log_file
 		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
 		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
 		chomp($totalsize);
-		if (!$totalsize) {
+		if ($totalsize eq '') {
 			die "FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'\n";
 		}
 		&logmsg('DEBUG', "Remote file size: $totalsize");
+		if (!$totalsize) {
+			return $totalsize;
+		}
 	}
 	my $iscompressed = 1;
 
