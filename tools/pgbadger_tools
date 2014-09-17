@@ -713,7 +713,23 @@ sub load_stats
 # Add your own below
 ###############################################################################
 
+# add cariage return to be more human readable
+sub fmtquery
+{
+    my $qry = shift;
+
+    my @KEYWORDS = qw(
+           FROM INNER WHERE AND ORDER RETURNING); 
+
+    foreach my $key (@KEYWORDS) {
+        $qry =~ s/\s$key/\n$key/igs;
+    }
+    return $qry;
+
+}
+
 # Dump top slowest queries as EXPLAIN statement.
+# one query by file
 sub dump_slowest_queries
 {
 	# Global information
@@ -725,6 +741,10 @@ sub dump_slowest_queries
 		# Do not process request that are slower than $max_duration
 		next if ( $max_duration && ($top_slowest[$i]->[0] > $max_duration) );
 
+        my $fhqr = new IO::File;
+        my $fname = sprintf("qry%02d.sql", $i);
+        $fhqr->open("> $fname") or die "FATAL: can't open temp file $fname, $!\n";
+
 		my $head = "-- duration: $top_slowest[$i]->[0]\n" if ($top_slowest[$i]->[0]);
 		$head .= "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
 		$head .= "-- user: $top_slowest[$i]->[4]\n" if ($top_slowest[$i]->[4]);
@@ -733,37 +753,23 @@ sub dump_slowest_queries
 		$head .= "--, bind query: yes\n" if ($top_slowest[$i]->[7]);
 		$head =~ s/^, //;
 
-		print qq{-- Generated on $curdate
+        $fhqr->print(qq{-- Generated on $curdate
 -- Log file: $logfile_str
 -- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
 --
-};
+});
 
-		print $head;
+        $fhqr->print("$head");
 		my $explain = "EXPLAIN\n";
 		if ($analyze) {
 			$explain = "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
 		}
 		$explain .= "$top_slowest[$i]->[2]\n";
 		$explain .= "ROLLBACK;\n" if ($analyze);
-$explain = qq{
-BEGIN;
-EXPLAIN (ANALYZE, VERBOSE, BUFFERS)
-SELECT n.nspname as "Schema",
-  c.relname as "Name",
-  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' END as "Type",
-  pg_catalog.pg_get_userbyid(c.relowner) as "Owner"
-FROM pg_catalog.pg_class c
-     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE c.relkind IN ('r','v','m','S','f','')
-      AND n.nspname <> 'pg_catalog'
-      AND n.nspname <> 'information_schema'
-      AND n.nspname !~ '^pg_toast'
-  AND pg_catalog.pg_table_is_visible(c.oid)
-ORDER BY 1,2;
-ROLLBACK;
-};
-		print $explain;
+
+        $fhqr->print(fmtquery("$explain"));
+        $fhqr->close();
+
 		if ($psql_cmd) {
 			my @tmpfile = tempfile('tmp_pgbadgeri_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
 			my $fht = new IO::File;
@@ -773,6 +779,5 @@ ROLLBACK;
 			print `$psql_cmd -f $tmpfile[1]`;
 			unlink($tmpfile[1]);
 		}
-		last;
 	}
 }
