@@ -8690,6 +8690,7 @@ sub validate_log_line
 
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -8697,6 +8698,7 @@ sub validate_log_line
 
 		# Log line does not match the required dbuser
 		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -8705,6 +8707,7 @@ sub validate_log_line
 		# Log line does not match the required dbclient
 		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
 		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -8712,6 +8715,7 @@ sub validate_log_line
 
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -8719,6 +8723,7 @@ sub validate_log_line
 
 		# Log line matches the excluded dbuser
 		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -8726,6 +8731,7 @@ sub validate_log_line
 
 		# Log line matches the excluded appname
 		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
