@@ -79,6 +79,8 @@ my $pgdb   = '';
 my $explain_slowest = 0;
 my $analyze         = 0;
 my $max_duration    = 0;
+my $file_per_query  = 0;
+my $format_query    = 0;
 
 my $result = GetOptions(
 	'h|host=s'         => \$pghost,
@@ -88,9 +90,12 @@ my $result = GetOptions(
 	'q|quiet!'         => \$quiet,
 	'v|verbose!'       => \$debug,
         'help!'            => \$help,
+	# Explain slowest query tool
 	'explain-slowest!' => \$explain_slowest,
 	'analyze!'         => \$analyze,
 	'max-duration=i'   => \$max_duration,
+	'file-per-query!'  => \$file_per_query,
+	'format-query!'    => \$format_query,
 );
 
 # Show help an exit
@@ -186,6 +191,9 @@ Options Tools:
 			will not be reported. Use it if you want to auto
 			execute explain statements.
 
+    --file-per-query  : will dump each query into a separate file named qryXXX.sql
+
+    --format-query    : do simple query formating
 
   To automatically execute those EXPLAIN statements and get the results with
   the queries, you just have to set at least one of the -d, -h, -p or -U
@@ -725,7 +733,12 @@ sub dump_slowest_queries
 		# Do not process request that are slower than $max_duration
 		next if ( $max_duration && ($top_slowest[$i]->[0] > $max_duration) );
 
-		my $head = "-- duration: $top_slowest[$i]->[0]\n" if ($top_slowest[$i]->[0]);
+		my $head = qq{-- Generated on $curdate
+-- Log file: $logfile_str
+-- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+--
+};
+		$head .= "-- duration: $top_slowest[$i]->[0]\n" if ($top_slowest[$i]->[0]);
 		$head .= "-- database: $top_slowest[$i]->[3]\n" if ($top_slowest[$i]->[3]);
 		$head .= "-- user: $top_slowest[$i]->[4]\n" if ($top_slowest[$i]->[4]);
 		$head .= "-- remote: $top_slowest[$i]->[5]\n" if ($top_slowest[$i]->[5]);
@@ -733,22 +746,25 @@ sub dump_slowest_queries
 		$head .= "--, bind query: yes\n" if ($top_slowest[$i]->[7]);
 		$head =~ s/^, //;
 
-		print qq{-- Generated on $curdate
--- Log file: $logfile_str
--- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
---
-};
-
-		print $head;
 		my $explain = "EXPLAIN\n";
 		if ($analyze) {
 			$explain = "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
 		}
 		$explain .= "$top_slowest[$i]->[2]\n";
 		$explain .= "ROLLBACK;\n" if ($analyze);
-		print $explain;
+		if ($file_per_query) {
+			my $fhqr = new IO::File;
+			my $fname = sprintf("qry%03d.sql", $i);
+			$fhqr->open("> $fname") or die "FATAL: can't open temp file $fname, $!\n";
+			$fhqr->print($head);
+			$fhqr->print(&fmtquery($explain));
+			$fhqr->close();
+		} else {
+			print $head;
+			print $explain;
+		}
 		if ($psql_cmd) {
-			my @tmpfile = tempfile('tmp_pgbadgeri_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
+			my @tmpfile = tempfile('tmp_pgbadger_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
 			my $fht = new IO::File;
 			$fht->open("> $tmpfile[1]") or die "FATAL: can't open temp file $tmpfile[1], $!\n";
 			$fht->print("$explain");
@@ -758,3 +774,21 @@ sub dump_slowest_queries
 		}
 	}
 }
+
+# Do minimal query formatting.
+# Add carriage return to be more human readable
+sub fmtquery
+{
+	my $qry = shift;
+
+	return $qry if (!$format_query);
+
+	my @KEYWORDS = qw( FROM INNER WHERE AND OR ORDER RETURNING ); 
+
+	foreach my $key (@KEYWORDS) {
+		$qry =~ s/\s+($key\s+)/\n$1/ig;
+	}
+	return $qry;
+}
+
+
