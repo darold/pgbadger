@@ -203,7 +203,7 @@ my $disable_autovacuum      = 0;
 my $avg_minutes             = 5;
 my $histo_avg_minutes       = 60;
 my $last_parsed             = '';
-my $report_title            = 'PostgreSQL log analyzer';
+my $report_title            = '';
 my $log_line_prefix         = '';
 my $compiled_prefix         = '';
 my $project_url             = 'http://dalibo.github.com/pgbadger/';
@@ -1412,10 +1412,14 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	my $date = localtime(time);
 	my @tmpjscode = @jscode;
 	map { s/EDIT_URI/\./; } @tmpjscode;
+	my $local_title = 'Global Index on incremental reports';
+	if ($report_title) {
+		$local_title = 'Global Index - ' . $report_title;
+	}
 	print $fh qq{<!DOCTYPE html>
 <html lang="en">
 <head>
-<title>pgBadger :: Global Index on incremental reports</title>
+<title>pgBadger :: $local_title</title>
 <meta http-equiv="Content-Type" content="text/html; charset=$charset" />
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Expires" content="$date">
@@ -1431,7 +1435,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 <nav class="navbar navbar-inverse navbar-fixed-top">
   <div class="navbar-inner">
     <div class="container-fluid">
-	<a data-placement="bottom" rel="tooltip" data-original-title="$report_title" href="" id="pgbadger-brand" class="brand">$pgbadger_logo Global Index of pgBadger incremental reports</a>
+	<a data-placement="bottom" rel="tooltip" data-original-title="$report_title" href="" id="pgbadger-brand" class="brand">$pgbadger_logo $local_title</a>
     </div>
   </div>
 </nav>
@@ -3542,7 +3546,7 @@ sub html_header
 <nav class="navbar navbar-inverse navbar-fixed-top">
   <div class="navbar-inner">
     <div class="container-fluid">
-	<a data-placement="bottom" rel="tooltip" data-original-title="$report_title" href="" id="pgbadger-brand" class="brand">$pgbadger_logo pgBadger</a>
+	<a data-placement="bottom" rel="tooltip" data-original-title="PostgreSQL log analyzer" href="" id="pgbadger-brand" class="brand">$pgbadger_logo pgBadger $report_title</a>
 	  <ul class="nav collapse in" id="navigation">
 };
 	if (!$error_only) {
