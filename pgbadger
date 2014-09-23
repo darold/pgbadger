@@ -369,6 +369,8 @@ my $result = GetOptions(
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
+$report_title = &escape_html($report_title) if $report_title;
+
 if ($ver) {
 	print "pgBadger version $VERSION\n";
 	exit 0;
@@ -3432,6 +3434,8 @@ sub dump_error_as_text
 	if ($#log_files > 0) {
 		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
+	$report_title ||= 'PostgreSQL Log Analyzer';
+
 	print $fh qq{
 pgBadger :: $report_title
 
@@ -3530,10 +3534,16 @@ sub html_header
 	my @tmpjscode = @jscode;
 	map { s/EDIT_URI/$uri/; } @tmpjscode;
 
+	my $local_title = 'PostgreSQL Log Analyzer';
+	if ($report_title) {
+		$local_title = $report_title;
+	}
+	$report_title ||= 'pgBadger';
+
 	print $fh qq{<!DOCTYPE html>
 <html lang="en">
 <head>
-<title>pgBadger :: $report_title</title>
+<title>pgBadger :: $local_title</title>
 <meta http-equiv="Content-Type" content="text/html; charset=$charset" />
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Expires" content="$date">
