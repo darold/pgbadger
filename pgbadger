@@ -1435,7 +1435,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 <nav class="navbar navbar-inverse navbar-fixed-top">
   <div class="navbar-inner">
     <div class="container-fluid">
-	<a data-placement="bottom" rel="tooltip" data-original-title="$report_title" href="" id="pgbadger-brand" class="brand">$pgbadger_logo $local_title</a>
+	<a data-placement="bottom" rel="tooltip" data-original-title="PostgreSQL Log Analyzer" href="" id="pgbadger-brand" class="brand">$pgbadger_logo $local_title</a>
     </div>
   </div>
 </nav>
@@ -3546,7 +3546,7 @@ sub html_header
 <nav class="navbar navbar-inverse navbar-fixed-top">
   <div class="navbar-inner">
     <div class="container-fluid">
-	<a data-placement="bottom" rel="tooltip" data-original-title="PostgreSQL log analyzer" href="" id="pgbadger-brand" class="brand">$pgbadger_logo pgBadger $report_title</a>
+	<a data-placement="bottom" rel="tooltip" data-original-title="PostgreSQL Log Analyzer" href="" id="pgbadger-brand" class="brand">$pgbadger_logo $report_title</a>
 	  <ul class="nav collapse in" id="navigation">
 };
 	if (!$error_only) {
