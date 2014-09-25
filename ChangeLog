@@ -1,3 +1,64 @@
+2014-09-25 version 6.1
+
+This release fix some issues and adds some new features. It adds a new option
+-B or --bar-graph to use bar instead of line in graphs. It will also keep tick
+formatting when zooming.
+
+The release also add a new program: pgbadger_tools to demonstrate how to
+works with pgBadger binary files to build your own new feature. The first
+tools 'explain-slowest' allow printing of top slowest queries as EXPLAIN
+statements. There's also additionnal options to execute automatically the
+statements with EXPLAIN ANALYZE and get the execution plan. See help of the
+program for more information or the README file in the tools directory.
+
+Some modifications will change certain behavior:
+
+	- The -T | --title text value will now be displayed instead of the
+	  pgBadger label right after the logo. report. It was previously
+	  displayed on mouse over the pgBadger label.
+
+Here is the full list of changes/fixes:
+
+	- Change -T | --title position on pgBadger report. Title now override
+	  the pgBadger label. Thanks to Julien Rouhauld for the patch.
+	- Add --file-per-query and --format-query option to write each slowest
+	  query in separate file named qryXXX.sql and perform minimal formating
+	  of the queries. Thanks to Rodolphe Quiedeville for the patch.
+	- Remove debug query from explain-slowest tool.
+	- Fix surge in sessions number report when an exclusion or inclusion
+	  option (dbname, user, appname, etc.) is used. Thanks to suyah for the
+	  report.
+	- Fix fatal error when remote log file is 0 size. Thanks to Julien
+	  Rouhaud for the report.
+	- Allow pgbadger_tools --explain-slowest to automatically execute the
+	  EXPLAIN statements an report the plan. See pgbadger_tools --help for
+	  more explanation.
+	- Add --analyze option to replace EXPLAIN statements by EXPLAIN
+	  (ANALYZE, VERBOSE, BUFFERS).
+	- Move pgbadger_tools program and README.tools into the tools/
+	  subdirectory with removing the extension. Add more comments and
+	  explanations.
+	- Fix case where die with interrupt signal is received when using -e
+	  option. Thanks to Lloyd Albin for the report.
+	- Add a new program pgbadger_tools to demonstrate how to deal with
+	  pgBadger binary files to build your own new feature. The first one
+	  'explain-slowest' allow printing of top slowest queries as EXPLAIN
+	  statements.
+	- Keep tick formatting when zooming. Thanks to Julien Rouhaud for the
+	  patch.
+	- Fix automatic detection of rsyslogd logs. Thanks to David Day for
+	  the report.
+	- Fix issue in calculating min/max/avg in "General Activity" report. It
+	  was build on the sum of queries duration per minutes instead of each
+	  duration. Thanks to Jayadevan M for the report.
+	- The same issue remains with percentile that are build using the sum of
+	  duration per minutes and doesn't represent the real queries duration.
+	- This commit also include a modification in convert_time() method to
+	  reports milliseconds.
+	- Add -B or --bar-graph command line option to use bar instead of line
+	  in graph. Thanks to Bart Dopheide for the suggestion.
+	- Fix Checkpoint Wal files usage graph title.
+
 2014-08-08 version 6.0
 
 This new major release adds some new features like automatic cleanup of binary
