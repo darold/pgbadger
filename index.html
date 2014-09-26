@@ -1494,6 +1494,38 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">6.1</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2014-09-25</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">	
+		<p>
+This release fix some issues and adds some new features. It adds a new option
+-B or --bar-graph to use bar instead of line in graphs. It will also keep tick
+formatting when zooming.
+		</p>
+		<p>
+The release also addis a new program: pgbadger_tools to demonstrate how to
+work with pgBadger binary files to build your own new feature. The first
+tools 'Explain slowest' allow printing of top slowest queries as EXPLAIN
+statements. There's also additionnal options to execute automatically the
+statements with EXPLAIN ANALYZE and get the execution plan. See help of the
+program for more information or the README file in the tools directory.
+</p>
+<p>
+Some modifications with behavior changes:
+</p>
+<pre>
+        - The -T | --title text value will now be displayed instead of the
+          pgBadger label right after the logo. report. It was previously
+          displayed on mouse over the pgBadger label.
+</pre>		
+		</div>	
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">6.0</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2014-08-12</span> <span class="figure-label">Date</span></li>    
 				</ul>
@@ -1603,8 +1635,6 @@ Here is the complete list of changes.
 	  Millies-Lacroix for the report.
 	- Fix remote logfile parsing. Thanks to Herve Werner for the report.
 </pre>		
-			
-				
 		</div>	
 		
 		<div class="span3">
