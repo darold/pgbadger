@@ -1932,7 +1932,15 @@ sub process_file
 	if ($format eq 'csv') {
 
 		require Text::CSV_XS;
-		my $csv = Text::CSV_XS->new({binary => 1, eol => $/, sep_char => $csv_sep_char});
+		my $csv = Text::CSV_XS->new(
+			{
+				binary => 1,
+				eol => $/,
+				sep_char => $csv_sep_char,
+				allow_loose_quotes => 1,
+				escape_char => undef
+			}
+		);
 
 		# Parse csvlog lines
 		while (my $row = $csv->getline($lfile)) {
@@ -2019,7 +2027,7 @@ sub process_file
 			}
 		}
 		if (!$getout) {
-			$csv->eof or warn "FATAL: cannot use CSV, " . $csv->error_diag() . "\n";
+			$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . "\n";
 		}
 
 	}
