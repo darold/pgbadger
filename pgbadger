@@ -1938,7 +1938,6 @@ sub process_file
 				eol => $/,
 				sep_char => $csv_sep_char,
 				allow_loose_quotes => 1,
-				escape_char => undef
 			}
 		);
 
