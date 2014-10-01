@@ -5259,13 +5259,13 @@ $drawn_graphs{checkpointfiles_graph}
 				$files .= "<td>" . &comma_numbers($cinf{file_added}) .
 					"</td><td>" . &comma_numbers($cinf{file_removed}) .
 					"</td><td>" . &comma_numbers($cinf{file_recycled}) .
-					"<td>" . &comma_numbers($cainf{sync_files}) . 's' .
+					"</td><td>" . &comma_numbers($cainf{sync_files}) .
 					"</td><td>" . &comma_numbers($cainf{sync_longest}) . 's' .
 					"</td><td>" . &comma_numbers($cainf{sync_avg}) . 's' .
 					"</td></tr>";
 			} else {
 				$buffers .= "<td>0</td><td>0s</td><td>0s</td><td>0s</td></tr>";
-				$files .= "<td>0</td><td>0</td><td>0</td><td>0s</td><td>0s</td><td>0s</td></tr>";
+				$files .= "<td>0</td><td>0</td><td>0</td><td>0</td><td>0s</td><td>0s</td></tr>";
 			}
 			if (exists $cinf{warning}) {
 				$warnings .= "<td>" . &comma_numbers($cinf{warning}) . "</td><td>" .
