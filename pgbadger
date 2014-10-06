@@ -1938,6 +1938,8 @@ sub process_file
 				eol => $/,
 				sep_char => $csv_sep_char,
 				allow_loose_quotes => 1,
+				allow_loose_escapes => 1,
+				escape_char => '"',
 			}
 		);
 
@@ -4374,12 +4376,10 @@ sub compute_query_graphs
 						}
 
 						# Search minimum and maximum during this minute
-						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{query}{second}}) {
-							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{max}
-								if ($per_minute_info{$tm}{$h}{$m}{query}{max} > $q_dataavg{max}{"$rd"});
-							$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{min}
-								if ($per_minute_info{$tm}{$h}{$m}{query}{min} < $q_dataavg{min}{"$rd"});
-						}
+						$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{count}
+							if ($per_minute_info{$tm}{$h}{$m}{query}{count} > $q_dataavg{max}{"$rd"});
+						$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{count}
+							if ($per_minute_info{$tm}{$h}{$m}{query}{count} < $q_dataavg{min}{"$rd"});
 
 						if (!$disable_query) {
 							foreach my $action (@SQL_ACTION) {
