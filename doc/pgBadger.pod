@@ -362,6 +362,11 @@ Of course your log messages should be in English without locale support:
 
 but this is not only recommended by pgBadger.
 
+Note: the session line [%l-1] is just used to match the default prefix for "stderr".
+The -1 has no real purpose and basically is not used in Pgbadger statistics / graphs.
+You can safely removed them from the log_line_prefix but you will need to set the
+--prefix command line option.
+
 =head1 log_min_duration_statement, log_duration and log_statement
 
 If you want full statistics reports you must set log_min_duration_statement
