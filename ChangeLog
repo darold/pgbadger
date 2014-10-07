@@ -1,22 +1,22 @@
 2014-10-07 version 6.2
 
-This is a maintenance release to fix a regression in SQL trafic graphs and
+This is a maintenance release to fix a regression in SQL traffic graphs and
 fix some other minor issues.
 
-The release also add a new option -D or --dns-resolv to map client ip adresses
+The release also add a new option -D or --dns-resolv to map client ip addresses
 to FQDN without having log_hostname enabled on the postgresql's configuration
 
 	- Do not display queries in Slowest individual, Time consuming and
 	  Normalized slowest queries reports when there is no duration in
 	  log file. Display NO DATASET instead.
-	- Fix min/max queries in SQL trafic that was based on duration instead
+	- Fix min/max queries in SQL traffic that was based on duration instead
 	  of query count.
 	- Fix wrong unit to Synced files in Checkpoints files report. Thanks
 	  to Levente Birta for the report.
 	- Enable allow_loose_quotes in Text::CSV_XS call to fix CSV parsing
 	  error when fields have quote inside an unquoted field. Thanks to
 	  Josh Berkus for the report.
-	- Add -D | --dns-resolv command line option to replace ip adresses
+	- Add -D | --dns-resolv command line option to replace ip addresses
 	  by their DNS name. Be warned that this can slow down pgBagder a lot.
 	  Thanks to Jiri Hlinka for the feature request.
 
@@ -29,15 +29,15 @@ formatting when zooming.
 The release also add a new program: pgbadger_tools to demonstrate how to
 works with pgBadger binary files to build your own new feature. The first
 tools 'explain-slowest' allow printing of top slowest queries as EXPLAIN
-statements. There's also additionnal options to execute automatically the
+statements. There's also additional options to execute automatically the
 statements with EXPLAIN ANALYZE and get the execution plan. See help of the
 program for more information or the README file in the tools directory.
 
 Some modifications will change certain behavior:
 
 	- The -T | --title text value will now be displayed instead of the
-	  pgBadger label right after the logo. report. It was previously
-	  displayed on mouse over the pgBadger label.
+	  pgBadger label right after the logo. It was previously displayed
+	  on mouse over the pgBadger label.
 
 Here is the full list of changes/fixes:
 
