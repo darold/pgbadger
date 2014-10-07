@@ -7040,9 +7040,11 @@ sub print_time_consuming
 				<tbody>
 };
 	my $rank = 1;
+	my $found = 0;
 	foreach my $k (sort {$normalyzed_info{$b}{duration} <=> $normalyzed_info{$a}{duration}} keys %normalyzed_info) {
-		next if (!$normalyzed_info{$k}{count});
+		next if (!$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
 		last if ($rank > $top);
+		$found++;
 		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
 		my $duration = &convert_time($normalyzed_info{$k}{duration});
 		my $count = &comma_numbers($normalyzed_info{$k}{count});
@@ -7170,9 +7172,8 @@ sub print_time_consuming
 };
 		$rank++;
 	}
-
-	if (scalar keys %normalyzed_info == 0) {
-		print $fh qq{<tr><td colspan="7">$NODATA</td></tr>};
+	if (!$found) {
+		print $fh qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
 	print $fh qq{
 			</tbody>
@@ -7368,9 +7369,11 @@ sub print_slowest_queries
 				<tbody>
 };
 	my $rank = 1;
+	my $found = 0;
 	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
-		next if (!$k || !$normalyzed_info{$k}{count});
+		next if (!$k || !$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
 		last if ($rank > $top);
+		$found++;
                 $normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
                 my $duration = &convert_time($normalyzed_info{$k}{duration});
                 my $count = &comma_numbers($normalyzed_info{$k}{count});
@@ -7499,8 +7502,8 @@ sub print_slowest_queries
 };
 		$rank++;
 	}
-	if (scalar keys %normalyzed_info == 0) {
-		print $fh qq{<tr><td colspan="7">$NODATA</td></tr>};
+	if (!$found) {
+		print $fh qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
         print $fh qq{
 			</tbody>
@@ -9639,6 +9642,7 @@ sub store_queries
 			# Store normalized query count and duration per time
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 			$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
+
 			if ($cur_info{$t_pid}{duration}) {
 
 				# Update top slowest queries statistics
