@@ -1,3 +1,25 @@
+2014-10-07 version 6.2
+
+This is a maintenance release to fix a regression in SQL trafic graphs and
+fix some other minor issues.
+
+The release also add a new option -D or --dns-resolv to map client ip adresses
+to FQDN without having log_hostname enabled on the postgresql's configuration
+
+	- Do not display queries in Slowest individual, Time consuming and
+	  Normalized slowest queries reports when there is no duration in
+	  log file. Display NO DATASET instead.
+	- Fix min/max queries in SQL trafic that was based on duration instead
+	  of query count.
+	- Fix wrong unit to Synced files in Checkpoints files report. Thanks
+	  to Levente Birta for the report.
+	- Enable allow_loose_quotes in Text::CSV_XS call to fix CSV parsing
+	  error when fields have quote inside an unquoted field. Thanks to
+	  Josh Berkus for the report.
+	- Add -D | --dns-resolv command line option to replace ip adresses
+	  by their DNS name. Be warned that this can slow down pgBagder a lot.
+	  Thanks to Jiri Hlinka for the feature request.
+
 2014-09-25 version 6.1
 
 This release fix some issues and adds some new features. It adds a new option
