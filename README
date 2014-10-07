@@ -23,6 +23,8 @@ SYNOPSIS
         -c | --dbclient host   : only report on entries for the given client host.
         -C | --nocomment       : remove comments like /* ... */ from queries.
         -d | --dbname database : only report on entries for the given database.
+        -D | --dns-resolv      : client ip adresses are replaced by their DNS name.
+                                 Be warned that this can really slow down pgBadger.
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.

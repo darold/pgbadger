@@ -43,6 +43,7 @@ use File::Temp qw/ tempfile /;
 use IO::Handle;
 use IO::Pipe;
 use FileHandle;
+use Socket;
 
 $VERSION = '6.1';
 
@@ -60,6 +61,8 @@ my $graphid      = 1;
 my $NODATA       = '<div class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
 my $MAX_QUERY_LENGTH = 20480;
 my $terminate = 0;
+my %CACHE_DNS = ();
+my $DNSLookupTimeout = 1; # (in seconds)
 
 my $pgbadger_logo =
         '<img src="data:image/png;base64,
@@ -223,6 +226,7 @@ my $anonymize               = 0;
 my $noclean                 = 0;
 my $retention               = 0;
 my $bar_graph               = 0;
+my $dns_resolv              = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -306,6 +310,7 @@ my $result = GetOptions(
 	"c|dbclient=s"             => \@dbclient,
 	"C|nocomment!"             => \$remove_comment,
 	"d|dbname=s"               => \@dbname,
+	"D|dns-resolv!"            => \$dns_resolv,
 	"e|end=s"                  => \$to,
 	"f|format=s"               => \$format,
 	"G|nograph!"               => \$nograph,
@@ -1549,6 +1554,8 @@ Options:
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
+    -D | --dns-resolv      : client ip adresses are replaced by their DNS name.
+                             Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog,stderr,csv. Default: stderr.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
@@ -2003,6 +2010,7 @@ sub process_file
 				$prefix_vars{'t_appname'} = $row->[22] || '';
 				$prefix_vars{'t_client'}  = $row->[4] || '';
 				$prefix_vars{'t_client'}  =~ s/:.*//;
+				$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 				$prefix_vars{'t_host'}    = 'csv';
 				$prefix_vars{'t_pid'}     = $row->[3];
 				$prefix_vars{'t_session_line'} = $row->[5];
@@ -2151,6 +2159,7 @@ sub process_file
 					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 					$goon = 1;
+					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
@@ -2283,6 +2292,7 @@ sub process_file
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
+					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
@@ -8727,7 +8737,6 @@ sub validate_log_line
 	if ($#dbclient >= 0) {
 
 		# Log line does not match the required dbclient
-		$prefix_vars{'t_client'} ||= $prefix_vars{'t_hostport'};
 		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
@@ -11126,7 +11135,31 @@ sub get_calendar
 
 }
 
+sub _gethostbyaddr
+{
+	my $ip = shift;
 
+	my $host = undef;
+	unless(exists $CACHE_DNS{$ip}) {
+		eval {
+			local $SIG{ALRM} = sub { die "DNS lookup timeout.\n"; };
+			alarm($DNSLookupTimeout);
+			$host = gethostbyaddr(inet_aton($ip), AF_INET);
+			alarm(0);
+		};
+		if ($@) {
+			$CACHE_DNS{$ip} = undef;
+			#printf "_gethostbyaddr timeout : %s\n", $ip;
+		}
+		else {
+			$CACHE_DNS{$ip} = $host;
+			#printf "_gethostbyaddr success : %s (%s)\n", $ip, $host;
+		}
+	}
+
+	return $CACHE_DNS{$ip} || $ip;
+
+}
 
 __DATA__
 
