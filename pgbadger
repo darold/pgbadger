@@ -1256,7 +1256,7 @@ if ($last_parsed && $last_line{datetime} && $last_line{orig}) {
 	}
 }
 
-exit 0 if ($terminate);
+exit 2 if ($terminate);
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
@@ -1843,7 +1843,7 @@ sub multiprocess_progressbar
 	# Terminate the process when we haven't read the complete file but must exit
 	local $SIG{USR1} = sub {
 		print STDERR "\n";
-		exit 0;
+		exit 1;
 	};
 	my $timeout  = 3;
 	my $cursize  = 0;
