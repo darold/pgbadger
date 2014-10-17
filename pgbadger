@@ -227,6 +227,7 @@ my $noclean                 = 0;
 my $retention               = 0;
 my $bar_graph               = 0;
 my $dns_resolv              = 0;
+my $nomultiline             = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -321,6 +322,7 @@ my $result = GetOptions(
 	"J|job_per_file=i"         => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
 	"m|maxlength=i"            => \$maxlength,
+	"M|no-multiline!"          => \$nomultiline,
 	"N|appname=s"              => \@dbappname,
 	"n|nohighlight!"           => \$nohighlight,
 	"o|outfile=s"              => \$outfile,
@@ -1573,6 +1575,8 @@ Options:
                              report per day with a log rotated each week.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
+    -M | --no-multiline    : do not collect multiline statement to avoid garbage
+                             especially on errors that generate a huge report.
     -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
@@ -2204,40 +2208,40 @@ sub process_file
 					} 
 
 					# Some log line may be written by applications
-					next if ($line =~ / LOG:  /);
+					next if ($line =~ /\bLOG:  /);
 
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $t_query;
+						$cur_info{$cur_pid}{statement} .= "\n" . $t_query if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $t_query;
+						$cur_info{$cur_pid}{query} .= "\n" . $t_query if (!$nomultiline);
 					}
 
 				# Collect orphaned lines of multiline queries
 				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
 
 					# Some log line may be written by applications
-					next if ($line =~ / LOG:  /);
+					next if ($line =~ /\bLOG:  /);
 
 					if (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line;
+						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line;
+						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline);
 					}
 
 				} else {
@@ -2343,20 +2347,20 @@ sub process_file
 					} 
 
 					# Some log line may be written by applications
-					next if ($line =~ / LOG:  /);
+					next if ($line =~ /\bLOG:  /);
 
 					if (exists $cur_temp_info{$cur_pid}{size}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line;
+						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line;
+						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline);
 					}
 
 				# Collect orphaned lines of multiline queries
