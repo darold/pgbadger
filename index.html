@@ -1494,6 +1494,39 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">6.2</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2014-10-07</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">	
+		<p>
+This is a maintenance release to fix a regression in SQL traffic graphs and
+fix some other minor issues.
+		</p>
+		<p>
+The release also add a new option -D or --dns-resolv to map client ip addresses
+to FQDN without having log_hostname enabled on the postgresql's configuration
+		</p>
+<pre>
+	- Do not display queries in Slowest individual, Time consuming and
+	  Normalized slowest queries reports when there is no duration in
+	  log file. Display NO DATASET instead.
+	- Fix min/max queries in SQL traffic that was based on duration instead
+	  of query count.
+	- Fix wrong unit to Synced files in Checkpoints files report. Thanks
+	  to Levente Birta for the report.
+	- Enable allow_loose_quotes in Text::CSV_XS call to fix CSV parsing
+	  error when fields have quote inside an unquoted field. Thanks to
+	  Josh Berkus for the report.
+	- Add -D | --dns-resolv command line option to replace ip addresses
+	  by their DNS name. Be warned that this can slow down pgBagder a lot.
+	  Thanks to Jiri Hlinka for the feature request.
+</pre>		
+		</div>	
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">6.1</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2014-09-25</span> <span class="figure-label">Date</span></li>    
 				</ul>
