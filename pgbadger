@@ -841,7 +841,7 @@ map {$_ = quotemeta($_)} @BRACKETS;
 my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
 
 # Inbounds of session times histogram
-my @histogram_session_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
+my @histogram_session_time = (0, 500, 1000, 30000, 60000, 600000, 1800000, 3600000, 28800000);
 
 # Get inbounds of query times histogram
 sub get_hist_inbound
@@ -4867,7 +4867,8 @@ sub print_histogram_session_times
 	my $most_range_value = '';
 
 	for (my $i = 1; $i <= $#histogram_session_time; $i++) {
-                $histogram_info .= "<tr><td>$histogram_session_time[$i-1]-$histogram_session_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
+                #$histogram_info .= "<tr><td>$histogram_session_time[$i-1]-$histogram_session_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
+                $histogram_info .= "<tr><td>" . &convert_time($histogram_session_time[$i-1]) . '-' . &convert_time($histogram_session_time[$i]) . "</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
                         "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
 		$data{"$histogram_session_time[$i-1]-$histogram_session_time[$i]ms"} = $overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > 0);
 		if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > $most_range_value) {
@@ -4876,7 +4877,8 @@ sub print_histogram_session_times
 		}
 	}
 	if ($overall_stat{histogram}{session_total} > 0) {
-		$histogram_info .= "<tr><td> &gt; $histogram_session_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
+		#$histogram_info .= "<tr><td> &gt; $histogram_session_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
+		$histogram_info .= "<tr><td> &gt; " . &convert_time($histogram_session_time[-1]) . "</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
 			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{'-1'} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
 		$data{"> $histogram_session_time[-1]ms"} = $overall_stat{histogram}{session_time}{"-1"} if ($overall_stat{histogram}{session_time}{"-1"} > 0);
 		if ($overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
