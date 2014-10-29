@@ -840,13 +840,16 @@ map {$_ = quotemeta($_)} @BRACKETS;
 # Inbounds of query times histogram
 my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
 
+# Inbounds of session times histogram
+my @histogram_session_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
+
 # Get inbounds of query times histogram
 sub get_hist_inbound
 {
-	my $duration = shift;
+	my ($duration, @histogram) = @_;
 
-	for (my $i = 0; $i <= $#histogram_query_time; $i++) {
-		return $histogram_query_time[$i-1] if ($histogram_query_time[$i] > $duration);
+	for (my $i = 0; $i <= $#histogram; $i++) {
+		return $histogram[$i-1] if ($histogram[$i] > $duration);
 	}
 
 	return -1;
@@ -3629,6 +3632,7 @@ sub html_header
 };
 			}
 			print $fh qq{
+     				<li><a href="#histogram-session-times">Histogram of sessions times</a></li>
      				<li><a href="#sessions-per-database">Sessions per database</a></li>
      				<li><a href="#sessions-per-user">Sessions per user</a></li>
      				<li><a href="#sessions-per-host">Sessions per host</a></li>
@@ -4854,6 +4858,83 @@ $drawn_graphs{sessionspersecond_graph}
 	delete $drawn_graphs{sessionspersecond_graph};
 
 }
+
+sub print_histogram_session_times
+{
+	my %data = ();
+	my $histogram_info = '';
+	my $most_range = '';
+	my $most_range_value = '';
+
+	for (my $i = 1; $i <= $#histogram_session_time; $i++) {
+                $histogram_info .= "<tr><td>$histogram_session_time[$i-1]-$histogram_session_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
+                        "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
+		$data{"$histogram_session_time[$i-1]-$histogram_session_time[$i]ms"} = $overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > 0);
+		if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > $most_range_value) {
+			$most_range = "$histogram_session_time[$i-1]-$histogram_session_time[$i]ms";
+			$most_range_value = $overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]};
+		}
+	}
+	if ($overall_stat{histogram}{session_total} > 0) {
+		$histogram_info .= "<tr><td> &gt; $histogram_session_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
+			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{'-1'} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
+		$data{"> $histogram_session_time[-1]ms"} = $overall_stat{histogram}{session_time}{"-1"} if ($overall_stat{histogram}{session_time}{"-1"} > 0);
+		if ($overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
+			$most_range = "> $histogram_session_time[-1]ms";
+			$most_range_value = $overall_stat{histogram}{session_time}{"-1"};
+		}
+	} else {
+		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
+	}
+
+	$drawn_graphs{histogram_session_times_graph} = &flotr2_piegraph($graphid++, 'histogram_session_times_graph', 'Histogram of session times', %data);
+
+	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
+
+	print $fh qq{
+	<h2><i class="icon-question-sign"></i> Top Queries</h2>
+	<div class="analysis-item row-fluid" id="histogram-session-times">
+		<h2><i class="icon-signal"></i> Histogram of session times</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$most_range_value</span> <span class="figure-label">$most_range duration</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#histogram-session-times-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#histogram-session-times-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="histogram-session-times-graph">
+						$drawn_graphs{histogram_session_times_graph}
+					</div>
+					<div class="tab-pane" id="histogram-session-times-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Range</th>
+									<th>Count</th>
+									<th>Percentage</th>
+								</tr>
+							</thead>
+							<tbody>
+							$histogram_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of queries by type -->
+};
+	delete $drawn_graphs{histogram_session_times_graph};
+}
+
 
 
 sub print_user_session
@@ -6910,16 +6991,16 @@ sub print_histogram_query_times
 
 	for (my $i = 1; $i <= $#histogram_query_time; $i++) {
                 $histogram_info .= "<tr><td>$histogram_query_time[$i-1]-$histogram_query_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]}) .
-                        "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
+                        "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} * 100) / ($overall_stat{histogram}{query_total}||1)) . "%</td></tr>";
 		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > 0);
 		if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > $most_range_value) {
 			$most_range = "$histogram_query_time[$i-1]-$histogram_query_time[$i]ms";
 			$most_range_value = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
 		}
 	}
-	if ($overall_stat{histogram}{total} > 0) {
+	if ($overall_stat{histogram}{query_total} > 0) {
 		$histogram_info .= "<tr><td> &gt; $histogram_query_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{'-1'}) .
-			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{'-1'} * 100) / ($overall_stat{histogram}{total}||1)) . "%</td></tr>";
+			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{'-1'} * 100) / ($overall_stat{histogram}{query_total}||1)) . "%</td></tr>";
 		$data{"> $histogram_query_time[-1]ms"} = $overall_stat{histogram}{query_time}{"-1"} if ($overall_stat{histogram}{query_time}{"-1"} > 0);
 		if ($overall_stat{histogram}{query_time}{"-1"} > $most_range_value) {
 			$most_range = "> $histogram_query_time[-1]ms";
@@ -7597,6 +7678,8 @@ sub dump_as_html
 };
 			# Show number of simultaneous sessions
 			&print_simultaneous_session();
+			# Show histogram for session times
+			&print_histogram_session_times();
 			# Show per database sessions
 			&print_database_session();
 			# Show per user sessions
@@ -8110,7 +8193,12 @@ sub load_stats
 	foreach my $k (keys %{$_overall_stat{histogram}{query_time}}) {
 		$overall_stat{histogram}{query_time}{$k} += $_overall_stat{histogram}{query_time}{$k};
 	}
-	$overall_stat{histogram}{total} += $_overall_stat{histogram}{total};
+	$overall_stat{histogram}{query_total} += $_overall_stat{histogram}{total};
+	$overall_stat{histogram}{query_total} += $_overall_stat{histogram}{query_total};
+	foreach my $k (keys %{$_overall_stat{histogram}{session_time}}) {
+		$overall_stat{histogram}{session_time}{$k} += $_overall_stat{histogram}{session_time}{$k};
+	}
+	$overall_stat{histogram}{session_total} += $_overall_stat{histogram}{session_total};
 
 	foreach my $k ('prepare', 'bind','execute') {
 		$overall_stat{$k} += $_overall_stat{$k};
@@ -9049,6 +9137,9 @@ sub parse_query
 		$session_info{user}{$usr}{duration} += $time;
 		$session_info{host}{$host}{count}++;
 		$session_info{host}{$host}{duration} += $time;
+		my $k = &get_hist_inbound($time, @histogram_session_time);
+		$overall_stat{histogram}{session_time}{$k}++;
+		$overall_stat{histogram}{session_total}++;
 		return;
 	}
 
@@ -9268,9 +9359,9 @@ sub parse_query
 	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms$//s) {
 		$prefix_vars{'t_duration'} = $1;
 		$prefix_vars{'t_query'} = '';
-		my $k = &get_hist_inbound($1);
+		my $k = &get_hist_inbound($1, @histogram_query_time);
 		$overall_stat{histogram}{query_time}{$k}++;
-		$overall_stat{histogram}{total}++;
+		$overall_stat{histogram}{query_total}++;
 		&set_current_infos($t_pid);
 		return;
 	}
@@ -9287,9 +9378,9 @@ sub parse_query
 	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (query|statement): //is) {
 		$prefix_vars{'t_duration'} = $1;
 		$t_action   = $2;
-		my $k = &get_hist_inbound($1);
+		my $k = &get_hist_inbound($1, @histogram_query_time);
 		$overall_stat{histogram}{query_time}{$k}++;
-		$overall_stat{histogram}{total}++;
+		$overall_stat{histogram}{query_total}++;
 		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)\b/i) {
 			$overall_stat{lc($1)}++;
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
@@ -9305,9 +9396,9 @@ sub parse_query
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
 		# Skipping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
-		my $k = &get_hist_inbound($prefix_vars{'t_duration'});
+		my $k = &get_hist_inbound($prefix_vars{'t_duration'}, @histogram_query_time);
 		$overall_stat{histogram}{query_time}{$k}++;
-		$overall_stat{histogram}{total}++;
+		$overall_stat{histogram}{query_total}++;
 		$prefix_vars{'t_bind'} = 1;
 	# Log line without duration at all
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
@@ -12438,7 +12529,7 @@ WRFILE: fontawesome.css
 	height: 400px;
 }
 
-	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph {
+	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
 	width : 100%;
 	height: 320px;
 }
@@ -12492,7 +12583,7 @@ WRFILE: fontawesome.css
 			width : 94.5%;
 		}
 
-		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph {
+		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
 			width : 94.5%;
 		}
 
