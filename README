@@ -250,6 +250,7 @@ FEATURE
             Sessions per database/user/client.
             Connections per database/user/client.
             Autovacuum and autoanalyze per table.
+            Histogram of sessions times.
 
     All charts are zoomable and can be saved as PNG images. SQL queries
     reported are highlighted and beautified automatically.
@@ -350,21 +351,22 @@ POSTGRESQL CONFIGURATION
 
             log_line_prefix = '%t [%p]: [%l-1] '
 
-    Log line prefix could add user and database name as follows:
+    Log line prefix could add user, database name and client ip address as
+    follows:
 
-            log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
+            log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,client=%h '
 
     or for syslog log file format:
 
-            log_line_prefix = 'user=%u,db=%d '
+            log_line_prefix = 'user=%u,db=%d,client=%h '
 
     Log line prefix for stderr output could also be:
 
-            log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+            log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u,client=%h '
 
     or for syslog output:
 
-            log_line_prefix = 'db=%d,user=%u '
+            log_line_prefix = 'db=%d,user=%u,client=%h '
 
     You need to enable other parameters in postgresql.conf to get more
     information from your log files:
