@@ -1298,7 +1298,11 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 				&dump_as_text();
 			}
 		} elsif ($extension eq 'json') {
-			&dump_as_json();
+			if ($error_only) {
+				&dump_error_as_json();
+			} else {
+				&dump_as_json();
+			}
 		} elsif ($extension eq 'binary') {
 			&dump_as_binary($fh);
 		} else {
@@ -8653,6 +8657,15 @@ sub dump_as_binary
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
 	}, $lfh) || die ("Couldn't save binary data to «$outfile»!\n");
+}
+
+sub dump_error_as_json
+{
+	my $json = encode_json({
+		'error_info' => \%error_info,
+	}) || die ("Encode object to JSON failed!\n");
+
+	print $fh $json;
 }
 
 sub dump_as_json
