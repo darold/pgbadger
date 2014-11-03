@@ -506,6 +506,12 @@ if (!$extension) {
 	} else {
 		$extension = 'html';
 	}
+} elsif (lc($extension) eq 'json') {
+	if (eval {require JSON::XS;1;} ne 1) {
+		die("Can not save output in json format, please install Perl module JSON::XS first.\n");
+	} else {
+		JSON::XS->import();
+	}
 }
 
 # Set default filename of the output file
