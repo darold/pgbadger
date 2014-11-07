@@ -60,7 +60,7 @@ my @top_tempfile_info   = ();
 my @log_files           = ();
 my $nlines              = 0;
 my $sample              = 3;
-my $top                 = 0;
+my $top                 = 20;
 
 ##################################################################
 # Get the command line parameters
@@ -81,6 +81,8 @@ my $analyze         = 0;
 my $max_duration    = 0;
 my $file_per_query  = 0;
 my $format_query    = 0;
+my $explain_time_consuming = 0;
+my $explain_normalized = 0;
 
 my $result = GetOptions(
 	'h|host=s'         => \$pghost,
@@ -92,10 +94,13 @@ my $result = GetOptions(
         'help!'            => \$help,
 	# Explain slowest query tool
 	'explain-slowest!' => \$explain_slowest,
+	'explain-time-consuming!' => \$explain_time_consuming,
+	'explain-normalized!' => \$explain_normalized,
 	'analyze!'         => \$analyze,
 	'max-duration=i'   => \$max_duration,
 	'file-per-query!'  => \$file_per_query,
 	'format-query!'    => \$format_query,
+	'top=i'            => $top,
 );
 
 # Show help an exit
@@ -134,11 +139,21 @@ if ($psql_cmd) {
 ####################################################################
 # 1srt tool: Dump top slowest queries inside explain statement. Will
 # be executed when option --explain-slowest is set at command line
-# Add your own condition.
+# Add your own condition. See also TOOL FUNCTIONS bellow 
 ##################################################################
 if ($explain_slowest) {
     &logmsg('LOG', "Output each slowest queries within explain statement.");
-    &dump_slowest_queries(); # See TOOL FUNCTIONS bellow 
+    &dump_slowest_queries();
+}
+# when option --explain-time-consuming is set at command line
+if ($explain_time_consuming) {
+    &logmsg('LOG', "Output each most times consuming queries within explain statement.");
+    &dump_times_consuming_queries();
+}
+# when option --explain-normalized is set at command line
+if ($explain_normalized) {
+    &logmsg('LOG', "Output each slowest normalized queries within explain statement.");
+    &dump_normalized_slowest_queries();
 }
 
 # Add your own bellow
@@ -183,6 +198,14 @@ Options Tools:
 
 	./pgbadger_tools --explain-slowest out.bin
 
+    --explain-time-consuming : generate explain statements of time consuming queries
+
+	./pgbadger_tools --explain-time-consuming out.bin
+
+    --explain-normalized : generate explain statements of normalized slowest queries
+
+	./pgbadger_tools --explain-normalized out.bin
+
     --analyze         : generate explain analyze statements of slowest queries
 
 	./pgbadger_tools --explain-slowest --analyze out.bin
@@ -202,6 +225,11 @@ Options Tools:
 
 	./pgbadger_tools --explain-slowest --analyze -d postgres out.bin
 
+  Default is to generate EXPLAIN statement for the top 20 of queries, you can
+  change this value using --top N.
+
+  Options --explain-slowest, --explain-time-consuming and --explain-normalized
+  can be use together in the same pgbadger_tools command.
 
 };
 	exit 0;
@@ -716,6 +744,22 @@ sub load_stats
 	return;
 }
 
+# Do minimal query formatting.
+# Add carriage return to be more human readable
+sub fmtquery
+{
+	my $qry = shift;
+
+	return $qry if (!$format_query);
+
+	my @KEYWORDS = qw( FROM INNER WHERE AND OR ORDER RETURNING ); 
+
+	foreach my $key (@KEYWORDS) {
+		$qry =~ s/\s+($key\s+)/\n$1/ig;
+	}
+	return $qry;
+}
+
 ###############################################################################
 # TOOL FUNCTIONS
 # Add your own below
@@ -775,20 +819,127 @@ sub dump_slowest_queries
 	}
 }
 
-# Do minimal query formatting.
-# Add carriage return to be more human readable
-sub fmtquery
+# Dump top time consuming queries as EXPLAIN statement.
+sub dump_times_consuming_queries
 {
-	my $qry = shift;
+	# Global information
+	my $curdate    = localtime(time);
+	my $logfile_str = join(',', @log_files);
 
-	return $qry if (!$format_query);
+        my $rank = 1;
+        foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+                next if (!$normalyzed_info{$k}{count});
+                foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			# Do not process request that are slower than $max_duration
+			next if ( $max_duration && ( $d > $max_duration) );
 
-	my @KEYWORDS = qw( FROM INNER WHERE AND OR ORDER RETURNING ); 
+			my $head = qq{-- Generated on $curdate
+-- Log file: $logfile_str
+-- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+--
+};
+			$head .= "-- duration: $d\n" if ($d);
+			$head .= "-- database: $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+			$head .= "-- user: $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+			$head .= "-- remote: $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+			$head .= "-- app: $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$head .= "--, bind query: yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
+			$head =~ s/^, //;
 
-	foreach my $key (@KEYWORDS) {
-		$qry =~ s/\s+($key\s+)/\n$1/ig;
-	}
-	return $qry;
+			my $explain = "EXPLAIN\n";
+			if ($analyze) {
+				$explain = "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
+			}
+			$explain .= "$normalyzed_info{$k}{samples}{$d}{query}\n";
+			$explain .= "ROLLBACK;\n" if ($analyze);
+			if ($file_per_query) {
+				my $fhqr = new IO::File;
+				my $fname = sprintf("time_consuming_query%03d.sql", $rank);
+				$fhqr->open("> $fname") or die "FATAL: can't open temp file $fname, $!\n";
+				$fhqr->print($head);
+				$fhqr->print(&fmtquery($explain));
+				$fhqr->close();
+			} else {
+				print $head;
+				print $explain;
+			}
+			if ($psql_cmd) {
+				my @tmpfile = tempfile('tmp_pgbadger_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
+				my $fht = new IO::File;
+				$fht->open("> $tmpfile[1]") or die "FATAL: can't open temp file $tmpfile[1], $!\n";
+				$fht->print("$explain");
+				$fht->close();
+				print `$psql_cmd -f $tmpfile[1]`;
+				unlink($tmpfile[1]);
+			}
+			last; # Just take one sample 
+                }
+                last if ($rank > $top);
+                $rank++;
+        }
+
 }
+
+# Dump top normalized slowest queries as EXPLAIN statement.
+sub dump_normalized_slowest_queries
+{
+	# Global information
+	my $curdate    = localtime(time);
+	my $logfile_str = join(',', @log_files);
+
+        my $rank = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+                next if (!$normalyzed_info{$k}{count});
+                foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			# Do not process request that are slower than $max_duration
+			next if ( $max_duration && ( $d > $max_duration) );
+
+			my $head = qq{-- Generated on $curdate
+-- Log file: $logfile_str
+-- Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+--
+};
+			$head .= "-- duration: $d\n" if ($d);
+			$head .= "-- database: $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+			$head .= "-- user: $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+			$head .= "-- remote: $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+			$head .= "-- app: $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$head .= "--, bind query: yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
+			$head =~ s/^, //;
+
+			my $explain = "EXPLAIN\n";
+			if ($analyze) {
+				$explain = "BEGIN;\nEXPLAIN (ANALYZE, VERBOSE, BUFFERS)\n";
+			}
+			$explain .= "$normalyzed_info{$k}{samples}{$d}{query}\n";
+			$explain .= "ROLLBACK;\n" if ($analyze);
+			if ($file_per_query) {
+				my $fhqr = new IO::File;
+				my $fname = sprintf("normalized_slowest_query%03d.sql", $rank);
+				$fhqr->open("> $fname") or die "FATAL: can't open temp file $fname, $!\n";
+				$fhqr->print($head);
+				$fhqr->print(&fmtquery($explain));
+				$fhqr->close();
+			} else {
+				print $head;
+				print $explain;
+			}
+			if ($psql_cmd) {
+				my @tmpfile = tempfile('tmp_pgbadger_tools_XXXX', SUFFIX => '.txt', DIR => $TMP_DIR, UNLINK => 1 );
+				my $fht = new IO::File;
+				$fht->open("> $tmpfile[1]") or die "FATAL: can't open temp file $tmpfile[1], $!\n";
+				$fht->print("$explain");
+				$fht->close();
+				print `$psql_cmd -f $tmpfile[1]`;
+				unlink($tmpfile[1]);
+			}
+			last; # Just take one sample 
+                }
+                last if ($rank > $top);
+                $rank++;
+        }
+
+}
+
 
 
