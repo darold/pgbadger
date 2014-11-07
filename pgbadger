@@ -11454,7 +11454,8 @@ function format_number(val) {
 
 function pieTracker(obj) 
 {
-	return obj.series.label+': '+format_number(obj.y);
+	var textToShow = '<span class="mfigure">'+format_number(obj.y)+' <small>'+obj.series.label+'</small></span>';
+	return textToShow;
 }
 
 WRFILE: bean.js
