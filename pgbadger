@@ -3021,9 +3021,13 @@ Average size of temporary files: $fmt_temp_avsize
 	if (!$disable_session && $session_info{count}) {
 		my $avg_session_duration = &convert_time($session_info{duration} / $session_info{count});
 		my $tot_session_duration = &convert_time($session_info{duration});
+		my $avg_queries = &comma_numbers(int($overall_stat{'queries_number'}/$session_info{count}));
+		my $avg_duration = &convert_time(int($overall_stat{'queries_duration'}/$session_info{count}));
 		print $fh qq{Total number of sessions: $session_info{count}
 Total duration of sessions: $tot_session_duration
 Average duration of sessions: $avg_session_duration
+Average queries per sessions: $avg_queries
+Average queries duration per sessions: $avg_duration
 };
 		foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
 			print $fh "Session peak: ", &comma_numbers($overall_stat{'peak'}{$_}{session}), " sessions at $_";
@@ -3825,6 +3829,8 @@ sub print_overall_statistics
 		$query_peak_date = $_;
 		last;
 	}
+	my $avg_queries = &comma_numbers(int($overall_stat{'queries_number'}/$session_info{count}));
+	my $avg_duration = &convert_time(int($overall_stat{'queries_duration'}/$session_info{count}));
 	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'});
 	my $fmt_unique_error = &comma_numbers(scalar keys %error_info);
 	my $autovacuum_count = &comma_numbers($autovacuum_info{count});
@@ -3911,6 +3917,9 @@ sub print_overall_statistics
 							<li><span class="figure">$session_peak sessions at $session_peak_date</span> <span class="figure-label">Session peak</span></li>
 							<li><span class="figure">$tot_session_duration</span> <span class="figure-label">Total duration of sessions</span></li>
 							<li><span class="figure">$avg_session_duration</span> <span class="figure-label">Average duration of sessions</span></li>
+							<li><span class="figure">$avg_queries</span> <span class="figure-label">Average queries per session</span></li>
+							<li><span class="figure">$avg_duration</span> <span class="figure-label">Average queries duration per session</span></li>
+
 						</ul>
 					</div>
 					<div class="tab-pane" id="tab-connections">
