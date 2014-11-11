@@ -3829,8 +3829,8 @@ sub print_overall_statistics
 		$query_peak_date = $_;
 		last;
 	}
-	my $avg_queries = &comma_numbers(int($overall_stat{'queries_number'}/$session_info{count}));
-	my $avg_duration = &convert_time(int($overall_stat{'queries_duration'}/$session_info{count}));
+	my $avg_queries = &comma_numbers(int($overall_stat{'queries_number'}/($session_info{count} || 1)));
+	my $avg_duration = &convert_time(int($overall_stat{'queries_duration'}/($session_info{count} || 1)));
 	my $fmt_errors = &comma_numbers($overall_stat{'errors_number'});
 	my $fmt_unique_error = &comma_numbers(scalar keys %error_info);
 	my $autovacuum_count = &comma_numbers($autovacuum_info{count});
