@@ -618,6 +618,9 @@ if ($error_only && $disable_error) {
 my $regex_prefix_dbname = qr/db=([^,]*)/;
 my $regex_prefix_dbuser = qr/user=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote)=([^,]*)/;
+# Set pattern to look for query type
+my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY)/is;
+
 
 # Loading excluded query from file if any
 if ($exclude_file) {
@@ -665,13 +668,6 @@ if ($#include_query >= 0) {
 		&check_regex($r, '--include-query');
 	}
 }
-
-my @action_regex = (
-	qr/^\s*(delete) from/is,
-	qr/^\s*(insert) into/is,
-	qr/^\s*(update) .*\bset\b/is,
-	qr/^\s*(select) /is
-);
 
 # Compile custom log line prefix prefix
 my @prefix_params = ();
@@ -2722,10 +2718,16 @@ sub normalize_query
 	# Remove comments
 	$orig_query =~ s/\/\*(.*?)\*\///gs;
 
+	# Set the entire query lowercase
 	$orig_query = lc($orig_query);
 
 	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/[\t\s\r\n]+/ /gs;
+
+	# Removed start of transaction 
+	if ($orig_query !~ /^\s*begin\s*;\s*$/) {
+		$orig_query =~ s/^\s*begin\s*;\s*//gs
+	}
 
 	# Remove string content
 	$orig_query =~ s/\\'//g;
@@ -4415,12 +4417,13 @@ sub compute_query_graphs
 						if (exists $per_minute_info{$tm}{$h}{$m}{query}{duration}) {
 							$q_dataavg{duration}{"$rd"} += $per_minute_info{$tm}{$h}{$m}{query}{duration};
 						}
-
 						# Search minimum and maximum during this minute
-						$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{count}
-							if ($per_minute_info{$tm}{$h}{$m}{query}{count} > $q_dataavg{max}{"$rd"});
-						$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{count}
-							if ($per_minute_info{$tm}{$h}{$m}{query}{count} < $q_dataavg{min}{"$rd"});
+						foreach my $s (keys %{$per_minute_info{$tm}{$h}{$m}{query}{second}}) {
+							$q_dataavg{max}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
+								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} > $q_dataavg{max}{"$rd"});
+							$q_dataavg{min}{"$rd"} = $per_minute_info{$tm}{$h}{$m}{query}{second}{$s}
+								if ($per_minute_info{$tm}{$h}{$m}{query}{second}{$s} < $q_dataavg{min}{"$rd"});
+						}
 
 						if (!$disable_query) {
 							foreach my $action (@SQL_ACTION) {
@@ -9742,39 +9745,42 @@ sub store_queries
 			# Normalize query
 			my $normalized = &normalize_query($cur_info{$t_pid}{query});
 
-			foreach my $act (@action_regex) {
-				if ($normalized =~ $act) {
-					my $action = uc($1);
-					$overall_stat{$action}++;
-					if ($action eq 'SELECT') {
-						$overall_stat{'peak'}{$cur_last_log_timestamp}{select}++;
-					} else {
-						$overall_stat{'peak'}{$cur_last_log_timestamp}{write}++;
-					}
-					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
-					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
-					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-					if ($cur_info{$t_pid}{dbname}) {
-						$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
-					} else {
-						$database_info{'unknown'}{$action}++;
-					}
-					if ($cur_info{$t_pid}{dbappname}) {
-						$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
-					} else {
-						$application_info{'unknown'}{$action}++;
-					}
-					if ($cur_info{$t_pid}{dbuser}) {
-						$user_info{$cur_info{$t_pid}{dbuser}}{$action}++;
-					} else {
-						$user_info{'unknown'}{$action}++;
-					}
-					if ($cur_info{$t_pid}{dbclient}) {
-						$host_info{$cur_info{$t_pid}{dbclient}}{$action}++;
-					} else {
-						$host_info{'unknown'}{$action}++;
-					}
-					last;
+			if ($normalized =~ $action_regex) {
+				my $action = uc($1);
+				# If this is a copy statement try to find if this is a write or read statement
+				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/i))) {
+					$action = 'INSERT';
+				} elsif ($action eq 'COPY') {
+					$action = 'SELECT';
+				}
+				$overall_stat{$action}++;
+				if ($action eq 'SELECT') {
+					$overall_stat{'peak'}{$cur_last_log_timestamp}{select}++;
+				} else {
+					$overall_stat{'peak'}{$cur_last_log_timestamp}{write}++;
+				}
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				if ($cur_info{$t_pid}{dbname}) {
+					$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
+				} else {
+					$database_info{'unknown'}{$action}++;
+				}
+				if ($cur_info{$t_pid}{dbappname}) {
+					$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
+				} else {
+					$application_info{'unknown'}{$action}++;
+				}
+				if ($cur_info{$t_pid}{dbuser}) {
+					$user_info{$cur_info{$t_pid}{dbuser}}{$action}++;
+				} else {
+					$user_info{'unknown'}{$action}++;
+				}
+				if ($cur_info{$t_pid}{dbclient}) {
+					$host_info{$cur_info{$t_pid}{dbclient}}{$action}++;
+				} else {
+					$host_info{'unknown'}{$action}++;
 				}
 			}
 
