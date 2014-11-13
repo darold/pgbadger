@@ -7036,8 +7036,7 @@ sub print_histogram_query_times
 	} else {
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
-
-	$drawn_graphs{histogram_query_times_graph} = &flotr2_piegraph($graphid++, 'graph_histogram_query_times', 'Histogram of query times', %data);
+	$drawn_graphs{histogram_query_times_graph} = &flotr2_duration_histograph($graphid++, 'graph_histogram_query_times', 'Queries', \@histogram_query_time, %data);
 
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
@@ -10493,6 +10492,7 @@ sub flotr2_duration_histograph
 	$data1 =~ s/,$//;
 	$data1 .= "];";
 	$max += int(($max*25)/100);
+	my $xmax = @$range + 1;
 	
 	my $dateTracker_lblopts = "[ '0', ";
 	for (my $i = 1; $i <= $#{$range}; $i++) {
@@ -10511,7 +10511,7 @@ sub flotr2_duration_histograph
 	xaxis: {
 		mode: "normal",
 		min: 0,
-		max: 10,
+		max: $xmax,
 		tickDecimals: 0,
 		noTicks: 20,
 		tickFormatter: function(x) {
