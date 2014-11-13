@@ -4427,7 +4427,6 @@ sub compute_query_graphs
 
 						if (!$disable_query) {
 							foreach my $action (@SQL_ACTION) {
-								next if (!$per_minute_info{$tm}{$h}{$m}{$action}{count});
 								$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{count} || 0);
 								$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{$action}{duration} || 0);
 								if ( ($action ne 'SELECT') && exists $per_minute_info{$tm}{$h}{$m}{$action}{count}) {
@@ -4522,7 +4521,7 @@ sub compute_query_graphs
 								# Min queries per minute
 								$graph_data{"$action-min"} .= "[$t, " . ($a_dataavg{$action}{min}{"$rd"} || 0) . "],";
 								# Average query duration
-								$graph_data{"$action-2"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) . "]," if ($action eq 'SELECT');
+								$graph_data{"$action-2"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) . "],";
 							} else {
 								# Average query duration
 								$graph_data{"write"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{write}{duration}{"$rd"} || 0) / ($a_dataavg{write}{count}{"$rd"} || 1)) . "],";
@@ -4651,7 +4650,7 @@ sub print_user_connection
 			delete $infos{"Sum connections < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{userconnections_graph} = &flotr2_piegraph($graphid++, 'userconnections_graph', 'Connections per user', %infos);
+	$drawn_graphs{userconnections_graph} = &flotr2_piegraph($graphid++, 'graph_userconnections', 'Connections per user', %infos);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="connections-per-user">
@@ -4727,7 +4726,7 @@ sub print_host_connection
 			delete $infos{"Sum connections < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{hostconnections_graph} = &flotr2_piegraph($graphid++, 'hostconnections_graph', 'Connections per host', %infos);
+	$drawn_graphs{hostconnections_graph} = &flotr2_piegraph($graphid++, 'graph_hostconnections', 'Connections per host', %infos);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="connections-per-host">
@@ -4808,7 +4807,7 @@ sub print_database_connection
 			delete $infos{"Sum connections < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{databaseconnections_graph} = &flotr2_piegraph($graphid++, 'databaseconnections_graph', 'Connections per database', %infos);
+	$drawn_graphs{databaseconnections_graph} = &flotr2_piegraph($graphid++, 'graph_databaseconnections', 'Connections per database', %infos);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="connections-per-database">
@@ -4895,20 +4894,18 @@ sub print_histogram_session_times
 	my $most_range_value = '';
 
 	for (my $i = 1; $i <= $#histogram_session_time; $i++) {
-                #$histogram_info .= "<tr><td>$histogram_session_time[$i-1]-$histogram_session_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
                 $histogram_info .= "<tr><td>" . &convert_time($histogram_session_time[$i-1]) . '-' . &convert_time($histogram_session_time[$i]) . "</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
                         "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
-		$data{"$histogram_session_time[$i-1]-$histogram_session_time[$i]ms"} = $overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > 0);
+		$data{"$histogram_session_time[$i-1]-$histogram_session_time[$i]ms"} = ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} || 0);
 		if ($overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > $most_range_value) {
 			$most_range = "$histogram_session_time[$i-1]-$histogram_session_time[$i]ms";
 			$most_range_value = $overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]};
 		}
 	}
 	if ($overall_stat{histogram}{session_total} > 0) {
-		#$histogram_info .= "<tr><td> &gt; $histogram_session_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
 		$histogram_info .= "<tr><td> &gt; " . &convert_time($histogram_session_time[-1]) . "</td><td>" . &comma_numbers($overall_stat{histogram}{session_time}{'-1'}) .
 			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{session_time}{'-1'} * 100) / ($overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
-		$data{"> $histogram_session_time[-1]ms"} = $overall_stat{histogram}{session_time}{"-1"} if ($overall_stat{histogram}{session_time}{"-1"} > 0);
+		$data{"> $histogram_session_time[-1]ms"} = ($overall_stat{histogram}{session_time}{"-1"} || 0);
 		if ($overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
 			$most_range = "> $histogram_session_time[-1]ms";
 			$most_range_value = $overall_stat{histogram}{session_time}{"-1"};
@@ -4917,7 +4914,7 @@ sub print_histogram_session_times
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
 
-	$drawn_graphs{histogram_session_times_graph} = &flotr2_piegraph($graphid++, 'histogram_session_times_graph', 'Histogram of session times', %data);
+	$drawn_graphs{histogram_session_times_graph} = &flotr2_duration_histograph($graphid++, 'graph_histogram_session_times', 'Queries', \@histogram_session_time, %data);
 
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
@@ -5000,7 +4997,7 @@ sub print_user_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{usersessions_graph} = &flotr2_piegraph($graphid++, 'usersessions_graph', 'Connections per user', %infos);
+	$drawn_graphs{usersessions_graph} = &flotr2_piegraph($graphid++, 'graph_usersessions', 'Connections per user', %infos);
 	$sess_user_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5081,7 +5078,7 @@ sub print_host_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{hostsessions_graph} = &flotr2_piegraph($graphid++, 'hostsessions_graph', 'Connections per host', %infos);
+	$drawn_graphs{hostsessions_graph} = &flotr2_piegraph($graphid++, 'graph_hostsessions', 'Connections per host', %infos);
 	$sess_host_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5162,7 +5159,7 @@ sub print_database_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{databasesessions_graph} = &flotr2_piegraph($graphid++, 'databasesessions_graph', 'Connections per database', %infos);
+	$drawn_graphs{databasesessions_graph} = &flotr2_piegraph($graphid++, 'graph_databasesessions', 'Connections per database', %infos);
 	$sess_database_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 
 	$total_count = &comma_numbers($total_count);
@@ -5676,7 +5673,7 @@ sub print_analyze_per_table
 			delete $infos{"Sum analyzes < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{tableanalyzes_graph} = &flotr2_piegraph($graphid++, 'tableanalyzes_graph', 'Analyzes per tables', %infos);
+	$drawn_graphs{tableanalyzes_graph} = &flotr2_piegraph($graphid++, 'graph_tableanalyzes', 'Analyzes per tables', %infos);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
 	if ($main_analyze[0] =~ s/^([^\.]+)\.//) {
@@ -5935,7 +5932,7 @@ sub print_vacuum_per_table
 		$infos{$small[0]} = $infos{"Sum vacuums < $pie_percentage_limit%"};
 		delete $infos{"Sum vacuums < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{tablevacuums_graph} = &flotr2_piegraph($graphid++, 'tablevacuums_graph', 'Analyzes per tables', %infos);
+	$drawn_graphs{tablevacuums_graph} = &flotr2_piegraph($graphid++, 'graph_tablevacuums', 'Analyzes per tables', %infos);
 	$vacuum_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -6028,7 +6025,7 @@ sub print_vacuum_tuple_removed
 		$infos_tuple{$small[0]} = $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 		delete $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{tuplevacuums_graph} = &flotr2_piegraph($graphid++, 'tuplevacuums_graph', 'Tuples removed per tables', %infos_tuple);
+	$drawn_graphs{tuplevacuums_graph} = &flotr2_piegraph($graphid++, 'graph_tuplevacuums', 'Tuples removed per tables', %infos_tuple);
 	$vacuum_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -6124,7 +6121,7 @@ sub print_vacuum_page_removed
 		$infos_page{$small[0]} = $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 		delete $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{pagevacuums_graph} = &flotr2_piegraph($graphid++, 'pagevacuums_graph', 'Tuples removed per tables', %infos_page);
+	$drawn_graphs{pagevacuums_graph} = &flotr2_piegraph($graphid++, 'graph_pagevacuums', 'Tuples removed per tables', %infos_page);
 	$vacuum_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -6226,7 +6223,7 @@ sub print_lock_type
 			delete $locktype{"Sum lock types < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{lockbytype_graph} = &flotr2_piegraph($graphid++, 'lockbytype_graph', 'Type of locks', %locktype);
+	$drawn_graphs{lockbytype_graph} = &flotr2_piegraph($graphid++, 'graph_lockbytype', 'Type of locks', %locktype);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
 	<h1 class="page-header"><i class="icon-lock"></i> Locks</h1>
@@ -6317,7 +6314,7 @@ sub print_query_type
 			$data{"Sum query types < $pie_percentage_limit%"} += $total - $total_queries;
 		}
 	}
-	$drawn_graphs{queriesbytype_graph} = &flotr2_piegraph($graphid++, 'queriesbytype_graph', 'Type of queries', %data);
+	$drawn_graphs{queriesbytype_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbytype', 'Type of queries', %data);
 
 	$total_select = &comma_numbers($total_select);
 	$total_write = &comma_numbers($total_write);
@@ -6405,7 +6402,7 @@ sub print_query_per_database
 			delete $infos{"Sum queries per databases < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{queriesbydatabase_graph} = &flotr2_piegraph($graphid++, 'queriesbydatabase_graph', 'Queries per database', %infos);
+	$drawn_graphs{queriesbydatabase_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbydatabase', 'Queries per database', %infos);
 
 	$main_database[1] = &comma_numbers($main_database[1]);
 	print $fh qq{
@@ -6490,7 +6487,7 @@ sub print_query_per_application
 			delete $infos{"Sum queries per applications < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{queriesbyapplication_graph} = &flotr2_piegraph($graphid++, 'queriesbyapplication_graph', 'Queries per application', %infos);
+	$drawn_graphs{queriesbyapplication_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyapplication', 'Queries per application', %infos);
 
 	$main_application[1] = &comma_numbers($main_application[1]);
 	print $fh qq{
@@ -6575,7 +6572,7 @@ sub print_query_per_user
 			delete $infos{"Sum queries per users < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'queriesbyuser_graph', 'Queries per user', %infos);
+	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyuser', 'Queries per user', %infos);
 
 	$main_user[1] = &comma_numbers($main_user[1]);
 	print $fh qq{
@@ -6660,7 +6657,7 @@ sub print_query_per_host
 			delete $infos{"Sum queries per hosts < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{queriesbyhost_graph} = &flotr2_piegraph($graphid++, 'queriesbyhost_graph', 'Queries per host', %infos);
+	$drawn_graphs{queriesbyhost_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyhost', 'Queries per host', %infos);
 
 	$main_host[1] = &comma_numbers($main_host[1]);
 	print $fh qq{
@@ -7040,7 +7037,7 @@ sub print_histogram_query_times
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
 
-	$drawn_graphs{histogram_query_times_graph} = &flotr2_piegraph($graphid++, 'histogram_query_times_graph', 'Histogram of query times', %data);
+	$drawn_graphs{histogram_query_times_graph} = &flotr2_piegraph($graphid++, 'graph_histogram_query_times', 'Histogram of query times', %data);
 
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
@@ -7900,7 +7897,7 @@ sub print_log_level
 			delete $infos{"Sum log types < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{logstype_graph} = &flotr2_piegraph($graphid++, 'logstype_graph', 'Logs per type', %infos);
+	$drawn_graphs{logstype_graph} = &flotr2_piegraph($graphid++, 'graph_logstype', 'Logs per type', %infos);
 	if (!$total_logs) {
 		$logtype_info = qq{<tr><td colspan="7">$NODATA</td></tr>};
 	}
@@ -8393,13 +8390,12 @@ sub load_stats
 						($_per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} || 0);
 				}
 				foreach my $action (@SQL_ACTION) {
-					if (exists $_per_minute_info{$day}{$hour}{$min}{$action}) {
-						$per_minute_info{$day}{$hour}{$min}{$action}{count} += $_per_minute_info{$day}{$hour}{$min}{$action}{count};
-						$per_minute_info{$day}{$hour}{$min}{$action}{duration} += $_per_minute_info{$day}{$hour}{$min}{$action}{duration};
-						foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
-							$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
-								($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
-						}
+					next if (!exists $_per_minute_info{$day}{$hour}{$min}{$action});
+					$per_minute_info{$day}{$hour}{$min}{$action}{count} += ($_per_minute_info{$day}{$hour}{$min}{$action}{count} || 0);
+					$per_minute_info{$day}{$hour}{$min}{$action}{duration} += ($_per_minute_info{$day}{$hour}{$min}{$action}{duration} || 0);
+					foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
+						$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
+							($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
 					}
 				}
 				foreach my $k ('prepare', 'bind','execute') {
@@ -9425,6 +9421,8 @@ sub parse_query
 		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)\b/i) {
 			$overall_stat{lc($1)}++;
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
+			# We do not store prepare statement
+			return if (lc($1) eq 'prepare');
 		}
 	# Log line with duration and statement from prepared queries
 	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  (prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//is)
@@ -9435,7 +9433,7 @@ sub parse_query
 		$t_action = 'prepare' if ($t_action eq 'parse');
 		$overall_stat{$t_action}++;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
-		# Skipping parse and bind logs
+		# Skipping prepare, parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
 		my $k = &get_hist_inbound($prefix_vars{'t_duration'}, @histogram_query_time);
 		$overall_stat{histogram}{query_time}{$k}++;
@@ -9603,7 +9601,7 @@ sub store_queries
 	if ($cur_info{$t_pid}{query}) {
 		# Should we just want select queries
 		if ($select_only) {
-			return if (($cur_info{$t_pid}{query} !~ /^SELECT/is) || ($cur_info{$t_pid}{query} =~ /FOR UPDATE/is));
+			return if ($cur_info{$t_pid}{query} !~ /^SELECT/is);
 		}
 
 		# Should we have to exclude some queries
@@ -9739,6 +9737,7 @@ sub store_queries
 		}
 
 		if ($cur_info{$t_pid}{query}) {
+
 			# Add a semi-colon at end of the query
 			$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
 
@@ -9748,7 +9747,7 @@ sub store_queries
 			if ($normalized =~ $action_regex) {
 				my $action = uc($1);
 				# If this is a copy statement try to find if this is a write or read statement
-				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/i))) {
+				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/is))) {
 					$action = 'INSERT';
 				} elsif ($action eq 'COPY') {
 					$action = 'SELECT';
@@ -10250,7 +10249,7 @@ sub flotr2_piegraph
 	}
 
 	return <<EOF;
-<div id="$divid" class="flotr-graph"></div>
+<div id="$divid" class="flotr-graph piegraph"></div>
 <script type="text/javascript">
 /* <![CDATA[ */
 (function basic_pie(container) {
@@ -10469,6 +10468,139 @@ sub flotr2_histograph
 EOF
 
 }
+
+sub flotr2_duration_histograph
+{
+	my ($buttonid, $divid, $legend, $range, %data) = @_;
+
+	if (scalar keys %data == 0) {
+		return qq{
+<div id="$divid" class="flotr-graph duration-histo-graph"><blockquote><b>NO DATASET</b></blockquote></div>
+};
+	}
+	$legend ||= 'Queries';
+	$legend = "{ data: d1, color: \"#6e9dc9\", mouse:{track:true}, bars: {show: true, shadowSize: 0}, },";
+
+	my $dateTracker_dataopts = '[ d1 ]';
+	my $data1 = "var d1 = [";
+	my $i = 1;
+	my $max = 0;
+	foreach my $k (sort keys %data) {
+		$data1 .= " [$i, $data{$k}],";
+		$max += $data{$k} if ($data{$k} > $max);
+		$i++;
+	}
+	$data1 =~ s/,$//;
+	$data1 .= "];";
+	$max += int(($max*25)/100);
+	
+	my $dateTracker_lblopts = "[ '0', ";
+	for (my $i = 1; $i <= $#{$range}; $i++) {
+                $dateTracker_lblopts .= "'" . &convert_time($range->[$i-1]) . '-' . &convert_time($range->[$i]) . "',";
+	}
+	$dateTracker_lblopts .= "'> " . &convert_time($range->[-1]) . "'";
+	$dateTracker_lblopts .= "]";
+
+	return <<EOF;
+<div id="$divid" class="flotr-graph duration-histo-graph"></div>
+<script type="text/javascript">
+/* <![CDATA[ */
+(function mouse_zoom(container) {
+    $data1
+    var options = {
+	xaxis: {
+		mode: "normal",
+		min: 0,
+		max: 10,
+		tickDecimals: 0,
+		noTicks: 20,
+		tickFormatter: function(x) {
+			var x = parseInt(x);
+			var lbls = $dateTracker_lblopts;
+			if (x >= lbls.length) {
+				return '.';
+			}
+			return lbls[x];
+		},
+	},
+        yaxis: {
+	    mode: "normal",
+            title: "Number of queries",
+	    autoscaleMargin: 1,
+	    max: $max,
+	    tickFormatter: function(val){ return pretty_print_number(val,'') },
+        },
+	mouse: {
+            track: true,
+	    trackFormatter: function(obj){ return histoDurationTracker(obj,$dateTracker_lblopts,$dateTracker_dataopts) },
+            relative: true,
+	    sensibility: 5,
+	    trackDecimals: 2,
+	    lineColor: 'purple',
+	    position: 'no',
+        },
+        HtmlText: false,
+    };
+
+    function drawGraph(opts) {
+        var o = Flotr._.extend(Flotr._.clone(options), opts );
+        return Flotr.draw(
+        	container,
+        	[
+        		$legend
+    		],
+    		o
+    	);
+    }
+
+    var graph = drawGraph();
+    Flotr.EventAdapter.observe(container, "flotr:select", function(area) {
+        f = drawGraph({
+            xaxis: {
+                mode: "time",
+                labelsAngle: 45,
+                min: area.x1,
+                max: area.x2
+            },
+            yaxis: {
+                min: area.y1,
+                max: area.y2,
+                tickFormatter: function(val){ return pretty_print_number(val,'') }
+            }
+        });
+    });
+    Flotr.EventAdapter.observe(container, "flotr:click", function() {
+        drawGraph();
+    });
+    jQuery("#reset$buttonid").click( function() {
+      graph.download.restoreCanvas();
+    });
+    jQuery("#download$buttonid").click( function(){
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$img_format');
+    });
+    jQuery("#toimage$buttonid").click( function() {
+	if (Flotr.isIE && Flotr.isIE < 9) {
+		alert(
+		"Your browser doesn't allow you to get a bitmap image from the plot, " +
+		"you can only get a VML image that you can use in Microsoft Office.<br />"
+		);
+	}
+      graph.download.saveImage('$img_format', null, null, true);
+    });
+
+})(document.getElementById("$divid"));
+/* ]]> */
+</script>
+EOF
+
+}
+
 
 sub build_log_line_prefix_regex
 {
@@ -11392,6 +11524,35 @@ function histoHourTracker(obj, labels, datasets)
 	textToShow += '</div>';
 	return textToShow;
 }
+
+function histoDurationTracker(obj, labels, datasets) 
+{
+	var posValue = parseInt(obj.x);
+ 
+	// look for the position in data arrays 
+	 var pos = 0;
+	 if (datasets != undefined) { 
+		 for (pos=0; pos < datasets[0].length; pos++) {
+			// If timestamp are the same we have found the position
+			 if (datasets[0][pos][0] == posValue) {
+				// get out of here
+				 break;
+			 }
+		 }
+	} else {
+		return '<span class="mfigure">NO DATASET</span>';
+	 }
+
+	var textToShow = '<div class="mouse-figures">';
+	for (var i = 0; i < labels.length; i++) {
+		if (datasets[i] != undefined) {
+			textToShow += '<span class="smfigure">'+pretty_print_number(datasets[i][pos][1])+' <small>'+labels[pos+1]+'</small></span>';
+		}
+	}
+	textToShow += '</div>';
+	return textToShow;
+}
+
 
 function pretty_print_number(val, type) 
 {
@@ -12414,269 +12575,299 @@ WRFILE: fontawesome.css
 
 
 	font-weight:normal;font-style:normal}[class^="icon-"],[class*=" icon-"]{font-family:FontAwesome;font-weight:normal;font-style:normal;text-decoration:inherit;-webkit-font-smoothing:antialiased;*margin-right:.3em}[class^="icon-"]:before,[class*=" icon-"]:before{text-decoration:inherit;display:inline-block;speak:none}.icon-large:before{vertical-align:-10%;font-size:1.3333333333333333em}a [class^="icon-"],a [class*=" icon-"],a [class^="icon-"]:before,a [class*=" icon-"]:before{display:inline}[class^="icon-"].icon-fixed-width,[class*=" icon-"].icon-fixed-width{display:inline-block;width:1.2857142857142858em;text-align:center}[class^="icon-"].icon-fixed-width.icon-large,[class*=" icon-"].icon-fixed-width.icon-large{width:1.5714285714285714em}ul.icons-ul{list-style-type:none;text-indent:-0.7142857142857143em;margin-left:2.142857142857143em}ul.icons-ul>li .icon-li{width:.7142857142857143em;display:inline-block;text-align:center}[class^="icon-"].hide,[class*=" icon-"].hide{display:none}.icon-muted{color:#eee}.icon-light{color:#fff}.icon-dark{color:#333}.icon-border{border:solid 1px #eee;padding:.2em .25em .15em;-webkit-border-radius:3px;-moz-border-radius:3px;border-radius:3px}.icon-2x{font-size:2em}.icon-2x.icon-border{border-width:2px;-webkit-border-radius:4px;-moz-border-radius:4px;border-radius:4px}.icon-3x{font-size:3em}.icon-3x.icon-border{border-width:3px;-webkit-border-radius:5px;-moz-border-radius:5px;border-radius:5px}.icon-4x{font-size:4em}.icon-4x.icon-border{border-width:4px;-webkit-border-radius:6px;-moz-border-radius:6px;border-radius:6px}.icon-5x{font-size:5em}.icon-5x.icon-border{border-width:5px;-webkit-border-radius:7px;-moz-border-radius:7px;border-radius:7px}.pull-right{float:right}.pull-left{float:left}[class^="icon-"].pull-left,[class*=" icon-"].pull-left{margin-right:.3em}[class^="icon-"].pull-right,[class*=" icon-"].pull-right{margin-left:.3em}[class^="icon-"],[class*=" icon-"]{display:inline;width:auto;height:auto;line-height:normal;vertical-align:baseline;background-image:none;background-position:0 0;background-repeat:repeat;margin-top:0}.icon-white,.nav-pills>.active>a>[class^="icon-"],.nav-pills>.active>a>[class*=" icon-"],.nav-list>.active>a>[class^="icon-"],.nav-list>.active>a>[class*=" icon-"],.navbar-inverse .nav>.active>a>[class^="icon-"],.navbar-inverse .nav>.active>a>[class*=" icon-"],.dropdown-menu>li>a:hover>[class^="icon-"],.dropdown-menu>li>a:hover>[class*=" icon-"],.dropdown-menu>.active>a>[class^="icon-"],.dropdown-menu>.active>a>[class*=" icon-"],.dropdown-submenu:hover>a>[class^="icon-"],.dropdown-submenu:hover>a>[class*=" icon-"]{background-image:none}.btn [class^="icon-"].icon-large,.nav [class^="icon-"].icon-large,.btn [class*=" icon-"].icon-large,.nav [class*=" icon-"].icon-large{line-height:.9em}.btn [class^="icon-"].icon-spin,.nav [class^="icon-"].icon-spin,.btn [class*=" icon-"].icon-spin,.nav [class*=" icon-"].icon-spin{display:inline-block}.nav-tabs [class^="icon-"],.nav-pills [class^="icon-"],.nav-tabs [class*=" icon-"],.nav-pills [class*=" icon-"],.nav-tabs [class^="icon-"].icon-large,.nav-pills [class^="icon-"].icon-large,.nav-tabs [class*=" icon-"].icon-large,.nav-pills [class*=" icon-"].icon-large{line-height:.9em}.btn [class^="icon-"].pull-left.icon-2x,.btn [class*=" icon-"].pull-left.icon-2x,.btn [class^="icon-"].pull-right.icon-2x,.btn [class*=" icon-"].pull-right.icon-2x{margin-top:.18em}.btn [class^="icon-"].icon-spin.icon-large,.btn [class*=" icon-"].icon-spin.icon-large{line-height:.8em}.btn.btn-small [class^="icon-"].pull-left.icon-2x,.btn.btn-small [class*=" icon-"].pull-left.icon-2x,.btn.btn-small [class^="icon-"].pull-right.icon-2x,.btn.btn-small [class*=" icon-"].pull-right.icon-2x{margin-top:.25em}.btn.btn-large [class^="icon-"],.btn.btn-large [class*=" icon-"]{margin-top:0}.btn.btn-large [class^="icon-"].pull-left.icon-2x,.btn.btn-large [class*=" icon-"].pull-left.icon-2x,.btn.btn-large [class^="icon-"].pull-right.icon-2x,.btn.btn-large [class*=" icon-"].pull-right.icon-2x{margin-top:.05em}.btn.btn-large [class^="icon-"].pull-left.icon-2x,.btn.btn-large [class*=" icon-"].pull-left.icon-2x{margin-right:.2em}.btn.btn-large [class^="icon-"].pull-right.icon-2x,.btn.btn-large [class*=" icon-"].pull-right.icon-2x{margin-left:.2em}.icon-stack{position:relative;display:inline-block;width:2em;height:2em;line-height:2em;vertical-align:-35%}.icon-stack [class^="icon-"],.icon-stack [class*=" icon-"]{display:block;text-align:center;position:absolute;width:100%;height:100%;font-size:1em;line-height:inherit;*line-height:2em}.icon-stack .icon-stack-base{font-size:2em;*line-height:1em}.icon-spin{display:inline-block;-moz-animation:spin 2s infinite linear;-o-animation:spin 2s infinite linear;-webkit-animation:spin 2s infinite linear;animation:spin 2s infinite linear}@-moz-keyframes spin{0%{-moz-transform:rotate(0deg)}100%{-moz-transform:rotate(359deg)}}@-webkit-keyframes spin{0%{-webkit-transform:rotate(0deg)}100%{-webkit-transform:rotate(359deg)}}@-o-keyframes spin{0%{-o-transform:rotate(0deg)}100%{-o-transform:rotate(359deg)}}@-ms-keyframes spin{0%{-ms-transform:rotate(0deg)}100%{-ms-transform:rotate(359deg)}}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(359deg)}}.icon-rotate-90:before{-webkit-transform:rotate(90deg);-moz-transform:rotate(90deg);-ms-transform:rotate(90deg);-o-transform:rotate(90deg);transform:rotate(90deg);filter:progid:DXImageTransform.Microsoft.BasicImage(rotation=1)}.icon-rotate-180:before{-webkit-transform:rotate(180deg);-moz-transform:rotate(180deg);-ms-transform:rotate(180deg);-o-transform:rotate(180deg);transform:rotate(180deg);filter:progid:DXImageTransform.Microsoft.BasicImage(rotation=2)}.icon-rotate-270:before{-webkit-transform:rotate(270deg);-moz-transform:rotate(270deg);-ms-transform:rotate(270deg);-o-transform:rotate(270deg);transform:rotate(270deg);filter:progid:DXImageTransform.Microsoft.BasicImage(rotation=3)}.icon-flip-horizontal:before{-webkit-transform:scale(-1,1);-moz-transform:scale(-1,1);-ms-transform:scale(-1,1);-o-transform:scale(-1,1);transform:scale(-1,1)}.icon-flip-vertical:before{-webkit-transform:scale(1,-1);-moz-transform:scale(1,-1);-ms-transform:scale(1,-1);-o-transform:scale(1,-1);transform:scale(1,-1)}.icon-glass:before{content:"\f000"}.icon-music:before{content:"\f001"}.icon-search:before{content:"\f002"}.icon-envelope:before{content:"\f003"}.icon-heart:before{content:"\f004"}.icon-star:before{content:"\f005"}.icon-star-empty:before{content:"\f006"}.icon-user:before{content:"\f007"}.icon-film:before{content:"\f008"}.icon-th-large:before{content:"\f009"}.icon-th:before{content:"\f00a"}.icon-th-list:before{content:"\f00b"}.icon-ok:before{content:"\f00c"}.icon-remove:before{content:"\f00d"}.icon-zoom-in:before{content:"\f00e"}.icon-zoom-out:before{content:"\f010"}.icon-off:before{content:"\f011"}.icon-signal:before{content:"\f012"}.icon-cog:before{content:"\f013"}.icon-trash:before{content:"\f014"}.icon-home:before{content:"\f015"}.icon-file:before{content:"\f016"}.icon-time:before{content:"\f017"}.icon-road:before{content:"\f018"}.icon-download-alt:before{content:"\f019"}.icon-download:before{content:"\f01a"}.icon-upload:before{content:"\f01b"}.icon-inbox:before{content:"\f01c"}.icon-play-circle:before{content:"\f01d"}.icon-repeat:before,.icon-rotate-right:before{content:"\f01e"}.icon-refresh:before{content:"\f021"}.icon-list-alt:before{content:"\f022"}.icon-lock:before{content:"\f023"}.icon-flag:before{content:"\f024"}.icon-headphones:before{content:"\f025"}.icon-volume-off:before{content:"\f026"}.icon-volume-down:before{content:"\f027"}.icon-volume-up:before{content:"\f028"}.icon-qrcode:before{content:"\f029"}.icon-barcode:before{content:"\f02a"}.icon-tag:before{content:"\f02b"}.icon-tags:before{content:"\f02c"}.icon-book:before{content:"\f02d"}.icon-bookmark:before{content:"\f02e"}.icon-print:before{content:"\f02f"}.icon-camera:before{content:"\f030"}.icon-font:before{content:"\f031"}.icon-bold:before{content:"\f032"}.icon-italic:before{content:"\f033"}.icon-text-height:before{content:"\f034"}.icon-text-width:before{content:"\f035"}.icon-align-left:before{content:"\f036"}.icon-align-center:before{content:"\f037"}.icon-align-right:before{content:"\f038"}.icon-align-justify:before{content:"\f039"}.icon-list:before{content:"\f03a"}.icon-indent-left:before{content:"\f03b"}.icon-indent-right:before{content:"\f03c"}.icon-facetime-video:before{content:"\f03d"}.icon-picture:before{content:"\f03e"}.icon-pencil:before{content:"\f040"}.icon-map-marker:before{content:"\f041"}.icon-adjust:before{content:"\f042"}.icon-tint:before{content:"\f043"}.icon-edit:before{content:"\f044"}.icon-share:before{content:"\f045"}.icon-check:before{content:"\f046"}.icon-move:before{content:"\f047"}.icon-step-backward:before{content:"\f048"}.icon-fast-backward:before{content:"\f049"}.icon-backward:before{content:"\f04a"}.icon-play:before{content:"\f04b"}.icon-pause:before{content:"\f04c"}.icon-stop:before{content:"\f04d"}.icon-forward:before{content:"\f04e"}.icon-fast-forward:before{content:"\f050"}.icon-step-forward:before{content:"\f051"}.icon-eject:before{content:"\f052"}.icon-chevron-left:before{content:"\f053"}.icon-chevron-right:before{content:"\f054"}.icon-plus-sign:before{content:"\f055"}.icon-minus-sign:before{content:"\f056"}.icon-remove-sign:before{content:"\f057"}.icon-ok-sign:before{content:"\f058"}.icon-question-sign:before{content:"\f059"}.icon-info-sign:before{content:"\f05a"}.icon-screenshot:before{content:"\f05b"}.icon-remove-circle:before{content:"\f05c"}.icon-ok-circle:before{content:"\f05d"}.icon-ban-circle:before{content:"\f05e"}.icon-arrow-left:before{content:"\f060"}.icon-arrow-right:before{content:"\f061"}.icon-arrow-up:before{content:"\f062"}.icon-arrow-down:before{content:"\f063"}.icon-share-alt:before,.icon-mail-forward:before{content:"\f064"}.icon-resize-full:before{content:"\f065"}.icon-resize-small:before{content:"\f066"}.icon-plus:before{content:"\f067"}.icon-minus:before{content:"\f068"}.icon-asterisk:before{content:"\f069"}.icon-exclamation-sign:before{content:"\f06a"}.icon-gift:before{content:"\f06b"}.icon-leaf:before{content:"\f06c"}.icon-fire:before{content:"\f06d"}.icon-eye-open:before{content:"\f06e"}.icon-eye-close:before{content:"\f070"}.icon-warning-sign:before{content:"\f071"}.icon-plane:before{content:"\f072"}.icon-calendar:before{content:"\f073"}.icon-random:before{content:"\f074"}.icon-comment:before{content:"\f075"}.icon-magnet:before{content:"\f076"}.icon-chevron-up:before{content:"\f077"}.icon-chevron-down:before{content:"\f078"}.icon-retweet:before{content:"\f079"}.icon-shopping-cart:before{content:"\f07a"}.icon-folder-close:before{content:"\f07b"}.icon-folder-open:before{content:"\f07c"}.icon-resize-vertical:before{content:"\f07d"}.icon-resize-horizontal:before{content:"\f07e"}.icon-bar-chart:before{content:"\f080"}.icon-twitter-sign:before{content:"\f081"}.icon-facebook-sign:before{content:"\f082"}.icon-camera-retro:before{content:"\f083"}.icon-key:before{content:"\f084"}.icon-cogs:before{content:"\f085"}.icon-comments:before{content:"\f086"}.icon-thumbs-up:before{content:"\f087"}.icon-thumbs-down:before{content:"\f088"}.icon-star-half:before{content:"\f089"}.icon-heart-empty:before{content:"\f08a"}.icon-signout:before{content:"\f08b"}.icon-linkedin-sign:before{content:"\f08c"}.icon-pushpin:before{content:"\f08d"}.icon-external-link:before{content:"\f08e"}.icon-signin:before{content:"\f090"}.icon-trophy:before{content:"\f091"}.icon-github-sign:before{content:"\f092"}.icon-upload-alt:before{content:"\f093"}.icon-lemon:before{content:"\f094"}.icon-phone:before{content:"\f095"}.icon-check-empty:before{content:"\f096"}.icon-bookmark-empty:before{content:"\f097"}.icon-phone-sign:before{content:"\f098"}.icon-twitter:before{content:"\f099"}.icon-facebook:before{content:"\f09a"}.icon-github:before{content:"\f09b"}.icon-unlock:before{content:"\f09c"}.icon-credit-card:before{content:"\f09d"}.icon-rss:before{content:"\f09e"}.icon-hdd:before{content:"\f0a0"}.icon-bullhorn:before{content:"\f0a1"}.icon-bell:before{content:"\f0a2"}.icon-certificate:before{content:"\f0a3"}.icon-hand-right:before{content:"\f0a4"}.icon-hand-left:before{content:"\f0a5"}.icon-hand-up:before{content:"\f0a6"}.icon-hand-down:before{content:"\f0a7"}.icon-circle-arrow-left:before{content:"\f0a8"}.icon-circle-arrow-right:before{content:"\f0a9"}.icon-circle-arrow-up:before{content:"\f0aa"}.icon-circle-arrow-down:before{content:"\f0ab"}.icon-globe:before{content:"\f0ac"}.icon-wrench:before{content:"\f0ad"}.icon-tasks:before{content:"\f0ae"}.icon-filter:before{content:"\f0b0"}.icon-briefcase:before{content:"\f0b1"}.icon-fullscreen:before{content:"\f0b2"}.icon-group:before{content:"\f0c0"}.icon-link:before{content:"\f0c1"}.icon-cloud:before{content:"\f0c2"}.icon-beaker:before{content:"\f0c3"}.icon-cut:before{content:"\f0c4"}.icon-copy:before{content:"\f0c5"}.icon-paper-clip:before{content:"\f0c6"}.icon-save:before{content:"\f0c7"}.icon-sign-blank:before{content:"\f0c8"}.icon-reorder:before{content:"\f0c9"}.icon-list-ul:before{content:"\f0ca"}.icon-list-ol:before{content:"\f0cb"}.icon-strikethrough:before{content:"\f0cc"}.icon-underline:before{content:"\f0cd"}.icon-table:before{content:"\f0ce"}.icon-magic:before{content:"\f0d0"}.icon-truck:before{content:"\f0d1"}.icon-pinterest:before{content:"\f0d2"}.icon-pinterest-sign:before{content:"\f0d3"}.icon-google-plus-sign:before{content:"\f0d4"}.icon-google-plus:before{content:"\f0d5"}.icon-money:before{content:"\f0d6"}.icon-caret-down:before{content:"\f0d7"}.icon-caret-up:before{content:"\f0d8"}.icon-caret-left:before{content:"\f0d9"}.icon-caret-right:before{content:"\f0da"}.icon-columns:before{content:"\f0db"}.icon-sort:before{content:"\f0dc"}.icon-sort-down:before{content:"\f0dd"}.icon-sort-up:before{content:"\f0de"}.icon-envelope-alt:before{content:"\f0e0"}.icon-linkedin:before{content:"\f0e1"}.icon-undo:before,.icon-rotate-left:before{content:"\f0e2"}.icon-legal:before{content:"\f0e3"}.icon-dashboard:before{content:"\f0e4"}.icon-comment-alt:before{content:"\f0e5"}.icon-comments-alt:before{content:"\f0e6"}.icon-bolt:before{content:"\f0e7"}.icon-sitemap:before{content:"\f0e8"}.icon-umbrella:before{content:"\f0e9"}.icon-paste:before{content:"\f0ea"}.icon-lightbulb:before{content:"\f0eb"}.icon-exchange:before{content:"\f0ec"}.icon-cloud-download:before{content:"\f0ed"}.icon-cloud-upload:before{content:"\f0ee"}.icon-user-md:before{content:"\f0f0"}.icon-stethoscope:before{content:"\f0f1"}.icon-suitcase:before{content:"\f0f2"}.icon-bell-alt:before{content:"\f0f3"}.icon-coffee:before{content:"\f0f4"}.icon-food:before{content:"\f0f5"}.icon-file-alt:before{content:"\f0f6"}.icon-building:before{content:"\f0f7"}.icon-hospital:before{content:"\f0f8"}.icon-ambulance:before{content:"\f0f9"}.icon-medkit:before{content:"\f0fa"}.icon-fighter-jet:before{content:"\f0fb"}.icon-beer:before{content:"\f0fc"}.icon-h-sign:before{content:"\f0fd"}.icon-plus-sign-alt:before{content:"\f0fe"}.icon-double-angle-left:before{content:"\f100"}.icon-double-angle-right:before{content:"\f101"}.icon-double-angle-up:before{content:"\f102"}.icon-double-angle-down:before{content:"\f103"}.icon-angle-left:before{content:"\f104"}.icon-angle-right:before{content:"\f105"}.icon-angle-up:before{content:"\f106"}.icon-angle-down:before{content:"\f107"}.icon-desktop:before{content:"\f108"}.icon-laptop:before{content:"\f109"}.icon-tablet:before{content:"\f10a"}.icon-mobile-phone:before{content:"\f10b"}.icon-circle-blank:before{content:"\f10c"}.icon-quote-left:before{content:"\f10d"}.icon-quote-right:before{content:"\f10e"}.icon-spinner:before{content:"\f110"}.icon-circle:before{content:"\f111"}.icon-reply:before,.icon-mail-reply:before{content:"\f112"}.icon-folder-close-alt:before{content:"\f114"}.icon-folder-open-alt:before{content:"\f115"}.icon-expand-alt:before{content:"\f116"}.icon-collapse-alt:before{content:"\f117"}.icon-smile:before{content:"\f118"}.icon-frown:before{content:"\f119"}.icon-meh:before{content:"\f11a"}.icon-gamepad:before{content:"\f11b"}.icon-keyboard:before{content:"\f11c"}.icon-flag-alt:before{content:"\f11d"}.icon-flag-checkered:before{content:"\f11e"}.icon-terminal:before{content:"\f120"}.icon-code:before{content:"\f121"}.icon-reply-all:before{content:"\f122"}.icon-mail-reply-all:before{content:"\f122"}.icon-star-half-full:before,.icon-star-half-empty:before{content:"\f123"}.icon-location-arrow:before{content:"\f124"}.icon-crop:before{content:"\f125"}.icon-code-fork:before{content:"\f126"}.icon-unlink:before{content:"\f127"}.icon-question:before{content:"\f128"}.icon-info:before{content:"\f129"}.icon-exclamation:before{content:"\f12a"}.icon-superscript:before{content:"\f12b"}.icon-subscript:before{content:"\f12c"}.icon-eraser:before{content:"\f12d"}.icon-puzzle-piece:before{content:"\f12e"}.icon-microphone:before{content:"\f130"}.icon-microphone-off:before{content:"\f131"}.icon-shield:before{content:"\f132"}.icon-calendar-empty:before{content:"\f133"}.icon-fire-extinguisher:before{content:"\f134"}.icon-rocket:before{content:"\f135"}.icon-maxcdn:before{content:"\f136"}.icon-chevron-sign-left:before{content:"\f137"}.icon-chevron-sign-right:before{content:"\f138"}.icon-chevron-sign-up:before{content:"\f139"}.icon-chevron-sign-down:before{content:"\f13a"}.icon-html5:before{content:"\f13b"}.icon-css3:before{content:"\f13c"}.icon-anchor:before{content:"\f13d"}.icon-unlock-alt:before{content:"\f13e"}.icon-bullseye:before{content:"\f140"}.icon-ellipsis-horizontal:before{content:"\f141"}.icon-ellipsis-vertical:before{content:"\f142"}.icon-rss-sign:before{content:"\f143"}.icon-play-sign:before{content:"\f144"}.icon-ticket:before{content:"\f145"}.icon-minus-sign-alt:before{content:"\f146"}.icon-check-minus:before{content:"\f147"}.icon-level-up:before{content:"\f148"}.icon-level-down:before{content:"\f149"}.icon-check-sign:before{content:"\f14a"}.icon-edit-sign:before{content:"\f14b"}.icon-external-link-sign:before{content:"\f14c"}.icon-share-sign:before{content:"\f14d"}
- 	/*Art is code*/
-	body {
-	  background-color:#cdd5da;
-	  background: -webkit-linear-gradient( bottom, #cdd5da, #e8e7e7); 
-	  background: -moz-linear-gradient( bottom, #cdd5da, #e8e7e7); 
-	  background: -ms-linear-gradient( bottom, #cdd5da, #e8e7e7); 
-	  background: -o-linear-gradient( bottom, #cdd5da, #e8e7e7); 
-	  background: linear-gradient( to bottom, #cdd5da, #e8e7e7);
-	}
+/*Art is code*/
+body {
+	background-color:#cdd5da;
+	background: -webkit-linear-gradient( bottom, #cdd5da, #e8e7e7); 
+	background: -moz-linear-gradient( bottom, #cdd5da, #e8e7e7); 
+	background: -ms-linear-gradient( bottom, #cdd5da, #e8e7e7); 
+	background: -o-linear-gradient( bottom, #cdd5da, #e8e7e7); 
+	background: linear-gradient( to bottom, #cdd5da, #e8e7e7);
+}
 
-	ul.nav li.dropdown:hover ul.dropdown-menu{
-    display: block;    
-	}
+ul.nav li.dropdown:hover ul.dropdown-menu{
+	display: block;    
+}
 
-	ul.nav li.dropdown ul.dropdown-menu{
-		margin: 0;
-	}
+ul.nav li.dropdown ul.dropdown-menu{
+	margin: 0;
+}
 
-	.navbar-inner {
-		border-radius:0;
-	}
+.navbar-inner {
+	border-radius:0;
+}
 
-	#pgbadger-brand {
-		font-size: 1.1em;
-		font-weight: bold;
-	}
+#pgbadger-brand {
+	font-size: 1.1em;
+	font-weight: bold;
+}
 
-	.popover-content, .popover-title {
-		color:#333;
-	}
+.popover-content, .popover-title {
+	color:#333;
+}
 
-	h3.popover-title {
-		font-weight: bold;
-		font-size: 1.1em;
-	}
+h3.popover-title {
+	font-weight: bold;
+	font-size: 1.1em;
+}
 
-	ul#slides li {
-		list-style-type: none;
-	}
+ul#slides li {
+	list-style-type: none;
+}
 
-	h1 {
-		font-size: 2em;
-	}
+h1 {
+	font-size: 2em;
+}
 
-	h2 {
-		font-size: 1.6em;
-	}
+h2 {
+	font-size: 1.6em;
+}
 
-	h3, h3 small {
-		font-size: 1.1em;
-		text-transform: uppercase;
-		letter-spacing: .1em;
-	}
+h3, h3 small {
+	font-size: 1.1em;
+	text-transform: uppercase;
+	letter-spacing: .1em;
+}
 
-	h3 small {
-		font-size: 1em;
-	}
+h3 small {
+	font-size: 1em;
+}
 
-	.analysis-item {
-		background: #fff;
-		margin: 2em 0;
-  		padding: 2em 0;
-	}
+.analysis-item {
+	background: #fff;
+	margin: 2em 0;
+	padding: 2em 0;
+}
 
-	.analysis-item h2 {
-		margin: 1em 0 .5em 1em;
+.analysis-item h2 {
+	margin: 1em 0 .5em 1em;
 
-	}
+}
 
-	h3 {
-		margin: 0;
-		padding: 0;
-		color: #5f5555;
-	}
+h3 {
+	margin: 0;
+	padding: 0;
+	color: #5f5555;
+}
 
-	h1.page-header {
-		margin: 1em 0 1em 0;
-		padding: 0;
-		color: #5f5555;
-		border-bottom: none;
-	}
+h1.page-header {
+	margin: 1em 0 1em 0;
+	padding: 0;
+	color: #5f5555;
+	border-bottom: none;
+}
 
-	h2 {
-		color:#5f5555;
-	}
+h2 {
+	color:#5f5555;
+}
 
-	.nav-pills, .nav-tabs {
-		margin: 0 1em;
-	}
+.nav-pills, .nav-tabs {
+	margin: 0 1em;
+}
 
-	footer {
-		margin-top: 60px;
-	}
+footer {
+	margin-top: 60px;
+}
 
-	.span8 .tabbable {
-		margin-top: 1em;
-	}
+.span8 .tabbable {
+	margin-top: 1em;
+}
 
-	#global-stats .tab-content {
-		margin: 2em 0 3em 0;
-	}
+#global-stats .tab-content {
+	margin: 2em 0 3em 0;
+}
 
-	#global-stats .tab-content li {
-		display: block;
-		width:14%; /*160/960*/
-		float:left;
-		margin-left: 3%;
-	}
+#global-stats .tab-content li {
+	display: block;
+	width:14%; /*160/960*/
+	float:left;
+	margin-left: 3%;
+}
 
-	#global-stats .tab-content li.first {
-		margin-left: 0;
-	}
+#global-stats .tab-content li.first {
+	margin-left: 0;
+}
 
-	.well {
-		background: #f9f9f9;
-		border-radius: 0;
-	}
+.well {
+	background: #f9f9f9;
+	border-radius: 0;
+}
 
-	.key-figures ul {
-		margin: 0;
-		padding: 0;
-	}
+.key-figures ul {
+	margin: 0;
+	padding: 0;
+}
 
-	.key-figures li {
-		list-style-type: none;
-		margin-bottom: 2em;
-	}
+.key-figures li {
+	list-style-type: none;
+	margin-bottom: 2em;
+}
 
-	.figure {
-		font-weight: bold;
-		font-size: 1.4em;
-		color:#2e8aa5;
-	}
+.figure {
+	font-weight: bold;
+	font-size: 1.4em;
+	color:#2e8aa5;
+}
 
-	.figure-label {
-		display: block;
-		color: #666;
-	}
+.figure-label {
+	display: block;
+	color: #666;
+}
 
-	.mouse-figures {
-		font-weight: bold;
-		font-size: 1.2em;
-		margin: 0;
-		padding: 0;
-	}       
+.mouse-figures {
+	font-weight: bold;
+	font-size: 1.2em;
+	margin: 0;
+	padding: 0;
+}       
 
-	.mfigure {
-		font-weight: bold;
-		font-size: 1.4em;
-		color:#d26115;
-	}
+.mfigure {
+	font-weight: bold;
+	font-size: 1.4em;
+	color:#d26115;
+}
 
-	.mfigure small {
-		font-weight: bold;
-		font-size: 0.6em;
-		color:#ffffff;
-	}
+.smfigure {
+	font-weight: bold;
+	font-size: 1.1em;
+	color:#d26115;
+}
 
-	.hfigure {
-		font-weight: bold;
-		font-size: 1.0em;
-		color:#8dbd0f;
-	}
+.mfigure small {
+	font-weight: bold;
+	font-size: 0.6em;
+	color:#ffffff;
+}
 
-	.hfigure small {
-		font-weight: bold;
-		font-size: 0.6em;
-		color:#ffffff;
-	}
+.smfigure small {
+	font-weight: bold;
+	font-size: 0.6em;
+	color:#ffffff;
+}
 
+.hfigure {
+	font-weight: bold;
+	font-size: 1.0em;
+	color:#8dbd0f;
+}
 
-	.navbar-inverse .navbar-inner {
-		background: #5f5555;
-		border: none;
-	}
+.hfigure small {
+	font-weight: bold;
+	font-size: 0.6em;
+	color:#ffffff;
+}
 
-	.navbar-inverse .brand, .navbar-inverse .nav > li > a	{
-		color:#eee;
-	}
+.navbar-inverse .navbar-inner {
+	background: #5f5555;
+	border: none;
+}
 
-	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+.navbar-inverse .brand, .navbar-inverse .nav > li > a	{
+	color:#eee;
+}
+
+#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
 	width : 100%;
 	height: 400px;
 }
 
-	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
+.linegraph
+	width : 100%;
+	height: 400px;
+}
+
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
+	width : 100%;
+	height: 320px;
+}
+
+.piegraph {
 	width : 100%;
 	height: 320px;
 }
 .histo-graph {
-
 	width : 100%;
 	height: 140px;
 }
+.duration-histo-graph {
+	width : 100%;
+	height: 300px;
+}
 
-/*
-		#show-hide-menu {
-			position: absolute;
-			left: -9999px;
-		}
-	*/
-	@media (min-width:969px) {
-		#show-hide-menu {
-			position: absolute;
-			left: -9999px;
-		}
-
-		.navbar ul.collapse {
-			overflow: visible;
-		}
+@media (min-width:969px) {
+	#show-hide-menu {
+		position: absolute;
+		left: -9999px;
 	}
 
-	@media (max-width:968px) {
-		#show-hide-menu {
-			position: inherit;
-		}
-
-		#global-stats .tab-content li {
-			display: block;
-			width:auto; /*160/960*/
-			float:none;
-			margin-left: 0;
-			margin-bottom: 1em;
-		}
-
-		ul#slides {
-			margin: 0;
-			padding: 0;
-		}
-
-		ul#slides li div div {
-			padding:0 1.5em;
-		}
-
-
-		#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
-			width : 94.5%;
-		}
-
-		#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
-			width : 94.5%;
-		}
-
-		.histo-graph {
-			width : 84.5%;
-		}
-
-		.key-figures ul {
-			margin-top: 1.5em;
-		}
-
-		.navbar .nav {
-			margin: 0 3em 2em 3em;
-		}
-
-		.navbar .nav > li {
-			float: none;
-		}
-
-		.navbar ul.collapse:hover {
-			overflow: visible;
-		}
+	.navbar ul.collapse {
+		overflow: visible;
 	}
+}
+
+@media (max-width:968px) {
+	#show-hide-menu {
+		position: inherit;
+	}
+
+	#global-stats .tab-content li {
+		display: block;
+		width:auto; /*160/960*/
+		float:none;
+		margin-left: 0;
+		margin-bottom: 1em;
+	}
+
+	ul#slides {
+		margin: 0;
+		padding: 0;
+	}
+
+	ul#slides li div div {
+		padding:0 1.5em;
+	}
+
+
+	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+		width : 94.5%;
+	}
+
+	.linegraph {
+		width : 94.5%;
+	}
+
+	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
+		width : 94.5%;
+	}
+
+	.piegraph {
+		width : 94.5%;
+	}
+
+	.histo-graph {
+		width : 84.5%;
+	}
+
+	.duration-histo-graph {
+		width : 94.5%;
+	}
+
+	.key-figures ul {
+		margin-top: 1.5em;
+	}
+
+	.navbar .nav {
+		margin: 0 3em 2em 3em;
+	}
+
+	.navbar .nav > li {
+		float: none;
+	}
+
+	.navbar ul.collapse:hover {
+		overflow: visible;
+	}
+}
 
 WRFILE: jquery.js
 
