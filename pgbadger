@@ -2053,7 +2053,8 @@ sub process_file
 			}
 		}
 		if (!$getout) {
-			$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . "\n";
+			$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
+			print STDERR "DETAIL: " . $csv->error_input(), "\n";
 		}
 
 	}
