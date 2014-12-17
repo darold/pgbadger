@@ -233,6 +233,7 @@ my $retention               = 0;
 my $bar_graph               = 0;
 my $dns_resolv              = 0;
 my $nomultiline             = 0;
+my $noreport                = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -378,6 +379,7 @@ my $result = GetOptions(
         'ssh-timeout=i'            => \$ssh_timeout,
 	'anonymize!'               => \$anonymize,
 	'noclean!'                 => \$noclean,
+	'noreport!'                => \$noreport,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1320,7 +1322,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		$fh->close();
 	}
 
-} else {
+} elsif (!$incremental || !$noreport) {
 
 	# Build a report per day
 	my %weeks_directories = ();
