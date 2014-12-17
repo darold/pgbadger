@@ -2054,7 +2054,7 @@ sub process_file
 		}
 		if (!$getout) {
 			$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
-			print STDERR "DETAIL: " . $csv->error_input(), "\n";
+			print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
 		}
 
 	}
@@ -3079,12 +3079,12 @@ Report not supported by text format
 		# Show request per database statistics
 		if (scalar keys %database_info > 1) {
 			print $fh "\n- Request per database ------------------------------------------------------\n\n";
-			print $fh "Database     Request type     Count\n";
+			print $fh "Database     Request type     Count    Duration\n";
 			foreach my $d (sort keys %database_info) {
-				print $fh "$d - ", &comma_numbers($database_info{$d}{count}), "\n";
+				print $fh "$d - ", &comma_numbers($database_info{$d}{count}), " ", &convert_time($database_info{$d}{duration}), "\n";
 				foreach my $r (sort keys %{$database_info{$d}}) {
-					next if ($r eq 'count');
-					print $fh "\t$r ", &comma_numbers($database_info{$d}{$r}), "\n";
+					next if (($r eq 'count') || ($r =~ /duration/));
+					print $fh "\t$r ", &comma_numbers($database_info{$d}{$r}), " ", &convert_time($database_info{$d}{"$r|duration"}), "\n";
 				}
 			}
 		}
@@ -3092,12 +3092,12 @@ Report not supported by text format
 		# Show request per application statistics
 		if (scalar keys %application_info > 1) {
 			print $fh "\n- Request per application ------------------------------------------------------\n\n";
-			print $fh "Application     Request type     Count\n";
+			print $fh "Application     Request type    Count    Duration\n";
 			foreach my $d (sort keys %application_info) {
-				print $fh "$d - ", &comma_numbers($application_info{$d}{count}), "\n";
+				print $fh "$d - ", &comma_numbers($application_info{$d}{count}), " ", &convert_time($application_info{$d}{duration}), "\n";
 				foreach my $r (sort keys %{$application_info{$d}}) {
-					next if ($r eq 'count');
-					print $fh "\t$r ", &comma_numbers($application_info{$d}{$r}), "\n";
+					next if (($r eq 'count') || ($r =~ /duration/));
+					print $fh "\t$r ", &comma_numbers($application_info{$d}{$r}), " ", &convert_time($application_info{$d}{"$r|duration"}), "\n";
 				}
 			}
 		}
@@ -3105,25 +3105,25 @@ Report not supported by text format
 		# Show request per user statistics
 		if (scalar keys %user_info > 1) {
 			print $fh "\n- Request per user ------------------------------------------------------\n\n";
-			print $fh "User     Request type     Count\n";
+			print $fh "User     Request type     Count    duration\n";
 			foreach my $d (sort keys %user_info) {
-				print $fh "$d - ", &comma_numbers($user_info{$d}{count}), "\n";
+				print $fh "$d - ", &comma_numbers($user_info{$d}{count}), " ", &convert_time($user_info{$d}{duration}), "\n";
 				foreach my $r (sort keys %{$user_info{$d}}) {
-					next if ($r eq 'count');
-					print $fh "\t$r ", &comma_numbers($user_info{$d}{$r}), "\n";
+					next if (($r eq 'count') || ($r =~ /duration/));
+					print $fh "\t$r ", &comma_numbers($user_info{$d}{$r}), " ", &convert_time($user_info{$d}{"$r|duration"}), "\n";
 				}
 			}
 		}
 
-		# Show request per user statistics
-		if (scalar keys %user_info > 1) {
-			print $fh "\n- Request per user ------------------------------------------------------\n\n";
-			print $fh "Host     Request type     Count\n";
-			foreach my $d (sort keys %user_info) {
-				print $fh "$d - ", &comma_numbers($user_info{$d}{count}), "\n";
-				foreach my $r (sort keys %{$user_info{$d}}) {
-					next if ($r eq 'count');
-					print $fh "\t$r ", &comma_numbers($user_info{$d}{$r}), "\n";
+		# Show request per host statistics
+		if (scalar keys %host_info > 1) {
+			print $fh "\n- Request per host ------------------------------------------------------\n\n";
+			print $fh "Host     Request type     Count   Duration\n";
+			foreach my $d (sort keys %host_info) {
+				print $fh "$d - ", &comma_numbers($host_info{$d}{count}), " ", &convert_time($host_info{$d}{duration}), "\n";
+				foreach my $r (sort keys %{$host_info{$d}}) {
+					next if (($r eq 'count') || ($r =~ /duration/));
+					print $fh "\t$r ", &comma_numbers($host_info{$d}{$r}), " ", &convert_time($host_info{$d}{"$r|duration"}), "\n";
 				}
 			}
 		}
@@ -6371,18 +6371,25 @@ sub print_query_per_database
 	my $total_count = 0;
 	my $query_database_info = '';
 	my @main_database = ('unknown', 0);
+	my @main_database_duration = ('unknown', 0);
 	foreach my $d (sort keys %database_info) {
 		$query_database_info .= "<tr><td>$d</td><td>Total</td><td>" .
-					&comma_numbers($database_info{$d}{count}) . "</td></tr>";
+					&comma_numbers($database_info{$d}{count}) . "</td><td>" .
+					&convert_time($database_info{$d}{duration}) . "</td></tr>";
 		$total_count += $database_info{$d}{count};
                 if ($main_database[1] < $database_info{$d}{count}) {
                         $main_database[0] = $d;
                         $main_database[1] = $database_info{$d}{count};
                 }
+                if ($main_database_duration[1] < $database_info{$d}{duration}) {
+                        $main_database_duration[0] = $d;
+                        $main_database_duration[1] = $database_info{$d}{duration};
+                }
 		foreach my $r (sort keys %{$database_info{$d}}) {
-			next if ($r eq 'count');
+			next if (($r eq 'count') || ($r =~ /duration/));
 			$query_database_info .= "<tr><td></td><td>$r</td><td>" .
-						&comma_numbers($database_info{$d}{$r}) . "</td></tr>";
+						&comma_numbers($database_info{$d}{$r}) . "</td><td>" .
+						&convert_time($database_info{$d}{"$r|duration"}) . "</td></tr>";
 		}
 	}
 
@@ -6406,6 +6413,7 @@ sub print_query_per_database
 	$drawn_graphs{queriesbydatabase_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbydatabase', 'Queries per database', %infos);
 
 	$main_database[1] = &comma_numbers($main_database[1]);
+	$main_database_duration[1] = &convert_time($main_database_duration[1]);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="queries-by-database">
 		<h2><i class="icon-question-sign"></i> Queries by database</h2>
@@ -6415,6 +6423,8 @@ sub print_query_per_database
 				<ul>
 					<li><span class="figure">$main_database[0]</span> <span class="figure-label">Main database</span></li>
 					<li><span class="figure">$main_database[1]</span> <span class="figure-label">Requests</span></li>
+					<li><span class="figure">$main_database_duration[1] ($main_database_duration[0])</span></li>
+					<li><span class="figure-label">Main time consuming database</span></li>
 				</ul>
 			</div>
 		</div>
@@ -6435,6 +6445,7 @@ sub print_query_per_database
 									<th>Database</th>
 									<th>Request type</th>
 									<th>Count</th>
+									<th>Duration</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -6448,8 +6459,6 @@ sub print_query_per_database
 	</div><!-- end of queries by database -->
 };
 	delete $drawn_graphs{queriesbydatabase_graph};
-
-
 }
 
 sub print_query_per_application
@@ -6458,18 +6467,25 @@ sub print_query_per_application
 	my $total_count = 0;
 	my $query_application_info = '';
 	my @main_application = ('unknown', 0);
+	my @main_application_duration = ('unknown', 0);
 	foreach my $d (sort keys %application_info) {
 		$query_application_info .= "<tr><td>$d</td><td>Total</td><td>" .
-					&comma_numbers($application_info{$d}{count}) . "</td></tr>";
+					&comma_numbers($application_info{$d}{count}) . "</td><td>" .
+					&convert_time($application_info{$d}{duration}) . "</td></tr>";
 		$total_count += $application_info{$d}{count};
                 if ($main_application[1] < $application_info{$d}{count}) {
                         $main_application[0] = $d;
                         $main_application[1] = $application_info{$d}{count};
                 }
+                if ($main_application_duration[1] < $application_info{$d}{duration}) {
+                        $main_application_duration[0] = $d;
+                        $main_application_duration[1] = $application_info{$d}{duration};
+                }
 		foreach my $r (sort keys %{$application_info{$d}}) {
-			next if ($r eq 'count');
+			next if (($r eq 'count') || ($r =~ /duration/));
 			$query_application_info .= "<tr><td></td><td>$r</td><td>" .
-						&comma_numbers($application_info{$d}{$r}) . "</td></tr>";
+						&comma_numbers($application_info{$d}{$r}) . "</td><td>" .
+						&convert_time($application_info{$d}{"$r|duration"}) . "</td></tr>";
 		}
 	}
 	$query_application_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
@@ -6491,6 +6507,7 @@ sub print_query_per_application
 	$drawn_graphs{queriesbyapplication_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyapplication', 'Queries per application', %infos);
 
 	$main_application[1] = &comma_numbers($main_application[1]);
+	$main_application_duration[1] = &convert_time($main_application_duration[1]);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="queries-by-application">
 		<h2><i class="icon-question-sign"></i> Queries by application</h2>
@@ -6500,6 +6517,8 @@ sub print_query_per_application
 				<ul>
 					<li><span class="figure">$main_application[0]</span> <span class="figure-label">Main application</span></li>
 					<li><span class="figure">$main_application[1]</span> <span class="figure-label">Requests</span></li>
+					<li><span class="figure">$main_application_duration[1] ($main_application_duration[0])</span></li>
+					<li><span class="figure-label">Main time consuming application</span></li>
 				</ul>
 			</div>
 		</div>
@@ -6520,6 +6539,7 @@ sub print_query_per_application
 									<th>Application</th>
 									<th>Request type</th>
 									<th>Count</th>
+									<th>Duration</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -6542,18 +6562,25 @@ sub print_query_per_user
 	my $total_count = 0;
 	my $query_user_info = '';
 	my @main_user = ('unknown', 0);
+	my @main_user_duration = ('unknown', 0);
 	foreach my $d (sort keys %user_info) {
 		$query_user_info .= "<tr><td>$d</td><td>Total</td><td>" .
-					&comma_numbers($user_info{$d}{count}) . "</td></tr>";
+					&comma_numbers($user_info{$d}{count}) . "</td><td>" .
+					&convert_time($user_info{$d}{duration}) . "</td></tr>";
 		$total_count += $user_info{$d}{count};
                 if ($main_user[1] < $user_info{$d}{count}) {
                         $main_user[0] = $d;
                         $main_user[1] = $user_info{$d}{count};
                 }
+                if ($main_user_duration[1] < $user_info{$d}{duration}) {
+                        $main_user_duration[0] = $d;
+                        $main_user_duration[1] = $user_info{$d}{duration};
+                }
 		foreach my $r (sort keys %{$user_info{$d}}) {
-			next if ($r eq 'count');
+			next if (($r eq 'count') || ($r =~ /duration/));
 			$query_user_info .= "<tr><td></td><td>$r</td><td>" .
-						&comma_numbers($user_info{$d}{$r}) . "</td></tr>";
+						&comma_numbers($user_info{$d}{$r}) . "</td><td>" .
+						&convert_time($user_info{$d}{"$r|duration"}) . "</td></tr>";
 		}
 	}
 	$query_user_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
@@ -6576,6 +6603,7 @@ sub print_query_per_user
 	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyuser', 'Queries per user', %infos);
 
 	$main_user[1] = &comma_numbers($main_user[1]);
+	$main_user_duration[1] = &convert_time($main_user_duration[1]);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="queries-by-user">
 		<h2><i class="icon-question-sign"></i> Queries by user</h2>
@@ -6585,6 +6613,8 @@ sub print_query_per_user
 				<ul>
 					<li><span class="figure">$main_user[0]</span> <span class="figure-label">Main user</span></li>
 					<li><span class="figure">$main_user[1]</span> <span class="figure-label">Requests</span></li>
+					<li><span class="figure">$main_user_duration[1] ($main_user_duration[0])</span></li>
+					<li><span class="figure-label">Main time consuming user</span></li>
 				</ul>
 			</div>
 		</div>
@@ -6605,6 +6635,7 @@ sub print_query_per_user
 									<th>User</th>
 									<th>Request type</th>
 									<th>Count</th>
+									<th>Duration</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -6627,18 +6658,25 @@ sub print_query_per_host
 	my $total_count = 0;
 	my $query_host_info = '';
 	my @main_host = ('unknown', 0);
+	my @main_host_duration = ('unknown', 0);
 	foreach my $d (sort keys %host_info) {
 		$query_host_info .= "<tr><td>$d</td><td>Total</td><td>" .
-					&comma_numbers($host_info{$d}{count}) . "</td></tr>";
+					&comma_numbers($host_info{$d}{count}) . "</td><td>" .
+					&convert_time($host_info{$d}{duration}) . "</td></tr>";
 		$total_count += $host_info{$d}{count};
                 if ($main_host[1] < $host_info{$d}{count}) {
                         $main_host[0] = $d;
                         $main_host[1] = $host_info{$d}{count};
                 }
+                if ($main_host_duration[1] < $host_info{$d}{duration}) {
+                        $main_host_duration[0] = $d;
+                        $main_host_duration[1] = $host_info{$d}{duration};
+                }
 		foreach my $r (sort keys %{$host_info{$d}}) {
-			next if ($r eq 'count');
+			next if (($r eq 'count') || ($r =~ /duration/));
 			$query_host_info .= "<tr><td></td><td>$r</td><td>" .
-						&comma_numbers($host_info{$d}{$r}) . "</td></tr>";
+						&comma_numbers($host_info{$d}{$r}) . "</td><td>" .
+						&convert_time($host_info{$d}{"$r|duration"}) . "</td></tr>";
 		}
 	}
 	$query_host_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
@@ -6661,6 +6699,7 @@ sub print_query_per_host
 	$drawn_graphs{queriesbyhost_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyhost', 'Queries per host', %infos);
 
 	$main_host[1] = &comma_numbers($main_host[1]);
+	$main_host_duration[1] = &convert_time($main_host_duration[1]);
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="queries-by-host">
 		<h2><i class="icon-question-sign"></i> Queries by host</h2>
@@ -6670,6 +6709,8 @@ sub print_query_per_host
 				<ul>
 					<li><span class="figure">$main_host[0]</span> <span class="figure-label">Main host</span></li>
 					<li><span class="figure">$main_host[1]</span> <span class="figure-label">Requests</span></li>
+					<li><span class="figure">$main_host_duration[1] ($main_host_duration[0])</span></li>
+					<li><span class="figure-label">Main time consuming host</span></li>
 				</ul>
 			</div>
 		</div>
@@ -6690,6 +6731,7 @@ sub print_query_per_host
 									<th>Host</th>
 									<th>Request type</th>
 									<th>Count</th>
+									<th>Duration</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -9704,36 +9746,46 @@ sub store_queries
 		if ($graph) {
 			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{count}++;
 			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{second}{$cur_info{$t_pid}{sec}}++;
-			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			# Store min / max duration
-			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} > $cur_info{$t_pid}{duration})) {
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} = $cur_info{$t_pid}{duration};
-			}
-			if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} < $cur_info{$t_pid}{duration})) {
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} = $cur_info{$t_pid}{duration};
+			if ($cur_info{$t_pid}{duration}) {
+				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} > $cur_info{$t_pid}{duration})) {
+					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} = $cur_info{$t_pid}{duration};
+				}
+				if (!exists $per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} || ($per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} < $cur_info{$t_pid}{duration})) {
+					$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} = $cur_info{$t_pid}{duration};
+				}
 			}
 		}
 
 		# Counter per database and application name
 		if ($cur_info{$t_pid}{dbname}) {
 			$database_info{$cur_info{$t_pid}{dbname}}{count}++;
+			$database_info{$cur_info{$t_pid}{dbname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$database_info{'unknown'}{count}++;
+			$database_info{unknown}{count}++;
+			$database_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbappname}) {
 			$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
+			$application_info{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$application_info{'unknown'}{count}++;
+			$application_info{unknown}{count}++;
+			$application_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbuser}) {
 			$user_info{$cur_info{$t_pid}{dbuser}}{count}++;
+			$user_info{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$user_info{'unknown'}{count}++;
+			$user_info{unknown}{count}++;
+			$user_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbclient}) {
 			$host_info{$cur_info{$t_pid}{dbclient}}{count}++;
+			$host_info{$cur_info{$t_pid}{dbclient}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$host_info{'unknown'}{count}++;
+			$host_info{unknown}{count}++;
+			$host_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 
 		if ($cur_info{$t_pid}{query}) {
@@ -9743,44 +9795,54 @@ sub store_queries
 
 			# Normalize query
 			my $normalized = &normalize_query($cur_info{$t_pid}{query});
-
+			my $action = uc($1);
 			if ($normalized =~ $action_regex) {
-				my $action = uc($1);
+				$action = uc($1);
 				# If this is a copy statement try to find if this is a write or read statement
 				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/is))) {
 					$action = 'INSERT';
 				} elsif ($action eq 'COPY') {
 					$action = 'SELECT';
 				}
-				$overall_stat{$action}++;
-				if ($action eq 'SELECT') {
-					$overall_stat{'peak'}{$cur_last_log_timestamp}{select}++;
-				} else {
-					$overall_stat{'peak'}{$cur_last_log_timestamp}{write}++;
-				}
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
-				$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-				if ($cur_info{$t_pid}{dbname}) {
-					$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
-				} else {
-					$database_info{'unknown'}{$action}++;
-				}
-				if ($cur_info{$t_pid}{dbappname}) {
-					$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
-				} else {
-					$application_info{'unknown'}{$action}++;
-				}
-				if ($cur_info{$t_pid}{dbuser}) {
-					$user_info{$cur_info{$t_pid}{dbuser}}{$action}++;
-				} else {
-					$user_info{'unknown'}{$action}++;
-				}
-				if ($cur_info{$t_pid}{dbclient}) {
-					$host_info{$cur_info{$t_pid}{dbclient}}{$action}++;
-				} else {
-					$host_info{'unknown'}{$action}++;
-				}
+			} else {
+				$action = 'OTHERS';
+			}
+			$overall_stat{$action}++;
+			if ($action eq 'SELECT') {
+				$overall_stat{'peak'}{$cur_last_log_timestamp}{select}++;
+			} elsif ($action ne 'OTHERS') {
+				$overall_stat{'peak'}{$cur_last_log_timestamp}{write}++;
+			}
+			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
+			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
+			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			if ($cur_info{$t_pid}{dbname}) {
+				$database_info{$cur_info{$t_pid}{dbname}}{$action}++;
+				$database_info{$cur_info{$t_pid}{dbname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			} else {
+				$database_info{unknown}{$action}++;
+				$database_info{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			}
+			if ($cur_info{$t_pid}{dbappname}) {
+				$application_info{$cur_info{$t_pid}{dbappname}}{$action}++;
+				$application_info{$cur_info{$t_pid}{dbappname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			} else {
+				$application_info{unknown}{$action}++;
+				$application_info{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			}
+			if ($cur_info{$t_pid}{dbuser}) {
+				$user_info{$cur_info{$t_pid}{dbuser}}{$action}++;
+				$user_info{$cur_info{$t_pid}{dbuser}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			} else {
+				$user_info{unknown}{$action}++;
+				$user_info{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			}
+			if ($cur_info{$t_pid}{dbclient}) {
+				$host_info{$cur_info{$t_pid}{dbclient}}{$action}++;
+				$host_info{$cur_info{$t_pid}{dbclient}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			} else {
+				$host_info{unknown}{$action}++;
+				$host_info{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 
 			# Store normalized query count
