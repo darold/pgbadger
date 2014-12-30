@@ -189,21 +189,35 @@ solve this problem in a simpler way.
 
 =head1 DESCRIPTION
 
-pgBadger is a PostgreSQL log analyzer build for speed with fully detailed reports from your PostgreSQL log file. It's a single and small Perl script that outperform any other PostgreSQL log analyzer.
+pgBadger is a PostgreSQL log analyzer build for speed with fully detailed
+reports from your PostgreSQL log file. It's a single and small Perl script
+that outperform any other PostgreSQL log analyzer.
 
-It is written in pure Perl language and uses a javascript library (flotr2) to draw graphs so that you don't need to install any additional Perl modules or other packages. Furthermore, this library gives us more features such as zooming. pgBadger also uses the Bootstrap javascript library and the FontAwesome webfont for better design. Everything is embedded.
+It is written in pure Perl language and uses a javascript library (flotr2)
+to draw graphs so that you don't need to install any additional Perl modules
+or other packages. Furthermore, this library gives us more features such as
+zooming. pgBadger also uses the Bootstrap javascript library and the FontAwesome
+webfont for better design. Everything is embedded.
 
-pgBadger is able to autodetect your log file format (syslog, stderr or csvlog). It is designed to parse huge log files as well as gzip compressed file. See a complete list of features below. Supported compressed format are gzip, bzip2 and xz. For the last one you must have a xz version upper than 5.05 that support the --robot option.
+pgBadger is able to autodetect your log file format (syslog, stderr or csvlog).
+It is designed to parse huge log files as well as gzip compressed file. See a
+complete list of features below. Supported compressed format are gzip, bzip2
+and xz. For the last one you must have a xz version upper than 5.05 that support
+the --robot option.
 
 All charts are zoomable and can be saved as PNG images.
 
-You can also limit pgBadger to only report errors or remove any part of the report using command line options.
+You can also limit pgBadger to only report errors or remove any part of the
+report using command line options.
 
-pgBadger supports any custom format set into log_line_prefix of your postgresql.conf file provide that you use the %t, %p and %l patterns.
+pgBadger supports any custom format set into the log_line_prefix directive of
+your postgresql.conf file as long as it at least specify the %t and %p patterns.
 
-pgBadger allow parallel processing on a single log file and multiple files through the use of the -j option and the number of CPUs as value.
+pgBadger allow parallel processing on a single log file and multiple files
+through the use of the -j option and the number of CPUs as value.
 
-If you want to save system performance you can also use log_duration instead of log_min_duration_statement to have reports on duration and number of queries only.
+If you want to save system performance you can also use log_duration instead of
+log_min_duration_statement to have reports on duration and number of queries only.
 
 =head1 FEATURE
 
