@@ -211,7 +211,7 @@ DESCRIPTION
     the report using command line options.
 
     pgBadger supports any custom format set into the log_line_prefix
-    directive of your postgresql.conf file as long as it at least specify
+    directive of your postgresql.conf file as long as it at least specifies
     the %t and %p patterns.
 
     pgBadger allow parallel processing on a single log file and multiple
@@ -235,7 +235,7 @@ FEATURE
             The most frequent errors.
             Histogram of query times.
 
-    The following reports are also available with hourly charts divide by
+    The following reports are also available with hourly charts divided by
     periods of five minutes:
 
             SQL queries statistics.
@@ -266,8 +266,8 @@ FEATURE
     per hour, but you can specify the granularity down to the minute.
 
     pgBadger can also be used in a central place to parse remote log files
-    using a password less SSH connection. This mode can be used with
-    compressed files and in mode multiprocess per file (-J) but can not be
+    using a password-less SSH connection. This mode can be used with
+    compressed files and in multiprocess per file mode (-J) but can not be
     used with CSV log format.
 
 REQUIREMENT
@@ -292,7 +292,7 @@ REQUIREMENT
     don't need to install it.
 
     Compressed log file format is autodetected from the file exension. If
-    pgBadger find a gz extension it will use the zcat utility, with a bz2
+    pgBadger finds a gz extension it will use the zcat utility, with a bz2
     extension it will use bzcat and if the file extension is zip or xz then
     the unzip or xz utilities will be used.
 
@@ -303,8 +303,8 @@ REQUIREMENT
             --zcat="C:\tools\unzip -p"
 
     By default pgBadger will use the zcat, bzcat and unzip utilities
-    following the file extension. If you use the default autodetection
-    compress format you can mixed gz, bz2, xz or zip files. Specifying a
+    following the file extension. If you use the default (autodetect
+    compress format) you can mixed gz, bz2, xz or zip files. Specifying a
     custom value to --zcat option will remove this feature of mixed
     compressed format.
 
@@ -342,7 +342,7 @@ POSTGRESQL CONFIGURATION
 
             log_min_duration_statement = 0
 
-    Here every statement will be logged, on busy server you may want to
+    Here every statement will be logged, on a busy server you may want to
     increase this value to only log queries with a higher duration time.
     Note that if you have log_statement set to 'all' nothing will be logged
     through log_min_duration_statement. See next chapter for more
@@ -428,9 +428,9 @@ PARALLEL PROCESSING
             memory to build the html output.
 
     With that method, at start/end of chunks pgbadger may truncate or omit a
-    maximum of N queries perl log file which is an insignificant gap if you
+    maximum of N queries per log file which is an insignificant gap if you
     have millions of queries in your log file. The chance that the query
-    that you were looking for is loose is near 0, this is why I think this
+    that you were looking for is lost is near 0, this is why I think this
     gap is livable. Most of the time the query is counted twice but
     truncated.
 
@@ -438,9 +438,9 @@ PARALLEL PROCESSING
     dedicate one core to one log file at a time. To enable this behavior you
     have to use option -J N instead. With 200 log files of 10MB each the use
     of the -J option start being really interesting with 8 Cores. Using this
-    method you will be sure to not loose any queries in the reports.
+    method you will be sure to not lose any queries in the reports.
 
-    He are a benchmarck done on a server with 8 CPUs and a single file of
+    Here is a benchmark done on a server with 8 CPUs and a single file of
     9.5GB.
 
              Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
@@ -448,7 +448,7 @@ PARALLEL PROCESSING
                -j   | 1h41m18 | 50m25 | 25m39 | 15m58
                -J   | 1h41m18 | 54m28 | 41m16 | 34m45
 
-    With 200 log files of 10MB each and a total og 2GB the results are
+    With 200 log files of 10MB each and a total of 2GB the results are
     slightly different:
 
              Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
@@ -476,7 +476,7 @@ INCREMENTAL REPORTS
     The main index file will show a dropdown menu per week with a link to
     the week report and links to daily reports of this week.
 
-    For example, if you run pgBadger as follow based on a daily rotated
+    For example, if you run pgBadger as follows, based on a daily rotated
     file:
 
         0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 \
