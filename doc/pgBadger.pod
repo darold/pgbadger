@@ -256,7 +256,7 @@ five minutes:
 There's also some pie reports of distribution about:
 
 	Locks statistics.
-	ueries by type (select/insert/update/delete).
+	Queries by type (select/insert/update/delete).
 	Distribution of queries type per database/application
 	Sessions per database/user/client.
 	Connections per database/user/client.
