@@ -2429,7 +2429,7 @@ sub process_file
 	# Get stats from all pending temporary storage
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
 		# Stores last query information
-		&store_queries($pid);
+		&store_queries($pid, 1);
 
 	}
 
@@ -2664,7 +2664,7 @@ sub check_incremental_position
 			# Get stats from all pending temporary storage
 			foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
 				# Stores last queries information
-				&store_queries($pid);
+				&store_queries($pid, 1);
 			}
 			# Stores last temporary files and lock information
 			foreach my $pid (keys %cur_temp_info) {
@@ -7082,7 +7082,7 @@ sub print_histogram_query_times
 	for (my $i = 1; $i <= $#histogram_query_time; $i++) {
                 $histogram_info .= "<tr><td>$histogram_query_time[$i-1]-$histogram_query_time[$i]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]}) .
                         "</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} * 100) / ($overall_stat{histogram}{query_total}||1)) . "%</td></tr>";
-		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > 0);
+		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} || 0);
 		if ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} > $most_range_value) {
 			$most_range = "$histogram_query_time[$i-1]-$histogram_query_time[$i]ms";
 			$most_range_value = $overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]};
@@ -9623,8 +9623,9 @@ sub store_tsung_session
 sub store_queries
 {
 	my $t_pid  = shift;
+	my $end  = shift;
 
-	return 0 if ($log_duration && ($cur_info{$t_pid}{duration} eq ''));
+	return 0 if (!$end && $log_duration && ($cur_info{$t_pid}{duration} eq ''));
 
 	# Remove comments if required
 	if ($remove_comment) {
@@ -10568,24 +10569,25 @@ sub flotr2_duration_histograph
 
 	my $dateTracker_dataopts = '[ d1 ]';
 	my $data1 = "var d1 = [";
-	my $i = 1;
 	my $max = 0;
-	foreach my $k (sort keys %data) {
-		$data1 .= " [$i, $data{$k}],";
-		$max += $data{$k} if ($data{$k} > $max);
-		$i++;
-	}
-	$data1 =~ s/,$//;
-	$data1 .= "];";
-	$max += int(($max*25)/100);
 	my $xmax = @$range + 1;
-	
 	my $dateTracker_lblopts = "[ '0', ";
 	for (my $i = 1; $i <= $#{$range}; $i++) {
+		my $k = "$range->[$i-1]-$range->[$i]ms";
+		$max = $data{$k} if ($data{$k} > $max);
+		$data1 .= " [$i, $data{$k}],";
+		$data{"$histogram_query_time[$i-1]-$histogram_query_time[$i]ms"} = ($overall_stat{histogram}{query_time}{$histogram_query_time[$i-1]} || 0);
                 $dateTracker_lblopts .= "'" . &convert_time($range->[$i-1]) . '-' . &convert_time($range->[$i]) . "',";
 	}
 	$dateTracker_lblopts .= "'> " . &convert_time($range->[-1]) . "'";
 	$dateTracker_lblopts .= "]";
+	$data1 =~ s/,$//;
+	$data1 .= "];";
+	if ($max > 3) {
+		$max += int(($max*25)/100);
+	} else {
+		$max *= 2;
+	}
 
 	return <<EOF;
 <div id="$divid" class="flotr-graph duration-histo-graph"></div>
