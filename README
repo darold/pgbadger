@@ -61,7 +61,8 @@ SYNOPSIS
                                  prefix includes additional variables like client ip
                                  or application name. See examples below.
         -P | --no-prettify     : disable SQL queries prettify formatter.
-        -q | --quiet           : don't print anything to stdout, not even a progress     bar.
+        -q | --quiet           : don't print anything to stdout, not even a progress
+                                 bar.
         -r | --remote-host ip  : set the host where to execute the cat command on
                                  remote logfile to parse localy the file.
         -R | --retention N     : number of week to keep in incremental mode. Default
@@ -120,9 +121,12 @@ SYNOPSIS
         --exclude-line regex   : pgbadger will start to exclude any log entry that
                                  will match the given regex. Can be used multiple
                                  time.
-        --anonymize            : obscure all literals in queries to hide confidential data.
+        --anonymize            : obscure all literals in queries, useful to hide
+                                 confidential data.
         --noreport             : prevent pgbadger to create reports in incremental
                                  mode.
+        --log-duration         : force pgbadger to associate log entries generated
+                                 by both log_duration = on and log_statement = 'all'
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
@@ -255,7 +259,7 @@ FEATURE
     There's also some pie reports of distribution about:
 
             Locks statistics.
-            ueries by type (select/insert/update/delete).
+            Queries by type (select/insert/update/delete).
             Distribution of queries type per database/application
             Sessions per database/user/client.
             Connections per database/user/client.

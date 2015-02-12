@@ -234,6 +234,7 @@ my $bar_graph               = 0;
 my $dns_resolv              = 0;
 my $nomultiline             = 0;
 my $noreport                = 0;
+my $log_duration            = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -380,6 +381,7 @@ my $result = GetOptions(
 	'anonymize!'               => \$anonymize,
 	'noclean!'                 => \$noclean,
 	'noreport!'                => \$noreport,
+	'log-duration!'            => \$log_duration,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1611,7 +1613,8 @@ Options:
 			     prefix includes additional variables like client ip
 			     or application name. See examples below.
     -P | --no-prettify     : disable SQL queries prettify formatter.
-    -q | --quiet           : don't print anything to stdout, not even a progress			     bar.
+    -q | --quiet           : don't print anything to stdout, not even a progress
+			     bar.
     -r | --remote-host ip  : set the host where to execute the cat command on
 			     remote logfile to parse localy the file.
     -R | --retention N     : number of week to keep in incremental mode. Default
@@ -1670,9 +1673,13 @@ Options:
     --exclude-line regex   : pgbadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple
 			     time.
-    --anonymize            : obscure all literals in queries to hide confidential data.
+    --anonymize            : obscure all literals in queries, useful to hide
+                             confidential data.
     --noreport             : prevent pgbadger to create reports in incremental
 			     mode.
+    --log-duration         : force pgbadger to associate log entries generated
+                             by both log_duration = on and log_statement = 'all'
+
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2059,8 +2066,9 @@ sub process_file
 
 					# Parse the query now
 					&parse_query();
-					&store_queries($prefix_vars{'t_pid'});
-					delete $cur_info{$prefix_vars{'t_pid'}};
+					if (&store_queries($prefix_vars{'t_pid'})) {
+						delete $cur_info{$prefix_vars{'t_pid'}};
+					}
 				}
 			}
 		}
@@ -9437,8 +9445,9 @@ sub parse_query
 	if (exists $cur_info{$t_pid}{query}) {
 		# when switching to a new log message
 		if ( ($prefix_vars{'t_loglevel'} eq 'LOG') || ($format eq 'csv') || ($prefix_vars{'t_loglevel'} =~ $main_error_regex) ) {
-			&store_queries($t_pid);
-			delete $cur_info{$t_pid};
+			if (&store_queries($t_pid)) {
+				delete $cur_info{$t_pid};
+			}
 		}
 	}
 
@@ -9538,25 +9547,25 @@ sub set_current_infos
 
 	my $t_pid = shift;
 
-	$cur_info{$t_pid}{year}      = $prefix_vars{'t_year'};
-	$cur_info{$t_pid}{month}     = $prefix_vars{'t_month'};
-	$cur_info{$t_pid}{day}       = $prefix_vars{'t_day'};
-	$cur_info{$t_pid}{hour}      = $prefix_vars{'t_hour'};
-	$cur_info{$t_pid}{min}       = $prefix_vars{'t_min'};
-	$cur_info{$t_pid}{sec}       = $prefix_vars{'t_sec'};
-	$cur_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'};
-	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-	$cur_info{$t_pid}{duration}  = $prefix_vars{'t_duration'};
-	$cur_info{$t_pid}{pid}       = $prefix_vars{'t_pid'};
-	$cur_info{$t_pid}{session}   = $prefix_vars{'t_session_line'};
-	$cur_info{$t_pid}{loglevel}  = $prefix_vars{'t_loglevel'};
-	$cur_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
-	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'};
+	$cur_info{$t_pid}{year}      = $prefix_vars{'t_year'} if (! $cur_info{$t_pid}{year});
+	$cur_info{$t_pid}{month}     = $prefix_vars{'t_month'} if (! $cur_info{$t_pid}{month});
+	$cur_info{$t_pid}{day}       = $prefix_vars{'t_day'} if (! $cur_info{$t_pid}{day});
+	$cur_info{$t_pid}{hour}      = $prefix_vars{'t_hour'} if ($cur_info{$t_pid}{hour} ne '');
+	$cur_info{$t_pid}{min}       = $prefix_vars{'t_min'} if (! $cur_info{$t_pid}{min} ne '');
+	$cur_info{$t_pid}{sec}       = $prefix_vars{'t_sec'} if (! $cur_info{$t_pid}{sec} ne '');
+	$cur_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'} if (! $cur_info{$t_pid}{timestamp});
+	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'} if (! $cur_info{$t_pid}{ident});
+	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'} if (! $cur_info{$t_pid}{query});
+	$cur_info{$t_pid}{duration}  = $prefix_vars{'t_duration'} if (! $cur_info{$t_pid}{duration});
+	$cur_info{$t_pid}{pid}       = $prefix_vars{'t_pid'} if (! $cur_info{$t_pid}{pid});
+	$cur_info{$t_pid}{session}   = $prefix_vars{'t_session_line'} if (! $cur_info{$t_pid}{session});
+	$cur_info{$t_pid}{loglevel}  = $prefix_vars{'t_loglevel'} if (! $cur_info{$t_pid}{loglevel});
+	$cur_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'} if (! $cur_info{$t_pid}{dbname});
+	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} if (! $cur_info{$t_pid}{dbuser});
+	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'} if (! $cur_info{$t_pid}{dbclient});
+	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} if (! $cur_info{$t_pid}{dbappname});
+	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if (! $cur_info{$t_pid}{date});
+	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (! $cur_info{$t_pid}{bind});
 
 }
 
@@ -9615,6 +9624,8 @@ sub store_queries
 {
 	my $t_pid  = shift;
 
+	return 0 if ($log_duration && ($cur_info{$t_pid}{duration} eq ''));
+
 	# Remove comments if required
 	if ($remove_comment) {
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
@@ -9628,8 +9639,8 @@ sub store_queries
 	# Stores temporary files and lock information
 	&store_temporary_and_lock_infos($t_pid);
 
-	return if (!exists $cur_info{$t_pid});
-	return if (!$cur_info{$t_pid}{year});
+	return 0 if (!exists $cur_info{$t_pid});
+	return 1 if (!$cur_info{$t_pid}{year});
 
 	# Cleanup and normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
@@ -9655,7 +9666,7 @@ sub store_queries
 	if ($cur_info{$t_pid}{query}) {
 		# Should we just want select queries
 		if ($select_only) {
-			return if ($cur_info{$t_pid}{query} !~ /^SELECT/is);
+			return 1 if ($cur_info{$t_pid}{query} !~ /^SELECT/is);
 		}
 
 		# Should we have to exclude some queries
@@ -9663,7 +9674,7 @@ sub store_queries
 			foreach (@exclude_query) {
 				if ($cur_info{$t_pid}{query} =~ /$_/i) {
 					$cur_info{$t_pid}{query} = '';
-					return;
+					return 1;
 				}
 			}
 		}
@@ -9673,7 +9684,7 @@ sub store_queries
 			foreach (@include_query) {
 				if ($cur_info{$t_pid}{query} !~ /$_/i) {
 					$cur_info{$t_pid}{query} = '';
-					return;
+					return 1;
 				}
 			}
 		}
@@ -9693,7 +9704,7 @@ sub store_queries
 			# Stores global statistics
 			$overall_stat{'queries_number'}++;
 			$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-			return;
+			return 1;
 		}
 
 		# Truncate the query if requested by the user
@@ -9888,7 +9899,7 @@ sub store_queries
 			}
 		}
 	}
-
+	return 1;
 }
 
 sub store_temporary_and_lock_infos
