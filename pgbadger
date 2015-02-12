@@ -9011,6 +9011,11 @@ sub parse_query
 		}
 	}
 
+	# Do not process DEALLOCATE lines
+	if ($prefix_vars{'t_query'} =~ /statement: DEALLOCATE/) {
+		return;
+	}
+
 	# Do not parse lines that are not an error message when error only report is requested
 	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
 		return;
