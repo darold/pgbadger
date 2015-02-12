@@ -10613,6 +10613,7 @@ sub flotr2_duration_histograph
 	    mode: "normal",
             title: "Number of queries",
 	    autoscaleMargin: 1,
+	    min: 0,
 	    max: $max,
 	    tickFormatter: function(val){ return pretty_print_number(val,'') },
         },
