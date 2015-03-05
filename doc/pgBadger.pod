@@ -13,6 +13,8 @@ Arguments:
     logfile can be a single log file, a list of files, or a shell command
     returning a list of files. If you want to pass log content from stdin
     use - as filename. Note that input from stdin will not work with csvlog.
+    You can also use a file containing a list of log file to parse, see -L
+    command line option.
 
 Options:
 
@@ -43,6 +45,7 @@ Options:
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
                              report per day with a log rotated each week.
+    -L | logfile-list file : file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
     -M | --no-multiline    : do not collect multiline statement to avoid garbage

@@ -235,6 +235,7 @@ my $dns_resolv              = 0;
 my $nomultiline             = 0;
 my $noreport                = 0;
 my $log_duration            = 0;
+my $logfile_list            = '';
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -328,6 +329,7 @@ my $result = GetOptions(
 	"j|jobs=i"                 => \$queue_size,
 	"J|job_per_file=i"         => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
+	"L|logfile-list=s"         => \$logfile_list,
 	"m|maxlength=i"            => \$maxlength,
 	"M|no-multiline!"          => \$nomultiline,
 	"N|appname=s"              => \@dbappname,
@@ -431,9 +433,48 @@ if ($#ARGV >= 0) {
 				}
 			}
 		} else {
+			if ($logfile_list) {
+				die "FATAL: stdin input - can not be used with logfile list (-L).\n";
+			}
 			push(@log_files, $file);
 		}
 	}
+
+}
+
+if ($logfile_list) {
+
+	if (!-e $logfile_list) {
+		die "FATAL: logfile list $logfile_list must exist!\n";
+	}
+	if (not open(IN, $logfile_list)) {
+		die "FATAL: can not read logfile list $logfile_list, $!.\n";
+	}
+	my @files = <IN>;
+	close(IN);
+	foreach my $file (@files) {
+		chomp($file);
+		$file =~ s/\r//;
+		if ($file eq '-') {
+			die "FATAL: stdin input - can not be used with logfile list.\n";
+		}
+		if (!$remote_host) {
+			die "FATAL: logfile $file must exist!\n" if not -f $file;
+			if (-z $file) {
+				print "WARNING: file $file is empty\n";
+				next;
+			}
+			push(@log_files, $file);
+		} else {
+			# Get files from remote host
+			&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
+			my @rfiles = `$ssh_command "ls $file"`;
+			foreach my $f (@rfiles) {
+				push(@log_files, $f);
+			}
+		}
+	}
+
 }
 
 # Logfile is a mandatory parameter
@@ -1593,6 +1634,7 @@ Options:
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
                              report per day with a log rotated each week.
+    -L | logfile-list file : file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
     -M | --no-multiline    : do not collect multiline statement to avoid garbage
