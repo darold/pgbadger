@@ -130,6 +130,11 @@ SYNOPSIS
                                  mode.
         --log-duration         : force pgbadger to associate log entries generated
                                  by both log_duration = on and log_statement = 'all'
+        --csv-output           : For the Top Queries section, also output the
+                                 results in csv format, for example, to COPY into
+                                 a PostgreSQL database for analysis.
+        --csv-filename filename: The filename to emit the Top Queries to.
+                                 Defaults to topqueries.csv.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
