@@ -913,6 +913,7 @@ my %overall_stat        = ();
 my %overall_checkpoint  = ();
 my @top_slowest         = ();
 my %normalyzed_info     = ();
+my %normalyzed_user     = ();
 my %error_info          = ();
 my %logs_type           = ();
 my %per_minute_info     = ();
@@ -2953,6 +2954,7 @@ sub set_top_locked_info
 		push(@top_locked_info, $tmp_top_locked_info[$i]);
 		last if ($i == $end_top);
 	}
+	
 }
 
 # Stores the top N slowest queries
@@ -2983,6 +2985,23 @@ sub set_top_sample
 	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
 	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
 	$normalyzed_info{$norm}{samples}{$dt}{bind}  = $bind;
+
+	# Gathering data into normalyzed_user, to display importance of each user for each time consuming query
+	my $duration;
+	my $us;
+	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$norm}{samples}}) {
+		if (!exists $normalyzed_info{$norm}{samples}{$k}{used}) {
+			$user = $normalyzed_info{$norm}{samples}{$k}{user};
+
+			if (!exists $normalyzed_user{$norm}{$user}) {
+				$normalyzed_user{$norm}{$user}{Duration} = 0;
+				$normalyzed_user{$norm}{$user}{numberRequests} = 0;
+			}
+			$normalyzed_user{$norm}{$user}{Duration} += $k;
+			$normalyzed_user{$norm}{$user}{numberRequests} += 1;
+			$normalyzed_info{$norm}{samples}{$k}{used} = 1;
+		}
+	}
 
 	if ($sample > 0) {
 		my $i = 1;
@@ -7394,6 +7413,38 @@ sub print_time_consuming
 							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of details collapse -->
+};
+		print $fh qq{
+						<!-- Details collapse -->
+					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
+
+						</div><!-- end of details collapse -->
+	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">User(s) involved</button></p>                                                          
+						<!-- Involved users list collapse -->
+						<div id="time-consuming-queries-user-involved-rank-$rank" class="collapse">
+							<dl>
+};
+
+		my $idx = 1;
+		foreach my $d (sort {$normalyzed_user{$k}{$b}{Duration} <=> $normalyzed_user{$k}{$a}{Duration}} keys %{$normalyzed_user{$k}}) {
+			if ($normalyzed_user{$k}{$d}{Duration} > 0) {
+				my $details = "[<b>User:</b> $d";
+				$details .= " - <b>Total duration for this user:</b> ".&convert_time($normalyzed_user{$k}{$d}{Duration}) if ($normalyzed_user{$k}{$d}{Duration});
+				$details .= " - <b>Number of requests:</b> $normalyzed_user{$k}{$d}{numberRequests}" if ($normalyzed_user{$k}{$d}{numberRequests});
+				$details .= " ]\n";
+				print $fh qq{
+									<pre>$details</pre>
+	};
+				$idx++;
+			}
+		}
+		print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of involved users list collapse -->
+};
+		print $fh qq{
 					</td>
 				</tr>
 };
@@ -7557,9 +7608,43 @@ sub print_most_frequent
 							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of details collapse -->
+};
+
+		print $fh qq{
+						<!-- Details collapse -->
+					    <div id="time-consuming-queries-details-rank-$rank" class="collapse">
+
+						</div><!-- end of details collapse -->
+	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">User(s) involved</button></p>                                                          
+						<!-- Involved users list collapse -->
+						<div id="most-frequent-queries-user-involved-rank-$rank" class="collapse">
+							<dl>
+};
+
+		my $idx = 1;
+		foreach my $d (sort {$normalyzed_user{$k}{$b}{numberRequests} <=> $normalyzed_user{$k}{$a}{numberRequests}} keys %{$normalyzed_user{$k}}) {
+			if ($normalyzed_user{$k}{$d}{Duration} > 0) {
+				my $details = "[<b>User:</b> $d";
+				$details .= " - <b>Total duration for this user:</b> ".&convert_time($normalyzed_user{$k}{$d}{Duration}) if ($normalyzed_user{$k}{$d}{Duration});
+				$details .= " - <b>Number of requests:</b> $normalyzed_user{$k}{$d}{numberRequests}" if ($normalyzed_user{$k}{$d}{numberRequests});
+				$details .= " ]\n";
+				print $fh qq{
+									<pre>$details</pre>
+	};
+				$idx++;
+			}
+		}
+		print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of involved users list collapse -->
+};
+		print $fh qq{
 					</td>
 				</tr>
 };
+
 		$rank++;
 	}
 	if (scalar keys %normalyzed_info == 0) {
@@ -9051,13 +9136,6 @@ sub parse_query
 		delete $current_sessions{$prefix_vars{'t_pid'}};
 		if ($extension eq 'tsung') {
 			delete $tsung_session{$prefix_vars{'t_pid'}}
-		}
-	} elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING')) {
-		if ($prefix_vars{'t_query'} =~ /terminating connection/) {
-			delete $current_sessions{$prefix_vars{'t_pid'}};
-			if ($extension eq 'tsung') {
-				delete $tsung_session{$prefix_vars{'t_pid'}}
-			}
 		}
 	}
 
@@ -10860,12 +10938,10 @@ sub build_log_line_prefix_regex
 
 		my $re = qr{
     (
-        (?:--)[\ \t\S]*      # single line comments
+        (?:--|\#)[\ \t\S]*      # single line comments
         |
         (?:<>|<=>|>=|<=|==|=|!=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?)
                                 # operators and tests
-	(?:\#|\@\-\@|\@\@|\#\#|<\->|\&<|\&>|<<\||\|>>|\&<\||\|\&>|<\^|>\^|\?\#|\?\-|\?\||\?\-\||\?\|\||\@>|<\@|\~=)
-				# Geometric Operators
         |
         [\[\]\(\),;.]            # punctuation (parenthesis, comma)
         |
