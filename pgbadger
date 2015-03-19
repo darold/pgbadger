@@ -9052,6 +9052,13 @@ sub parse_query
 		if ($extension eq 'tsung') {
 			delete $tsung_session{$prefix_vars{'t_pid'}}
 		}
+	} elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING')) {
+		if ($prefix_vars{'t_query'} =~ /terminating connection/) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
+			if ($extension eq 'tsung') {
+				delete $tsung_session{$prefix_vars{'t_pid'}}
+			}
+		}
 	}
 
 	# Do not process DEALLOCATE lines
