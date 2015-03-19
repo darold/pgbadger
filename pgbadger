@@ -10860,10 +10860,12 @@ sub build_log_line_prefix_regex
 
 		my $re = qr{
     (
-        (?:--|\#)[\ \t\S]*      # single line comments
+        (?:--)[\ \t\S]*      # single line comments
         |
         (?:<>|<=>|>=|<=|==|=|!=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?)
                                 # operators and tests
+	(?:\#|\@\-\@|\@\@|\#\#|<\->|\&<|\&>|<<\||\|>>|\&<\||\|\&>|<\^|>\^|\?\#|\?\-|\?\||\?\-\||\?\|\||\@>|<\@|\~=)
+				# Geometric Operators
         |
         [\[\]\(\),;.]            # punctuation (parenthesis, comma)
         |
