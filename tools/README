@@ -71,6 +71,12 @@ Option to limit top queries to minimum duration:
                         will not be reported. Use it if you want to auto
                         execute explain statements.
 
+If you want to chain tools and HTML report, you can proceed as follow:
+
+    pgbadger -o out.bin /var/log/postgresql/postgresql.log
+    ./pgbadger_tools --csv-slowest out.bin --csv-filename top_slowest.csv
+    pgbadger -o report.html out.bin
+
 
 CONTRIBUTION:
 -------------
