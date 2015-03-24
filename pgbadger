@@ -8715,6 +8715,14 @@ sub load_stats
 		}
 	}
 
+	### normalyzed_user ###
+	foreach my $stmt (keys %_normalyzed_user) {
+		foreach my $usr (keys %{$_normalyzed_user{$stmt}}) {
+			$normalyzed_user{$stmt}{$usr}{Duration} = $_normalyzed_user{$stmt}{$usr}{Duration};
+			$normalyzed_user{$stmt}{$usr}{numberRequests} = $_normalyzed_user{$stmt}{$usr}{numberRequests};
+		}
+	}
+
 	### session_info ###
 
 	foreach my $db (keys %{ $_session_info{database}}) {
@@ -8835,6 +8843,7 @@ sub dump_as_binary
 		'overall_stat' => \%overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
 		'normalyzed_info' => \%normalyzed_info,
+		'normalyzed_user' => \%normalyzed_user,
 		'error_info' => \%error_info,
 		'connection_info' => \%connection_info,
 		'database_info' => \%database_info,
@@ -8873,6 +8882,7 @@ sub dump_as_json
 		'overall_stat' => \%overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
 		'normalyzed_info' => \%normalyzed_info,
+		'normalyzed_user' => \%normalyzed_user,
 		'error_info' => \%error_info,
 		'connection_info' => \%connection_info,
 		'database_info' => \%database_info,
