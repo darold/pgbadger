@@ -8334,6 +8334,7 @@ sub load_stats
 	my %_overall_stat = %{$stats{overall_stat}};
 	my %_overall_checkpoint = %{$stats{overall_checkpoint}};
 	my %_normalyzed_info = %{$stats{normalyzed_info}};
+	my %_normalyzed_user = %{$stats{normalyzed_user}};
 	my %_error_info = %{$stats{error_info}};
 	my %_connection_info = %{$stats{connection_info}};
 	my %_database_info = %{$stats{database_info}};
