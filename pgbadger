@@ -7329,6 +7329,10 @@ sub print_time_consuming
 		%hourly_duration = ();
 		$ctime = timegm_nocheck(0, 0, 0, 19, 4, 80) * 1000;
 
+		my $users_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">User(s) involved</button>};
+		}
 		my $query_histo = 
 		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
@@ -7364,7 +7368,35 @@ sub print_time_consuming
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
-	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">Examples</button></p>                                                          
+	<p> <button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">Examples</button> $users_involved</p>
+};
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			print $fh qq{
+						<!-- Involved users list collapse -->
+						<div id="time-consuming-queries-user-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
+				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
+					my $details = "[<b>User:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of user involved collapse -->
+};
+		}
+		print $fh qq{
 						<!-- Examples collapse -->
 						<div id="time-consuming-queries-examples-rank-$rank" class="collapse">
 							<dl>
@@ -7495,6 +7527,11 @@ sub print_most_frequent
                 my $query_histo =
                 &flotr2_histograph($graphid++, 'mostfrequent_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
+		my $users_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">User(s) involved</button>};
+		}
+
                 print $fh qq{
                                 <tr>
                                 <td>$rank</td>
@@ -7527,7 +7564,36 @@ sub print_most_frequent
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
-	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">Examples</button></p>                                                          
+	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">Examples</button> $users_involved</p>
+};
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			print $fh qq{
+						<!-- Involved users list collapse -->
+						<div id="most-frequent-queries-user-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
+				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
+					my $details = "[<b>User:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of user involved collapse -->
+};
+		}
+		print $fh qq{
+
 						<!-- Examples collapse -->
 						<div id="most-frequent-queries-examples-rank-$rank" class="collapse">
 							<dl>
@@ -7662,6 +7728,11 @@ sub print_slowest_queries
 		my $query_histo =
 		&flotr2_histograph($graphid++, 'normalizedslowest_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
+		my $users_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-user-involved-rank-$rank">User(s) involved</button>};
+		}
+
                 print $fh qq{
                                 <tr>
                                 <td>$rank</td>
@@ -7694,7 +7765,36 @@ sub print_slowest_queries
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
-	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-examples-rank-$rank">Examples</button></p>                                                          
+	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-examples-rank-$rank">Examples</button> $users_involved</p>
+};
+		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
+			print $fh qq{
+						<!-- Involved users list collapse -->
+						<div id="normalized-slowest-queries-user-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
+				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
+					my $details = "[<b>User:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of user involved collapse -->
+};
+		}
+		print $fh qq{
+
 						<!-- Examples collapse -->
 						<div id="normalized-slowest-queries-examples-rank-$rank" class="collapse">
 							<dl>
@@ -8625,6 +8725,12 @@ sub load_stats
 			}
 			if (!exists $normalyzed_info{$stmt}{tempfiles}{maxsize} || ($normalyzed_info{$stmt}{tempfiles}{maxsize} < $_normalyzed_info{$stmt}{tempfiles}{maxsize})) { 
 				$normalyzed_info{$stmt}{tempfiles}{maxsize} = $_normalyzed_info{$stmt}{tempfiles}{maxsize};
+			}
+		}
+
+		foreach my $u (keys %{$_normalyzed_info{$stmt}{users}} ) {
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{users}{$u}} ) {
+				$normalyzed_info{$stmt}{users}{$u}{$k} += $_normalyzed_info{$stmt}{users}{$u}{$k};
 			}
 		}
 	}
@@ -9961,6 +10067,7 @@ sub store_queries
 				# Store normalized query total duration
 				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $cur_info{$t_pid}{duration};
+
 				# Store min / max duration
 				if (!exists $normalyzed_info{$normalized}{min} || ($normalyzed_info{$normalized}{min} > $cur_info{$t_pid}{duration})) {
 					$normalyzed_info{$normalized}{min} = $cur_info{$t_pid}{duration};
@@ -9968,6 +10075,10 @@ sub store_queries
 				if (!exists $normalyzed_info{$normalized}{max} || ($normalyzed_info{$normalized}{max} < $cur_info{$t_pid}{duration})) {
 					$normalyzed_info{$normalized}{max} = $cur_info{$t_pid}{duration};
 				}
+
+				# Stores query/user information
+				$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
+				$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
 
 				# Store normalized query count and duration per time
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
