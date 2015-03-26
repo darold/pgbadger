@@ -8718,8 +8718,8 @@ sub load_stats
 	### normalyzed_user ###
 	foreach my $stmt (keys %_normalyzed_user) {
 		foreach my $usr (keys %{$_normalyzed_user{$stmt}}) {
-			$normalyzed_user{$stmt}{$usr}{Duration} = $_normalyzed_user{$stmt}{$usr}{Duration};
-			$normalyzed_user{$stmt}{$usr}{numberRequests} = $_normalyzed_user{$stmt}{$usr}{numberRequests};
+			$normalyzed_user{$stmt}{$usr}{Duration} += $_normalyzed_user{$stmt}{$usr}{Duration};
+			$normalyzed_user{$stmt}{$usr}{numberRequests} += $_normalyzed_user{$stmt}{$usr}{numberRequests};
 		}
 	}
 
