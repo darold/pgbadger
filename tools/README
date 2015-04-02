@@ -18,6 +18,11 @@ pgbadger it already generate binary file in daily directories.
 
     example: pgbadger -o out.bin /var/log/postgresql/postgresql.log
 
+PGBADGER_TOOLS OPTIONS AND TOOLS
+--------------------------------
+
+**Auto explain**
+
 The first option added is --explain-slowest that dump top slowest queries in
 an explain analyze statement, ready to be executed. An extended version could
 be created to automatically execute those explain statement on the database.
@@ -41,7 +46,42 @@ If you want to chain tools and HTML report, you can proceed as follow:
     ./pgbadger_tools --explain-slowest out.bin > explain_top_slowest.sql
     pgbadger -o report.html out.bin
 
-Feel free to extend pgbadger_tools of new feature. To see how to integrate
+**CSV output**
+_
+When using the following option, pgbadger_tools will export top queries section
+results in csv format, for example for later analysis. This is an original work
+of bricklen.
+
+Here are the supported options, only one of the following is mandatory:
+
+    --csv-time-consuming : generate a CSV file with top time consuming queries
+    --csv-slowest        : generate a CSV file with top slowest queries
+    --csv-normalized     : generate a CSV file with top normalized queries
+
+        ./pgbadger_tools --csv-time-consuming out.bin
+
+Those options can not be used together. By default the output file is named
+out.csv, you can use the --csv-filename option to renamed this file. Ex:
+
+        ./pgbadger_tools --csv-slowest --csv-filename slowest.csv out.bin
+
+Option to limit top queries to minimum duration:
+
+    --max-duration MS : set the number of milliseconds above which queries
+                        will not be reported. Use it if you want to auto
+                        execute explain statements.
+
+If you want to chain tools and HTML report, you can proceed as follow:
+
+    pgbadger -o out.bin /var/log/postgresql/postgresql.log
+    ./pgbadger_tools --csv-slowest out.bin --csv-filename top_slowest.csv
+    pgbadger -o report.html out.bin
+
+
+CONTRIBUTION:
+-------------
+
+Feel free to extend pgbadger_tools of new features. To see how to integrate
 you Perl code in this  program, search for "Add your own" string in the code
 and look at the example searching on explain_slowest.
 

@@ -83,6 +83,10 @@ my $file_per_query  = 0;
 my $format_query    = 0;
 my $explain_time_consuming = 0;
 my $explain_normalized = 0;
+my $csv_time_consuming = 0;
+my $csv_slowest        = 0;
+my $csv_normalized     = 0;
+my $csv_filename       = 'out.csv';
 
 my $result = GetOptions(
 	'h|host=s'         => \$pghost,
@@ -101,6 +105,11 @@ my $result = GetOptions(
 	'file-per-query!'  => \$file_per_query,
 	'format-query!'    => \$format_query,
 	'top=i'            => $top,
+	# CSV output of top queries tool
+	'csv-time-consuming!'      => \$csv_time_consuming,
+	'csv-slowest!'      => \$csv_slowest,
+	'csv-normalized!'      => \$csv_normalized,
+	'csv-filename=s'   => \$csv_filename,
 );
 
 # Show help an exit
@@ -156,7 +165,31 @@ if ($explain_normalized) {
     &dump_normalized_slowest_queries();
 }
 
+####################################################################
+# 2nd tool: Dump top queries into CSV file. Will be executed when
+# option --csv-time_consuming or --csv-slowest or --csv-normalized
+# are enabled.
+##################################################################
+if ($csv_time_consuming || $csv_slowest || $csv_normalized) {
+	# Check that Text::CSV is available
+	if (eval {require Text::CSV;1;} ne 1) {
+		die("Can not save output in csv format, please install Perl module Text::CSV first.\n");
+	} else {
+		Text::CSV->import();
+	}
+	if ($csv_time_consuming) {
+		&csv_times_consuming_queries();
+	} elsif ($csv_slowest) {
+		&csv_slowest_queries();
+	} elsif ($csv_normalized) {
+		&csv_normalized_queries();
+	}
+}
+
+
+##################################################################
 # Add your own bellow
+##################################################################
 
 exit 0;
 
@@ -230,6 +263,30 @@ Options Tools:
 
   Options --explain-slowest, --explain-time-consuming and --explain-normalized
   can be use together in the same pgbadger_tools command.
+
+  Generate CSV file with top queries
+  ----------------------------------
+
+  This tool allow to dump most time consuming statements reported by pgBadger.
+  Here are the supported options, only one of the following is mandatory:
+
+    --csv-time-consuming : generate a CSV file with top time consuming queries
+    --csv-slowest        : generate a CSV file with top slowest queries
+    --csv-normalized     : generate a CSV file with top normalized queries
+
+	./pgbadger_tools --csv-time-consuming out.bin
+
+  Those options can not be used together. By default the output file is named
+  out.csv, you can use the --csv-filename option to renamed this file. Ex:
+
+	./pgbadger_tools --csv-slowest --csv-filename slowest.csv out.bin
+
+  Option to limit top queries to minimum duration:
+
+    --max-duration MS : set the number of milliseconds above which queries
+			will not be reported. Use it if you want to auto
+			execute explain statements.
+
 
 };
 	exit 0;
@@ -941,5 +998,114 @@ sub dump_normalized_slowest_queries
 
 }
 
+# Export time consuming queries as CSV
+sub csv_times_consuming_queries
+{
+	my $fhcsv = undef;
+
+	my $csv = Text::CSV->new({
+			 binary => 1,      # should set binary attribute.
+			 eol    => $/,     # end of line character
+		}) or die "Cannot use CSV: ".Text::CSV->error_diag ();
+	open $fhcsv, ">", "$csv_filename" or die "FATAL: can not write to $csv_filename: $!\n";
+	$csv->print($fhcsv, ['Database','Rank','Total_Duration','Times_Executed','Min','Max','Avg','Query']);
+
+        my $rank = 1;
+        foreach my $k (sort {$normalyzed_info{$b}{count} <=> $normalyzed_info{$a}{count}} keys %normalyzed_info) {
+                next if (!$normalyzed_info{$k}{count});
+                foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			# Do not process request that are slower than $max_duration
+			next if ( $max_duration && ( $d > $max_duration) );
+
+			$csv->print ($fhcsv, [
+				$normalyzed_info{$k}{samples}{$d}{db},
+				$rank,
+				$d,
+				$normalyzed_info{$k}{count},
+				$normalyzed_info{$k}{min},
+				$normalyzed_info{$k}{max},
+				$normalyzed_info{$k}{average},
+				$normalyzed_info{$k}{samples}{$d}{query}
+			]);
+			# Report only the first sample
+			last;
+
+                }
+                last if ($rank > $top);
+                $rank++;
+        }
+	close $fhcsv if (defined $fhcsv);
+
+}
+
+# Export normalized slowest queries as CSV
+sub csv_normalized_queries
+{
+	my $fhcsv = undef;
+
+	my $csv = Text::CSV->new({
+			 binary => 1,      # should set binary attribute.
+			 eol    => $/,     # end of line character
+		}) or die "Cannot use CSV: ".Text::CSV->error_diag ();
+	open $fhcsv, ">", "$csv_filename" or die "FATAL: can not write to $csv_filename: $!\n";
+	$csv->print($fhcsv, ['Database','Rank','Total_Duration','Times_Executed','Min','Max','Avg','Query']);
+
+        my $rank = 1;
+        foreach my $k (sort {$normalyzed_info{$b}{average} <=> $normalyzed_info{$a}{average}} keys %normalyzed_info) {
+                next if (!$normalyzed_info{$k}{count});
+                foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			# Do not process request that are slower than $max_duration
+			next if ( $max_duration && ( $d > $max_duration) );
+
+			$csv->print ($fhcsv, [
+				$normalyzed_info{$k}{samples}{$d}{db},
+				$rank,
+				$d,
+				$normalyzed_info{$k}{count},
+				$normalyzed_info{$k}{min},
+				$normalyzed_info{$k}{max},
+				$normalyzed_info{$k}{average},
+				$normalyzed_info{$k}{samples}{$d}{query}
+			]);
+			# Report only the first sample
+			last;
+
+                }
+                last if ($rank > $top);
+                $rank++;
+        }
+	close $fhcsv if (defined $fhcsv);
+
+}
+
+# Export slowest queries as CSV
+sub csv_slowest_queries
+{
+	my $fhcsv = undef;
+
+	my $csv = Text::CSV->new({
+			 binary => 1,      # should set binary attribute.
+			 eol    => $/,     # end of line character
+		}) or die "Cannot use CSV: ".Text::CSV->error_diag ();
+	open $fhcsv, ">", "$csv_filename" or die "FATAL: can not write to $csv_filename: $!\n";
+	$csv->print($fhcsv, ['Database','Rank','Duration','Query']);
+
+	my $rank = 1;
+	for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
+
+		# Do not process request that are slower than $max_duration
+		next if ( $max_duration && ($top_slowest[$i]->[0] > $max_duration) );
+
+		$csv->print ($fhcsv, [
+			$top_slowest[$i]->[3],
+			$rank,
+			$top_slowest[$i]->[0],
+			$top_slowest[$i]->[2]
+		]);
+                last if ($rank > $top);
+                $rank++;
+        }
+	close $fhcsv if (defined $fhcsv);
+}
 
 
