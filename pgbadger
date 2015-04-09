@@ -2029,94 +2029,103 @@ sub process_file
 		);
 
 		# Parse csvlog lines
-		while (my $row = $csv->getline($lfile)) {
+		while (!$csv->eof()) {
+			while (my $row = $csv->getline($lfile)) {
 
-			# We received a signal
-			last if ($terminate);
+				# 23 columns in csvlog (from 9.0 to current)
+				next if $#{$row} != 22;
 
-			# Set progress statistics
-			$cursize += length(join(',', @$row));
-			$nlines++;
-			if (!$tmpoutfile) {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					if ($totalsize) {
-						print STDERR &progress_bar($cursize, $totalsize, 25, '=');
-					} else {
-						print STDERR ".";
+				# We received a signal
+				last if ($terminate);
+
+				# Set progress statistics
+				$cursize += length(join(',', @$row));
+				$nlines++;
+				if (!$tmpoutfile) {
+					if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+						if ($totalsize) {
+							print STDERR &progress_bar($cursize, $totalsize, 25, '=');
+						} else {
+							print STDERR ".";
+						}
 					}
-				}
-			} else {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
-					$old_queries_count = $overall_stat{'queries_number'};
-					$old_errors_count = $overall_stat{'errors_number'};
-					$cursize = 0;
-				}
-			}
-			next if ($row->[11] !~ $parse_regex);
-
-			# Extract the date
-			if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
-
-				# Remove newline characters from queries
-				map { s/[\r\n]+/ /gs; } @$row;
-
-				my $milli = $7 || 0;
-				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
-				$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
-
-				# Skip unwanted lines
-				next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-				if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
-					if ($tmpoutfile) {
+				} else {
+					if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
 						$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
 						$old_queries_count = $overall_stat{'queries_number'};
 						$old_errors_count = $overall_stat{'errors_number'};
 						$cursize = 0;
 					}
-					$getout = 2;
-					last;
 				}
+				next if ($row->[11] !~ $parse_regex);
+
+				# Extract the date
+				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
+
+				# Remove newline characters from queries
+					map { s/[\r\n]+/ /gs; } @$row;
+
+					my $milli = $7 || 0;
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
+					$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
+
+				# Skip unwanted lines
+					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+					if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
+						if ($tmpoutfile) {
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+							$old_queries_count = $overall_stat{'queries_number'};
+							$old_errors_count = $overall_stat{'errors_number'};
+							$cursize = 0;
+						}
+						$getout = 2;
+						last;
+					}
 
 				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
+					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
 
 				# Store the current timestamp of the log line
-				&store_current_timestamp($prefix_vars{'t_timestamp'});
+					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 				# Set query parameters as global variables
-				$prefix_vars{'t_dbuser'}  = $row->[1] || '';
-				$prefix_vars{'t_dbname'}  = $row->[2] || '';
-				$prefix_vars{'t_appname'} = $row->[22] || '';
-				$prefix_vars{'t_client'}  = $row->[4] || '';
-				$prefix_vars{'t_client'}  =~ s/:.*//;
-				$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
-				$prefix_vars{'t_host'}    = 'csv';
-				$prefix_vars{'t_pid'}     = $row->[3];
-				$prefix_vars{'t_session_line'} = $row->[5];
-				$prefix_vars{'t_session_line'} =~ s/\..*//;
-				$prefix_vars{'t_loglevel'} = $row->[11];
-				$prefix_vars{'t_query'}    = $row->[13];
+					$prefix_vars{'t_dbuser'}  = $row->[1] || '';
+					$prefix_vars{'t_dbname'}  = $row->[2] || '';
+					$prefix_vars{'t_appname'} = $row->[22] || '';
+					$prefix_vars{'t_client'}  = $row->[4] || '';
+					$prefix_vars{'t_client'}  =~ s/:.*//;
+					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
+					$prefix_vars{'t_host'}    = 'csv';
+					$prefix_vars{'t_pid'}     = $row->[3];
+					$prefix_vars{'t_session_line'} = $row->[5];
+					$prefix_vars{'t_session_line'} =~ s/\..*//;
+					$prefix_vars{'t_loglevel'} = $row->[11];
+					$prefix_vars{'t_query'}    = $row->[13];
 				# Set ERROR additional information
-				$prefix_vars{'t_detail'} = $row->[14];
-				$prefix_vars{'t_hint'} = $row->[15];
-				$prefix_vars{'t_context'} = $row->[18];
-				$prefix_vars{'t_statement'} = $row->[19];
+					$prefix_vars{'t_detail'} = $row->[14];
+					$prefix_vars{'t_hint'} = $row->[15];
+					$prefix_vars{'t_context'} = $row->[18];
+					$prefix_vars{'t_statement'} = $row->[19];
 
 				# Check if the log line should be excluded from the report
-				if (&validate_log_line($prefix_vars{'t_pid'})) {
+					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
-					# Parse the query now
-					&parse_query();
-					if (&store_queries($prefix_vars{'t_pid'})) {
-						delete $cur_info{$prefix_vars{'t_pid'}};
+						# Parse the query now
+						&parse_query();
+						if (&store_queries($prefix_vars{'t_pid'})) {
+							delete $cur_info{$prefix_vars{'t_pid'}};
+						}
 					}
 				}
 			}
-		}
-		if (!$getout) {
-			$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
-			print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
+			if (!$getout) {
+				$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
+				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
+			}
+			if (!$csv->eof()) {
+				print STDERR "reset CSV parser\n";
+				$csv->SetDiag(0);
+			}
 		}
 
 	}
