@@ -2029,14 +2029,14 @@ sub process_file
 		);
 
 		# Parse csvlog lines
-		while (!$csv->eof()) {
+		CSVLOOP: while (!$csv->eof()) {
 			while (my $row = $csv->getline($lfile)) {
+
+				# We received a signal
+				last CSVLOOP if ($terminate);
 
 				# 23 columns in csvlog (from 9.0 to current)
 				next if $#{$row} != 22;
-
-				# We received a signal
-				last if ($terminate);
 
 				# Set progress statistics
 				$cursize += length(join(',', @$row));
@@ -2062,14 +2062,14 @@ sub process_file
 				# Extract the date
 				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
 
-				# Remove newline characters from queries
+					# Remove newline characters from queries
 					map { s/[\r\n]+/ /gs; } @$row;
 
 					my $milli = $7 || 0;
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
 					$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
 
-				# Skip unwanted lines
+					# Skip unwanted lines
 					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
 					if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
 						if ($tmpoutfile) {
@@ -2079,16 +2079,16 @@ sub process_file
 							$cursize = 0;
 						}
 						$getout = 2;
-						last;
+						last CSVLOOP;
 					}
 
-				# Jump to the last line parsed if required
+					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
 
-				# Store the current timestamp of the log line
+					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
 
-				# Set query parameters as global variables
+					# Set query parameters as global variables
 					$prefix_vars{'t_dbuser'}  = $row->[1] || '';
 					$prefix_vars{'t_dbname'}  = $row->[2] || '';
 					$prefix_vars{'t_appname'} = $row->[22] || '';
@@ -2101,13 +2101,13 @@ sub process_file
 					$prefix_vars{'t_session_line'} =~ s/\..*//;
 					$prefix_vars{'t_loglevel'} = $row->[11];
 					$prefix_vars{'t_query'}    = $row->[13];
-				# Set ERROR additional information
+					# Set ERROR additional information
 					$prefix_vars{'t_detail'} = $row->[14];
 					$prefix_vars{'t_hint'} = $row->[15];
 					$prefix_vars{'t_context'} = $row->[18];
 					$prefix_vars{'t_statement'} = $row->[19];
 
-				# Check if the log line should be excluded from the report
+					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
 						# Parse the query now
@@ -2118,11 +2118,9 @@ sub process_file
 					}
 				}
 			}
-			if (!$getout) {
-				$csv->eof or warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
-				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
-			}
 			if (!$csv->eof()) {
+				warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
+				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
 				print STDERR "reset CSV parser\n";
 				$csv->SetDiag(0);
 			}
