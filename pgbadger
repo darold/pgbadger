@@ -513,6 +513,7 @@ my $other_syslog_line =
 my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 my $orphan_stderr_line = '';
 
+# Simply genreate a random string, thanks to Perlmonks
 # Set default format
 my $frmt = '';
 if (!$remote_host) {
@@ -2819,11 +2820,28 @@ sub normalize_query
 	return $orig_query;
 }
 
-# Simply genreate a random string, thanks to Perlmonks
-sub generate_fake_string
+sub generate_anonymized_string
 {
-	return join('', @_[ map{ rand @_ } 1 .. shift ]);
+        my ($original, $cache, $before) = @_;
+
+        # Prevent dates from being anonymized
+        return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
+        return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
+	# Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
+        return $original if $original =~ m{\A(?:FM|FX|TM)?(?:HH|HH12|HH24|MI|SS|MS|US|SSSS|AM|A\.M\.|PM|P\.M\.|am|a\.m\.|pm|p\.m\.|Y,YYY|YYYY|YYY|YY|Y|IYYY|IYY|IY|I|BC|B\.C\.|AD|A\.D\.|bc|b\.c\.|ad|a\.d\.|MONTH|Month|month|MON|Mon|mon|MM|DAY|Day|day|DY|Dy|dy|DDD|DD|D|W|WW|IW|CC|J|Q|RM|rm|TZ|tz|[\s\/\-:])+(?:TH|th|SP)?$};
+	# Prevent interval from being anonymized
+	return $original if $before =~ /interval/i;
+
+        # Range of characters to use in anonymized strings
+        my @chars = ('A'..'Z', 0..9, 'a'..'z', '-', '_', '.');
+
+        unless ($cache->{$original}) {
+                # Actual anonymized version generation
+                $cache->{$original} = join('', map { $chars[rand @chars] } 1..10 );
+        }
+        return $cache->{$original};
 }
+
 
 # Anonymize litteral in SQL queries by replacing parameters with fake values
 sub anonymize_query
@@ -2832,6 +2850,10 @@ sub anonymize_query
 
 	return if (!$orig_query);
 
+	# Variable to hold anonymized versions, so we can provide the same value
+	# for the same input, within single query.
+	my $anonymization_cache = {};
+
 	# Remove comments
 	$orig_query =~ s/\/\*(.*?)\*\///gs;
 
@@ -2839,18 +2861,11 @@ sub anonymize_query
 	$orig_query =~ s/\\'//g;
 	$orig_query =~ s/('')+//g;
 
-	# Prevent date to be anonymized
-	$orig_query =~ s/'([\d\/\-\:\s]+)'/DATEBOUNDARY$1DATEBOUNDARY/g;
-
 	# Anonymize each values
-	$orig_query =~ s/'[^']*'/"'".&generate_fake_string(10, 'A'..'Z', 0..9, 'a'..'z', '-', '_', '.')."'"/eg;
-
-	# Restore quote around date values
-	$orig_query =~ s/DATEBOUNDARY/'/g;
+	$orig_query =~ s/([^\s]+[\s\(]*)'([^']*)'/"$1'".generate_anonymized_string($2, $anonymization_cache, $1)."'"/eg;
 
 	return $orig_query;
 }
-
 
 # Format numbers with comma for better reading
 sub comma_numbers
