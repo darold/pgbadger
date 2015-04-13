@@ -132,6 +132,7 @@ Options:
 			     mode.
     --log-duration         : force pgbadger to associate log entries generated
                              by both log_duration = on and log_statement = 'all'
+    --enable-checksum      : used to add a md5 sum under each query report.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
