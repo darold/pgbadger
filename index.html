@@ -1509,16 +1509,12 @@ pgBadger will also try to parse the full csvlog when a broken CSV line is
 encountered. 
 </p>
 <pre>
-	- Make anonymization more useful. Thanks to Hubert depesz Lubaczewski
-	  for the patch.
-	- Fix previous patch for csvlog generated with a PostgreSQL version
-	  before 9.0.
-	- Try continue CSV parsing after broken CSV line. Thanks to Sergey
-	  Burladyan for the patch.
-	- Fix bug in SQL beautifier which removed operator. Thanks to Thomas
-	  Reiss for the report.
-	- Fix loop exit, check terminate quickly and correct comments
-	  indentation. Thanks to Sergey Burladyan for the patch
+  * Make anonymization more useful. Thanks to Hubert depesz Lubaczewski for the patch.
+  * Fix previous patch for csvlog generated with a PostgreSQL version before 9.0.
+  * Try continue CSV parsing after broken CSV line. Thanks to Sergey Burladyan for the patch.
+  * Fix bug in SQL beautifier which removed operator. Thanks to Thomas Reiss for the report.
+  * Fix loop exit, check terminate quickly and correct comments indentation. Thanks to Sergey
+    Burladyan for the patch
 </pre>
 <p>
 Please upgrade.
