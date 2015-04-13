@@ -1,3 +1,23 @@
+2015-04-13 version 6.4
+
+This new release fixes a major bugs in SQL beautifier which removed operator
+and adds some useful improvement in anonymization of parameters values.
+pgBadger will also try to parse the full csvlog when a broken CSV line is
+encountered. 
+
+	- Make anonymization more useful. Thanks to Hubert depesz Lubaczewski
+	  for the patch.
+	- Fix previous patch for csvlog generated with a PostgreSQL version
+	  before 9.0.
+	- Try continue CSV parsing after broken CSV line. Thanks to Sergey
+	  Burladyan for the patch.
+	- Fix bug in SQL beautifier which removed operator. Thanks to Thomas
+	  Reiss for the report.
+	- Fix loop exit, check terminate quickly and correct comments
+	  indentation. Thanks to Sergey Burladyan for the patch
+
+Please upgrade.
+
 2015-03-27 version 6.3
 
 This new release fixes some bugs and adds some new reports:

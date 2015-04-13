@@ -50,7 +50,7 @@ use IO::Pipe;
 use FileHandle;
 use Socket;
 
-$VERSION = '6.3';
+$VERSION = '6.4';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
