@@ -1492,7 +1492,39 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 
 	<div id="simultaneous-connections" class="analysis-item row-fluid">
 		<h2 class=""><i class="icon-random"></i> Latest news about pgBadger</h2>
-			
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">6.4</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2015-04-13</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This new release fixes a major bug in SQL beautifier which removed operator
+and adds some useful improvement in anonymization of parameters values.
+pgBadger will also try to parse the full csvlog when a broken CSV line is
+encountered. 
+</p>
+<pre>
+	- Make anonymization more useful. Thanks to Hubert depesz Lubaczewski
+	  for the patch.
+	- Fix previous patch for csvlog generated with a PostgreSQL version
+	  before 9.0.
+	- Try continue CSV parsing after broken CSV line. Thanks to Sergey
+	  Burladyan for the patch.
+	- Fix bug in SQL beautifier which removed operator. Thanks to Thomas
+	  Reiss for the report.
+	- Fix loop exit, check terminate quickly and correct comments
+	  indentation. Thanks to Sergey Burladyan for the patch
+</pre>
+<p>
+Please upgrade.
+</p>
+		</div>
+
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
