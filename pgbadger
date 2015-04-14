@@ -2448,6 +2448,15 @@ sub process_file
 					next if ($line =~ /\bLOG:  /);
 
 					if (exists $cur_temp_info{$cur_pid}{size}) {
+						if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
+							$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
+							$cur_temp_info{$cur_pid}{timestamp} = $cur_info{$cur_pid}{'timestamp'};
+							$cur_temp_info{$cur_pid}{dbname}    = $cur_info{$cur_pid}{'dbname'};
+							$cur_temp_info{$cur_pid}{dbuser}    = $cur_info{$cur_pid}{'dbuser'};
+							$cur_temp_info{$cur_pid}{dbclient}  = $cur_info{$cur_pid}{'client'} || $cur_info{$cur_pid}{'dbclient'};
+							$cur_temp_info{$cur_pid}{dbappname} = $cur_info{$cur_pid}{'appname'};
+							delete $cur_info{$cur_pid};
+						}
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
@@ -10058,7 +10067,7 @@ sub store_queries
 		if ($cur_info{$t_pid}{query}) {
 
 			# Add a semi-colon at end of the query
-			$cur_info{$t_pid}{query} .= ';' if (substr($cur_info{$t_pid}{query}, -1, 1) ne ';');
+			$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 
 			# Normalize query
 			my $normalized = &normalize_query($cur_info{$t_pid}{query});
@@ -10161,7 +10170,7 @@ sub store_temporary_and_lock_infos
 	if (exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid}{query} ne '') && $cur_temp_info{$t_pid}{size}) {
 
 		# Add a semi-colon at end of the query
-		$cur_temp_info{$t_pid}{query} .= ';' if (substr($cur_temp_info{$t_pid}{query}, -1, 1) ne ';');
+		$cur_temp_info{$t_pid}{query} .= ';' if ($cur_temp_info{$t_pid}{query} !~ /;\s*$/s);
 
 		# Anonymize query if requested by the user
 		if ($anonymize) {
@@ -10189,7 +10198,7 @@ sub store_temporary_and_lock_infos
 	if (exists $cur_lock_info{$t_pid}{wait} && ($cur_lock_info{$t_pid}{query} ne '')) {
 
 		# Add a semi-colon at end of the query
-		$cur_lock_info{$t_pid}{query} .= ';' if (substr($cur_lock_info{$t_pid}{query}, -1, 1) ne ';');
+		$cur_lock_info{$t_pid}{query} .= ';' if ($cur_lock_info{$t_pid}{query} !~ /;\s*$/s);
 
 		# Anonymize query if requested by the user
 		if ($anonymize) {
