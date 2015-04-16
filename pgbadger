@@ -6852,6 +6852,7 @@ sub print_query_per_user
 {
 	my %infos = ();
 	my $total_count = 0;
+	my $total_duration = 0;
 	my $query_user_info = '';
 	my @main_user = ('unknown', 0);
 	my @main_user_duration = ('unknown', 0);
@@ -6860,6 +6861,7 @@ sub print_query_per_user
 					&comma_numbers($user_info{$d}{count}) . "</td><td>" .
 					&convert_time($user_info{$d}{duration}) . "</td></tr>";
 		$total_count += $user_info{$d}{count};
+		$total_duration += $user_info{$d}{duration};
                 if ($main_user[1] < $user_info{$d}{count}) {
                         $main_user[0] = $d;
                         $main_user[1] = $user_info{$d}{count};
@@ -6878,24 +6880,37 @@ sub print_query_per_user
 	$query_user_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
 
 	if ($graph) {
-		my @small = ();
+		my %small = ();
 		foreach my $d (sort keys %user_info) {
 			if ((($user_info{$d}{count} * 100) / ($total_count || 1)) > $pie_percentage_limit) {
-				$infos{$d} = $user_info{$d}{count} || 0;
+				$infos{queries}{$d} = $user_info{$d}{count} || 0;
 			} else {
-				$infos{"Sum queries per users < $pie_percentage_limit%"} += $user_info{$d}{count} || 0;
-				push(@small, $d);
+				$infos{queries}{"Sum queries per users < $pie_percentage_limit%"} += $user_info{$d}{count} || 0;
+				push(@{$small{queries}}, $d);
+			}
+
+			if ((($user_info{$d}{duration} * 100) / ($total_duration || 1)) > $pie_percentage_limit) {
+				$infos{duration}{$d} = $user_info{$d}{duration} || 0;
+			} else {
+				$infos{duration}{"Sum duration per users < $pie_percentage_limit%"} += $user_info{$d}{duration} || 0;
+				push(@{$small{duration}}, $d);				
 			}
 		}
-		if ($#small == 0) {
-			$infos{$small[0]} = $infos{"Sum queries per users < $pie_percentage_limit%"};
-			delete $infos{"Sum queries per users < $pie_percentage_limit%"};
+		if ($#{$small{queries}} == 0) {
+			$infos{queries}{$small{queries}[0]} = $infos{queries}{"Sum queries per users < $pie_percentage_limit%"};
+			delete $infos{queries}{"Sum queries per users < $pie_percentage_limit%"};
+		}
+		if ($#{$small{duration}} == 0){
+			$infos{duration}{$small{duration}[0]} = $infos{duration}{"Sum duration per users < $pie_percentage_limit%"};
+			delete $infos{duration}{"Sum duration per users < $pie_percentage_limit%"};			
 		}
 	}
-	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyuser', 'Queries per user', %infos);
+	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyuser', 'Queries per user', %{$infos{queries}});
+	$drawn_graphs{durationbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_durationbyuser', 'Duration per user', %{$infos{duration}});
 
 	$main_user[1] = &comma_numbers($main_user[1]);
 	$main_user_duration[1] = &convert_time($main_user_duration[1]);
+
 	print $fh qq{
 	<div class="analysis-item row-fluid" id="queries-by-user">
 		<h2><i class="icon-question-sign"></i> Queries by user</h2>
@@ -6913,13 +6928,28 @@ sub print_query_per_user
 		<div class="span8">
 			<div class="tabbable">
 				<ul class="nav nav-tabs">
-					<li class="active"><a href="#queries-by-user-graph" data-toggle="tab">Chart</a></li>
+					<li class="active"><a href="#queries-by-user-graph" data-toggle="tab">Queries Chart</a></li>
+					<li><a href="#duration-by-user-graph" data-toggle="tab">Duration Chart</a></li>
 					<li><a href="#queries-by-user-table" data-toggle="tab">Table</a></li>
 				</ul>
+	};
+
+	print $fh qq{
 				<div class="tab-content">
 					<div class="tab-pane active" id="queries-by-user-graph">
 						$drawn_graphs{queriesbyuser_graph}
 					</div>
+};
+	delete $drawn_graphs{queriesbyuser_graph};
+
+	print $fh qq{
+					<div class="tab-pane active" id="duration-by-user-graph">
+						$drawn_graphs{durationbyuser_graph}
+					</div>
+};
+	delete $drawn_graphs{durationbyuser_graph};
+
+	print $fh qq{
 					<div class="tab-pane" id="queries-by-user-table">
 						<table class="table table-striped table-hover">
 							<thead>
@@ -6940,9 +6970,8 @@ sub print_query_per_user
 		</div>
 	</div><!-- end of queries by user -->
 };
-	delete $drawn_graphs{queriesbyuser_graph};
-
 }
+
 
 sub print_query_per_host
 {
