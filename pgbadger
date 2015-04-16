@@ -930,6 +930,7 @@ my %logs_type           = ();
 my %per_minute_info     = ();
 my %lock_info           = ();
 my %tempfile_info       = ();
+my %cancelled_info      = ();
 my %connection_info     = ();
 my %database_info       = ();
 my %application_info    = ();
@@ -943,6 +944,7 @@ my %autoanalyze_info    = ();
 my @graph_values        = ();
 my %cur_info            = ();
 my %cur_temp_info       = ();
+my %cur_cancel_info     = ();
 my %cur_lock_info       = ();
 my $nlines              = 0;
 my %last_line           = ();
@@ -950,6 +952,7 @@ our %saved_last_line    = ();
 my %tsung_session       = ();
 my @top_locked_info     = ();
 my @top_tempfile_info   = ();
+my @top_cancelled_info  = ();
 my %drawn_graphs        = ();
 
 my $t0 = Benchmark->new;
@@ -1901,6 +1904,7 @@ sub init_stats_vars
 	%overall_checkpoint  = ();
 	@top_slowest         = ();
 	@top_tempfile_info   = ();
+	@top_cancelled_info  = ();
 	@top_locked_info     = ();
 	%normalyzed_info     = ();
 	%error_info          = ();
@@ -1908,6 +1912,7 @@ sub init_stats_vars
 	%per_minute_info     = ();
 	%lock_info           = ();
 	%tempfile_info       = ();
+	%cancelled_info      = ();
 	%connection_info     = ();
 	%database_info       = ();
 	%application_info    = ();
@@ -2312,6 +2317,8 @@ sub process_file
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $t_query;
+					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
+						$cur_cancel_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $t_query if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
@@ -2332,6 +2339,8 @@ sub process_file
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
+						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
@@ -2420,6 +2429,10 @@ sub process_file
 						$line =~ s/ERROR:\s+//;
 						if (exists $cur_temp_info{$cur_pid}{size}) {
 							$cur_temp_info{$cur_pid}{query} .= $line;
+						} elsif (exists $cur_lock_info{$cur_pid}{query}) {
+							$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+						} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
+							$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
 						} else {
 							$cur_info{$cur_pid}{$lbl} = $line;
 						}
@@ -2460,6 +2473,8 @@ sub process_file
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
+						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
 						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
@@ -2508,7 +2523,12 @@ sub process_file
 	foreach my $pid (keys %cur_temp_info) {
 		&store_temporary_and_lock_infos($pid);
 	}
-	
+
+	# Stores last cancelled queries information
+	foreach my $pid (keys %cur_cancel_info) {
+		&store_temporary_and_lock_infos($pid);
+	}
+
 	# Stores last temporary files and lock information
 	foreach my $pid (keys %cur_lock_info) {
 		&store_temporary_and_lock_infos($pid);
@@ -2739,6 +2759,10 @@ sub check_incremental_position
 			}
 			# Stores last temporary files and lock information
 			foreach my $pid (keys %cur_temp_info) {
+				&store_temporary_and_lock_infos($pid);
+			}
+			# Stores last cancelled queries information
+			foreach my $pid (keys %cur_cancel_info) {
 				&store_temporary_and_lock_infos($pid);
 			}
 			# Stores last temporary files and lock information
@@ -2983,6 +3007,21 @@ sub set_top_tempfile_info
 	}
 }
 
+# Stores the top N queries cancelled
+sub set_top_cancelled_info
+{
+	my ($q, $sz, $date, $db, $user, $remote, $app) = @_;
+
+	push(@top_cancelled_info, [($sz, $date, $q, $db, $user, $remote, $app)]);
+
+	my @tmp_top_cancelled_info = sort {$b->[0] <=> $a->[0]} @top_cancelled_info;
+	@top_cancelled_info = ();
+	for (my $i = 0; $i <= $#tmp_top_cancelled_info; $i++) {
+		push(@top_cancelled_info, $tmp_top_cancelled_info[$i]);
+		last if ($i == $end_top);
+	}
+}
+
 # Stores the top N queries waiting the most
 sub set_top_locked_info
 {
@@ -3124,6 +3163,10 @@ Number of unique normalized events: $fmt_unique_error
 		print $fh qq{Number temporary files: $tempfile_info{count}
 Max size of temporary files: $fmt_temp_maxsise
 Average size of temporary files: $fmt_temp_avsize
+};
+	}
+	if ($cancelled_info{count}) {
+		print $fh qq{Number cancelled queries: $cancelled_info{count}
 };
 	}
 	if (!$disable_session && $session_info{count}) {
@@ -3434,6 +3477,62 @@ Report not supported by text format
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &comma_numbers($top_tempfile_info[$i]->[0]),
 			" - $ttl$db - ", $top_tempfile_info[$i]->[2], "\n";
+		}
+		print $fh "\n";
+	}
+
+	# Show cancelled queries detailed information
+	if (!$disable_query && scalar keys %cancelled_info > 0) {
+
+		my @top_cancelled;
+		foreach my $h (keys %normalyzed_info) {
+			if (exists($normalyzed_info{$h}{cancelled})) {
+				push (@top_cancelled, [$h, $normalyzed_info{$h}{cancelled}{count}]);
+			}
+		}
+
+		# Queries generating the most cancelled files (N)
+		@top_cancelled = sort {$b->[1] <=> $a->[1]} @top_cancelled;
+		print $fh "\n- Queries most cancelled (N) ---------------------------\n\n";
+		print $fh "Rank   Count   Query\n";
+		my $idx = 1;
+		for (my $i = 0 ; $i <= $#top_cancelled ; $i++) {
+			last if ($i > $end_top);
+			print $fh $idx, ")   ",
+			$top_cancelled[$i]->[1], " - ", $top_cancelled[$i]->[0], "\n";
+			print $fh "--\n";
+			my $k = $top_cancelled[$i]->[0];
+			if ($normalyzed_info{$k}{count} > 1) {
+				my $j = 1;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
+					$db =~ s/^, / - /;
+					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+					$j++;
+				}
+			}                             
+			$idx++;
+		}
+		@top_cancelled = ();
+
+		# Top queries generating the largest cancelled files
+		@top_cancelled_info = sort {$b->[1] <=> $a->[1]} @top_cancelled_info;
+
+		print $fh "\n- Queries generating the most cancellation ----------------------------\n\n";
+		print $fh "Rank   Times cancelled    Query\n";
+		for (my $i = 0 ; $i <= $#top_cancelled_info ; $i++) {
+			my $ttl = $top_cancelled_info[$i]->[1] || '';
+			my $db = " - database: $top_cancelled_info[$i]->[3]" if ($top_cancelled_info[$i]->[3]);
+			$db .= ", user: $top_cancelled_info[$i]->[4]" if ($top_cancelled_info[$i]->[4]);
+			$db .= ", remote: $top_cancelled_info[$i]->[5]" if ($top_cancelled_info[$i]->[5]);
+			$db .= ", app: $top_cancelled_info[$i]->[6]" if ($top_cancelled_info[$i]->[6]);
+			$db =~ s/^, / - /;
+			print $fh ($i + 1), ")   ", &comma_numbers($top_cancelled_info[$i]->[0]),
+			" - $ttl$db - ", $top_cancelled_info[$i]->[2], "\n";
 		}
 		print $fh "\n";
 	}
@@ -3779,6 +3878,7 @@ sub html_header
      		</li>
 };
 		}
+
 		if (!$disable_temporary) {
 			print $fh qq{
      		<li id="menu-tempfiles" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Temp Files <span class="caret"></span></a>
@@ -3829,6 +3929,10 @@ sub html_header
      				<li><a href="#queries-by-user">Queries by user</a></li>
      				<li><a href="#queries-by-host">Queries by host</a></li>
      				<li><a href="#queries-by-application">Queries by application</a></li>
+				<li class="divider"></li>
+     				<li><a href="#queries-cancelled-number">Number of cancelled queries</a></li>
+     				<li><a href="#queries-generating-most-cancellation">Queries generating the most cancellation (N)</a></li>
+     				<li><a href="#queries-generating-most-cancelled">Most cancelled queries</a></li>
      			</ul>     
      		</li>
 };
@@ -3944,6 +4048,7 @@ sub print_overall_statistics
 	my $autovacuum_count = &comma_numbers($autovacuum_info{count});
 	my $autoanalyze_count = &comma_numbers($autoanalyze_info{count});
 	my $tempfile_count = &comma_numbers($tempfile_info{count});
+	my $cancelled_count = &comma_numbers($cancelled_info{count});
 	my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize});
 	my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", $tempfile_info{size} / ($tempfile_info{count} || 1)));
 	my $session_count = &comma_numbers($session_info{count});
@@ -4004,6 +4109,7 @@ sub print_overall_statistics
 							<li class="first"><span class="figure">$fmt_errors</span> <span class="figure-label">Number of events</span></li>
 							<li><span class="figure">$fmt_unique_error</span> <span class="figure-label">Number of unique normalized events</span></li>
 							<li><span class="figure">$main_error</span> <span class="figure-label">Max number of times the same event was reported</span></li>
+							<li><span class="figure">$cancelled_count</span> <span class="figure-label">Number of cancellation</span></li>
 						</ul>
 					</div>
 					<div class="tab-pane" id="tab-vacuums">
@@ -5747,6 +5853,86 @@ $drawn_graphs{temporaryfile_graph}
 
 }
 
+sub print_cancelled_queries
+{
+
+	# checkpoint
+	my %graph_data = ();
+	if ($graph) {
+
+		foreach my $tm (sort {$a <=> $b} keys %per_minute_info) {
+
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $y  = $1 - 1900;
+			my $mo = $2 - 1;
+			my $d  = $3;
+			foreach my $h ("00" .. "23") {
+				next if (!exists $per_minute_info{$tm}{$h});
+				my %chk_dataavg = ();
+				my %t_dataavg = ();
+				my %v_dataavg = ();
+				foreach my $m ("00" .. "59") {
+					next if (!exists $per_minute_info{$tm}{$h}{$m});
+					my $rd = &average_per_minutes($m, $avg_minutes);
+					if ($cancelled_info{count}) {
+						$t_dataavg{count}{"$rd"} = 0 if (!exists $t_dataavg{count}{"$rd"});
+						if (exists $per_minute_info{$tm}{$h}{$m}{cancelled}) {
+							$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{cancelled}{count} || 0);
+						}
+					}
+				}
+
+				foreach my $rd (@avgs) {
+					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+
+					next if ($t < $t_min);
+					last if ($t > $t_max);
+
+					if (exists $t_dataavg{count}) {
+						$graph_data{count} .= "[$t, " . ($t_dataavg{count}{"$rd"} || 0) . "],";
+					}
+				}
+			}
+		}
+		foreach (keys %graph_data) {
+			$graph_data{$_} =~ s/,$//;
+		}
+	}
+	# Number of cancelled queries graph
+	$drawn_graphs{cancelledqueries_graph} =
+		&flotr2_graph($graphid++, 'cancelledqueries_graph', $graph_data{count}, '', '',
+			'Number of cancelled queries (' . $avg_minutes . ' minutes period)',
+			'Number of cancellation', 'Number of cancellation'
+		);
+
+	my $cancelled_count_peak = 0;
+	my $cancelled_count_peak_date = '';
+	foreach (sort {$overall_stat{'peak'}{$b}{cancelled_count} <=> $overall_stat{'peak'}{$a}{cancelled_count}} keys %{$overall_stat{'peak'}}) {
+		$cancelled_count_peak = &comma_numbers($overall_stat{'peak'}{$_}{cancelled_count});
+		$cancelled_count_peak_date = $_;
+		last;
+	}
+	print $fh qq{
+	<div id="queries-cancelled-number" class="analysis-item row-fluid">
+	<h2 class=""><i class="icon-th"></i> Number of cancelled queries</h2>
+	<div class="span3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+				<li><span class="figure">$cancelled_count_peak per second</span> <span class="figure-label">Cancelled query Peak</span></li>
+				<li><span class="figure">$cancelled_count_peak_date</span> <span class="figure-label">Date</span></li>
+			</ul>
+		</div>
+	</div>
+	<div class="span8">
+		<h3 class="">Number of cancelled queries ($avg_minutes minutes average)</h3>
+$drawn_graphs{cancelledqueries_graph}
+		</div>
+	</div><!-- end of Number of cancelled queries -->
+};
+	delete $drawn_graphs{cancelledqueries_graph};
+}
+
 sub print_analyze_per_table
 {
 	# ANALYZE stats per table
@@ -7170,6 +7356,149 @@ sub print_tempfile_report
 
 }
 
+sub print_cancelled_report
+{
+	my @top_cancelled = ();
+	foreach my $h (keys %normalyzed_info) {
+		if (exists($normalyzed_info{$h}{cancelled})) {
+			push (@top_cancelled, [$h, $normalyzed_info{$h}{cancelled}{count}]);
+		}
+	}
+
+	# Queries generating the most cancellation (N)
+	if ($#top_cancelled >= 0) {
+		@top_cancelled = sort {$b->[1] <=> $a->[1]} @top_cancelled;
+		print $fh qq{
+		<div class="analysis-item row-fluid" id="queries-generating-most-cancellation">
+			<h2><i class="icon-pencil"></i> Queries generating the most cancellation (N)</h2>
+			<div class="span11">
+				<table class="table table-striped" id="queries-generating-most-cancellation-table">
+				<thead>
+					<tr>
+						<th>Rank</th>
+						<th>Count</th>
+						<th>Query</th>
+					</tr>
+				</thead>
+				<tbody>
+};
+		my $rank = 1;
+		for (my $i = 0 ; $i <= $#top_cancelled ; $i++) {
+			my $count = &comma_numbers($top_cancelled[$i]->[1]);
+			my $query = &highlight_code($top_cancelled[$i]->[0]);
+			my $md5 = '';
+			$md5 = 'md5: ' . md5_hex($top_cancelled[$i]->[0]) if ($enable_checksum);
+			my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-cancellation-examples-rank-$rank">Examples</button></p>};
+			$example = '' if (scalar keys %{$normalyzed_info{$top_cancelled[$i]->[0]}{samples}} == 0);
+			print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$count</td>
+				<td id="queries-generating-most-cancellation-examples-details-rank-$rank">
+					<div id="query-c-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
+					$example
+				<!-- Examples collapse -->
+				<div id="queries-generating-most-cancellation-examples-rank-$rank" class="collapse">
+					<dl>
+};
+			my $k = $top_cancelled[$i]->[0];
+			if ($normalyzed_info{$k}{count} >= 1) {
+				my $idx = 1;
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
+					my $md5 = '';
+					$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
+					my $details = "Duration: " . &convert_time($d) . "<br />";
+					$details .= "Database: $normalyzed_info{$k}{samples}{$d}{db}<br/>" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$details .= "User: $normalyzed_info{$k}{samples}{$d}{user}<br/>" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$details .= "Remote: $normalyzed_info{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$details .= "Application: $normalyzed_info{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
+					print $fh qq{
+						<dt>
+						<div id="query-d-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
+						
+						</dt>
+						<pre>$details</pre>
+};
+				$idx++
+
+				}
+				print $fh qq{
+					</dl>
+					<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-cancellation-examples-rank-$rank">x Hide</button></p>
+				</div>
+				<!-- end of example collapse -->
+			</td>
+		</tr>
+};
+			}                             
+			$rank++;
+		}
+        print $fh qq{
+		</tbody>
+		</table>
+	</div>
+</div><!-- end of queries-generating-most-cancellation -->
+};
+
+		@top_cancelled = ();
+	}
+
+	# Top queries generating the most cancellation
+	if ($#top_cancelled_info >= 0) {
+		@top_cancelled_info = sort {$b->[0] <=> $a->[0]} @top_cancelled_info;
+		my $largest = &comma_numbers($top_cancelled[0]->[0]);
+		print $fh qq{
+		<div class="analysis-item row-fluid" id="queries-generating-most-cancelled">
+			<h2><i class="icon-pencil"></i> Queries most cancelled</h2>
+			<div class="span11">
+				<table class="table table-striped" id="queries-generating-most-cancelled-table">
+				<thead>
+					<tr>
+						<th>Rank</th>
+						<th>Number</th>
+						<th>Query</th>
+					</tr>
+				</thead>
+				<tbody>
+};
+		my $rank = 1;
+		for (my $i = 0 ; $i <= $#top_cancelled_info ; $i++) {
+			my $count = &comma_numbers($top_cancelled_info[$i]->[0]);
+			my $details = "[ <b>Date:</b> $top_cancelled_info[$i]->[1]";
+			$details .= " - <b>Database:</b> $top_cancelled_info[$i]->[3]" if ($top_cancelled_info[$i]->[3]);
+			$details .= " - <b>User:</b> $top_cancelled_info[$i]->[4]" if ($top_cancelled_info[$i]->[4]);
+			$details .= " - <b>Remote:</b> $top_cancelled_info[$i]->[5]" if ($top_cancelled_info[$i]->[5]);
+			$details .= " - <b>Application:</b> $top_cancelled_info[$i]->[6]" if ($top_cancelled_info[$i]->[6]);
+			$details .= " - <b>Bind yes:</b> yes" if ($top_cancelled_info[$i]->[7]);
+			$details .= " ]";
+			my $query = &highlight_code($top_cancelled_info[$i]->[2]);
+			my $md5 = '';
+			$md5 = 'md5: ' . md5_hex($top_cancelled_info[$i]->[2]) if ($enable_checksum);
+			print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$count</td>
+				<td id="queries-generating-most-cancelled-examples-details-rank-$rank">
+					<div id="query-d-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
+					<pre>$details</pre>
+				</td>
+				</tr>
+};
+			$rank++;
+		}
+		print $fh qq{
+		</tbody>
+		</table>
+	</div>
+</div><!-- end of queries-generating-most-cancelled -->
+};
+		@top_cancelled_info = ();
+	}
+
+}
+
 sub print_histogram_query_times
 {
 	my %data = ();
@@ -8033,8 +8362,6 @@ sub dump_as_html
 			&print_lock_queries_report();
 		}
 
-		%per_minute_info = ();
-
 		if (!$disable_query) {
 			print $fh qq{
 		</li>
@@ -8055,6 +8382,13 @@ sub dump_as_html
 
 				# Show requests per application
 				&print_query_per_application();
+;
+				# Show cancelled queries detailed information
+				&print_cancelled_queries();
+
+				# Show information about cancelled queries
+				&print_cancelled_report();
+
 			}
 
 			print $fh qq{
@@ -8076,6 +8410,8 @@ sub dump_as_html
 			# Print normalized slowest queries
 			&print_slowest_queries
 		}
+
+		%per_minute_info = ();
 
 	}
 
@@ -8427,6 +8763,7 @@ sub load_stats
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
 	my %_session_info = %{$stats{session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
+	my %_cancelled_info = %{$stats{cancelled_info}};
 	my %_logs_type = %{$stats{logs_type}};
 	my %_lock_info = %{$stats{lock_info}};
 	my %_per_minute_info = %{$stats{per_minute_info}};
@@ -8439,6 +8776,7 @@ sub load_stats
 	my %_autoanalyze_info = %{$stats{autoanalyze_info}};
 	my @_top_locked_info = @{$stats{top_locked_info}};
 	my @_top_tempfile_info = @{$stats{top_tempfile_info}};
+	my @_top_cancelled_info = @{$stats{top_cancelled_info}};
 
 	### overall_stat ###
 
@@ -8489,6 +8827,8 @@ sub load_stats
 		$overall_stat{peak}{$k}{session} += $_overall_stat{peak}{$k}{session};
 		$overall_stat{peak}{$k}{tempfile_size} += $_overall_stat{peak}{$k}{tempfile_size};
 		$overall_stat{peak}{$k}{tempfile_count} += $_overall_stat{peak}{$k}{tempfile_count};
+		$overall_stat{peak}{$k}{cancelled_size} += $_overall_stat{peak}{$k}{cancelled_size};
+		$overall_stat{peak}{$k}{cancelled_count} += $_overall_stat{peak}{$k}{cancelled_count};
 	}
 
 	foreach my $k (keys %{$_overall_stat{histogram}{query_time}}) {
@@ -8678,6 +9018,8 @@ sub load_stats
 					}
 				}
 
+				$per_minute_info{$day}{$hour}{$min}{cancelled}{count} += $_per_minute_info{$day}{$hour}{$min}{cancelled}{count}
+						if defined $_per_minute_info{$day}{$hour}{$min}{cancelled}{count};
 				$per_minute_info{$day}{$hour}{$min}{tempfile}{count} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{count}
 						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{count};
 				$per_minute_info{$day}{$hour}{$min}{tempfile}{size} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{size}
@@ -8795,6 +9137,10 @@ sub load_stats
 			if (!exists $normalyzed_info{$stmt}{tempfiles}{maxsize} || ($normalyzed_info{$stmt}{tempfiles}{maxsize} < $_normalyzed_info{$stmt}{tempfiles}{maxsize})) { 
 				$normalyzed_info{$stmt}{tempfiles}{maxsize} = $_normalyzed_info{$stmt}{tempfiles}{maxsize};
 			}
+		}
+
+		if (exists $_normalyzed_info{$stmt}{cancelled}) {
+			$normalyzed_info{$stmt}{cancelled}{count} += $_normalyzed_info{$stmt}{cancelled}{count};
 		}
 
 		foreach my $u (keys %{$_normalyzed_info{$stmt}{users}} ) {
@@ -9219,6 +9565,10 @@ sub parse_query
 		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
+	} elsif ($prefix_vars{'t_loglevel'} eq 'ERROR') {
+		if ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/) {
+			$prefix_vars{'t_loglevel'} = 'LOG';
+		}
 	}
 
 	# Remove session failure from current workload because there is no disconnection entry
@@ -9328,6 +9678,37 @@ sub parse_query
 		$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 		$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 		$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		return;
+	}
+
+	# Stores query related to cancelled queries information
+	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_cancel_info{$t_pid}{count}) {
+		$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+		$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+		$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+		$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+		$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+		$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		return;
+	}
+
+	# Stores cancelled queries
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/)) {
+		return if ($disable_query);
+		$cancelled_info{count}++;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{cancelled}{count}++;
+		# Store current cancelled query information that will be used later
+		# when we will parse the query that has been killed
+		$overall_stat{'peak'}{$cur_last_log_timestamp}{cancelled_count}++;
+		$cur_cancel_info{$t_pid}{count}++;
+		if ($format eq 'csv') {
+			$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		}
 		return;
 	}
 
@@ -10219,6 +10600,26 @@ sub store_temporary_and_lock_infos
 		}
 		&set_top_locked_info($cur_lock_info{$t_pid}{query}, $cur_lock_info{$t_pid}{wait}, $cur_lock_info{$t_pid}{timestamp}, $cur_lock_info{$t_pid}{dbname}, $cur_lock_info{$t_pid}{dbuser}, $cur_lock_info{$t_pid}{dbclient}, $cur_lock_info{$t_pid}{dbappname});
 		delete $cur_lock_info{$t_pid};
+	}
+
+	# Store normalized query temp file size if required
+	if (exists $cur_cancel_info{$t_pid} && ($cur_cancel_info{$t_pid}{query} ne '')) {
+
+		# Add a semi-colon at end of the query
+		$cur_cancel_info{$t_pid}{query} .= ';' if ($cur_cancel_info{$t_pid}{query} !~ /;\s*$/s);
+
+		# Anonymize query if requested by the user
+		if ($anonymize) {
+			$cur_cancel_info{$t_pid}{query} = &anonymize_query($cur_cancel_info{$t_pid}{query});
+		}
+
+		# Normalize query
+		my $normalized = &normalize_query($cur_cancel_info{$t_pid}{query});
+
+		$normalyzed_info{$normalized}{cancelled}{count}++;
+
+		&set_top_cancelled_info($cur_cancel_info{$t_pid}{query}, $cur_cancel_info{$t_pid}{count}, $cur_cancel_info{$t_pid}{timestamp}, $cur_cancel_info{$t_pid}{dbname}, $cur_cancel_info{$t_pid}{dbuser}, $cur_cancel_info{$t_pid}{dbclient}, $cur_cancel_info{$t_pid}{dbappname});
+		delete $cur_cancel_info{$t_pid};
 	}
 
 }
@@ -13115,7 +13516,7 @@ footer {
 	color:#eee;
 }
 
-#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph {
 	width : 100%;
 	height: 400px;
 }
@@ -13177,7 +13578,7 @@ footer {
 	}
 
 
-	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph {
+	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph {
 		width : 94.5%;
 	}
 
