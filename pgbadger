@@ -3927,6 +3927,7 @@ sub html_header
      				<li><a href="#queries-by-type">Queries by type</a></li>
      				<li><a href="#queries-by-database">Queries by database</a></li>
      				<li><a href="#queries-by-user">Queries by user</a></li>
+     				<li><a href="#queries-by-user">Duration by user</a></li>
      				<li><a href="#queries-by-host">Queries by host</a></li>
      				<li><a href="#queries-by-application">Queries by application</a></li>
 				<li class="divider"></li>
@@ -6888,12 +6889,11 @@ sub print_query_per_user
 				$infos{queries}{"Sum queries per users < $pie_percentage_limit%"} += $user_info{$d}{count} || 0;
 				push(@{$small{queries}}, $d);
 			}
-
 			if ((($user_info{$d}{duration} * 100) / ($total_duration || 1)) > $pie_percentage_limit) {
 				$infos{duration}{$d} = $user_info{$d}{duration} || 0;
 			} else {
 				$infos{duration}{"Sum duration per users < $pie_percentage_limit%"} += $user_info{$d}{duration} || 0;
-				push(@{$small{duration}}, $d);				
+				push(@{$small{duration}}, $d);                          
 			}
 		}
 		if ($#{$small{queries}} == 0) {
@@ -6902,7 +6902,7 @@ sub print_query_per_user
 		}
 		if ($#{$small{duration}} == 0){
 			$infos{duration}{$small{duration}[0]} = $infos{duration}{"Sum duration per users < $pie_percentage_limit%"};
-			delete $infos{duration}{"Sum duration per users < $pie_percentage_limit%"};			
+			delete $infos{duration}{"Sum duration per users < $pie_percentage_limit%"};                     
 		}
 	}
 	$drawn_graphs{queriesbyuser_graph} = &flotr2_piegraph($graphid++, 'graph_queriesbyuser', 'Queries per user', %{$infos{queries}});
@@ -6920,8 +6920,6 @@ sub print_query_per_user
 				<ul>
 					<li><span class="figure">$main_user[0]</span> <span class="figure-label">Main user</span></li>
 					<li><span class="figure">$main_user[1]</span> <span class="figure-label">Requests</span></li>
-					<li><span class="figure">$main_user_duration[1] ($main_user_duration[0])</span></li>
-					<li><span class="figure-label">Main time consuming user</span></li>
 				</ul>
 			</div>
 		</div>
@@ -6929,27 +6927,12 @@ sub print_query_per_user
 			<div class="tabbable">
 				<ul class="nav nav-tabs">
 					<li class="active"><a href="#queries-by-user-graph" data-toggle="tab">Queries Chart</a></li>
-					<li><a href="#duration-by-user-graph" data-toggle="tab">Duration Chart</a></li>
 					<li><a href="#queries-by-user-table" data-toggle="tab">Table</a></li>
 				</ul>
-	};
-
-	print $fh qq{
 				<div class="tab-content">
 					<div class="tab-pane active" id="queries-by-user-graph">
 						$drawn_graphs{queriesbyuser_graph}
 					</div>
-};
-	delete $drawn_graphs{queriesbyuser_graph};
-
-	print $fh qq{
-					<div class="tab-pane active" id="duration-by-user-graph">
-						$drawn_graphs{durationbyuser_graph}
-					</div>
-};
-	delete $drawn_graphs{durationbyuser_graph};
-
-	print $fh qq{
 					<div class="tab-pane" id="queries-by-user-table">
 						<table class="table table-striped table-hover">
 							<thead>
@@ -6970,8 +6953,52 @@ sub print_query_per_user
 		</div>
 	</div><!-- end of queries by user -->
 };
-}
+	delete $drawn_graphs{queriesbyuser_graph};
 
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="duration-by-user">
+		<h2><i class="icon-time"></i> Duration by user</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_user_duration[1] ($main_user_duration[0])</span> <span class="figure-label">Main time consuming user</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#duration-by-user-graph" data-toggle="tab">Duration Chart</a></li>
+					<li><a href="#duration-by-user-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="duration-by-user-graph">
+						$drawn_graphs{durationbyuser_graph}
+					</div>
+					<div class="tab-pane" id="duration-by-user-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>User</th>
+									<th>Request type</th>
+									<th>Count</th>
+									<th>Duration</th>
+								</tr>
+							</thead>
+							<tbody>
+							$query_user_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of duration by user -->
+};
+	delete $drawn_graphs{durationbyuser_graph};
+
+}
 
 sub print_query_per_host
 {
@@ -11003,6 +11030,13 @@ sub flotr2_piegraph
 {
 	my ($buttonid, $divid, $title, %data) = @_;
 
+	my $type = '';
+	if ($divid =~ /size/) {
+		$type = 'size';
+	} elsif ($divid =~ /duration/) {
+		$type = 'duration';
+	}
+
 	if (scalar keys %data == 0) {
 		return qq{
 <div id="$divid" class="flotr-graph"><blockquote><b>NO DATASET</b></blockquote></div>
@@ -11056,7 +11090,7 @@ document.writeln('<div class="btn-group pull-right"><input type="button" class="
         },
         mouse: {
             track: true,
-	    trackFormatter: function(obj){ return pieTracker(obj) },
+	    trackFormatter: function(obj){ return pieTracker(obj, '$type') },
             relative: true
         },
         legend: {
@@ -12408,9 +12442,15 @@ function format_number(val) {
         return val_format;
 }
 
-function pieTracker(obj) 
+function pieTracker(obj, utype) 
 {
-	var textToShow = '<span class="mfigure">'+format_number(obj.y)+' <small>'+obj.series.label+'</small></span>';
+	var textToShow = '<span class="mfigure">';
+	if (utype == 'duration') {
+		textToShow += pretty_print_number(obj.y, utype);
+	} else {
+		textToShow += format_number(obj.y);
+	}
+	textToShow += ' <small>'+obj.series.label+'</small></span>';
 	return textToShow;
 }
 
@@ -13555,7 +13595,7 @@ footer {
 	height: 400px;
 }
 
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
 	width : 100%;
 	height: 320px;
 }
@@ -13615,7 +13655,7 @@ footer {
 		width : 94.5%;
 	}
 
-	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph {
+	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
 		width : 94.5%;
 	}
 
