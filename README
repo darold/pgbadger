@@ -130,6 +130,7 @@ SYNOPSIS
                                  mode.
         --log-duration         : force pgbadger to associate log entries generated
                                  by both log_duration = on and log_statement = 'all'
+        --enable-checksum      : used to add a md5 sum under each query report.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
@@ -250,6 +251,10 @@ FEATURE
             The most frequent queries.
             The most frequent errors.
             Histogram of query times.
+            Histogram of sessions times.
+            Users involved in top queries.
+            Queries generating the most cancellation.
+            Queries most cancelled.
 
     The following reports are also available with hourly charts divide by
     periods of five minutes:
@@ -258,6 +263,7 @@ FEATURE
             Temporary file statistics.
             Checkpoints statistics.
             Autovacuum and autoanalyze statistics.
+            Cancelled queries.
 
     There's also some pie reports of distribution about:
 
@@ -267,7 +273,7 @@ FEATURE
             Sessions per database/user/client.
             Connections per database/user/client.
             Autovacuum and autoanalyze per table.
-            Histogram of sessions times.
+            Queries per user and total duration per user.
 
     All charts are zoomable and can be saved as PNG images. SQL queries
     reported are highlighted and beautified automatically.

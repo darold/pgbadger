@@ -252,6 +252,10 @@ pgBadger reports everything about your SQL queries:
 	The most frequent queries.
 	The most frequent errors.
 	Histogram of query times.
+	Histogram of sessions times.
+	Users involved in top queries.
+	Queries generating the most cancellation.
+	Queries most cancelled.
 
 The following reports are also available with hourly charts divide by periods of
 five minutes:
@@ -260,6 +264,7 @@ five minutes:
 	Temporary file statistics.
 	Checkpoints statistics.
 	Autovacuum and autoanalyze statistics.
+	Cancelled queries.
 
 There's also some pie reports of distribution about:
 
@@ -269,7 +274,7 @@ There's also some pie reports of distribution about:
 	Sessions per database/user/client.
 	Connections per database/user/client.
 	Autovacuum and autoanalyze per table.
-	Histogram of sessions times.
+	Queries per user and total duration per user.
 
 All charts are zoomable and can be saved as PNG images. SQL queries reported are
 highlighted and beautified automatically.
