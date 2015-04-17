@@ -49,6 +49,7 @@ use IO::Handle;
 use IO::Pipe;
 use FileHandle;
 use Socket;
+use constant EBCDIC => "\t" ne "\011";
 
 $VERSION = '6.4';
 
@@ -68,6 +69,37 @@ my $MAX_QUERY_LENGTH = 20480;
 my $terminate = 0;
 my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
+my $EXPLAIN_URL = 'http://explain.depesz.com/?is_public=0&is_anon=0&plan=';
+
+my @E2A = (
+   0,  1,  2,  3,156,  9,134,127,151,141,142, 11, 12, 13, 14, 15,
+  16, 17, 18, 19,157, 10,  8,135, 24, 25,146,143, 28, 29, 30, 31,
+ 128,129,130,131,132,133, 23, 27,136,137,138,139,140,  5,  6,  7,
+ 144,145, 22,147,148,149,150,  4,152,153,154,155, 20, 21,158, 26,
+  32,160,226,228,224,225,227,229,231,241,162, 46, 60, 40, 43,124,
+  38,233,234,235,232,237,238,239,236,223, 33, 36, 42, 41, 59, 94,
+  45, 47,194,196,192,193,195,197,199,209,166, 44, 37, 95, 62, 63,
+ 248,201,202,203,200,205,206,207,204, 96, 58, 35, 64, 39, 61, 34,
+ 216, 97, 98, 99,100,101,102,103,104,105,171,187,240,253,254,177,
+ 176,106,107,108,109,110,111,112,113,114,170,186,230,184,198,164,
+ 181,126,115,116,117,118,119,120,121,122,161,191,208, 91,222,174,
+ 172,163,165,183,169,167,182,188,189,190,221,168,175, 93,180,215,
+ 123, 65, 66, 67, 68, 69, 70, 71, 72, 73,173,244,246,242,243,245,
+ 125, 74, 75, 76, 77, 78, 79, 80, 81, 82,185,251,252,249,250,255,
+  92,247, 83, 84, 85, 86, 87, 88, 89, 90,178,212,214,210,211,213,
+  48, 49, 50, 51, 52, 53, 54, 55, 56, 57,179,219,220,217,218,159
+);
+if (EBCDIC && ord('^') == 106) { # as in the BS2000 posix-bc coded character set
+     $E2A[74] = 96;   $E2A[95] = 159;  $E2A[106] = 94;  $E2A[121] = 168;
+     $E2A[161] = 175; $E2A[173] = 221; $E2A[176] = 162; $E2A[186] = 172;
+     $E2A[187] = 91;  $E2A[188] = 92;  $E2A[192] = 249; $E2A[208] = 166;
+     $E2A[221] = 219; $E2A[224] = 217; $E2A[251] = 123; $E2A[253] = 125;
+     $E2A[255] = 126;
+}
+elsif (EBCDIC && ord('^') == 176) { # as in codepage 037 on os400
+  $E2A[21] = 133; $E2A[37] = 10;  $E2A[95] = 172; $E2A[173] = 221;
+  $E2A[176] = 94; $E2A[186] = 91; $E2A[187] = 93; $E2A[189] = 168;
+}
 
 my $pgbadger_logo =
         '<img src="data:image/png;base64,
@@ -7181,14 +7213,17 @@ sub print_lock_queries_report
 				$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 				$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$details .= " ]";
+				my $explain = '';
 				if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-					$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+					my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
+					$explain = "<div id=\"query-a-explain-$rank\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
 				}
 				print $fh qq{
 					<dt>
 						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></li>$query</div>$md5
 					</dt>
 					<pre>$details</pre>
+					$explain
 };
 				$idx++;
 
@@ -7674,8 +7709,10 @@ sub print_slowest_individual_queries
 		$details .= " - <b>Application:</b> $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
 		$details .= " - <b>Bind query:</b> yes" if ($top_slowest[$i]->[7]);
 		$details .= " ]";
+		my $explain = '';
 		if ($top_slowest[$i]->[8]) {
-			$details .= "\n<b>Explain plan:</b>\n" . $top_slowest[$i]->[8];
+			my $url = $EXPLAIN_URL . url_escape($top_slowest[$i]->[8]);
+			$explain = "<div id=\"query-d-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $top_slowest[$i]->[8] . "</pre>\n";
 		}
 		my $query = &highlight_code($top_slowest[$i]->[2]);
 		my $md5 = '';
@@ -7687,6 +7724,7 @@ sub print_slowest_individual_queries
 				<td id="slowest-individual-queries-examples-rank-$rank">
 					<div id="query-d-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 					<pre>$details</pre>
+					$explain
 				</td>
 				</tr>
 
@@ -7873,8 +7911,10 @@ sub print_time_consuming
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
+				$explain = "<div id=\"query-e-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -7884,6 +7924,7 @@ sub print_time_consuming
 								<div id="query-e-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 								</dt>
 								<pre>$details</pre>
+								$explain
 };
 			$idx++;
 		}
@@ -8077,8 +8118,10 @@ sub print_most_frequent
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
+				$explain = "<div id=\"query-f-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>";
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -8088,6 +8131,7 @@ sub print_most_frequent
 								<div id="query-f-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 								</dt>
 								<pre>$details</pre>
+								$explain
 };
 			$idx++;
 		}
@@ -8285,8 +8329,10 @@ sub print_slowest_queries
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
+				$explain = "<div id=\"query-g-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -8296,6 +8342,7 @@ sub print_slowest_queries
 								<div id="query-g-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 								</dt>
 								<pre>$details</pre>
+								$explain
 };
 			$idx++;
 		}
@@ -8521,6 +8568,23 @@ sub dump_as_html
 	# Dump the html footer
 	&html_footer();
 
+}
+
+sub url_escape
+{
+	my $toencode = shift;
+
+	return if (!$toencode);
+
+	utf8::encode($toencode) if (($] >= 5.008) && utf8::is_utf8($toencode));
+
+	if (EBCDIC) {
+		$toencode =~ s/([^a-zA-Z0-9_.~-])/uc sprintf("%%%02x",$E2A[ord($1)])/eg;
+	} else {
+		$toencode =~ s/([^a-zA-Z0-9_.~-])/uc sprintf("%%%02x",ord($1))/eg;
+	}
+
+	return $toencode;
 }
 
 sub escape_html
