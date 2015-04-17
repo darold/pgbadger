@@ -944,6 +944,7 @@ my %autoanalyze_info    = ();
 my @graph_values        = ();
 my %cur_info            = ();
 my %cur_temp_info       = ();
+my %cur_plan_info       = ();
 my %cur_cancel_info     = ();
 my %cur_lock_info       = ();
 my $nlines              = 0;
@@ -2313,7 +2314,9 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					if (exists $cur_temp_info{$cur_pid}{query}) {
+					if (exists $cur_plan_info{$cur_pid}{duration}) {
+						$cur_plan_info{$cur_pid}{plan} .= "\n" . $t_query;
+					} elsif (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $t_query;
@@ -2335,7 +2338,9 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					if (exists $cur_temp_info{$cur_pid}{query}) {
+					if (exists $cur_plan_info{$cur_pid}{duration}) {
+						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+					} elsif (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
@@ -2460,7 +2465,9 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					if (exists $cur_temp_info{$cur_pid}{size}) {
+					if (exists $cur_plan_info{$cur_pid}{duration}) {
+						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+					} elsif (exists $cur_temp_info{$cur_pid}{size}) {
 						if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
 							$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
 							$cur_temp_info{$cur_pid}{timestamp} = $cur_info{$cur_pid}{'timestamp'};
@@ -2490,6 +2497,10 @@ sub process_file
 
 					$cur_info{$cur_pid}{detail} .= "\n" . $line;
 
+				} elsif (exists $cur_plan_info{$cur_pid}{duration}) {
+
+					$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+
 				}
 
 			} else {
@@ -2516,7 +2527,6 @@ sub process_file
 	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
 		# Stores last query information
 		&store_queries($pid, 1);
-
 	}
 
 	# Stores last temporary files and lock information
@@ -3040,9 +3050,9 @@ sub set_top_locked_info
 # Stores the top N slowest queries
 sub set_top_slowest
 {
-	my ($q, $dt, $date, $db, $user, $remote, $app, $bind) = @_;
+	my ($q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
 
-	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app, $bind)]);
+	push(@top_slowest, [($dt, $date, $q, $db, $user, $remote, $app, $bind, $plan)]);
 
 	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} @top_slowest;
 	@top_slowest = ();
@@ -3056,7 +3066,7 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($norm, $q, $dt, $date, $db, $user, $remote, $app, $bind) = @_;
+	my ($norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
 
 	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
 	$normalyzed_info{$norm}{samples}{$dt}{date}  = $date;
@@ -3065,6 +3075,7 @@ sub set_top_sample
 	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
 	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
 	$normalyzed_info{$norm}{samples}{$dt}{bind}  = $bind;
+	$normalyzed_info{$norm}{samples}{$dt}{plan}  = $plan;
 
 	if ($sample > 0) {
 		my $i = 1;
@@ -7170,6 +7181,9 @@ sub print_lock_queries_report
 				$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 				$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$details .= " ]";
+				if ($normalyzed_info{$k}{samples}{$d}{plan}) {
+					$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+				}
 				print $fh qq{
 					<dt>
 						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></li>$query</div>$md5
@@ -7660,6 +7674,9 @@ sub print_slowest_individual_queries
 		$details .= " - <b>Application:</b> $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
 		$details .= " - <b>Bind query:</b> yes" if ($top_slowest[$i]->[7]);
 		$details .= " ]";
+		if ($top_slowest[$i]->[8]) {
+			$details .= "\n<b>Explain plan:</b>\n" . $top_slowest[$i]->[8];
+		}
 		my $query = &highlight_code($top_slowest[$i]->[2]);
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($top_slowest[$i]->[2]) if ($enable_checksum);
@@ -7856,6 +7873,9 @@ sub print_time_consuming
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
+				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -8057,6 +8077,9 @@ sub print_most_frequent
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
+				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -8262,6 +8285,9 @@ sub print_slowest_queries
 			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			$details .= " ]";
+			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
+				$details .= "\n<b>Explain plan:</b>\n" . $normalyzed_info{$k}{samples}{$d}{plan};
+			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -10169,6 +10195,9 @@ sub parse_query
 		$overall_stat{histogram}{query_time}{$k}++;
 		$overall_stat{histogram}{query_total}++;
 		$prefix_vars{'t_bind'} = 1;
+	# Activate storage of the explain plan generated by auto_explain
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms  plan://is) {
+		$cur_plan_info{$t_pid}{duration} = $1;
 	# Log line without duration at all
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
 		$t_action = $1;
@@ -10234,6 +10263,14 @@ sub set_current_infos
 		$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 		$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
 		$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'};
+
+		# Extract the query part from the plan
+		if (exists $cur_plan_info{$t_pid} && ($cur_plan_info{$t_pid}{plan} ne '')) {
+			$cur_plan_info{$t_pid}{plan} =~ s/^(?:.*?)\t([^\t]+\(cost=?)/$1/s;
+			$cur_info{$t_pid}{plan} = $cur_plan_info{$t_pid}{plan};
+			delete $cur_plan_info{$t_pid};
+		}
+
 	} else {
 		$cur_info{$t_pid}{year}      = $prefix_vars{'t_year'} if (! $cur_info{$t_pid}{year});
 		$cur_info{$t_pid}{month}     = $prefix_vars{'t_month'} if (! $cur_info{$t_pid}{month});
@@ -10254,6 +10291,14 @@ sub set_current_infos
 		$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} if (! $cur_info{$t_pid}{dbappname});
 		$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if (! $cur_info{$t_pid}{date});
 		$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (! $cur_info{$t_pid}{bind});
+
+		# Extract the query part from the plan
+		if (exists $cur_plan_info{$t_pid} && ($cur_plan_info{$t_pid}{plan} ne '')) {
+			$cur_plan_info{$t_pid}{plan} =~ s/^\s*Query Text: (.*?);//s;
+			$cur_info{$t_pid}{plan} = $cur_plan_info{$t_pid}{plan};
+			delete $cur_plan_info{$t_pid};
+		}
+
 	}
 
 }
@@ -10322,7 +10367,7 @@ sub store_queries
 	}
 
 	# Anonymize query if requested by the user
-	if ($anonymize) {
+	if ($anonymize && exists $cur_info{$t_pid}{query}) {
 		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
 	}
 
@@ -10568,7 +10613,7 @@ sub store_queries
 			if ($cur_info{$t_pid}{duration}) {
 
 				# Update top slowest queries statistics
-				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind});
+				&set_top_slowest($cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind}, $cur_info{$t_pid}{plan});
 
 				# Store normalized query total duration
 				$normalyzed_info{$normalized}{duration} += $cur_info{$t_pid}{duration};
@@ -10590,7 +10635,7 @@ sub store_queries
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
 				# Store normalized query samples
-				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind});
+				&set_top_sample($normalized, $cur_info{$t_pid}{query}, $cur_info{$t_pid}{duration}, $cur_last_log_timestamp, $cur_info{$t_pid}{dbname}, $cur_info{$t_pid}{dbuser}, $cur_info{$t_pid}{dbclient},$cur_info{$t_pid}{dbappname}, $cur_info{$t_pid}{bind}, $cur_info{$t_pid}{plan});
 			}
 		}
 	}
