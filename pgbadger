@@ -11740,6 +11740,7 @@ sub build_log_line_prefix_regex
 							and $self->_next_token ne ')'
 							and $self->_next_token !~ /::/
 							and $self->_next_token ne ';'
+							and $self->_next_token ne ','
 					);
 			}
 
