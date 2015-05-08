@@ -9014,6 +9014,7 @@ sub show_error_as_html
 };
 
 		for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
+			last if (($sample > 0) && ($i == $sample));
 			# Escape HTML code in error message
 			my $message = &escape_html($error_info{$k}{error}[$i]);
 			my $details = "Date: " . $error_info{$k}{date}[$i] . "\n";
