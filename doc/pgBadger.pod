@@ -266,6 +266,7 @@ five minutes:
 	Checkpoints statistics.
 	Autovacuum and autoanalyze statistics.
 	Cancelled queries.
+	Error events (panic, fatal, error and warning).
 
 There's also some pie reports of distribution about:
 
