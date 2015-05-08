@@ -3972,7 +3972,7 @@ sub html_header
      				<li><a href="#queries-by-type">Queries by type</a></li>
      				<li><a href="#queries-by-database">Queries by database</a></li>
      				<li><a href="#queries-by-user">Queries by user</a></li>
-     				<li><a href="#queries-by-user">Duration by user</a></li>
+     				<li><a href="#duration-by-user">Duration by user</a></li>
      				<li><a href="#queries-by-host">Queries by host</a></li>
      				<li><a href="#queries-by-application">Queries by application</a></li>
 				<li class="divider"></li>
