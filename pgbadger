@@ -4005,6 +4005,7 @@ sub html_header
      		<li id="menu-events" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Events <span class="caret"></span></a>
      			<ul class="dropdown-menu">
      				<li><a href="#log-levels">Log levels</a></li>
+     				<li><a href="#minutes-errors-levels">Events distribution</a></li>
 				<li class="divider"></li>
      				<li><a href="#most-frequent-errors-events">Most frequent errors/events</a></li>
      			</ul>        
@@ -4621,6 +4622,7 @@ sub compute_query_graphs
 {
 	my %graph_data = ();
 	if ($graph) {
+
 		foreach my $tm (sort {$a <=> $b} keys %per_minute_info) {
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $y  = $1 - 1900;
@@ -8637,8 +8639,6 @@ sub dump_as_html
 			&print_slowest_queries
 		}
 
-		%per_minute_info = ();
-
 	}
 
 	# Show errors report
@@ -8660,7 +8660,6 @@ sub dump_as_html
 		# Show Most Frequent Errors/Events
 		&show_error_as_html();
 	}
-
 
 	# Dump the html footer
 	&html_footer();
@@ -8734,6 +8733,8 @@ sub print_log_level
 		$logtype_info .= "<tr><td>$d</td><td>" . &comma_numbers($logs_type{$d}) .
 			"</td><td>" . sprintf("%0.2f", ($logs_type{$d} * 100) / ($total_logs||1)) . "%</td></tr>";
 	}
+	my %graph_data = ();
+	my %max_events = ();
 	if ($graph) {
 		my @small = ();
 		foreach my $d (sort keys %logs_type) {
@@ -8749,7 +8750,58 @@ sub print_log_level
 			$infos{$small[0]} = $infos{"Sum log types < $pie_percentage_limit%"};
 			delete $infos{"Sum log types < $pie_percentage_limit%"};
 		}
+		foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
+			$max_events{$l} = 0;
+		}
+		foreach my $tm (sort {$a <=> $b} keys %per_minute_info) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $y  = $1 - 1900;
+			my $mo = $2 - 1;
+			my $d  = $3;
+			foreach my $h ("00" .. "23") {
+				next if (!exists $per_minute_info{$tm}{$h});
+				my %e_dataavg = ();
+				foreach my $m ("00" .. "59") {
+					next if (!exists $per_minute_info{$tm}{$h}{$m});
+
+					my $rd = &average_per_minutes($m, $avg_minutes);
+
+					if (exists $per_minute_info{$tm}{$h}{$m}{log_level}) {
+
+						# Average per minute
+						foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
+							$e_dataavg{$l}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{log_level}{$l} || 0);
+							$max_events{$l} += ($per_minute_info{$tm}{$h}{$m}{log_level}{$l} || 0);
+						}
+						delete $per_minute_info{$tm}{$h}{$m}{log_level};
+					}
+				}
+
+				foreach my $rd (@avgs) {
+					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+
+					next if ($t < $t_min);
+					last if ($t > $t_max);
+
+					if (scalar keys %e_dataavg> 0) {
+						foreach my $l (qw(FATAL ERROR PANIC WARNING)) {
+							$graph_data{$l} .= "[$t, " . ($e_dataavg{$l}{"$rd"} || 0) . "],";
+						}
+					}
+				}
+			}
+		}
+		foreach (keys %graph_data) {
+			$graph_data{$_} =~ s/,$//;
+		}
+
 	}
+
+	$drawn_graphs{'eventspersecond_graph'} = &flotr2_graph( $graphid++, 'eventspersecond_graph', $graph_data{'PANIC'},
+		$graph_data{FATAL}, $graph_data{'ERROR'}, 'Errors per ' . $avg_minutes . ' minutes',
+		'Errors per ' . $avg_minutes . ' minutes', 'PANIC', 'FATAL', 'ERROR', '', $graph_data{'WARNING'}, 'WARNING'
+	);
+
 	$drawn_graphs{logstype_graph} = &flotr2_piegraph($graphid++, 'graph_logstype', 'Logs per type', %infos);
 	if (!$total_logs) {
 		$logtype_info = qq{<tr><td colspan="7">$NODATA</td></tr>};
@@ -8759,6 +8811,7 @@ sub print_log_level
 	$total_logs = &comma_numbers($total_logs);
 	print $fh qq{
 	<h1 class="page-header"><i class="icon-bullhorn"></i> Events</h1>
+
 	<div class="analysis-item row-fluid" id="log-levels">
 		<h2><i class="icon-tags"></i> Log levels</h2>
 		<div class="span3">
@@ -8766,8 +8819,6 @@ sub print_log_level
 			<div class="well key-figures">
 				<ul>
 					<li><span class="figure">$total_logs</span> <span class="figure-label">Log entries</span></li>
-					<li><span class="figure">$logs_type{ERROR}</span> <span class="figure-label">Number of ERROR entries</span></li>
-					<li><span class="figure">$logs_type{FATAL}</span> <span class="figure-label">Number of FATAL entries</span></li>
 				</ul>
 			</div>
 		</div>
@@ -8798,9 +8849,30 @@ sub print_log_level
 				</div>
 			</div>
 		</div>
-	</div><!-- end of queries by host -->
+	</div><!-- end of event flow -->
+
+	<div class="analysis-item row-fluid" id="minutes-errors-levels">
+		<h2><i class="icon-tags"></i> Events distribution</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$max_events{PANIC}</span> <span class="figure-label">PANIC entries</span></li>
+					<li><span class="figure">$max_events{FATAL}</span> <span class="figure-label">FATAL entries</span></li>
+					<li><span class="figure">$max_events{ERROR}</span> <span class="figure-label">ERROR entries</span></li>
+					<li><span class="figure">$max_events{WARNING}</span> <span class="figure-label">WARNING entries</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<h3 class="">Errors per $avg_minutes minutes</h3>
+$drawn_graphs{'eventspersecond_graph'}
+		</div>
+	</div><!-- end of errors per minutes -->
+
 };
 	delete $drawn_graphs{logstype_graph};
+	delete $drawn_graphs{'eventspersecond_graph'};
 
 }
 
@@ -9259,6 +9331,10 @@ sub load_stats
 					if (exists $_per_minute_info{$day}{$hour}{$min}{$k}) {
 						$per_minute_info{$day}{$hour}{$min}{$k} += $_per_minute_info{$day}{$hour}{$min}{$k};
 					}
+				}
+				foreach my $log (keys %{ $_per_minute_info{$day}{$hour}{$min}{log_level} }) {
+					$per_minute_info{$day}{$hour}{$min}{log_level}{$log} +=
+						($_per_minute_info{$day}{$hour}{$min}{log_level}{$log} || 0);
 				}
 
 				$per_minute_info{$day}{$hour}{$min}{cancelled}{count} += $_per_minute_info{$day}{$hour}{$min}{cancelled}{count}
@@ -10638,6 +10714,9 @@ sub store_queries
 		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 		$error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
+		# Stores log level count per minute
+		$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{log_level}{$cur_info{$t_pid}{loglevel}}++;
+
 		# Stores normalized query samples
 		if ($sample > 0) {
 			my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
@@ -11084,7 +11163,11 @@ sub flotr2_graph
 	}
 	if ($legend4) {
 		$dateTracker_lblopts .= "'$legend4',";
-		$legend4 = "{ data: d4, label: \"$legend4\", color: \"#8dbd0f\",yaxis: 2},";
+		if ($ytitle2) {
+			$legend4 = "{ data: d4, label: \"$legend4\", color: \"#8dbd0f\",yaxis: 2},";
+		} else {
+			$legend4 = "{ data: d4, label: \"$legend4\", color: \"#8dbd0f\", mouse:{track:true}},";
+		}
 	}
 	$dateTracker_lblopts =~ s/,$//;
 	$dateTracker_lblopts = "[$dateTracker_lblopts]";
@@ -11123,10 +11206,13 @@ sub flotr2_graph
 
 	my $barwidth = $avg_minutes * 60 * 1000;
 	my $bar_def = '';
-	if ($bar_graph) {
+	if ($bar_graph || ($divid eq 'eventspersecond_graph')) {
+		my $stacked = 'false';
+		$stacked = 'true' if ($divid eq 'eventspersecond_graph');
 		$bar_def = qq{
         bars: {
             show: true,
+	    stacked: $stacked,
             horizontal: false,
             shadowSize: 0,
 	    barWidth: $barwidth,
@@ -11138,7 +11224,6 @@ sub flotr2_graph
 <script type="text/javascript">
 /* <![CDATA[ */
 (function mouse_zoom(container) {
-
 document.writeln('<div class="pull-right btn-group"><input type="button" class="btn" value="To Image" id="toimage$buttonid" onclick="return false;">'+
 	'<input type="button" class="btn" value="Download" id="download$buttonid" onclick="return false;">' +
 	'<input type="button" class="btn" value="To Chart" id="reset$buttonid" onclick="return false;"></div>'
@@ -11160,6 +11245,9 @@ document.writeln('<div class="pull-right btn-group"><input type="button" class="
         yaxis: {
             mode: "normal",
             title: "$ytitle",
+	    min: null,
+	    max: null,
+	    autoscale: true,
 	    tickFormatter: function(val){ return pretty_print_number(val,'$type') },
         },
 	$yaxis2
@@ -13810,7 +13898,7 @@ footer {
 	color:#eee;
 }
 
-#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph {
+#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph, #eventspersecond_graph {
 	width : 100%;
 	height: 400px;
 }
@@ -13872,7 +13960,7 @@ footer {
 	}
 
 
-	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph {
+	#queriespersecond_graph, #connectionspersecond_graph, #sessionspersecond_graph, #selectqueries_graph, #writequeries_graph, #durationqueries_graph, #checkpointwritebuffers_graph, #checkpointfiles_graph, #temporarydata_graph, #temporaryfile_graph, #autovacuum_graph, #bindpreparequeries_graph, #cancelledqueries_graph, #eventspersecond_graph {
 		width : 94.5%;
 	}
 
