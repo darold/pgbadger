@@ -1500,6 +1500,57 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">7.0</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2015-05-08</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This major release adds some more useful reports and features.
+</p>
+<pre>
+  * New report about events distribution per 5 minutes.
+  * New per application details (total duration and times executed) for each
+    query reported in Top Queries reports. The details are visible from a new
+    button called "App(s) involved".
+  * Add support to auto_explain extension. EXPLAIN plan will be added together
+    with top slowest queries when available in log file.
+  * Add a link to automatically open the explain plan on http://explain.depesz.com/
+  * New report on queries cumulated durations per user.
+  * New report about the Number of cancelled queries (graph)
+  * New report about Queries generating the most cancellation (N)
+  * New report about Queries most cancelled.
+</pre>
+<p>
+Here is the full list of changes/fixes:
+</p>
+<pre>
+  * Update documentation with last reports.
+  * Fix number of event samples displayed in event reports.
+  * Add new report about events distribution per x minutes.
+  * Add app=%a default prefix to documentation.
+  * Add reports of "App(s) involved" with top queries. Thanks to Antti Koivisto
+    for the feature request.
+  * Remove newline between a ) and , in the beautifier.
+  * Add link to automatically open the explain plan on http://explain.depesz.com/
+  * Add support to auto_explain, EXPLAIN plan will be added together with top
+    slowest queries whane available in the log file.
+  * Add a graph on distributed duration per user. Thanks to Korriliam for the
+    patch.
+  * Add tree new report: Number of cancelled queries (graph), Queries generating
+    the most cancellation (N) and Queries most cancelled lists. Thanks to Thomas
+    Reiss for the feature request.
+  * Fix case where temporary file statement must be retrieved from the previous
+    LOG statement and not in the following STATEMENT log entry. Thanks to Mael
+    Rimbault for the report.
+  * Add --enable-checksum to show a md5 hash of each reported queries. Thanks
+    to Thomas Reiss for the feature request.
+</pre>
+		</div>
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">6.4</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2015-04-13</span> <span class="figure-label">Date</span></li>    
 				</ul>
