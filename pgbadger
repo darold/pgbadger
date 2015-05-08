@@ -703,10 +703,12 @@ if ($error_only && $disable_error) {
 	die "FATAL: please choose between no event report and reporting events only.\n";
 }
 
-# Set default search pattern for database, user name and host in log_line_prefix
+# Set default search pattern for database, user name, application name and host in log_line_prefix
 my $regex_prefix_dbname = qr/db=([^,]*)/;
 my $regex_prefix_dbuser = qr/user=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote)=([^,]*)/;
+my $regex_prefix_dbappname = qr/app=([^,]*)/;
+
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY)/is;
 
@@ -3975,13 +3977,17 @@ sub html_header
      				<li><a href="#queries-by-application">Queries by application</a></li>
 				<li class="divider"></li>
      				<li><a href="#queries-cancelled-number">Number of cancelled queries</a></li>
+};
+			}
+			if ($#top_cancelled_info >= 0) {
+				print $fh qq{
      				<li><a href="#queries-generating-most-cancellation">Queries generating the most cancellation (N)</a></li>
      				<li><a href="#queries-generating-most-cancelled">Most cancelled queries</a></li>
-     			</ul>     
-     		</li>
 };
 			}
 			print $fh qq{
+     			</ul>     
+     		</li>
      		<li id="menu-topqueries" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Top <span class="caret"></span></a>
      			<ul class="dropdown-menu">
      				<li><a href="#histogram-query-times">Histogram of query times</a></li>
@@ -7832,6 +7838,10 @@ sub print_time_consuming
 		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
 			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">User(s) involved</button>};
 		}
+		my $apps_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			$apps_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-app-involved-rank-$rank">App(s) involved</button>};
+		}
 		my $query_histo = 
 		&flotr2_histograph($graphid++, 'timeconsuming_graph_'.$rank, $graph_data{count}, $graph_data{duration}, 'Avg. queries', 'Avg. duration', $etime, $ctime);
 
@@ -7867,7 +7877,7 @@ sub print_time_consuming
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
-	<p> <button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">Examples</button> $users_involved</p>
+	<p> <button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
 		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
 			print $fh qq{
@@ -7893,6 +7903,33 @@ sub print_time_consuming
 							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
+};
+		}
+
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			print $fh qq{
+						<!-- Involved apps list collapse -->
+						<div id="time-consuming-queries-app-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
+				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
+					my $details = "[<b>Application:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#time-consuming-queries-app-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of app involved collapse -->
 };
 		}
 		print $fh qq{
@@ -8040,6 +8077,10 @@ sub print_most_frequent
 		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
 			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">User(s) involved</button>};
 		}
+		my $apps_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			$apps_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-app-involved-rank-$rank">App(s) involved</button>};
+		}
 
                 print $fh qq{
                                 <tr>
@@ -8073,7 +8114,7 @@ sub print_most_frequent
 								</table>
 						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-details-rank-$rank">x Hide</button></p>
 						</div><!-- end of details collapse -->
-	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">Examples</button> $users_involved</p>
+	<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
 		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
 			print $fh qq{
@@ -8099,6 +8140,32 @@ sub print_most_frequent
 							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
+};
+		}
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			print $fh qq{
+						<!-- Involved apps list collapse -->
+						<div id="most-frequent-queries-app-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
+				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
+					my $details = "[<b>Application:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#most-frequent-queries-app-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of app involved collapse -->
 };
 		}
 		print $fh qq{
@@ -8251,6 +8318,10 @@ sub print_slowest_queries
 		if (scalar keys %{$normalyzed_info{$k}{users}} > 0) {
 			$users_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-user-involved-rank-$rank">User(s) involved</button>};
 		}
+		my $apps_involved = '';
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			$apps_involved = qq{<button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-app-involved-rank-$rank">App(s) involved</button>};
+		}
 
                 print $fh qq{
                                 <tr>
@@ -8310,6 +8381,32 @@ sub print_slowest_queries
 							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
+};
+		}
+		if (scalar keys %{$normalyzed_info{$k}{apps}} > 0) {
+			print $fh qq{
+						<!-- Involved apps list collapse -->
+						<div id="normalized-slowest-queries-app-involved-rank-$rank" class="collapse">
+							<dl>
+};
+			my $idx = 1;
+			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
+				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
+					my $details = "[<b>Application:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#normalized-slowest-queries-app-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of app involved collapse -->
 };
 		}
 		print $fh qq{
@@ -9294,6 +9391,11 @@ sub load_stats
 				$normalyzed_info{$stmt}{users}{$u}{$k} += $_normalyzed_info{$stmt}{users}{$u}{$k};
 			}
 		}
+		foreach my $u (keys %{$_normalyzed_info{$stmt}{apps}} ) {
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{apps}{$u}} ) {
+				$normalyzed_info{$stmt}{apps}{$u}{$k} += $_normalyzed_info{$stmt}{apps}{$u}{$k};
+			}
+		}
 	}
 
 	### session_info ###
@@ -9686,11 +9788,17 @@ sub parse_log_prefix
 			$prefix_vars{'t_dbname'} = $1;
 		}
 
-		# Search for database name
+		# Search for client host name
 		if ($t_logprefix =~ $regex_prefix_dbclient) {
 			$prefix_vars{'t_dbclient'} = $1;
 			$prefix_vars{'t_dbclient'} = _gethostbyaddr($prefix_vars{'t_dbclient'}) if ($dns_resolv);
 		}
+
+		# Search for application name
+		if ($t_logprefix =~ $regex_prefix_dbappname) {
+			$prefix_vars{'t_appname'} = $1;
+		}
+
 	}
 }
 
@@ -10692,8 +10800,16 @@ sub store_queries
 				}
 
 				# Stores query/user information
-				$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
-				$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+				if ($cur_info{$t_pid}{dbuser}) {
+					$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
+					$normalyzed_info{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+				}
+
+				# Stores query/app information
+				if ($cur_info{$t_pid}{dbappname}) {
+					$normalyzed_info{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
+					$normalyzed_info{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
+				}
 
 				# Store normalized query count and duration per time
 				$normalyzed_info{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
@@ -11524,7 +11640,6 @@ EOF
 sub build_log_line_prefix_regex
 {
 	my %regex_map = (
-		#'%a' => [('t_appname',      '([0-9a-zA-Z\.\-\_\/\[\]]*)')],                                   # application name
 		'%a' => [('t_appname',      '(.*)')],                                   # application name
 		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # user name
 		'%d' => [('t_dbname',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # database name
