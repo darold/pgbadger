@@ -337,8 +337,8 @@ well as under Windows platform.
 
 Download the tarball from github and unpack the archive as follow:
 
-	tar xzf pgbadger-5.x.tar.gz
-	cd pgbadger-5.x/
+	tar xzf pgbadger-7.x.tar.gz
+	cd pgbadger-7.x/
 	perl Makefile.PL
 	make && sudo make install
 
@@ -564,7 +564,7 @@ Many people have contributed to pgBadger, they are all quoted in the Changelog f
 
 pgBadger is free software distributed under the PostgreSQL Licence.
 
-Copyright (c) 2012-2014, Dalibo
+Copyright (c) 2012-2015, Dalibo
 
 A modified version of the SQL::Beautify Perl Module is embedded in pgBadger
 with copyright (C) 2009 by Jonas Kramer and is published under the terms of
