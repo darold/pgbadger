@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Expires" CONTENT="Sat Oct 26 17:18:55 2013">
-<meta http-equiv="Generator" content="pgBadger v4.0">
+<meta http-equiv="Generator" content="pgBadger">
 <meta http-equiv="Date" content="Sat Oct 26 17:18:55 2013">
 <link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIiIiAAAAAAA////BxQUFH0FBQWyExMT4wQEBM4ODg7DFRUVe/T09AsAAAAAg4ODAAAAAAAAAAAAAAAAAFJSUgAAAAAAKioqcQICAv9aWlr/MjIy/omJif6Li4v+HR0d/ldXV/8DAwP/Ly8veAAAAABZWVkAAAAAAF9fXwAAAAAAKioqvh4eHv/n5+f/qqqq/s3Nzf4FBQX/AAAA/5KSkv+Kior/6urq/h0dHf8uLi7DAAAAAG1tbQAAAAAAJiYmeCEhIf//////6enp/iMjI//t7e3/l5eX/2dnZ//U1NT/S0tL/9XV1f7/////Hx8f/y8vL34AAAAAvb29HAEBAf/s7Oz+3d3d/j09Pf9TU1P/JCQk//z8/P//////oaGh/xsbG/95eXn/+Pj4/unp6f4DAwP/vLy8GiQkJJJjY2P95+fn/1NTU/9ubm7/UFBQ/yEhIf/m5ub//f39/yEhIf8SEhL/h4eH/4yMjP//////YWFh/w4ODn8CAgLLv7+//09PT/68vLz/ZGRk/zQ0NP8sLCz/9/f3/+Hh4f9gYGD/hYWF/0VFRf9nZ2f//v7+/rm5uf4CAgLLCwsL9efn5/9zc3P/dHR0/wUFBf8MDAz/ampq///////9/f3/FBQU/0BAQP88PDz/WFhY//Ly8v/j4+P+AAAA1QAAANyFhYX+5+fn/09PT/8AAAD/AgIC/9jY2P/+/v7//////y4uLv8AAAD/AAAA/5ycnP+Kior/6Ojo/gQEBOkAAADKVVVV/xgYGP8AAAD/AAAA/yAgIP///////v7+//////87Ozv/AAAA/wAAAP8wMDD/OTk5/7+/v/4AAADMJiYmn5mZmf0AAAD+AAAA/wAAAP9BQUH///////7+/v//////KCgo/wAAAP8AAAD/AAAA/5CQkP9ubm7+MjIynzMzMyFFRUX/zc3N/zw8PP4DAwP/BgYG/9bW1v//////mJiY/wAAAP8AAAD/AAAA/wAAAP5gYGD+BAQE/0JCQiMAAAAAIiIishEREf719fX+6Ojo/3Jycv9XV1f/ZGRk/3d3d/+5ubn/WVlZ/2dnZ/7MzMz+xMTE/h4eHrIAAAAATU1NAAAAAAALCwvhSUlJ/v7+/v7////+//////////////////////////+YmJj/QUFB/g8PD+EAAAAAVVVVAAAAAAAAAAAA////AR8fH70GBgb/goKC/tzc3P7////+/////9zc3P6CgoL+BgYG/xsbG7YAAAAAAAAAAAAAAAAAAAAAAAAAAD8/PwAAAAAARkZGNBkZGa4ODg73AAAA/wAAAP8NDQ31GhoasWFhYUAAAAAAOzs7AAAAAAAAAAAA/D8AAPAPAADAAwAAwAMAAIABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAAgAEAAMADAADgBwAA+B8AAA" />
 
@@ -1396,6 +1396,8 @@
 <li><i class="icon-check"></i>&nbsp;The most frequent queries.</li>
 <li><i class="icon-check"></i>&nbsp;The most frequent errors.</li>
 <li><i class="icon-check"></i>&nbsp;Users involved in top queries.</li>
+<li><i class="icon-check"></i>&nbsp;Queries generating the most cancellation</li>
+<li><i class="icon-check"></i>&nbsp;Queries most cancelled</li>
 </ul>
 
 <b>Pie charts</b>
@@ -1418,6 +1420,8 @@
 <li><i class="icon-check"></i>&nbsp;Autovacuum and autoanalyze statistics.</li>
 <li><i class="icon-check"></i>&nbsp;Histogram of query count and duration per hours</li>
 <li><i class="icon-check"></i>&nbsp;Histogram of error/event count per hours</li>
+<li><i class="icon-check"></i>&nbsp;Cancelled queries</li>
+<li><i class="icon-check"></i>&nbsp;Error events (panic, fatal, error and warning).</li>
 </ul>				
 				</div></div>
 		
@@ -1493,6 +1497,57 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 	<div id="simultaneous-connections" class="analysis-item row-fluid">
 		<h2 class=""><i class="icon-random"></i> Latest news about pgBadger</h2>
 
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">7.0</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2015-05-08</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This major release adds some more useful reports and features.
+</p>
+<pre>
+  * New report about events distribution per 5 minutes.
+  * New per application details (total duration and times executed) for each
+    query reported in Top Queries reports. The details are visible from a new
+    button called "App(s) involved".
+  * Add support to auto_explain extension. EXPLAIN plan will be added together
+    with top slowest queries when available in log file.
+  * Add a link to automatically open the explain plan on http://explain.depesz.com/
+  * New report on queries cumulated durations per user.
+  * New report about the Number of cancelled queries (graph)
+  * New report about Queries generating the most cancellation (N)
+  * New report about Queries most cancelled.
+</pre>
+<p>
+Here is the full list of changes/fixes:
+</p>
+<pre>
+  * Update documentation with last reports.
+  * Fix number of event samples displayed in event reports.
+  * Add new report about events distribution per x minutes.
+  * Add app=%a default prefix to documentation.
+  * Add reports of "App(s) involved" with top queries. Thanks to Antti Koivisto
+    for the feature request.
+  * Remove newline between a ) and , in the beautifier.
+  * Add link to automatically open the explain plan on http://explain.depesz.com/
+  * Add support to auto_explain, EXPLAIN plan will be added together with top
+    slowest queries when available in the log file.
+  * Add a graph on distributed duration per user. Thanks to Korriliam for the
+    patch.
+  * Add tree new report: Number of cancelled queries (graph), Queries generating
+    the most cancellation (N) and Queries most cancelled lists. Thanks to Thomas
+    Reiss for the feature request.
+  * Fix case where temporary file statement must be retrieved from the previous
+    LOG statement and not in the following STATEMENT log entry. Thanks to Mael
+    Rimbault for the report.
+  * Add --enable-checksum to show a md5 hash of each reported queries. Thanks
+    to Thomas Reiss for the feature request.
+</pre>
+		</div>
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
@@ -1770,9 +1825,6 @@ See ChangeLog for a complete list of changes.
 		<div class="span8">
 <p>
 Official release are always published to the <a href="https://sourceforge.net/projects/pgbadger/">SourceForge project page</a> of pgBadger.
-</p>
-<p>
-After a release publication, an announce is done to the <a href="https://freecode.com/projects/pgbadger">Freecode project page</a>
 </p>
 <p>
 Not all release are subject to a notification sent to the pgsql-announce mailling list, this is reserved to the main releases.
@@ -2257,7 +2309,7 @@ For a complete list of commercial support near of your place take a look at the 
 
 <footer>
 <div class="pull-left">
-	&copy; 2012-2013 <a href="http://www.dalibo.com/" target="_new">Dalibo</a
+	&copy; 2012-2015 <a href="http://www.dalibo.com/" target="_new">Dalibo</a
 </div>
 </footer>
 
