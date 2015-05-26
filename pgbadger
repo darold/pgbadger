@@ -3377,6 +3377,17 @@ Report not supported by text format
 		}
 	}
 
+	# Show session per application statistics
+	if (!$disable_session && exists $session_info{app}) {
+		print $fh "\n- Sessions per application ------------------------------------------------------\n\n";
+		print $fh "Application  Count     Total Duration     Avg duration (s)\n";
+		foreach my $d (sort keys %{$session_info{app}}) {
+			print $fh "$d - ", &comma_numbers($session_info{app}{$d}{count}), " ", &convert_time($session_info{app}{$d}{duration}),
+				" ", &convert_time($session_info{app}{$d}{duration} / $session_info{app}{$d}{count}), "\n";
+		}
+	}
+
+
 	# Show connection per database statistics
 	if (!$disable_connection && exists $connection_info{database}) {
 		print $fh "\n- Connections per database ------------------------------------------------------\n\n";
@@ -3908,6 +3919,7 @@ sub html_header
      				<li><a href="#sessions-per-database">Sessions per database</a></li>
      				<li><a href="#sessions-per-user">Sessions per user</a></li>
      				<li><a href="#sessions-per-host">Sessions per host</a></li>
+     				<li><a href="#sessions-per-app">Sessions per application</a></li>
      			</ul>
      		</li>
 };
@@ -5391,6 +5403,89 @@ sub print_host_session
 
 	delete $drawn_graphs{hostsessions_graph};
 }
+
+sub print_app_session
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $c           = 0;
+	my $sess_app_info = '';
+	my @main_app = ('unknown',0);
+	foreach my $h (sort keys %{$session_info{app}}) {
+		$sess_app_info .= "<tr><td>$h</td><td>" . &comma_numbers($session_info{app}{$h}{count}) .
+				   "</td><td>" . &convert_time($session_info{app}{$h}{duration}) . "</td><td>" .
+				   &convert_time($session_info{app}{$h}{duration} / $session_info{app}{$h}{count}) .
+				   "</td></tr>";
+		$total_count += $session_info{app}{$h}{count};
+		if ($main_app[1] < $session_info{app}{$h}{count}) {
+			$main_app[0] = $h;
+			$main_app[1] = $session_info{app}{$h}{count};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$session_info{app}}) {
+			if ((($session_info{app}{$d}{count} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $session_info{app}{$d}{count} || 0;
+			} else {
+				$infos{"Sum sessions < $pie_percentage_limit%"} += $session_info{app}{$d}{count} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+			delete $infos{"Sum sessions < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{appsessions_graph} = &flotr2_piegraph($graphid++, 'graph_appsessions', 'Connections per application', %infos);
+	$sess_app_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="sessions-per-app">
+		<h2><i class="icon-sitemap"></i> Sessions per application</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_app[0]</span> <span class="figure-label">Main Host</span></li>
+					<li><span class="figure">$total_count sessions</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#sessions-per-app-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#sessions-per-app-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="sessions-per-app-graph">
+						$drawn_graphs{appsessions_graph}
+					</div>
+					<div class="tab-pane" id="sessions-per-app-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Application</th>
+									<th>Count</th>
+									<th>Total Duration</th>
+									<th>Average Duration</th>
+								</tr>
+							</thead>
+							<tbody>
+							$sess_app_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of sessions per app -->
+};
+
+	delete $drawn_graphs{appsessions_graph};
+}
+
 
 sub print_database_session
 {
@@ -8544,6 +8639,8 @@ sub dump_as_html
 			&print_user_session();
 			# Show per host sessions
 			&print_host_session();
+			# Show per application sessions
+			&print_app_session();
 		}
 
 
@@ -9503,6 +9600,11 @@ sub load_stats
 		$session_info{host}{$host}{duration} += $_session_info{host}{$host}{duration};
 	}
 
+	foreach my $app (keys %{ $_session_info{app}}) {
+		$session_info{app}{$app}{count}    += $_session_info{app}{$app}{count};
+		$session_info{app}{$app}{duration} += $_session_info{app}{$app}{duration};
+	}
+
 	### tempfile_info ###
 
 	$tempfile_info{count} += $_tempfile_info{count}
@@ -10178,6 +10280,10 @@ sub parse_query
 		$session_info{user}{$usr}{duration} += $time;
 		$session_info{host}{$host}{count}++;
 		$session_info{host}{$host}{duration} += $time;
+		my $app = 'unknown';
+		$app = $prefix_vars{'t_appname'} if (exists $prefix_vars{'t_appname'});
+		$session_info{app}{$app}{count}++;
+		$session_info{app}{$app}{duration} += $time;
 		my $k = &get_hist_inbound($time, @histogram_session_time);
 		$overall_stat{histogram}{session_time}{$k}++;
 		$overall_stat{histogram}{session_total}++;
@@ -13911,7 +14017,7 @@ footer {
 	height: 400px;
 }
 
-#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
+#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #appsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
 	width : 100%;
 	height: 320px;
 }
@@ -13971,7 +14077,7 @@ footer {
 		width : 94.5%;
 	}
 
-	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
+	#queriesbytype_graph, #lockbytype_graph, #databasesessions_graph, #usersessions_graph, #hostsessions_graph, #appsessions_graph, #databaseconnections_graph, #userconnections_graph, #hostconnections_graph, #logstype_graph, #tableanalyzes_graph, #tablevacuums_graph, #tuplevacuums_graph, #pagevacuums_graph, #queriesbydatabase_graph, #queriesbyapplication_graph, #queriesbyuser_graph, #queriesbyhost_graph, #histogram_query_times_graph, #histogram_session_times_graph, #durationbyuser_graph {
 		width : 94.5%;
 	}
 

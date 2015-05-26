@@ -46,7 +46,7 @@ WriteMakefile(
 	'AUTHOR'       => 'Gilles Darold (gilles@darold.net)',
 	'ABSTRACT'     => 'pgBadger - PostgreSQL log analysis report',
 	'EXE_FILES'    => [ qw(pgbadger) ],
-	'MAN1PODS'     => { 'doc/pgBadger.pod' => 'blib/man1/pgbadger.1' },
+	'MAN1PODS'     => { 'doc/pgBadger.pod' => 'blib/man1/pgbadger.1p' },
 	'DESTDIR'      => $DESTDIR,
 	'INSTALLDIRS'  => $INSTALLDIRS,
 	'clean'	       => {},
