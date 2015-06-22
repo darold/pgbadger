@@ -2374,6 +2374,9 @@ sub process_file
 
 					if (exists $cur_plan_info{$cur_pid}{duration}) {
 						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+					} elsif (exists $cur_info{$cur_pid}{parameters}) {
+						# stores bind parameters if any
+						$cur_info{$cur_pid}{parameters} .= "\n" . $line;
 					} elsif (exists $cur_temp_info{$cur_pid}{query}) {
 						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
@@ -2501,6 +2504,9 @@ sub process_file
 
 					if (exists $cur_plan_info{$cur_pid}{duration}) {
 						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+					} elsif (exists $cur_info{$cur_pid}{parameters}) {
+						# stores bind parameters if any
+						$cur_info{$cur_pid}{parameters} .= "\n" . $line;
 					} elsif (exists $cur_temp_info{$cur_pid}{size}) {
 						if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
 							$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
