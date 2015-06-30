@@ -8585,11 +8585,11 @@ sub dump_as_html
 		&print_overall_statistics();
 
 		# Set graphs limits
-		$overall_stat{'first_log_ts'} =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+		$overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 		$t_min = timegm_nocheck(0, $5, $4, $3, $2 - 1, $1) * 1000;
 		$t_min -= ($avg_minutes * 60000);
 
-		$overall_stat{'last_log_ts'} =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+		$overall_stat{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 		$t_max = timegm_nocheck(59, $5, $4, $3, $2 - 1, $1) * 1000;
 		$t_max += ($avg_minutes * 60000);
 
