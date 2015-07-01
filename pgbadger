@@ -1191,9 +1191,12 @@ if (!$remote_host) {
 		my @tmpfilelist = ();
 		# Removed files that have already been parsed during previous runs
 		foreach my $f (@given_log_files) {
-			if (!&check_file_changed($f, $saved_last_line{datetime})) {
+			if ($f eq '-') {
+				&logmsg('DEBUG', "waiting for log entries from stdin.");
+				$saved_last_line{current_pos} = 0;
+				push(@tmpfilelist, $f);
+			} elsif (!&check_file_changed($f, $saved_last_line{datetime})) {
 				&logmsg('DEBUG', "this file has already been parsed: $f");
-				next;
 			} else {
 				push(@tmpfilelist, $f);
 			}
@@ -2193,7 +2196,7 @@ sub process_file
 		if ($#exclude_line >= 0) {
 			$has_exclusion = 1;
 		}
-		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile to $stop_offset");
+		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile to " . ($stop_offset || $totalsize));
 		if ($start_offset) {
 			# Move to the starting offset position in file
 			$lfile->seek($start_offset, 0);
@@ -12351,7 +12354,7 @@ sub get_log_file
 	# get file size
 	my $totalsize = 0;
 	if (!$remote_host) {
-		$totalsize = (stat("$logf"))[7] || 0;
+		$totalsize = (stat("$logf"))[7] || 0 if ($logf ne '-');
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
 		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
@@ -12374,7 +12377,7 @@ sub get_log_file
 			# Open a pipe to zcat program for compressed log
 			open($lfile,"$ssh_command \"cat $logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n";
 		}
-		$totalsize = 0 if ($lfile eq '-');
+		$totalsize = 0 if ($logf eq '-');
 		$iscompressed = 0;
 	} else {
 		my $uncompress = $zcat;
