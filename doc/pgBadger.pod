@@ -273,8 +273,8 @@ There's also some pie reports of distribution about:
 	Locks statistics.
 	Queries by type (select/insert/update/delete).
 	Distribution of queries type per database/application
-	Sessions per database/user/client.
-	Connections per database/user/client.
+	Sessions per database/user/client/application.
+	Connections per database/user/client/application.
 	Autovacuum and autoanalyze per table.
 	Queries per user and total duration per user.
 

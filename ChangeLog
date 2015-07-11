@@ -1,3 +1,32 @@
+2015-07-11 version 7.1 
+
+This new release fixes some issues and adds a new report:
+
+  * Distribution of sessions per application
+
+It also adds Json operators to SQL Beautifier.
+
+Here is the full list of changes/fixes:
+
+	- Fix unwanted seek on old parsing position when log entry is stdin.
+	  Thanks to Olivier Schiavo for the report.
+	- Try to fix a potential issue in log start/end date parsing. Thanks
+	  to gityerhubhere for the report.
+	- Fix broken queries with multiline in bind parameters. Thank to
+	  Nicolas Thauvin for the report.
+	- Add new report Sessions per application. Thanks to Keith Fiske for
+	  the feature request.
+	- Add Json Operators to SQL Beautifier. Thanks to Tom Burnett and
+	  Hubert depesz Lubaczewski.
+	- Makefile.PL: changed manpage section from '1' to '1p', fixes #237.
+	  Thanks to Cyril Bouthors for the patch.
+	- Update Copyright date-range and installation instructions that was
+	  still refering to version 5. Thanks to Steve Crawford for the report.
+	- Fix typo in changelog
+
+Note that new official releases must now be downloaded from GitHub and no more
+from SourceForge. Download at https://github.com/dalibo/pgbadger/releases
+
 2015-05-08 version 7.0 
 
 This major release adds some more useful reports and features.
