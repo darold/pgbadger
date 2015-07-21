@@ -1104,16 +1104,11 @@ if (!$noclean && $saved_last_line{datetime} && $outdir) {
 }
 
 # Clear storage when a retention is specified in incremental mode
-if ( $saved_last_line{datetime} && $outdir && $retention) {
+if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
 
 	# Search the current week following the last parse date
-	$saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /;
-	my $last_year  = $1;
-	my $last_month = $2;
-	my $last_day   = $3;
-	# Get the current week number
-	my $wn = &get_week_number($last_year, $last_month, $last_day);
-	my $limit = $last_year;
+	my $limit = $1;
+	my $wn = &get_week_number($1, $2, $3);
 	if (($wn - $retention) < 1) {
 		$limit--;
 		$limit .= "52";
@@ -2611,11 +2606,15 @@ sub process_file
 		$incr_date = $last_line{datetime};
 		$incr_date =~ s/\s.*$//;
 		# set path and create subdirectories
-		my $bpath = $incr_date;
-		while ($bpath =~ s/([^\-]+)\-/$1\//) {
+		if ($incr_date =~ /^(\d+)-(\d+)-(\d+)/) {
 			mkdir("$outdir/$1") if (!-d "$outdir/$1");
+			mkdir("$outdir/$1/$2") if (!-d "$outdir/$1/$2");
+			mkdir("$outdir/$1/$2/$3") if (!-d "$outdir/$1/$2/$3");
+		} else {
+			&logmsg('ERROR', "invalid incremental date: $incr_date, can not create subdirectories.");
 		}
-		mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
+		my $bpath = $incr_date;
+		$bpath =~ s/\-/\//g;
 
 		# Mark the directory as needing index update
 		if (open(OUT, ">>$last_parsed.tmp")) {
@@ -2830,11 +2829,15 @@ sub check_incremental_position
 			}
 
 			# set path and create subdirectories
-			my $bpath = $incr_date;
-			while ($bpath =~ s/([^\-]+)\-/$1\//) {
+			if ($incr_date =~ /^(\d+)-(\d+)-(\d+)/) {
 				mkdir("$outdir/$1") if (!-d "$outdir/$1");
+				mkdir("$outdir/$1/$2") if (!-d "$outdir/$1/$2");
+				mkdir("$outdir/$1/$2/$3") if (!-d "$outdir/$1/$2/$3");
+			} else {
+				&logmsg('ERROR', "invalid incremental date: $incr_date, can not create subdirectories.");
 			}
-			mkdir("$outdir/$bpath") if (!-d "$outdir/$bpath");
+			my $bpath = $incr_date;
+			$bpath =~ s/\-/\//g;
 
 			# Mark this directory as needing a reindex	
 			if (open(OUT, ">>$last_parsed.tmp")) {
