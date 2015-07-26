@@ -2894,7 +2894,7 @@ sub normalize_query
 	$orig_query = lc($orig_query);
 
 	# Remove extra space, new line and tab characters by a single space
-	$orig_query =~ s/[\t\s\r\n]+/ /gs;
+	$orig_query =~ s/\s+/ /gs;
 
 	# Removed start of transaction 
 	if ($orig_query !~ /^\s*begin\s*;\s*$/) {
@@ -8794,7 +8794,7 @@ sub url_escape
 
 sub escape_html
 {
-	$_[0] =~ s/<([\/a-zA-Z][\s\t\>]*)/\&lt;$1/sg;
+	$_[0] =~ s/<([\/a-zA-Z][\s\>]*)/\&lt;$1/sg;
 
 	return $_[0];
 }
@@ -10477,11 +10477,11 @@ sub parse_query
 				# go look at other params
 				return;
 			# replace the execute statements with the prepared query and set the parameters
-			} elsif (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ s/prepare: PREPARE[\s\t]+([^\s\t]+)[\s\t]+AS[\s\t]+(.*)//is)) {
+			} elsif (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ s/prepare: PREPARE\s+([^\s]+)\s+AS\s+(.*)//is)) {
 				my $q_name = $1;
 				my $real_query = $2;
 				if ($cur_info{$t_pid}{query} =~ /\b$q_name\b/) {
-					$cur_info{$t_pid}{query} =~ s/EXECUTE[\s\t]+$q_name([\s\t]+)\(//is;
+					$cur_info{$t_pid}{query} =~ s/EXECUTE\s+$q_name(\s+)\(//is;
 					$cur_info{$t_pid}{parameters} = $cur_info{$t_pid}{query};
 					$cur_info{$t_pid}{parameters} =~ s/\)$//;
 					$cur_info{$t_pid}{query} = $real_query;
@@ -10745,8 +10745,8 @@ sub store_queries
 	return 1 if (!$cur_info{$t_pid}{year});
 
 	# Cleanup and normalize the current query
-	$cur_info{$t_pid}{query} =~ s/^[\t\s\r\n]+//s;
-	$cur_info{$t_pid}{query} =~ s/[\t\s\r\n;]+$//s;
+	$cur_info{$t_pid}{query} =~ s/^\s+//s;
+	$cur_info{$t_pid}{query} =~ s/[\s;]+$//s;
 
 	# Replace bind parameters values in the query if any
 	if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/)) {
@@ -12161,7 +12161,7 @@ sub build_log_line_prefix_regex
 
 			elsif ($token =~ /^\/\*.*\*\/$/s) {
 				if (!$self->{no_comments}) {
-					$token =~ s/\n[\s\t]+\*/\n\*/gs;
+					$token =~ s/\n\s+\*/\n\*/gs;
 					$self->_new_line;
 					$self->_add_token($token);
 					$self->_new_line;
