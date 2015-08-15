@@ -10626,7 +10626,7 @@ sub set_current_infos
 		$cur_info{$t_pid}{loglevel}  = $prefix_vars{'t_loglevel'};
 		$cur_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
 		$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-		$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'};
+		$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} ||  $prefix_vars{'t_dbclient'};
 		$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 		$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'};
 		$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'};
