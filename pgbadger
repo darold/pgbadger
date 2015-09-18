@@ -2916,10 +2916,10 @@ sub normalize_query
 	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/g;
 
 	# Remove IN values
-	$orig_query =~ s/in\s*\([\'0x,\s]*\)/in (...)/g;
+	$orig_query =~ s/\bin\s*\([\'0x,\s]*\)/in (...)/g;
 
 	# Remove curor names in CURSOR and IN clauses
-	$orig_query =~ s/(declare|in)\s*"[a-zA-Z0-9_-]*"/\1 "..."/g;
+	$orig_query =~ s/\b(declare|in)\s+"[^"]+"/$1 "..."/g;
 
 	return $orig_query;
 }
