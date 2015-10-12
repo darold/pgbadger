@@ -3019,7 +3019,7 @@ sub convert_time
 {
 	my $time = shift;
 
-	return '0s' if (!$time);
+	return '0ms' if (!$time);
 
 	my $days = int($time / 86400000);
 	$time -= ($days * 86400000);
@@ -3046,7 +3046,7 @@ sub convert_time
 	
 
 	$time = $days . $hours . $minutes . $seconds . $milliseconds;
-	$time = '0s' if ($time eq '');
+	$time = '0ms' if ($time eq '');
 
 	return $time;
 }
