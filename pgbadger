@@ -2410,6 +2410,11 @@ sub process_file
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'}) {
+						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
+						if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
+							$prefix_vars{'t_timestamp'} .= $1;
+						}
 					}
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
@@ -2755,6 +2760,11 @@ sub check_file_changed
 					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
 					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'}) {
+					$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
+					if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
+						$prefix_vars{'t_timestamp'} .= $1;
+					}
 				}
 			}
 			next if (!$prefix_vars{'t_timestamp'});
@@ -11856,6 +11866,7 @@ sub build_log_line_prefix_regex
 		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[\(\d\)]*')],     # remote host and port
 		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?')],              # remote host
 		'%p' => [('t_pid',          '(\d+)')],                                                        # process ID
+		'%n' => [('t_epoch',    '(\d{10}\.\d{3})')],      # timestamp as Unix epoch
 		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
 		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
 		'%l' => [('t_session_line', '(\d+)')],                                                        # session line number
