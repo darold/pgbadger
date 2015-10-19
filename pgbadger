@@ -70,6 +70,7 @@ my $terminate = 0;
 my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
 my $EXPLAIN_URL = 'http://explain.depesz.com/?is_public=0&is_anon=0&plan=';
+my $_anonymization_cache = {};
 
 my @E2A = (
    0,  1,  2,  3,156,  9,134,127,151,141,142, 11, 12, 13, 14, 15,
@@ -2934,51 +2935,107 @@ sub normalize_query
 	return $orig_query;
 }
 
-sub generate_anonymized_string
+=head2 _generate_anonymized_string
+
+Simply generate a random string, thanks to Perlmonks.
+
+Returns original in certain cases which don't require anonymization, like
+timestamps, or intervals.
+
+=cut
+
+sub _generate_anonymized_string
 {
-        my ($original, $cache, $before) = @_;
+    my ( $before, $original, $after ) = @_;
 
-        # Prevent dates from being anonymized
-        return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
-        return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
-	# Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
-        return $original if $original =~ m{\A(?:FM|FX|TM)?(?:HH|HH12|HH24|MI|SS|MS|US|SSSS|AM|A\.M\.|PM|P\.M\.|am|a\.m\.|pm|p\.m\.|Y,YYY|YYYY|YYY|YY|Y|IYYY|IYY|IY|I|BC|B\.C\.|AD|A\.D\.|bc|b\.c\.|ad|a\.d\.|MONTH|Month|month|MON|Mon|mon|MM|DAY|Day|day|DY|Dy|dy|DDD|DD|D|W|WW|IW|CC|J|Q|RM|rm|TZ|tz|[\s\/\-:])+(?:TH|th|SP)?$};
-	# Prevent interval from being anonymized
-	return $original if $before =~ /interval/i;
+    # Prevent dates from being anonymized
+    return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
+    return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
 
-        # Range of characters to use in anonymized strings
-        my @chars = ('A'..'Z', 0..9, 'a'..'z', '-', '_', '.');
+    # Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
+    return $original if $original =~ m{
+        \A
+        (?:FM|FX|TM)?
+        (?:
+            HH | HH12 | HH24
+            | MI
+            | SS
+            | MS
+            | US
+            | SSSS
+            | AM | A\.M\. | am | a\.m\.
+            | PM | P\.M\. | pm | p\.m\.
+            | Y,YYY | YYYY | YYY | YY | Y
+            | IYYY | IYY | IY | I
+            | BC | B\.C\. | bc | b\.c\.
+            | AD | A\.D\. | ad | a\.d\.
+            | MONTH | Month | month | MON | Mon | mon | MM
+            | DAY | Day | day | DY | Dy | dy | DDD | DD | D
+            | W | WW | IW
+            | CC
+            | J
+            | Q
+            | RM | rm
+            | TZ | tz
+            | [\s/:-]
+        )+
+        (?:TH|th|SP)?
+        \z
+    };
 
-        unless ($cache->{$original}) {
-                # Actual anonymized version generation
-                $cache->{$original} = join('', map { $chars[rand @chars] } 1..10 );
-        }
-        return $cache->{$original};
+    # Prevent interval from being anonymized
+
+    return $original if ($before && ($before =~ /interval/i));
+    return $original if ($after && ($after =~ /^\)*::interval/i));
+
+    # Shortcut
+    my $cache = $_anonymization_cache;
+
+    # Range of characters to use in anonymized strings
+    my @chars = ( 'A' .. 'Z', 0 .. 9, 'a' .. 'z', '-', '_', '.' );
+
+    unless ( $cache->{ $original } ) {
+
+        # Actual anonymized version generation
+        $cache->{ $original } = join( '', map { $chars[ rand @chars ] } 1 .. 10 );
+    }
+
+    return $cache->{ $original };
 }
 
+=head2 anonymize
 
-# Anonymize litteral in SQL queries by replacing parameters with fake values
+Anonymize litteral in SQL queries by replacing parameters with fake values
+
+=cut
+
 sub anonymize_query
 {
-	my $orig_query = shift;
+    my $orig_query = shift;
 
-	return if (!$orig_query);
+    return if ( !$orig_query );
 
-	# Variable to hold anonymized versions, so we can provide the same value
-	# for the same input, within single query.
-	my $anonymization_cache = {};
+    # Variable to hold anonymized versions, so we can provide the same value
+    # for the same input, within single query.
+    $_anonymization_cache = {};
 
-	# Remove comments
-	$orig_query =~ s/\/\*(.*?)\*\///gs;
+    # Remove comments
+    $orig_query =~ s/\/\*(.*?)\*\///gs;
 
-	# Clean query
-	$orig_query =~ s/\\'//g;
-	$orig_query =~ s/('')+//g;
+    # Clean query
+    $orig_query =~ s/\\'//gs;
+    $orig_query =~ s/('')+/\$EMPTYSTRING\$/gs;
 
-	# Anonymize each values
-	$orig_query =~ s/([^\s]+[\s\(]*)'([^']*)'/"$1'".generate_anonymized_string($2, $anonymization_cache, $1)."'"/eg;
+    # Anonymize each values
+    $orig_query =~ s{
+        ([^\s\']+[\s\(]*)       # before
+        '([^']*)'               # original
+        ([\)]*::\w+)?           # after
+    }{$1 . "'" . _generate_anonymized_string($1, $2, $3) . "'" . ($3||'')}xeg;
 
-	return $orig_query;
+    $orig_query =~ s/\$EMPTYSTRING\$/''/gs;
+
+    return $orig_query;
 }
 
 # Format numbers with comma for better reading
