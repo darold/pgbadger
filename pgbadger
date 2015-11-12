@@ -11415,8 +11415,8 @@ sub build_log_line_prefix_regex
 {
 	my %regex_map = (
 		'%a' => [('t_appname',      '(.*)')],                                   # application name
-		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # user name
-		'%d' => [('t_dbname',       '([0-9a-zA-Z\_\[\]\-]*)')],                                         # database name
+		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-\.]*)')],                                         # user name
+		'%d' => [('t_dbname',       '([0-9a-zA-Z\_\[\]\-\.]*)')],                                         # database name
 		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[\(\d\)]*')],     # remote host and port
 		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?')],              # remote host
 		'%p' => [('t_pid',          '(\d+)')],                                                        # process ID
