@@ -9989,7 +9989,7 @@ sub parse_query
 		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
-	} elsif ($prefix_vars{'t_loglevel'} eq 'ERROR') {
+	} elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only) {
 		if ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/) {
 			$prefix_vars{'t_loglevel'} = 'LOG';
 		}
