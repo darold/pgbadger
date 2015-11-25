@@ -2520,7 +2520,9 @@ sub process_file
 							$cur_temp_info{$cur_pid}{dbappname} = $cur_info{$cur_pid}{'appname'};
 							delete $cur_info{$cur_pid};
 						}
-						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+						if (exists $cur_temp_info{$cur_pid}{query} && $cur_temp_info{$cur_pid}{query}) {
+							$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+						}
 					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
