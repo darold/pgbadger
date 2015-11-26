@@ -188,6 +188,7 @@ sub spawn
 }
 
 # Command line options
+my $journalctl_cmd          = '';
 my $zcat_cmd                = 'gunzip -c';
 my $zcat                    = $zcat_cmd;
 my $bzcat                   = 'bunzip2 -c';
@@ -418,6 +419,7 @@ my $result = GetOptions(
 	'noreport!'                => \$noreport,
 	'log-duration!'            => \$log_duration,
 	'enable-checksum!'         => \$enable_checksum,
+	'journalctl=s'             => \$journalctl_cmd,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -456,12 +458,22 @@ if ($remote_host) {
 	}
 }
 
+# Add journalctl command to the file list si on le trouve pas déjà
+if ($journalctl_cmd) {
+	if (!grep(/^\Q$journalctl_cmd\E$/, @ARGV)) {
+		$journalctl_cmd .= " --output='short-iso'";
+		push(@ARGV, $journalctl_cmd);
+	}
+}
+
 # Log files to be parsed are passed as command line arguments
 if ($#ARGV >= 0) {
 	foreach my $file (@ARGV) {
-		if ($file ne '-') {
+		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
+			push(@log_files, $file);
+		} elsif ($file ne '-') {
 			if (!$remote_host) {
-				die "FATAL: logfile $file must exist!\n" if not -f $file;
+				die "FATAL: logfile \"$file\" must exist!\n" if not -f $file;
 				if (-z $file) {
 					print "WARNING: file $file is empty\n";
 					next;
@@ -501,7 +513,9 @@ if ($logfile_list) {
 		if ($file eq '-') {
 			die "FATAL: stdin input - can not be used with logfile list.\n";
 		}
-		if (!$remote_host) {
+		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
+			push(@log_files, $file);
+		} elsif (!$remote_host) {
 			die "FATAL: logfile $file must exist!\n" if not -f $file;
 			if (-z $file) {
 				print "WARNING: file $file is empty\n";
@@ -520,10 +534,15 @@ if ($logfile_list) {
 
 }
 
-# Logfile is a mandatory parameter
-if ($#log_files < 0) {
+# Logfile is a mandatory parameter when journalctl command is not set.
+if ( ($#log_files < 0) && !$journalctl_cmd) {
 	print STDERR "FATAL: you must give a log file as command line parameter.\n\n";
 	&usage();
+}
+
+# Remove follow option from journalctl command to prevent infinit loop
+if ($journalctl_cmd) {
+	$journalctl_cmd =~ s/(-f|--follow)\b//;
 }
 
 # Quiet mode is forced with progress bar
@@ -556,13 +575,21 @@ my $other_syslog_line =
 my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 my $orphan_stderr_line = '';
 
-# Simply genreate a random string, thanks to Perlmonks
-# Set default format
+# Set default format, with multiple files format will be autodetected each time.
+# This default format will be used when the autodetection fail.
 my $frmt = '';
 if (!$remote_host) {
-	$frmt = &autodetect_format($log_files[0]);
+	if ($journalctl_cmd) {
+		$frmt = 'syslog2';
+	} else {
+		$frmt = &autodetect_format($log_files[0]);
+	}
 } elsif (!$format) {
-	die "FATAL: you must give a log file format (-f or --format) when using remote connection.\n\n";
+	if ($journalctl_cmd) {
+		$frmt = 'syslog2';
+	} else {
+		die "FATAL: you must give a log file format (-f or --format) when using remote connection.\n\n";
+	}
 }
 $format ||= $frmt;
 
@@ -1179,6 +1206,8 @@ if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{da
 my $global_totalsize = 0;
 my @given_log_files = ( @log_files );
 chomp(@given_log_files);
+# Append journalctl command at top of log file list
+unshift(@given_log_files, $journalctl_cmd) if ($journalctl_cmd);
 
 # Verify that the file has not changed for incremental move
 if (!$remote_host) {
@@ -1190,6 +1219,13 @@ if (!$remote_host) {
 				&logmsg('DEBUG', "waiting for log entries from stdin.");
 				$saved_last_line{current_pos} = 0;
 				push(@tmpfilelist, $f);
+			} elsif ( $journalctl_cmd && ($f eq $journalctl_cmd) ) {
+				my $since = '';
+				if ( ($journalctl_cmd !~ /--since|-S/) && ($saved_last_line{datetime} =~ /^(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/) ) {
+					$since = " --since='$1-$2-$3 $4:$5:$6'";
+				}
+				&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
+				push(@tmpfilelist, "$f $since");
 			} elsif (!&check_file_changed($f, $saved_last_line{datetime})) {
 				&logmsg('DEBUG', "this file has already been parsed: $f");
 			} else {
@@ -1256,7 +1292,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Do not use split method with compressed files
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) ) {
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile !~ /\Q$journalctl_cmd\E/) ) {
 			# Create multiple processes to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
@@ -1770,6 +1806,9 @@ Options:
     --log-duration         : force pgbadger to associate log entries generated
                              by both log_duration = on and log_statement = 'all'
     --enable-checksum      : used to add a md5 sum under each query report.
+    --journalctl command   : command to use to replace PostgreSQL logfile by
+			     a call to journalctl. Basically it might be:
+				journalctl -u postgresql-9.5
 
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
@@ -1842,6 +1881,17 @@ use pgbadger as follow to exclude these period from the report:
 This will help avoid having COPY statements, as generated by pg_dump, on top of
 the list of slowest queries. You can also use --exclude-appname "pg_dump" to
 solve this problem in a simpler way.
+
+You can also parse journalctl output just as if it was a log file:
+
+	perl pgbadger --journalctl 'journalctl -u postgresql-9.5'
+
+or worst, call it from a remote host:
+
+	perl pgbadger -r 192.168.1.159 --journalctl 'journalctl -u postgresql-9.5'
+
+you don't need to specify any log file at command line, but if you have other
+PostgreSQL log file to parse, you can add them as usual.
 
 };
 
@@ -11930,7 +11980,9 @@ sub get_log_file
 
 	# get file size
 	my $totalsize = 0;
-	if (!$remote_host) {
+	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
+		$totalsize = 0;
+	} elsif (!$remote_host) {
 		$totalsize = (stat("$logf"))[7] || 0 if ($logf ne '-');
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
@@ -11947,10 +11999,21 @@ sub get_log_file
 	my $iscompressed = 1;
 
 	# Open a file handle
-	if ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
+	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
+		# For journalctl command we need to use a pipe as file handle
+		if (!$remote_host) {
+			open($lfile, "$logf |") || die "FATAL: cannot read output of commanf: $logf. $!\n";
+		} else {
+			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
+			# Open a pipe to remote journalctl program
+			open($lfile,"$ssh_command \"$logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n";
+		}
+		$iscompressed = 0;
+	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
 			open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
 		} else {
+			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
 			# Open a pipe to zcat program for compressed log
 			open($lfile,"$ssh_command \"cat $logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n";
 		}
@@ -12006,6 +12069,7 @@ sub get_log_file
 	}
 	# In scalar context return size only
 	close($lfile);
+
 	return $totalsize;
 }
 
@@ -13814,7 +13878,7 @@ function create_bargraph (divid, title, ytitle, data, y2title) {
 			tickRenderer: $.jqplot.CanvasAxisTickRenderer,
                         tickOptions: {
                             textColor: '#333',
-                            formatter: function(format, value) { return pretty_print_number(value, 0, ytitle); },
+                            formatter: function(format, value) { return pretty_print_number(value, 1, ytitle); },
 			    fontFamily:'Helvetica',
 			    fontSize: '8pt'
                         },
@@ -13826,7 +13890,7 @@ function create_bargraph (divid, title, ytitle, data, y2title) {
 			tickRenderer: $.jqplot.CanvasAxisTickRenderer,
 			tickOptions: {
 			    textColor: '#8dbd0f',
-			    formatter: function(format, value) { return pretty_print_number(value, 0, y2title); },
+			    formatter: function(format, value) { return pretty_print_number(value, 1, y2title); },
 			    fontFamily:'Helvetica',
 			    fontSize: '8pt'
 			},
