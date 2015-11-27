@@ -1718,7 +1718,7 @@ Options:
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
                              report per day with a log rotated each week.
-    -L | logfile-list file : file containing a list of log file to parse.
+    -L | --logfile-list file:file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
     -M | --no-multiline    : do not collect multiline statement to avoid garbage
