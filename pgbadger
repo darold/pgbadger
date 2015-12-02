@@ -1371,6 +1371,7 @@ if ($last_parsed) {
 	if (open(IN, "$tmp_last_parsed") ) {
 		while (my $line = <IN>) {
 			chomp($line);
+			$line =~ s/\r//;
 			my ($d, $p, $l) = split(/\t/, $line, 3);
 			if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
 				$last_line{datetime} = $d;
@@ -1457,6 +1458,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	if (open(IN, "$last_parsed.tmp")) {
 		while (my $l = <IN>) {
 			chomp($l);
+			$l =~ s/\r//;
 			push(@build_directories, $l) if (!grep(/^$l$/, @build_directories));
 		}
 		close(IN);
@@ -2133,6 +2135,8 @@ sub process_file
 		CSVLOOP: while (!$csv->eof()) {
 			while (my $row = $csv->getline($lfile)) {
 
+				$row =~ s/\r//;
+
 				# We received a signal
 				last CSVLOOP if ($terminate);
 
@@ -2251,6 +2255,8 @@ sub process_file
 			# We received a signal
 			last if ($terminate);
 
+			$line =~ s/\r//;
+
 			# Start to exclude from parsing any desired lines
 			if ($has_exclusion >= 0) {
 
@@ -2264,7 +2270,6 @@ sub process_file
 			$current_offset += length($line);
 
 			chomp($line);
-			$line =~ s/\r//;
 			$nlines++;
 			next if (!$line);
 
@@ -2771,6 +2776,8 @@ sub check_file_changed
 
 		$more_lines++;
 
+		$line =~ s/\r//;
+
 		if ($format =~ /syslog/) {
 
 			my @matches = ($line =~ $compiled_prefix);
@@ -2942,6 +2949,16 @@ sub logmsg
 	print STDERR "$level: $str\n";
 }
 
+# Remove quote from alias for normalisation
+sub remove_alias
+{
+	my $str = shift();
+
+	$str =~ s/'//gs;
+
+	return $str;
+}
+
 # Normalize SQL queries by removing parameters
 sub normalize_query
 {
@@ -2963,6 +2980,9 @@ sub normalize_query
 		$orig_query =~ s/^\s*begin\s*;\s*//gs
 	}
 
+	# Normalise alias with quote
+	$orig_query =~ s/AS\s+"([^"]+)"/'AS "' . remove_alias($1) . '"'/eigs;
+	
 	# Remove string content
 	$orig_query =~ s/\\'//g;
 	$orig_query =~ s/'[^']*'/''/g;
@@ -3179,14 +3199,16 @@ sub set_top_sample
 {
 	my ($norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
 
-	$normalyzed_info{$norm}{samples}{$dt}{query} = $q;
-	$normalyzed_info{$norm}{samples}{$dt}{date}  = $date;
-	$normalyzed_info{$norm}{samples}{$dt}{db}  = $db;
-	$normalyzed_info{$norm}{samples}{$dt}{user}  = $user;
-	$normalyzed_info{$norm}{samples}{$dt}{remote}  = $remote;
-	$normalyzed_info{$norm}{samples}{$dt}{app}  = $app;
-	$normalyzed_info{$norm}{samples}{$dt}{bind}  = $bind;
-	$normalyzed_info{$norm}{samples}{$dt}{plan}  = $plan;
+	return if (!$norm || !$q);
+
+	$normalyzed_info{$norm}{samples}{$dt}{query}  = $q;
+	$normalyzed_info{$norm}{samples}{$dt}{date}   = $date;
+	$normalyzed_info{$norm}{samples}{$dt}{db}     = $db;
+	$normalyzed_info{$norm}{samples}{$dt}{user}   = $user;
+	$normalyzed_info{$norm}{samples}{$dt}{remote} = $remote;
+	$normalyzed_info{$norm}{samples}{$dt}{app}    = $app;
+	$normalyzed_info{$norm}{samples}{$dt}{bind}   = $bind;
+	$normalyzed_info{$norm}{samples}{$dt}{plan}   = $plan;
 
 	if ($sample > 0) {
 		my $i = 1;
@@ -3521,7 +3543,7 @@ Report not supported by text format
 			my $k = $top_locked_queries[$i]->[0];
 			my $j = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
-			my $ttl = $top_locked_info[$i]->[1] || '';
+				my $ttl = $top_locked_info[$i]->[1] || '';
 				my $db = " - $normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
@@ -3579,7 +3601,7 @@ Report not supported by text format
 			" - ", $top_temporary[$i]->[0], "\n";
 			print $fh "--\n";
 			my $k = $top_temporary[$i]->[0];
-			if ($normalyzed_info{$k}{count} > 1) {
+			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
@@ -3635,7 +3657,7 @@ Report not supported by text format
 			$top_cancelled[$i]->[1], " - ", $top_cancelled[$i]->[0], "\n";
 			print $fh "--\n";
 			my $k = $top_cancelled[$i]->[0];
-			if ($normalyzed_info{$k}{count} > 1) {
+			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
@@ -7348,9 +7370,9 @@ sub print_lock_queries_report
 		my $query = &highlight_code($top_locked_queries[$i]->[0]);
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($top_locked_queries[$i]->[0]) if ($enable_checksum);
-		my $k = $top_locked_queries[$i]->[0];
 		my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-most-frequent-waiting-examples-rank-$rank">Examples</button></p>};
-		$example = '' if (scalar keys %{$normalyzed_info{$k}{samples}} <= 1);
+		my $k = $top_locked_queries[$i]->[0];
+		$example = '' if (scalar keys %{$normalyzed_info{$k}{samples}} == 0);
 		print $fh qq{
 			<tr>
 			<td>$rank</td>
@@ -7366,7 +7388,7 @@ sub print_lock_queries_report
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
 				<dl>
 };
-		if ($normalyzed_info{$k}{count} > 1) {
+		if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 			my $idx = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
@@ -7514,7 +7536,8 @@ sub print_tempfile_report
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($top_temporary[$i]->[0]) if ($enable_checksum);
 			my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-temporary-files-examples-rank-$rank">Examples</button></p>};
-			$example = '' if (scalar keys %{$normalyzed_info{$top_temporary[$i]->[0]}{samples}} == 0);
+			my $k = $top_temporary[$i]->[0];
+			$example = '' if (scalar keys %{$normalyzed_info{$k}{samples}} == 0);
 			print $fh qq{
 				<tr>
 				<td>$rank</td>
@@ -7530,8 +7553,7 @@ sub print_tempfile_report
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
 					<dl>
 };
-			my $k = $top_temporary[$i]->[0];
-			if ($normalyzed_info{$k}{count} > 1) {
+			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $idx = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
@@ -7661,7 +7683,8 @@ sub print_cancelled_report
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($top_cancelled[$i]->[0]) if ($enable_checksum);
 			my $example = qq{<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#queries-generating-most-cancellation-examples-rank-$rank">Examples</button></p>};
-			$example = '' if (scalar keys %{$normalyzed_info{$top_cancelled[$i]->[0]}{samples}} == 0);
+			my $k = $top_cancelled[$i]->[0];
+			$example = '' if (scalar keys %{$normalyzed_info{$k}{samples}} == 0);
 			print $fh qq{
 				<tr>
 				<td>$rank</td>
@@ -7673,8 +7696,7 @@ sub print_cancelled_report
 				<div id="queries-generating-most-cancellation-examples-rank-$rank" class="collapse">
 					<dl>
 };
-			my $k = $top_cancelled[$i]->[0];
-			if ($normalyzed_info{$k}{count} >= 1) {
+			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $idx = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
