@@ -3302,8 +3302,8 @@ Number of unique normalized events: $fmt_unique_error
 };
 	}
 	if ($tempfile_info{count}) {
-		my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize});
-		my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", ($tempfile_info{size} / $tempfile_info{count})));
+		my $fmt_temp_maxsise = &pretty_print_size($tempfile_info{maxsize});
+		my $fmt_temp_avsize = &pretty_print_size(sprintf("%.2f", ($tempfile_info{size} / $tempfile_info{count})));
 		print $fh qq{Number temporary files: $tempfile_info{count}
 Max size of temporary files: $fmt_temp_maxsise
 Average size of temporary files: $fmt_temp_avsize
@@ -4211,8 +4211,8 @@ sub print_overall_statistics
 	my $autoanalyze_count = &comma_numbers($autoanalyze_info{count});
 	my $tempfile_count = &comma_numbers($tempfile_info{count});
 	my $cancelled_count = &comma_numbers($cancelled_info{count});
-	my $fmt_temp_maxsise = &comma_numbers($tempfile_info{maxsize});
-	my $fmt_temp_avsize = &comma_numbers(sprintf("%.2f", $tempfile_info{size} / ($tempfile_info{count} || 1)));
+	my $fmt_temp_maxsise = &pretty_print_size($tempfile_info{maxsize});
+	my $fmt_temp_avsize = &pretty_print_size(sprintf("%.2f", $tempfile_info{size} / ($tempfile_info{count} || 1)));
 	my $session_count = &comma_numbers($session_info{count});
 	my $avg_session_duration = &convert_time($session_info{duration} / ($session_info{count} || 1));
 	my $tot_session_duration = &convert_time($session_info{duration});
@@ -6048,6 +6048,7 @@ $drawn_graphs{temporaryfile_graph}
 			if (scalar keys %tinf) {
 				my $temp_average = &pretty_print_size(sprintf("%.2f", $tinf{size} / $tinf{count}));
 				$tempfiles_activity .=  "<td>" . &comma_numbers($tinf{count}) .
+							"</td><td>" . &pretty_print_size($tinf{size}) . "</td>" .
 							"</td><td>$temp_average</td>";
 			} else {
 				$tempfiles_activity .= "<td>0</td><td>0</td>";
@@ -6072,6 +6073,7 @@ $drawn_graphs{temporaryfile_graph}
 							<th>Day</th>
 							<th>Hour</th>
 							<th>Count</th>
+							<th>Total size</th>
 							<th>Average size</th>
 						</tr>
 					</thead>
@@ -10211,17 +10213,17 @@ sub parse_query
 	}
 
 	# Stores temporary files activity
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path .*, size (\d+)/)) {
+	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path (.*), size (\d+)/)) {
 		return if ($disable_temporary);
 		$tempfile_info{count}++;
-		$tempfile_info{size} += $1;
+		$tempfile_info{size} += $2;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{count}++;
-		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{size} += $1;
-		$tempfile_info{maxsize} = $1 if ($tempfile_info{maxsize} < $1);
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{size} += $2;
 		# Store current temporary file information that will be used later
 		# when we will parse the query responsible for the tempfile
-		$cur_temp_info{$t_pid}{size} = $1;
-		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $1;
+		$cur_temp_info{$t_pid}{size} += $2;
+		$tempfile_info{maxsize} = $cur_temp_info{$t_pid}{size} if ($tempfile_info{maxsize} < $cur_temp_info{$t_pid}{size});
+		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $2;
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_count}++;
 		if ($format eq 'csv') {
 			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
