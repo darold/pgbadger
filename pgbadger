@@ -2307,7 +2307,9 @@ sub process_file
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
 					# Store temporary files and locks information
-					&store_temporary_and_lock_infos($cur_pid);
+					if (($prefix_vars{'t_pid'} ne $cur_pid) || ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
+						&store_temporary_and_lock_infos($cur_pid);
+					}
 
 					# Standard syslog format does not have year information, months are
 					# three letters and days are not always with 2 digits.
@@ -2459,7 +2461,9 @@ sub process_file
 					}
 
 					# Stores temporary files and lock information
-					&store_temporary_and_lock_infos($cur_pid);
+					if (($prefix_vars{'t_pid'} ne $cur_pid) || ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
+						&store_temporary_and_lock_infos($cur_pid);
+					}
 
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
@@ -10053,6 +10057,10 @@ sub parse_query
 
 	my $t_pid = $prefix_vars{'t_pid'};
 
+	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
+	my $cur_last_log_timestamp = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
+				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
+
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
@@ -10065,9 +10073,27 @@ sub parse_query
 		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
+
 	} elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only) {
+
 		if ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/) {
-			$prefix_vars{'t_loglevel'} = 'LOG';
+
+			# Stores cancelled queries
+			return if ($disable_query);
+			$cancelled_info{count}++;
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{cancelled}{count}++;
+			# Store current cancelled query information that will be used later
+			# when we will parse the query that has been killed
+			$overall_stat{'peak'}{$cur_last_log_timestamp}{cancelled_count}++;
+			$cur_cancel_info{$t_pid}{count}++;
+			if ($format eq 'csv') {
+				$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+				$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+				$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+				$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+				$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+				$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			}
 		}
 	}
 
@@ -10122,10 +10148,6 @@ sub parse_query
 			return;
 		}
 	}
-
-	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
-	my $cur_last_log_timestamp = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
-				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
 
 	# set current session workload
 	if ( !$disable_session ) {
@@ -10192,29 +10214,10 @@ sub parse_query
 		return;
 	}
 
-	# Stores cancelled queries
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/)) {
-		return if ($disable_query);
-		$cancelled_info{count}++;
-		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{cancelled}{count}++;
-		# Store current cancelled query information that will be used later
-		# when we will parse the query that has been killed
-		$overall_stat{'peak'}{$cur_last_log_timestamp}{cancelled_count}++;
-		$cur_cancel_info{$t_pid}{count}++;
-		if ($format eq 'csv') {
-			$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
-			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-			$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-		}
-		return;
-	}
-
 	# Stores temporary files activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path (.*), size (\d+)/)) {
 		return if ($disable_temporary);
+		my $filepath = $1;
 		$tempfile_info{count}++;
 		$tempfile_info{size} += $2;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{count}++;
@@ -10232,6 +10235,9 @@ sub parse_query
 			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		} elsif ($filepath =~ /\.\d+"$/) {
+			# Temporary store the current request to keep temporary file query in memory
+			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} || $cur_info{$t_pid}{query} if (!exists $cur_temp_info{$t_pid}{query});
 		}
 		return;
 	}
