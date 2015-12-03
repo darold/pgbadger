@@ -10088,12 +10088,12 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{count}++;
 			if ($format eq 'csv') {
 				$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
-				$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-				$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-				$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-				$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-				$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 			}
+			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 		}
 	}
 
@@ -10230,14 +10230,16 @@ sub parse_query
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_count}++;
 		if ($format eq 'csv') {
 			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+		} elsif ($filepath =~ /\.\d+"$/) {
+			# Temporary store the current request to keep temporary file query in memory
+			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} || $cur_info{$t_pid}{query} if (!exists $cur_temp_info{$t_pid}{query});
+		}
+		if (!exists $cur_temp_info{$t_pid}{timestamp}) {
 			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 			$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
 			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-		} elsif ($filepath =~ /\.\d+"$/) {
-			# Temporary store the current request to keep temporary file query in memory
-			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} || $cur_info{$t_pid}{query} if (!exists $cur_temp_info{$t_pid}{query});
 		}
 		return;
 	}
