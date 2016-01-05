@@ -1500,6 +1500,72 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">7.2</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-01-05</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This new release fixes some issues especially in temporary files
+reports and adds some features.
+</p>
+<pre>
+  * Allow pgBadger to parse natively the journalctl command output
+  * Add new keywords from PG 9.5 for code formating
+  * Add support to %n log_line_prefix option for Unix epoch (PG 9.6)
+</pre>
+<p>
+There's also some new command line option:
+</p>
+<pre>
+  * Adds --journalctl_cmd option to enable this functionality and
+    set the command. Typically:
+
+	--journalctl_cmd "journalctl -u postgresql-9.4"
+
+    to parse output of PG 9.4 log
+</pre>
+<p>
+Here is the full list of changes/fixes:
+</p>
+<pre>
+  - Fix missing detailed information (date, db, etc.) in Queries
+    generating the largest temporary files report.
+  - Fix label of sessions histogram. Thanks to Guillaume Lelarge
+    for the patch.
+  - Fix to handle cancelled query that generate more than one
+    temporary file and more generally aggregate size on queries with
+    multiple (> 1GB) temporary files.
+  - Add "Total size" column in Temporary Files Activity table and
+    fix size increment when a query have multiple 1GB temporary file.
+  - Fix temporary file query normalization and examples.
+  - Fix incomplete and wrong queries associated to temporary files
+    when STATEMENT level log line was missing. Thanks to Mael
+    Rimbault for the report.
+  - When -w or --watch-mode is used, message "canceling statement
+    due to statement timeout" s now reported with other errors.
+  - Allow dot in dbname and user name. Thanks to David Turvey for
+    the patch.
+  - Remove use of unmaintained flotr2 javascript chart library and
+    use of jqflot instead.
+  - Fix bad formatting with anonymized values in queries.
+  - Display 0ms instead of 0s when qery time is under the millisecond.
+    Thanks to venkatabn for the report.
+  - Normalize cursor names. Patch from Julien Rouhaud
+  - Fix unregistered client host name with default pattern. Thanks to
+    Eric S. Lucinger Ruiz for the report.
+  - Remove redundant regular expressions.
+  - Tweaking awkward phrasing, correcting subject-verb agreements,
+    typos, and misspellings. Patch from Josh Kupershmid.
+  - Fix potential incorrect creation of subdirectory in incremental mode.
+  - Allow single white space after duration even if this should not appear.
+  - Update copyright.
+</pre>
+		</div>
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">7.1</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2015-07-11</span> <span class="figure-label">Date</span></li>    
 				</ul>
@@ -2346,7 +2412,7 @@ For a complete list of commercial support near of your place take a look at the 
 
 <footer>
 <div class="pull-left">
-	&copy; 2012-2015 <a href="http://www.dalibo.com/" target="_new">Dalibo</a
+	&copy; 2012-2016 <a href="http://www.dalibo.com/" target="_new">Dalibo</a
 </div>
 </footer>
 
