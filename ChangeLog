@@ -1,3 +1,56 @@
+2016-01-05 version 7.2 
+
+This new release fixes some issues especially in temporary files
+reports and adds some features.
+
+  * Allow pgBadger to parse natively the journalctl command output
+  * Add new keywords from PG 9.5 for code formating
+  * Add support to %n log_line_prefix option for Unix epoch (PG 9.6)
+
+There's also some new command line option:
+
+  * Adds --journalctl_cmd option to enable this functionality and
+    set the command. Typically:
+
+	--journalctl_cmd "journalctl -u postgresql-9.4"
+
+    to parse output of PG 9.4 log
+
+Here is the full list of changes/fixes:
+
+  - Fix missing detailed information (date, db, etc.) in Queries
+    generating the largest temporary files report.
+  - Fix label of sessions histogram. Thanks to Guillaume Lelarge
+    for the patch.
+  - Fix to handle cancelled query that generate more than one
+    temporary file and more generally aggregate size on queries with
+    multiple (> 1GB) temporary files.
+  - Add "Total size" column in Temporary Files Activity table and
+    fix size increment when a query have multiple 1GB temporary file.
+  - Fix temporary file query normalization and examples.
+  - Fix incomplete and wrong queries associated to temporary files
+    when STATEMENT level log line was missing. Thanks to Mael
+    Rimbault for the report.
+  - When -w or --watch-mode is used, message "canceling statement
+    due to statement timeout" s now reported with other errors.
+  - Allow dot in dbname and user name. Thanks to David Turvey for
+    the patch.
+  - Remove use of unmaintained flotr2 javascript chart library and
+    use of jqflot instead.
+  - Fix bad formatting with anonymized values in queries.
+  - Display 0ms instead of 0s when qery time is under the millisecond.
+    Thanks to venkatabn for the report.
+  - Normalize cursor names. Patch from Julien Rouhaud
+  - Fix unregistered client host name with default pattern. Thanks to
+    Eric S. Lucinger Ruiz for the report.
+  - Remove redundant regular expressions.
+  - Tweaking awkward phrasing, correcting subject-verb agreements,
+    typos, and misspellings. Patch from Josh Kupershmid.
+  - Fix potential incorrect creation of subdirectory in incremental mode.
+  - Allow single white space after duration even if this should not appear.
+  - Update copyright.
+
+
 2015-07-11 version 7.1 
 
 This new release fixes some issues and adds a new report:
