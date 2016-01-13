@@ -1226,10 +1226,13 @@ if (!$remote_host) {
 				}
 				&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
 				push(@tmpfilelist, "$f $since");
-			} elsif (!&check_file_changed($f, $saved_last_line{datetime})) {
-				&logmsg('DEBUG', "this file has already been parsed: $f");
 			} else {
-				push(@tmpfilelist, $f);
+				my ($retcode, $msg) = &check_file_changed($f, $saved_last_line{datetime});
+				if (!$retcode) {
+					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
+				} else {
+					push(@tmpfilelist, $f);
+				}
 			}
 		}
 		@given_log_files = ();
@@ -2092,10 +2095,13 @@ sub process_file
 	# Check if the first date in the log are after the last date saved
 	if (($format ne 'binary') && ($format ne 'csv')) {
 		if ($start_offset && !$chunk_pos) {
-			if (&check_file_changed($logfile, $saved_last_line{datetime}, 1)) {
-				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile");
+			my ($retcode, $msg) = &check_file_changed($logfile, $saved_last_line{datetime}, 1);
+			if ($retcode) {
+				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile, $msg");
 				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
 				$start_offset = 0;
+			} else {
+				&logmsg('DEBUG', "This might not be parsed: $logfile, $msg");
 			}
 			$cursize = $start_offset;
 		}
@@ -2758,7 +2764,7 @@ sub check_file_changed
 	# Compressed files do not allow seeking
 	if ($iscompressed) {
 		close($lfile);
-		return 1;
+		return (1, "log file is compressed");
 		
 	}
 
@@ -2767,11 +2773,13 @@ sub check_file_changed
 	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
 
 	%prefix_vars = ();
+	my $startoffset = 0;
 	# If seeking is not explicitely disabled
 	if (!$look_at_beginning) {
 		# do not seek if filesize is smaller than the seek position
 		if ($saved_last_line{current_pos} < $totalsize) {
 			$lfile->seek($saved_last_line{current_pos} || 0, 0);
+			$startoffset = $saved_last_line{current_pos} || 0;
 		}
 	}
 
@@ -2806,7 +2814,7 @@ sub check_file_changed
 				# This file has already been parsed
 				if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 					close($lfile);
-					return 0;
+					return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
 				} else {
 					last;
 				}
@@ -2834,6 +2842,7 @@ sub check_file_changed
 			# This file has already been parsed
 			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 				close($lfile);
+				return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
 				return 0;
 			} else {
 				last;
@@ -2844,10 +2853,10 @@ sub check_file_changed
 
 	if (!$more_lines) {
 		close($lfile);
-		return 0;
+		return (0, "there no new lines in this file");
 	}
 
-	return 1;
+	return (1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
 }
 
 
