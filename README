@@ -132,6 +132,9 @@ SYNOPSIS
         --journalctl command   : command to use to replace PostgreSQL logfile by
                                  a call to journalctl. Basically it might be:
                                     journalctl -u postgresql-9.5
+        --pid-dir dirpath      : set the path of the directory where the pid file
+                                 will be written to be able to run two pgbadger at
+                                 the same time.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
