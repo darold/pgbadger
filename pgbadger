@@ -70,6 +70,7 @@ my $terminate = 0;
 my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
 my $EXPLAIN_URL = 'http://explain.depesz.com/?is_public=0&is_anon=0&plan=';
+my $PID_DIR = $TMP_DIR;
 
 my @E2A = (
    0,  1,  2,  3,156,  9,134,127,151,141,142, 11, 12, 13, 14, 15,
@@ -336,6 +337,9 @@ sub wait_child
 	if ($last_parsed && -e "$last_parsed.tmp") {
 		unlink("$last_parsed.tmp");
 	}
+	if (-e "$PID_DIR/pgbadger.pid") {
+		unlink("$PID_DIR/pgbadger.pid");
+	}
 	_exit(0);
 }
 $SIG{INT} = \&wait_child;
@@ -440,6 +444,20 @@ if ($enable_checksum) {
 	}
 }
 
+# Check if an other process is already running
+if (-f "$PID_DIR/pgbadger.pid") {
+	print "FATAL: an other process is already started or remove the file, see $PID_DIR/pgbadger.pid\n";
+	exit 1;
+} else {
+	# Create pid file
+	unless(open(OUT, ">$PID_DIR/pgbadger.pid")) {
+		print "FATAL: can't create pid file $PID_DIR/pgbadger.pid, $!\n";
+		exit 1;
+	}
+	print OUT $$;
+	close(OUT);
+}
+
 # Rewrite some command line arguments as lists
 &compute_arg_list();
 
@@ -473,7 +491,7 @@ if ($#ARGV >= 0) {
 			push(@log_files, $file);
 		} elsif ($file ne '-') {
 			if (!$remote_host) {
-				die "FATAL: logfile \"$file\" must exist!\n" if not -f $file;
+				localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
 				if (-z $file) {
 					print "WARNING: file $file is empty\n";
 					next;
@@ -489,7 +507,7 @@ if ($#ARGV >= 0) {
 			}
 		} else {
 			if ($logfile_list) {
-				die "FATAL: stdin input - can not be used with logfile list (-L).\n";
+				localdie("FATAL: stdin input - can not be used with logfile list (-L).\n");
 			}
 			push(@log_files, $file);
 		}
@@ -500,10 +518,10 @@ if ($#ARGV >= 0) {
 if ($logfile_list) {
 
 	if (!-e $logfile_list) {
-		die "FATAL: logfile list $logfile_list must exist!\n";
+		localdie("FATAL: logfile list $logfile_list must exist!\n");
 	}
 	if (not open(IN, $logfile_list)) {
-		die "FATAL: can not read logfile list $logfile_list, $!.\n";
+		localdie("FATAL: can not read logfile list $logfile_list, $!.\n");
 	}
 	my @files = <IN>;
 	close(IN);
@@ -511,12 +529,12 @@ if ($logfile_list) {
 		chomp($file);
 		$file =~ s/\r//;
 		if ($file eq '-') {
-			die "FATAL: stdin input - can not be used with logfile list.\n";
+			localdie("FATAL: stdin input - can not be used with logfile list.\n");
 		}
 		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
 			push(@log_files, $file);
 		} elsif (!$remote_host) {
-			die "FATAL: logfile $file must exist!\n" if not -f $file;
+			localdie("FATAL: logfile $file must exist!\n") if (not -f $file);
 			if (-z $file) {
 				print "WARNING: file $file is empty\n";
 				next;
@@ -588,7 +606,7 @@ if (!$remote_host) {
 	if ($journalctl_cmd) {
 		$frmt = 'syslog2';
 	} else {
-		die "FATAL: you must give a log file format (-f or --format) when using remote connection.\n\n";
+		localdie("FATAL: you must give a log file format (-f or --format) when using remote connection.\n\n");
 	}
 }
 $format ||= $frmt;
@@ -608,7 +626,7 @@ if (!$extension) {
 		$extension = 'binary';
 	} elsif ($outfile =~ /\.json/i) {
 		if (eval {require JSON::XS;1;} ne 1) {
-			die("Can not save output in json format, please install Perl module JSON::XS first.\n");
+			localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
 		} else {
 			JSON::XS->import();
 		}
@@ -624,7 +642,7 @@ if (!$extension) {
 	}
 } elsif (lc($extension) eq 'json') {
 	if (eval {require JSON::XS;1;} ne 1) {
-		die("Can not save output in json format, please install Perl module JSON::XS first.\n");
+		localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
 	} else {
 		JSON::XS->import();
 	}
@@ -656,11 +674,11 @@ if ($outfile ne '-') {
 			$outdir = $infs[1];
 		} else {
 			# maybe a confusion between -O and -o
-			die "FATAL: output file $outfile is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n";
+			localdie("FATAL: output file $outfile is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n");
 		}
 	} elsif (!-d "$outdir") {
 		# An output directory has been passed as command line parameter
-		die "FATAL: $outdir is not a directory or doesn't exist.\n";
+		localdie("FATAL: $outdir is not a directory or doesn't exist.\n");
 	}
 	$outfile = basename($outfile);
 	$outfile = $outdir . '/' . $outfile;
@@ -688,7 +706,7 @@ if ($extension eq 'tsung') {
 	# Open filehandle
 	my $fh = new IO::File ">$outfile";
 	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
+		localdie("FATAL: can't write to $outfile, $!\n");
 	}
 	print $fh qq{<?xml version="1.0"?>
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
@@ -719,7 +737,7 @@ if ($extension eq 'tsung') {
 	# Test file creation before going to parse log
 	my $tmpfh = new IO::File ">$outfile";
 	if (not defined $tmpfh) {
-		die "FATAL: can't write to $outfile, $!\n";
+		localdie("FATAL: can't write to $outfile, $!\n");
 	}
 	$tmpfh->close();
 	unlink($outfile) if (-e $outfile);
@@ -727,7 +745,7 @@ if ($extension eq 'tsung') {
 
 # -w and --disable-error can't go together
 if ($error_only && $disable_error) {
-	die "FATAL: please choose between no event report and reporting events only.\n";
+	localdie("FATAL: please choose between no event report and reporting events only.\n");
 }
 
 # Set default search pattern for database, user name, application name and host in log_line_prefix
@@ -742,7 +760,7 @@ my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY)/is;
 
 # Loading excluded query from file if any
 if ($exclude_file) {
-	open(IN, "$exclude_file") or die "FATAL: can't read file $exclude_file: $!\n";
+	open(IN, "$exclude_file") or localdie("FATAL: can't read file $exclude_file: $!\n");
 	my @exclq = <IN>;
 	close(IN);
 	chomp(@exclq);
@@ -769,7 +787,7 @@ if ($#exclude_time >= 0) {
 
 # Loading included query from file if any
 if ($include_file) {
-	open(IN, "$include_file") or die "FATAL: can't read file $include_file: $!\n";
+	open(IN, "$include_file") or localdie("FATAL: can't read file $include_file: $!\n");
 	my @exclq = <IN>;
 	close(IN);
 	chomp(@exclq);
@@ -840,14 +858,14 @@ sub check_regex
 
 	eval {m/$pattern/i;};
 	if ($@) {
-		die "FATAL: '$varname' invalid regex '$pattern', $!\n";
+		localdie("FATAL: '$varname' invalid regex '$pattern', $!\n");
 	}
 }
 
 # Check start/end date time
 if ($from) {
 	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		die "FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n";
+		localdie("FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
 	} else {
                 my $fractional_seconds = $7 || "0";
                 $from = "$1-$2-$3 $4:$5:$6.$7"
@@ -856,7 +874,7 @@ if ($from) {
 }
 if ($to) {
 	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		die "FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n";
+		localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
 	} else {
                 my $fractional_seconds = $7 || "0";
                 $to = "$1-$2-$3 $4:$5:$6.$7"
@@ -1029,15 +1047,15 @@ if ($incremental) {
 
 	# In incremental mode an output directory must be set
 	if (!$outdir) {
-		die "FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n"
+		localdie("FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n")
 	}
 	# Ensure this is not a relative path
 	if (dirname($outdir) eq '.') {
-		die "FATAL: output directory ($outdir) is not an absolute path.\n";
+		localdie("FATAL: output directory ($outdir) is not an absolute path.\n");
 	}
 	# Ensure that the directory already exists
 	if (!-d $outdir) {
-		die "FATAL: output directory $outdir does not exists\n";
+		localdie("FATAL: output directory $outdir does not exists\n");
 	}
 	# Set default last parsed file in incremental mode
 	if (!$last_parsed) {
@@ -1070,7 +1088,7 @@ if ($last_parsed && -e $last_parsed) {
 		}
 
 	} else {
-		die "FATAL: can't read last parsed line from $last_parsed, $!\n";
+		localdie("FATAL: can't read last parsed line from $last_parsed, $!\n");
 	}
 }
 $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
@@ -1090,20 +1108,20 @@ if (!$noclean && $saved_last_line{datetime} && $outdir) {
 	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
 	# Find obsolete dir days that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
-		die "Error: can't opendir $outdir: $!";
+		localdie("Error: can't opendir $outdir: $!");
 	}
 	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 	closedir DIR;
 	my @obsolete_days = ();
 	foreach my $y (sort { $a <=> $b } @dyears) {
 		unless(opendir(DIR, "$outdir/$y")) {
-			die "Error: can't opendir $outdir/$y: $!";
+			localdie("Error: can't opendir $outdir/$y: $!");
 		}
 		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
 		foreach my $m (sort { $a <=> $b } @dmonths) {
 			unless(opendir(DIR, "$outdir/$y/$m")) {
-				die "Error: can't opendir $outdir/$y/$m: $!";
+				localdie("Error: can't opendir $outdir/$y/$m: $!");
 			}
 			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
@@ -1116,7 +1134,7 @@ if (!$noclean && $saved_last_line{datetime} && $outdir) {
 	}
 	foreach my $p (@obsolete_days) {
 		unless(opendir(DIR, "$p")) {
-			die "Error: can't opendir $p: $!";
+			localdie("Error: can't opendir $p: $!");
 		}
 		my @hfiles = grep { $_ =~ /\.(html|txt|tsung|json)$/i } readdir(DIR);
 		next if ($#hfiles == -1); # do not remove files if report file has not been generated
@@ -1145,14 +1163,14 @@ if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{da
 
 	# Find obsolete weeks dir that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
-		die "Error: can't opendir $outdir: $!";
+		localdie("Error: can't opendir $outdir: $!");
 	}
 	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 	closedir DIR;
 	my @obsolete_weeks = ();
 	foreach my $y (sort { $a <=> $b } @dyears) {
 		unless(opendir(DIR, "$outdir/$y")) {
-			die "Error: can't opendir $outdir/$y: $!";
+			localdie("Error: can't opendir $outdir/$y: $!");
 		}
 		my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
 		closedir DIR;
@@ -1168,14 +1186,14 @@ if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{da
 	# Now removed the corresponding days 
 	foreach my $y (sort { $a <=> $b } @dyears) {
 		unless(opendir(DIR, "$outdir/$y")) {
-			die "Error: can't opendir $outdir/$y: $!";
+			localdie("Error: can't opendir $outdir/$y: $!");
 		}
 		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
 		my @rmmonths = ();
 		foreach my $m (sort { $a <=> $b } @dmonths) {
 			unless(opendir(DIR, "$outdir/$y/$m")) {
-				die "Error: can't opendir $outdir/$y/$m: $!";
+				localdie("Error: can't opendir $outdir/$y/$m: $!");
 			}
 			my @rmdays = ();
 			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
@@ -1308,7 +1326,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 					}
 					sleep(1);
 				}
-				die "FATAL: Abort signal received when processing to next chunk\n" if ($interrupt == 2);
+				localdie("FATAL: Abort signal received when processing to next chunk\n") if ($interrupt == 2);
 				last if ($interrupt);
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 				spawn sub {
@@ -1328,13 +1346,13 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		}
 
-		die "FATAL: Abort signal received when processing next file\n" if ($interrupt == 2);
+		localdie("FATAL: Abort signal received when processing next file\n") if ($interrupt == 2);
 		last if ($interrupt);
 	}
 
 	my $minproc = 1;
 	$minproc = 0 if (!$progress);
-	# Wait for all child processes to die except for the logger
+	# Wait for all child processes to localdie except for the logger
 	while (scalar keys %RUNNING_PIDS > $minproc) {
 		my $kid = waitpid(-1, WNOHANG);
 		if ($kid > 0) {
@@ -1356,7 +1374,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 	foreach my $f (@tempfiles) {
 		next if (!-e "$f->[1]" || -z "$f->[1]");
 		my $fht = new IO::File;
-		$fht->open("< $f->[1]") or die "FATAL: can't open temp file $f->[1], $!\n";
+		$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
 		&load_stats($fht);
 		$fht->close();
 	}
@@ -1418,7 +1436,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	if ($extension ne 'tsung') {
 		$fh = new IO::File ">$outfile";
 		if (not defined $fh) {
-			die "FATAL: can't write to $outfile, $!\n";
+			localdie("FATAL: can't write to $outfile, $!\n");
 		}
 		if (($extension eq 'text') || ($extension eq 'txt')) {
 			if ($error_only) {
@@ -1447,7 +1465,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		# Open filehandle
 		$fh = new IO::File ">>$outfile";
 		if (not defined $fh) {
-			die "FATAL: can't write to $outfile, $!\n";
+			localdie("FATAL: can't write to $outfile, $!\n");
 		}
 		print $fh "</sessions>\n</tsung>\n";
 		$fh->close();
@@ -1488,13 +1506,13 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 
 		# Load all data gathered by all the different processes
                 unless(opendir(DIR, "$outdir/$bpath")) {
-                        die "Error: can't opendir $outdir/$bpath: $!";
+                        localdie("Error: can't opendir $outdir/$bpath: $!");
                 }
                 my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
                 closedir DIR;
 		foreach my $f (@mfiles) {
 			my $fht = new IO::File;
-			$fht->open("< $outdir/$bpath/$f") or die "FATAL: can't open file $outdir/$bpath/$f, $!\n";
+			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
 			&load_stats($fht);
 			$fht->close();
 		}
@@ -1503,7 +1521,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 
 		$fh = new IO::File ">$outdir/$bpath/$outfile";
 		if (not defined $fh) {
-			die "FATAL: can't write to $outdir/$bpath/$outfile, $!\n";
+			localdie("FATAL: can't write to $outdir/$bpath/$outfile, $!\n");
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
@@ -1531,13 +1549,13 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 			# Load all data gathered by all the differents processes
 			if (-e "$outdir/$bpath") {
 				unless(opendir(DIR, "$outdir/$bpath")) {
-					die "Error: can't opendir $outdir/$bpath: $!";
+					localdie("Error: can't opendir $outdir/$bpath: $!");
 				}
 				my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
 				closedir DIR;
 				foreach my $f (@mfiles) {
 					my $fht = new IO::File;
-					$fht->open("< $outdir/$bpath/$f") or die "FATAL: can't open file $outdir/$bpath/$f, $!\n";
+					$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
 					&load_stats($fht);
 					$fht->close();
 				}
@@ -1550,7 +1568,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		}
 		$fh = new IO::File ">$outdir/$wdir/$outfile";
 		if (not defined $fh) {
-			die "FATAL: can't write to $outdir/$wdir/$outfile, $!\n";
+			localdie("FATAL: can't write to $outdir/$wdir/$outfile, $!\n");
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
@@ -1565,7 +1583,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	
 	$fh = new IO::File ">$outdir/index.html";
 	if (not defined $fh) {
-		die "FATAL: can't write to $outdir/index.html, $!\n";
+		localdie("FATAL: can't write to $outdir/index.html, $!\n");
 	}
 	my $date = localtime(time);
 	my @tmpjscode = @jscode;
@@ -1621,7 +1639,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 };
 	# get year directories
 	unless(opendir(DIR, "$outdir")) {
-		die "Error: can't opendir $outdir: $!";
+		localdie("Error: can't opendir $outdir: $!");
 	}
 	my @dyears = grep { !/^\./ && /^\d{4}$/ } readdir(DIR);
 	closedir DIR;
@@ -1632,7 +1650,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 };
 		# foreach year directory look for week directories
 		unless(opendir(DIR, "$outdir/$y")) {
-			die "Error: can't opendir $outdir/$y: $!";
+			localdie("Error: can't opendir $outdir/$y: $!");
 		}
 
 		my @ymonths = grep { /^\d{2}$/ } readdir(DIR);
@@ -1908,7 +1926,7 @@ sub cleanup_directory
 	my ($dir, $remove_dir) = @_;
 
 	unless(opendir(DIR, "$dir")) {
-		die "Error: can't opendir $dir: $!";
+		localdie("Error: can't opendir $dir: $!");
 	}
 	my @todel = grep { !/^\./ } readdir(DIR);
 	closedir DIR;
@@ -1948,7 +1966,7 @@ sub write_resources
 			}
 			if (!-e "$outdir/$file") {
 				$rscfh = new IO::File ">$outdir/$file";
-				die "FATAL: can't write file $outdir/$file\n" if (not defined $rscfh);
+				localdie("FATAL: can't write file $outdir/$file\n") if (not defined $rscfh);
 			}
 			next;
 		}
@@ -2074,8 +2092,8 @@ sub process_file
 		&logmsg('DEBUG', "Starting to parse remote log file: $remote_host:$logfile");
 	}
 
-	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; $terminate = 1; };
-	local $SIG{TERM} = sub { print STDERR "Received SIGTERM abort parsing...\n"; $terminate = 1 };
+	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; unlink("$PID_DIR/pgbadger.pid"); $terminate = 1; };
+	local $SIG{TERM} = sub { print STDERR "Received SIGTERM abort parsing...\n"; unlink("$PID_DIR/pgbadger.pid"); $terminate = 1; };
 
 	my $curdate = localtime(time);
 
@@ -2702,7 +2720,7 @@ sub process_file
 		$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
 		my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
 		if (not defined $fhb) {
-			die "FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n";
+			localdie("FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n");
 		}
 		&dump_as_binary($fhb);
 		$fhb->close;
@@ -2935,7 +2953,7 @@ sub check_incremental_position
 			$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
 			my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
 			if (not defined $fhb) {
-				die "FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n";
+				localdie("FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n");
 			}
 			&dump_as_binary($fhb);
 			$fhb->close;
@@ -9813,14 +9831,14 @@ sub dump_as_binary
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
-	}, $lfh) || die ("Couldn't save binary data to «$outfile»!\n");
+	}, $lfh) || localdie ("Couldn't save binary data to «$outfile»!\n");
 }
 
 sub dump_error_as_json
 {
 	my $json = encode_json({
 		'error_info' => \%error_info,
-	}) || die ("Encode object to JSON failed!\n");
+	}) || localdie ("Encode object to JSON failed!\n");
 
 	print $fh $json;
 }
@@ -9851,7 +9869,7 @@ sub dump_as_json
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
-	}) || die ("Encode object to JSON failed!\n");
+	}) || localdie ("Encode object to JSON failed!\n");
 
 	print $fh $json;
 }
@@ -10771,7 +10789,7 @@ sub store_tsung_session
 	# Open filehandle
 	my $fh = new IO::File ">>$outfile";
 	if (not defined $fh) {
-		die "FATAL: can't write to $outfile, $!\n";
+		localdie("FATAL: can't write to $outfile, $!\n");
 	}
 	if ($pid) {
 		print $fh "  <session weight=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
@@ -11253,7 +11271,7 @@ sub autodetect_format
 	my $nline  = 0;
 	my $fmt    = '';
 
-	die "FATAL: can't open file $file, $!\n" unless(open(TESTFILE, $file));
+	localdie("FATAL: can't open file $file, $!\n") unless(open(TESTFILE, $file));
 	my $fltf = <TESTFILE>;
 	close($fltf);
 	# is file in binary format ?
@@ -11308,7 +11326,7 @@ sub autodetect_format
 		$tfile->close();
 		if (!$format) {
 			if (!$fmt || ($nfound < 10)) {
-				die "FATAL: unable to detect log file format from $file, please use -f option.\n";
+				localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
 			}
 		}
 
@@ -12051,7 +12069,7 @@ sub get_log_file
 		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
 		chomp($totalsize);
 		if ($totalsize eq '') {
-			die "FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'\n";
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'\n");
 		}
 		&logmsg('DEBUG', "Remote file size: $totalsize");
 		if (!$totalsize) {
@@ -12064,20 +12082,20 @@ sub get_log_file
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
 		# For journalctl command we need to use a pipe as file handle
 		if (!$remote_host) {
-			open($lfile, "$logf |") || die "FATAL: cannot read output of commanf: $logf. $!\n";
+			open($lfile, "$logf |") || localdie("FATAL: cannot read output of commanf: $logf. $!\n");
 		} else {
 			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
 			# Open a pipe to remote journalctl program
-			open($lfile,"$ssh_command \"$logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n";
+			open($lfile,"$ssh_command \"$logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
 		}
 		$iscompressed = 0;
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
-			open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
+			open($lfile, $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 		} else {
 			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
 			# Open a pipe to zcat program for compressed log
-			open($lfile,"$ssh_command \"cat $logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n";
+			open($lfile,"$ssh_command \"cat $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
 		}
 		$totalsize = 0 if ($logf eq '-');
 		$iscompressed = 0;
@@ -12094,11 +12112,11 @@ sub get_log_file
 		if (!$remote_host) {
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
-			open($lfile,"$uncompress \"$logf\" |") || die "FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n";
+			open($lfile,"$uncompress \"$logf\" |") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
 		} else {
 			&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
 			# Open a pipe to zcat program for compressed log
-			open($lfile,"$ssh_command \"$uncompress $logf\" |") || die "FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n";
+			open($lfile,"$ssh_command \"$uncompress $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
 		}
 
 
@@ -12378,6 +12396,16 @@ sub _gethostbyaddr
 
 	return $CACHE_DNS{$ip} || $ip;
 
+}
+
+sub localdie
+{
+	my $msg = shift;
+
+	print STDERR "$msg";
+	unlink("$PID_DIR/pgbadger.pid");
+
+	exit 1;
 }
 
 __DATA__
