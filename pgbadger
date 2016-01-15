@@ -271,6 +271,7 @@ my $noreport                = 0;
 my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
+my $timezone                = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -391,6 +392,7 @@ my $result = GetOptions(
 	"x|extension=s"            => \$extension,
 	"X|extra-files!"           => \$extra_files,
 	"z|zcat=s"                 => \$zcat,
+        "Z|timezone=s"             => \$timezone,
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
@@ -620,6 +622,9 @@ if ($format eq 'syslog2') {
 
 # Set default top query
 $top ||= 20;
+
+# Set timezone
+$timezone = ((0-$timezone)*3600);
 
 # Set the default extension and output format
 if (!$extension) {
@@ -1793,6 +1798,8 @@ Options:
 			     JS files in the output directory as separate files.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                              zcat or bzcat or unzip is not in your path.
+    -Z | --timezone +/-XX  : Set the number of hour(s) from GMT of the timezone.
+                             Use this to adjust date/time in javascript graphs.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
                              from the report. For example: "^(VACUUM|COMMIT)"
@@ -4898,6 +4905,7 @@ sub compute_query_graphs
 
 				foreach my $rd (@avgs) {
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
@@ -5749,6 +5757,7 @@ sub print_checkpoint
 
 				foreach my $rd (@avgs) {
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
@@ -6000,6 +6009,7 @@ sub print_temporary_file
 
 				foreach my $rd (@avgs) {
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
@@ -6172,6 +6182,7 @@ sub print_cancelled_queries
 
 				foreach my $rd (@avgs) {
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
@@ -6338,6 +6349,7 @@ sub print_vacuum
 
 			foreach my $rd (@avgs) {
 				my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+				$t += ($timezone*1000);
 
 				next if ($t < $t_min);
 				last if ($t > $t_max);
@@ -8705,10 +8717,12 @@ sub dump_as_html
 		# Set graphs limits
 		$overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 		$t_min = timegm_nocheck(0, $5, $4, $3, $2 - 1, $1) * 1000;
+		$t_min += ($timezone*1000);
 		$t_min -= ($avg_minutes * 60000);
 
 		$overall_stat{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 		$t_max = timegm_nocheck(59, $5, $4, $3, $2 - 1, $1) * 1000;
+		$t_max += ($timezone*1000);
 		$t_max += ($avg_minutes * 60000);
 
 		if (!$disable_hourly) {
@@ -9006,6 +9020,7 @@ sub print_log_level
 
 				foreach my $rd (@avgs) {
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
@@ -13904,7 +13919,7 @@ function create_linegraph (divid, charttitle, ylabel, arr_series, lineseries) {
                 show: true,
                 tooltipContentEditor: function (str, seriesIndex, pointIndex, plot) {
                     var dateToDisplay = new Date(plot.data[seriesIndex][pointIndex][0]);
-                    var textToShow = '<div>On '+dateToDisplay.toGMTString();
+                    var textToShow = '<div>On '+dateToDisplay.toString();
                     for (var i=0; i<plot.data.length;i++) {
                             textToShow += '<br><span class="mfigure">'+pretty_print_number(plot.data[i][pointIndex][1], 2, plot.series[i].label)+' <small>'+plot.series[i].label+'</small></span>';
                     }
