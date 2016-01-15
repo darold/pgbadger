@@ -8731,13 +8731,13 @@ sub dump_as_html
 			&print_established_connection() if (!$disable_hourly);
 
 			# Show per database/user connections
-			&print_database_connection() if (exists $connection_info{database});
+			&print_database_connection();
 
 			# Show per user connections
-			&print_user_connection() if (exists $connection_info{user});
+			&print_user_connection();
 
 			# Show per client ip connections
-			&print_host_connection() if (exists $connection_info{host});
+			&print_host_connection();
 		}
 
 
