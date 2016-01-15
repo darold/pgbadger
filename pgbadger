@@ -1695,6 +1695,9 @@ $td = timediff($t2, $t1);
 $td = timediff($t2, $t0);
 &logmsg('DEBUG', "the total execution time took: " . timestr($td));
 
+# Remove pidfile
+unlink("$PID_DIR/pgbadger.pid");
+
 exit 0;
 
 #-------------------------------------------------------------------------------
