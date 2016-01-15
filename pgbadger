@@ -1421,7 +1421,10 @@ if ($last_parsed && $last_line{datetime} && $last_line{orig}) {
 	}
 }
 
-exit 2 if ($terminate);
+if ($terminate) {
+	unlink("$PID_DIR/pgbadger.pid");
+	exit 2;
+}
 
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
