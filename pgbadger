@@ -11284,7 +11284,7 @@ sub autodetect_format
 
 	localdie("FATAL: can't open file $file, $!\n") unless(open(TESTFILE, $file));
 	my $fltf = <TESTFILE>;
-	close($fltf);
+	close(TESTFILE);
 	# is file in binary format ?
 	if ( $fltf =~ /^pst\d/ ) {
 		$fmt = 'binary';
