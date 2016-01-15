@@ -2282,6 +2282,11 @@ sub process_file
 			# We received a signal
 			last if ($terminate);
 
+			# Get current size/offset in the log file
+			$cursize += length($line);
+			$current_offset += length($line);
+
+			# Replace CR/LF by LF
 			$line =~ s/\r//;
 
 			# Start to exclude from parsing any desired lines
@@ -2292,9 +2297,6 @@ sub process_file
 				map { $ef = 1, last if ($line =~ /$_/is); } @exclude_line;
 				next if ($ef);
 			}
-
-			$cursize += length($line);
-			$current_offset += length($line);
 
 			chomp($line);
 			$nlines++;
