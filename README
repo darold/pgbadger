@@ -86,6 +86,8 @@ SYNOPSIS
                                  JS files in the output directory as separate files.
         -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                                  zcat or bzcat or unzip is not in your path.
+        -Z | --timezone +/-XX  : Set the number of hour(s) from GMT of the timezone.
+                                 Use this to adjust date/time in javascript graphs.
         --pie-limit num        : pie data lower than num% will show a sum instead.
         --exclude-query regex  : any query matching the given regex will be excluded
                                  from the report. For example: "^(VACUUM|COMMIT)"
