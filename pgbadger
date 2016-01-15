@@ -5335,7 +5335,7 @@ sub print_histogram_session_times
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
 	print $fh qq{
-	<h2><i class="icon-question-sign"></i> Top Queries</h2>
+	<h2><i class="icon-question-sign"></i> Sessions</h2>
 	<div class="analysis-item row-fluid" id="histogram-session-times">
 		<h2><i class="icon-signal"></i> Histogram of session times</h2>
 		<div class="span3">
@@ -5413,7 +5413,7 @@ sub print_user_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{usersessions_graph} = &jqplot_piegraph($graphid++, 'graph_usersessions', 'Connections per user', %infos);
+	$drawn_graphs{usersessions_graph} = &jqplot_piegraph($graphid++, 'graph_usersessions', 'Sessions per user', %infos);
 	$sess_user_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5494,7 +5494,7 @@ sub print_host_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Connections per host', %infos);
+	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Sessions per host', %infos);
 	$sess_host_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5576,7 +5576,7 @@ sub print_app_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{appsessions_graph} = &jqplot_piegraph($graphid++, 'graph_appsessions', 'Connections per application', %infos);
+	$drawn_graphs{appsessions_graph} = &jqplot_piegraph($graphid++, 'graph_appsessions', 'Sessions per application', %infos);
 	$sess_app_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5658,7 +5658,7 @@ sub print_database_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{databasesessions_graph} = &jqplot_piegraph($graphid++, 'graph_databasesessions', 'Connections per database', %infos);
+	$drawn_graphs{databasesessions_graph} = &jqplot_piegraph($graphid++, 'graph_databasesessions', 'Sessions per database', %infos);
 	$sess_database_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 
 	$total_count = &comma_numbers($total_count);
