@@ -2284,6 +2284,10 @@ sub process_file
 
 			$line =~ s/\r//;
 
+			# Set current size and offset
+			$cursize += bytes($line);
+			$current_offset += bytes($line);
+
 			# Start to exclude from parsing any desired lines
 			if ($has_exclusion >= 0) {
 
@@ -2292,9 +2296,6 @@ sub process_file
 				map { $ef = 1, last if ($line =~ /$_/is); } @exclude_line;
 				next if ($ef);
 			}
-
-			$cursize += length($line);
-			$current_offset += length($line);
 
 			chomp($line);
 			$nlines++;
@@ -2880,6 +2881,12 @@ sub check_file_changed
 	return (1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
 }
 
+# Return real size of ascii and unicode string.
+sub bytes($)
+{
+	use bytes;
+	return length shift;
+}
 
 # Method used to check if we have already reached the last parsing position in incremental mode
 # This position should have been saved in the incremental file and read in the $last_parsed at
