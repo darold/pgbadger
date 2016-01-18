@@ -448,18 +448,26 @@ if ($enable_checksum) {
 }
 
 # Check if an other process is already running
-if (-f "$PID_DIR/pgbadger.pid") {
-	print "FATAL: an other process is already started or remove the file, see $PID_DIR/pgbadger.pid\n";
-	exit 1;
-} else {
-	# Create pid file
-	unless(open(OUT, ">$PID_DIR/pgbadger.pid")) {
-		print "FATAL: can't create pid file $PID_DIR/pgbadger.pid, $!\n";
+if (-e "$PID_DIR/pgbadger.pid") {
+	my $is_running = 2;
+	if ($^O !~ /MSWin32|dos/i) {
+		eval { $is_running = `ps auwx | grep pgbadger | grep -v grep | wc -l`; chomp($is_running); };
+	}
+	if (!$@ && ($is_running <= 1)) {
+		unlink("$PID_DIR/pgbadger.pid");
+	} else {
+		print "FATAL: an other process is already started or remove the file, see $PID_DIR/pgbadger.pid\n";
 		exit 1;
 	}
-	print OUT $$;
-	close(OUT);
 }
+
+# Create pid file
+unless(open(OUT, ">$PID_DIR/pgbadger.pid")) {
+	print "FATAL: can't create pid file $PID_DIR/pgbadger.pid, $!\n";
+	exit 1;
+}
+print OUT $$;
+close(OUT);
 
 # Rewrite some command line arguments as lists
 &compute_arg_list();
