@@ -1500,6 +1500,67 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">7.3</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-01-18</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This is a maintenance release to fix a major bug that was breaking
+the incremental mode in pgBadger. It also adds some more reports and
+features.
+</p>
+<pre>
+  * Add --timezone=+/-HH to control the timezone used in charts. The
+    javascript library runs at client side so the timezone used is
+    the browser timezone so the displayed time in the charts can be
+    different from the time in the log file.
+  * Add /tmp/pgbadger.pid file to prevent cron jobs overlaping on
+    same log files.
+  * Add command line option --pid-dir to be able to run two pgbadger
+    at the same time by setting an alternate path to the pid file.
+  * Report information about "LOG:  skipping analyze of ..." into
+    events reports.
+  * Report message "LOG: sending cancel to blocking autovacuum" into
+   events reports. Useful to look for queries generating autovacuum
+    kill on account of a lock issue.
+</pre>
+<p>
+Here is the full list of changes/fixes:
+</p>
+<pre>
+  - Automatically remove obsolete pid file when there is no other
+    pgbadger process running (unix only)
+  - Update documentation about the --timezone command line option.
+  - Add --timezone=+/-HH to control the timezone used in charts.
+    Thanks to CZAirwolf for the report.
+  - Fix Histogram of session times when there is no data.
+  - Fix unclosed test file.
+  - Fix an other case where pgbadger.pid was not removed.
+  - Always display slides part on connections report even if there
+    is no data.
+  - Fix some label on sessions reports
+  - Add remove of pid file at normal ending.
+  - Fix wrong size/offset of log files that was breaking incremental
+    mode. Thanks a lot to CZAirwolf for the report and the help to
+    find the problem.
+  - Add command line option --pid-dir to be able to run two pgbadger
+    at the same time by setting an alternate path to the directory
+    where the pid file will be written.
+  - Add /tmp/pgbadger.pid file to prevent cron jobs overlaping on same
+    log files.
+  - Report information about "LOG:  skipping analyze of ..." into
+    events reports.
+  - Report message "LOG: sending cancel to blocking autovacuum" into
+    events reports. Usefull to know which queries generate autovacuum
+    kill on account of a lock issue.
+  - Add more debug information about check log parsing decision.
+</pre>
+		</div>
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">7.2</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2016-01-05</span> <span class="figure-label">Date</span></li>    
 				</ul>
