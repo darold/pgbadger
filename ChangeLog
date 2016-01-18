@@ -1,3 +1,52 @@
+2016-01-18 version 7.3 
+
+This is a maintenance release to fix a major bug that was breaking
+the incremental mode in pgBadger. It also adds some more reports and
+features.
+
+  * Add --timezone=+/-HH to control the timezone used in charts. The
+    javascript library runs at client side so the timezone used is
+    the browser timezone so the displayed time in the charts can be
+    different from the time in the log file.
+  * Add /tmp/pgbadger.pid file to prevent cron jobs overlaping on
+    same log files.
+  * Add command line option --pid-dir to be able to run two pgbadger
+    at the same time by setting an alternate path to the pid file.
+  * Report information about "LOG:  skipping analyze of ..." into
+    events reports.
+  * Report message "LOG: sending cancel to blocking autovacuum" into
+   events reports. Useful to look for queries generating autovacuum
+    kill on account of a lock issue.
+
+Here the complete list of changes:
+
+  - Automatically remove obsolete pid file when there is no other
+    pgbadger process running (unix only)
+  - Update documentation about the --timezone command line option.
+  - Add --timezone=+/-HH to control the timezone used in charts.
+    Thanks to CZAirwolf for the report.
+  - Fix Histogram of session times when there is no data.
+  - Fix unclosed test file.
+  - Fix an other case where pgbadger.pid was not removed.
+  - Always display slides part on connections report even if there
+    is no data.
+  - Fix some label on sessions reports
+  - Add remove of pid file at normal ending.
+  - Fix wrong size/offset of log files that was breaking incremental
+    mode. Thanks a lot to CZAirwolf for the report and the help to
+    find the problem.
+  - Add command line option --pid-dir to be able to run two pgbadger
+    at the same time by setting an alternate path to the directory
+    where the pid file will be written.
+  - Add /tmp/pgbadger.pid file to prevent cron jobs overlaping on same
+    log files.
+  - Report information about "LOG:  skipping analyze of ..." into
+    events reports.
+  - Report message "LOG: sending cancel to blocking autovacuum" into
+    events reports. Usefull to know which queries generate autovacuum
+    kill on account of a lock issue.
+  - Add more debug information about check log parsing decision.
+
 2016-01-05 version 7.2 
 
 This new release fixes some issues especially in temporary files

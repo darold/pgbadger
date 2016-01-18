@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         pgBadger
-version:      7.2
+version:      7.3
 version_from: pgbadger
 installdirs:  site
 recommends:
