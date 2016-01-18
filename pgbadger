@@ -1327,7 +1327,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Do not use split method with compressed files
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile !~ /\Q$journalctl_cmd\E/) ) {
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) ) {
 			# Create multiple processes to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
