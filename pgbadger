@@ -394,7 +394,7 @@ my $result = GetOptions(
 	"x|extension=s"            => \$extension,
 	"X|extra-files!"           => \$extra_files,
 	"z|zcat=s"                 => \$zcat,
-        "Z|timezone=s"             => \$timezone,
+	"Z|timezone=s"             => \$timezone,
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
@@ -568,8 +568,7 @@ if ($logfile_list) {
 
 # Logfile is a mandatory parameter when journalctl command is not set.
 if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd) {
-	print STDERR "FATAL: you must give a log file as command line parameter.\n\n";
-	&usage();
+	localdie("FATAL: you must give a log file as command line parameter.\n\n");
 }
 
 # Remove follow option from journalctl command to prevent infinit loop
@@ -1332,11 +1331,17 @@ if (!$remote_host) {
 	}
 } else {
 	# Disable multi process when using ssh to parse remote log
+	if ($queue_size > 1) {
+		&logmsg('DEBUG', "parallel processing through ssh is not supported with remote file.");
+	}
 	$queue_size = 1;
 }
 
 # log files must be erased when loading stats from binary format
 if ($format eq 'binary') {
+	if (($queue_size > 1) || ($job_per_file > 1)) {
+		&logmsg('DEBUG', "parallel processing is not supported with binary format.");
+	}
 	$queue_size = 1;
 	$job_per_file = 1;
 }
@@ -1837,11 +1842,11 @@ sub build_incremental_reports
 		&init_stats_vars();
 
 		# Load all data gathered by all the different processes
-                unless(opendir(DIR, "$outdir/$bpath")) {
-                        localdie("Error: can't opendir $outdir/$bpath: $!");
-                }
-                my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
-                closedir DIR;
+		unless(opendir(DIR, "$outdir/$bpath")) {
+			localdie("Error: can't opendir $outdir/$bpath: $!");
+		}
+		my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
+		closedir DIR;
 		foreach my $f (@mfiles) {
 			my $fht = new IO::File;
 			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
@@ -1954,17 +1959,17 @@ sub build_incremental_reports
 <script type="text/javascript">
 \$(function () {
     \$(".pgb-popover a").popover({
-        placement : 'bottom',
-        html : true,
+	placement : 'bottom',
+	html : true,
     });
 });
 </script>
 <style type="text/css">
 .btn-primary {
-        font-size: 2.0em;
-        font-weight: bold;
-        height: 60px;
-        width: 184px;
+	font-size: 2.0em;
+	font-weight: bold;
+	height: 60px;
+	width: 184px;
 }
 </style>
 
@@ -2319,7 +2324,7 @@ sub process_file
 					$prefix_vars{'t_client'}  = $row->[4] || '';
 					$prefix_vars{'t_client'}  =~ s/:.*//;
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
-					$prefix_vars{'t_host'}    = 'csv';
+					$prefix_vars{'t_host'}    = 'csv'; # this unused variable is used to store format information when log format is not syslog
 					$prefix_vars{'t_pid'}     = $row->[3];
 					$prefix_vars{'t_session_line'} = $row->[5];
 					$prefix_vars{'t_session_line'} =~ s/\..*//;
@@ -2640,7 +2645,7 @@ sub process_file
 
 					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
-						$prefix_vars{'t_host'} = 'stderr';
+						$prefix_vars{'t_host'} = 'stderr'; # this unused variable is used to store format information when log format is not syslog
 
 						# Process the log line
 						&parse_query();
@@ -11373,6 +11378,9 @@ sub average_per_minutes
 sub autodetect_format
 {
 	my $file = shift;
+
+	# a file must be passed
+	return if (!$file);
 
 	# Open log file for reading
 	my $nfound = 0;
