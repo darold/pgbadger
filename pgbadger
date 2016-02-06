@@ -11743,44 +11743,58 @@ sub build_log_line_prefix_regex
 		my ($query, $remove_white_tokens) = @_;
 
 		my $re = qr{
-    (
-        (?:--)[\ \t\S]*      # single line comments
-	|
-	(?:\#|\@\-\@|\@\@|\#\#|<\->|\&<|\&>|<<\||\|>>|\&<\||\|\&>|<\^|>\^|\?\#|\?\-|\?\||\?\-\||\?\|\||\@>|<\@|\~=)
-				# Geometric Operators
-        |
-        (?:\->>|\->|\#>|\?\&|\?)  # Json Operators
-        |
-        (?:<>|<=>|>=|<=|==|=|!=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?)
-                                # operators and tests
-        |
-        [\[\]\(\),;.]            # punctuation (parenthesis, comma)
-        |
-        \'\'(?!\')              # empty single quoted string
-        |
-        \"\"(?!\"")             # empty double quoted string
-        |
-        "(?>(?:(?>[^"\\]+)|""|\\.)*)+"
-                                # anything inside double quotes, ungreedy
-        |
-        `(?>(?:(?>[^`\\]+)|``|\\.)*)+`
-                                # anything inside backticks quotes, ungreedy
-        |
-        '(?>(?:(?>[^'\\]+)|''|\\.)*)+'
-                                # anything inside single quotes, ungreedy.
-        |
-        /\*[\ \t\r\n\S]*?\*/      # C style comments
-        |
-        (?:[\w:@]+(?:\.(?:\w+|\*)?)*)
-                                # words, standard named placeholders, db.table.*, db.*
-        |
-        (?: \$_\$ | \$\d+ | \${1,2})
-                                # dollar expressions - eg $_$ $3 $$
-        |
-        \n                      # newline
-        |
-        [\t\ ]+                 # any kind of white spaces
-    )
+        (
+                (?:--)[\ \t\S]*      # single line comments
+                |
+                (?:\-\|\-) # range operator "is adjacent to"
+                |
+                (?:\->>|\->|\#>>|\#>|\?\&|\?)  # Json Operators
+                |
+                (?:\#<=|\#>=|\#<>|\#<|\#=) # compares tinterval and reltime
+                |
+                (?:>>=|<<=) # inet operators
+                |
+                (?:!!|\@\@\@) # deprecated factorial and full text search  operators
+                |
+                (?:\|\|\/|\|\/) # square root and cube root
+                |
+                (?:\@\-\@|\@\@|\#\#|<\->|<<\||\|>>|\&<\||\&<|\|\&>|\&>|<\^|>\^|\?\#|\#|\?<\||\?\-\||\?\-|\?\|\||\?\||\@>|<\@|\~=)
+                                 # Geometric Operators
+                |
+                (?:~<=~|~>=~|~>~|~<~) # string comparison for pattern matching operator families
+                |
+                (?:!~~|!~~\*|~~\*|~~) # LIKE operators
+                |
+                (?:!~\*|!~|~\*) # regular expression operators
+                |
+                (?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
+                |
+                (?:<>|<=>|>=|<=|==|=|!=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
+                |
+                [\[\]\(\),;.]            # punctuation (parenthesis, comma)
+                |
+                \'\'(?!\')              # empty single quoted string
+                |
+                \"\"(?!\"")             # empty double quoted string
+                |
+                "(?>(?:(?>[^"\\]+)|""|\\.)*)+" # anything inside double quotes, ungreedy
+                |
+                `(?>(?:(?>[^`\\]+)|``|\\.)*)+` # anything inside backticks quotes, ungreedy
+                |
+                '(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything inside single quotes, ungreedy.
+                |
+                /\*[\ \t\r\n\S]*?\*/      # C style comments
+                |
+                (?:[\w:@]+(?:\.(?:\w+|\*)?)*) # words, standard named placeholders, db.table.*, db.*
+                |
+                (?:\$\w+\$)
+                |
+                (?: \$_\$ | \$\d+ | \${1,2} | \$\w+\$ ) # dollar expressions - eg $_$ $3 $$ $BODY$
+                |
+                \n                      # newline
+                |
+                [\t\ ]+                 # any kind of white spaces
+        )
 }smx;
 
 		my @query = ();
