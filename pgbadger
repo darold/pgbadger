@@ -3117,24 +3117,24 @@ sub normalize_query
 	$orig_query =~ s/AS\s+"([^"]+)"/'AS "' . remove_alias($1) . '"'/eigs;
 	
 	# Remove string content
-	$orig_query =~ s/\\'//g;
-	$orig_query =~ s/'[^']*'/''/g;
-	$orig_query =~ s/''('')+/''/g;
+	$orig_query =~ s/\\'//gs;
+	$orig_query =~ s/'[^']*'/''/gs;
+	$orig_query =~ s/''('')+/''/gs;
 
 	# Remove NULL parameters
-	$orig_query =~ s/=\s*NULL/=''/g;
+	$orig_query =~ s/=\s*NULL/=''/gs;
 
 	# Remove numbers
-	$orig_query =~ s/([^a-z_\$-])-?([0-9]+)/${1}0/g;
+	$orig_query =~ s/([^a-z0-9_\$\-])-?\d+/${1}0/gs;
 
 	# Remove hexadecimal numbers
-	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/g;
+	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/gs;
 
 	# Remove IN values
-	$orig_query =~ s/\bin\s*\([\'0x,\s]*\)/in (...)/g;
+	$orig_query =~ s/\bin\s*\([\'0x,\s]*\)/in (...)/gs;
 
 	# Remove curor names in CURSOR and IN clauses
-	$orig_query =~ s/\b(declare|in)\s+"[^"]+"/$1 "..."/g;
+	$orig_query =~ s/\b(declare|in)\s+"[^"]+"/$1 "..."/gs;
 
 	return $orig_query;
 }
