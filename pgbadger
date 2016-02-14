@@ -11769,7 +11769,7 @@ sub build_log_line_prefix_regex
                 |
                 (?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
                 |
-                (?:<>|<=>|>=|<=|==|=|!=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
+                (?:<>|<=>|>=|<=|==|!=|=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
                 |
                 [\[\]\(\),;.]            # punctuation (parenthesis, comma)
                 |
