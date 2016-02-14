@@ -10020,7 +10020,7 @@ sub highlight_code
 		$i++;
 	}
 
-	foreach my $x (keys %SYMBOLS) {
+	foreach my $x (sort (keys %SYMBOLS)) {
 		$code =~ s/$x/\$\$PGBGYA\$\$$SYMBOLS{$x}\$\$PGBGYB\$\$/gs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
