@@ -1041,6 +1041,7 @@ my @top_slowest         = ();
 my %normalyzed_info     = ();
 my %error_info          = ();
 my %pgb_error_info      = ();
+my %pgb_pool_info       = ();
 my %logs_type           = ();
 my %per_minute_info     = ();
 my %pgb_per_minute_info = ();
@@ -2132,6 +2133,7 @@ sub init_stats_vars
 	%normalyzed_info     = ();
 	%error_info          = ();
 	%pgb_error_info      = ();
+	%pgb_pool_info       = ();
 	%logs_type           = ();
 	%per_minute_info     = ();
 	%pgb_per_minute_info = ();
@@ -4652,6 +4654,7 @@ sub html_header
      				<li><a href="#pgbconnections-per-user">Connections per user</a></li>
      				<li><a href="#pgbconnections-per-host">Connections per host</a></li>
 				<li class="divider"></li>
+     				<li><a href="#pgbmost-used-reserved-pool">Most used reserved pools</a></li>
      				<li><a href="#pgbmost-frequent-errors-events">Most Frequent Errors/Events</a></li>
      			</ul>
      		</li>
@@ -10219,6 +10222,8 @@ sub dump_as_html
 			# Show per host sessions
 			&print_host_pgb_session();
 
+			# Show most used reserved pool
+			&show_pgb_reserved_pool();
 			# Show Most Frequent Errors/Events
 			&show_pgb_error_as_html();
 		}
@@ -10809,6 +10814,133 @@ sub show_pgb_error_as_html
 
 }
 
+sub show_pgb_reserved_pool
+{
+
+	my $main_pool = '';
+	my $main_pool_val = 0;
+	my $total = 0;
+	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info) {
+		if (!$main_pool || ($pgb_pool_info{$k}{count} > $pgb_pool_info{$main_pool}{count})) {
+			$main_pool = $k;
+			$main_pool_val = &comma_numbers($pgb_pool_info{$k}{count});
+		}
+		$total += $pgb_pool_info{$k}{count};
+	}
+	$total = &comma_numbers($total);
+
+	print $fh qq{
+		<div class="analysis-item row-fluid" id="pgbmost-used-reserved-pool">
+  	  		<h2><i class="icon-warning-sign"></i> Most used reserved pools</h2>
+			<div class="span3">
+				<h3 class="">Key values</h3>
+				<div class="well key-figures">
+					<ul>
+						<li><span class="figure">$main_pool</span> <span class="figure-label">Most used reserved pool</span></li>
+						<li><span class="figure">$main_pool_val</span> <span class="figure-label">Time used</span></li>
+						<li><span class="figure">$total</span> <span class="figure-label">Total time reserved pools was used</span></li>    
+					</ul>
+				</div>  	  
+  	  		</div>
+  	  		<div class="span8">
+				<table class="table table-striped" id="pgbmost-used-reserved-pool-table">
+				<thead>
+					<tr>
+						<th>Rank</th>
+						<th>Times used</th>
+						<th>Reserved pool</th>
+					</tr>
+				</thead>
+				<tbody>
+};
+	my $rank = 1;
+	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info) {
+		next if (!$pgb_pool_info{$k}{count});
+		my $count = &comma_numbers($pgb_pool_info{$k}{count});
+		my $details = '';
+                my %hourly_count = ();
+                my $days = 0;
+		foreach my $d (sort keys %{$pgb_pool_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$pgb_pool_info{$k}{chronos}{$d}}) {
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($pgb_pool_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
+				$zday = "";
+				foreach my $m (sort keys %{$pgb_pool_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $pgb_pool_info{$k}{chronos}{$d}{$h}{min}{$m};
+				}
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+					}
+				}
+			}
+		}
+                # Set graph dataset
+                my %graph_data = ();
+                foreach my $h ("00" .. "23") {
+			foreach my $rd (@histo_avgs) {
+				$graph_data{count} .= "['$h:$rd'," . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+			}
+                }
+		$graph_data{count} =~ s/,$//;
+                %hourly_count = ();
+
+                my $pool_histo =
+                &jqplot_histograph($graphid++, 'pgbreservedpool_graph_'.$rank, $graph_data{count}, '', 'Avg. used', '');
+
+		# Escape HTML code in pool message
+		print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$count
+					<p><a href="#pgbmost-used-reserved-pool-details-rank-$rank" class="btn btn-mini" data-toggle="collapse">Details</a></p>
+				</td>
+				<td id="pgbmost-used-reserved-pool-examples-details-rank-$rank">
+					<pre><span class="text-warning">$k</span></pre>
+					<!-- Details collapse -->
+					    <div id="pgbmost-used-reserved-pool-details-rank-$rank" class="collapse">
+						<h3>Times Reported <small>Most used reserved pools #$rank</small></h3>
+						$pool_histo
+								<table class="table table-stripped table-condensed">
+									<thead>
+										<tr>
+											<th>Day</th>
+											<th>Hour</th>
+											<th>Count</th>
+										</tr>
+									</thead>
+									<tbody>
+										$details
+									</tbody>
+								</table>
+						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#pgbmost-used-reserved-pool-events-details-rank-$rank">x Hide</button></p>
+						</div><!-- end of details collapse -->
+					</td>
+				</tr>
+};
+		$rank++;
+	}
+	if (scalar keys %pgb_pool_info == 0) {
+		print $fh qq{<tr><td colspan="7">$NODATA</td></tr>};
+	}
+
+	print $fh qq{
+			</tbody>
+			</table>
+		</div>
+	</div><!-- end of pgbmost-used-reserved-pool -->
+};
+
+}
+
+
 sub load_stats
 {
 
@@ -10821,6 +10953,7 @@ sub load_stats
 	my %_normalyzed_info = %{$stats{normalyzed_info}};
 	my %_error_info = %{$stats{error_info}};
 	my %_pgb_error_info = %{$stats{pgb_error_info}};
+	my %_pgb_pool_info = %{$stats{pgb_pool_info}};
 	my %_connection_info = %{$stats{connection_info}};
 	my %_pgb_connection_info = %{$stats{pgb_connection_info}};
 	my %_database_info = %{$stats{database_info}};
@@ -11111,6 +11244,20 @@ sub load_stats
 									$_pgb_error_info{$q}{user}[$i],
 									$_pgb_error_info{$q}{remote}[$i]
 									);
+		}
+	}
+
+	### pgbouncer pool_info ###
+
+	foreach my $q (keys %_pgb_pool_info) {
+		$pgb_pool_info{$q}{count} += $_pgb_pool_info{$q}{count};
+		foreach my $day (keys %{ $_pgb_pool_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_pgb_pool_info{$q}{chronos}{$day}}) {
+				$pgb_pool_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{count};
+				foreach my $min (keys %{$_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}}) {
+					$pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min};
+				}
+			}
 		}
 	}
 
@@ -11475,6 +11622,7 @@ sub dump_as_binary
 		'normalyzed_info' => \%normalyzed_info,
 		'error_info' => \%error_info,
 		'pgb_error_info' => \%pgb_error_info,
+		'pgb_pool_info' => \%pgb_pool_info,
 		'connection_info' => \%connection_info,
 		'pgb_connection_info' => \%pgb_connection_info,
 		'database_info' => \%database_info,
@@ -11517,6 +11665,7 @@ sub dump_as_json
 		'normalyzed_info' => \%normalyzed_info,
 		'error_info' => \%error_info,
 		'pgb_error_info' => \%pgb_error_info,
+		'pgb_pool_info' => \%pgb_pool_info,
 		'connection_info' => \%connection_info,
 		'pgb_connection_info' => \%pgb_connection_info,
 		'database_info' => \%database_info,
@@ -12464,6 +12613,15 @@ sub parse_pgbouncer
 										$prefix_vars{t_client} || $prefix_vars{t_dbclient}
 				);
 			}
+
+			# Stores taken reserved pool
+			if ($prefix_vars{'t_query'} =~ /Taking connection from reserve_pool/) {
+				my $pool = "$prefix_vars{t_dbuser}\@$prefix_vars{t_dbname}";
+				$pgb_pool_info{$pool}{count}++;
+				$pgb_pool_info{$pool}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+				$pgb_pool_info{$pool}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$prefix_vars{t_min}}++;
+			}
+
 
 		} else {
 			print STDERR "UNPARSED LOG LEVEL: $prefix_vars{'t_loglevel'} => $prefix_vars{'t_query'}\n";
