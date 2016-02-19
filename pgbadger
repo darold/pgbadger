@@ -2318,7 +2318,9 @@ sub process_file
 				}
 			} else {
 				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					$pipe->print("$cursize\n");
+					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
+					$old_queries_count = $overall_stat{'queries_number'};
+					$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 					$cursize = 0;
 				}
 			}
@@ -2440,9 +2442,9 @@ sub process_file
 					}
 				} else {
 					if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-						$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+						$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 						$old_queries_count = $overall_stat{'queries_number'};
-						$old_errors_count = $overall_stat{'errors_number'};
+						$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 						$cursize = 0;
 					}
 				}
@@ -2462,9 +2464,9 @@ sub process_file
 					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
 					if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
 						if ($tmpoutfile) {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'};
+							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 							$cursize = 0;
 						}
 						$getout = 2;
@@ -2569,9 +2571,9 @@ sub process_file
 				}
 			} else {
 				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 					$old_queries_count = $overall_stat{'queries_number'};
-					$old_errors_count = $overall_stat{'errors_number'};
+					$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 					$cursize = 0;
 				}
 			}
@@ -2629,9 +2631,9 @@ sub process_file
 								print STDERR ".";
 							}
 						} else {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'};
+							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 							$cursize = 0;
 						}
 						$getout = 2;
@@ -2781,9 +2783,9 @@ sub process_file
 								print STDERR ".";
 							}
 						} else {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'})- $old_errors_count) . "\n");
 							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'};
+							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 							$cursize = 0;
 						}
 						$getout = 2;
@@ -2943,11 +2945,11 @@ sub process_file
 	if ($progress && ($getout != 1)) {
 		if (!$tmpoutfile) {
 			if ($totalsize) {
-				print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},$overall_stat{'errors_number'}, $logfile);
+				print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
 				print STDERR "\n";
 			}
 		} else {
-			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . ($overall_stat{'errors_number'} - $old_errors_count) . "\n");
+			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 		}
 	}
 
@@ -4650,7 +4652,7 @@ sub html_header
      				<li><a href="#pgbconnections-per-user">Connections per user</a></li>
      				<li><a href="#pgbconnections-per-host">Connections per host</a></li>
 				<li class="divider"></li>
-     				<li><a href="#pgbqueries-most-frequent-waiting">Most frequent waiting queries (N)</a></li>
+     				<li><a href="#pgbmost-frequent-errors-events">Most Frequent Errors/Events</a></li>
      			</ul>
      		</li>
 };
@@ -10932,6 +10934,8 @@ sub load_stats
 	}
 	$pgb_overall_stat{histogram}{session_total} += $_pgb_overall_stat{histogram}{session_total};
 
+	$pgb_overall_stat{errors_number} += $_pgb_overall_stat{errors_number};
+
 	### Logs level ###
 
 	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
@@ -13221,13 +13225,13 @@ sub progress_bar
 		my $file = $_[-1];
 		sprintf(
 			"Loaded %d queries and %d events from binary file %s...\r",
-			$overall_stat{'queries_number'}, $overall_stat{'errors_number'}, $file
+			$overall_stat{'queries_number'}, ($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $file
 		);
 	} else {
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
 			$char x $nchars . '>',
-			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'}), ($errors || $overall_stat{'errors_number'})
+			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
 		);
 	}
 }
