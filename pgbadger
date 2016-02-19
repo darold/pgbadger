@@ -259,6 +259,7 @@ my $job_per_file            = 0;
 my $charset                 = 'utf-8';
 my $csv_sep_char            = ',';
 my %current_sessions        = ();
+my %pgb_current_sessions    = ();
 my $incr_date               = '';
 my $last_incr_date          = '';
 my $anonymize               = 0;
@@ -272,8 +273,8 @@ my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
 my $timezone                = 0;
+my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
-
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -430,6 +431,7 @@ my $result = GetOptions(
 	'journalctl=s'             => \$journalctl_cmd,
 	'pid-dir=s'		   => \$PID_DIR,
 	'rebuild!'                 => \$rebuild,
+	'pgbouncer-only!'          => \$pgbouncer_only,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -600,6 +602,14 @@ my $parse_regex      = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|
 my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
 
+my $pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
+my @pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+
+my $pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.*)/;
+my @pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
+my $pgbouncer_log_parse2 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
+my @pgb_prefix_parse2 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+
 # Set syslog prefix regex
 my $other_syslog_line =
 	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
@@ -636,6 +646,7 @@ if ($format eq 'syslog2') {
 		qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
 	$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
 }
+
 
 # Set default top query
 $top ||= 20;
@@ -1024,21 +1035,26 @@ sub get_hist_inbound
 
 # Where statistics are stored
 my %overall_stat        = ();
+my %pgb_overall_stat    = ();
 my %overall_checkpoint  = ();
 my @top_slowest         = ();
 my %normalyzed_info     = ();
 my %error_info          = ();
+my %pgb_error_info      = ();
 my %logs_type           = ();
 my %per_minute_info     = ();
+my %pgb_per_minute_info = ();
 my %lock_info           = ();
 my %tempfile_info       = ();
 my %cancelled_info      = ();
 my %connection_info     = ();
+my %pgb_connection_info = ();
 my %database_info       = ();
 my %application_info    = ();
 my %user_info           = ();
 my %host_info           = ();
 my %session_info        = ();
+my %pgb_session_info    = ();
 my %conn_received       = ();
 my %checkpoint_info     = ();
 my %autovacuum_info     = ();
@@ -1178,7 +1194,6 @@ if (!$noclean && $saved_last_line{datetime} && $outdir) {
 	my $wn = &get_week_number($last_year, $last_month, $last_day);
 	# Get the days of the current week where binary files must be preserved
 	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
-
 	# Find obsolete dir days that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
 		localdie("Error: can't opendir $outdir: $!");
@@ -1508,7 +1523,6 @@ my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
 
-
 if (!$incremental && ($#given_log_files >= 0) ) {
 
 	&logmsg('LOG', "Ok, generating $extension report...");
@@ -1568,6 +1582,7 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 		&logmsg('HINT', "maybe there's no new entries in your log since last run.");
 	}
 	&build_incremental_reports(@build_directories);
+
 }
 
 my $t2 = Benchmark->new;
@@ -1724,6 +1739,7 @@ Options:
 			     the same time.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
+    --pgbouncer-only       : only show pgbouncer related menu in the header.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -1917,7 +1933,7 @@ sub build_incremental_reports
 	}
 
 	&logmsg('LOG', "Ok, generating global index to access incremental reports...");
-	
+
 	$fh = new IO::File ">$outdir/index.html";
 	if (not defined $fh) {
 		localdie("FATAL: can't write to $outdir/index.html, $!\n");
@@ -2107,6 +2123,7 @@ sub init_stats_vars
 
 	# Empty where statistics are stored
 	%overall_stat        = ();
+	%pgb_overall_stat    = ();
 	%overall_checkpoint  = ();
 	@top_slowest         = ();
 	@top_tempfile_info   = ();
@@ -2114,15 +2131,19 @@ sub init_stats_vars
 	@top_locked_info     = ();
 	%normalyzed_info     = ();
 	%error_info          = ();
+	%pgb_error_info      = ();
 	%logs_type           = ();
 	%per_minute_info     = ();
+	%pgb_per_minute_info = ();
 	%lock_info           = ();
 	%tempfile_info       = ();
 	%cancelled_info      = ();
 	%connection_info     = ();
+	%pgb_connection_info = ();
 	%database_info       = ();
 	%application_info    = ();
 	%session_info        = ();
+	%pgb_session_info    = ();
 	%conn_received       = ();
 	%checkpoint_info     = ();
 	%autovacuum_info     = ();
@@ -2243,7 +2264,146 @@ sub process_file
 		&logmsg('DEBUG', "Starting reading file $remote_host:$logfile...");
 	}
 
-	if ($format eq 'csv') {
+	# Detect if we are parsing a pgbouncer file
+	my ($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
+
+	# Parse pgbouncer logfile
+	if ($is_pgbouncer_format) {
+
+		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+		my $cur_pid = '';
+		my @matches = ();
+		my $goon = 0;
+		my $has_exclusion = 0;
+		if ($#exclude_line >= 0) {
+			$has_exclusion = 1;
+		}
+		&logmsg('DEBUG', "Start parsing at offset $start_offset of file $logfile to " . ($stop_offset || $totalsize));
+		if ($start_offset) {
+			# Move to the starting offset position in file
+			$lfile->seek($start_offset, 0);
+		}
+		while (my $line = <$lfile>) {
+
+			# We received a signal
+			last if ($terminate);
+
+			# Get current size/offset in the log file
+			$cursize += length($line);
+			$current_offset += length($line);
+
+			# Replace CR/LF by LF
+			$line =~ s/\r//;
+
+			# Start to exclude from parsing any desired lines
+			if ($has_exclusion >= 0) {
+
+				# Log line matches the excluded regex
+				my $ef = 0;
+				map { $ef = 1, last if ($line =~ /$_/is); } @exclude_line;
+				next if ($ef);
+			}
+
+			chomp($line);
+			$nlines++;
+			next if (!$line);
+
+			if (!$tmpoutfile) {
+				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+					if ($totalsize) {
+						print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
+					} else {
+						print STDERR ".";
+					}
+				}
+			} else {
+				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+					$pipe->print("$cursize\n");
+					$cursize = 0;
+				}
+			}
+
+			%prefix_vars = ();
+
+			@matches = ($line =~ $pgbouncer_log_parse1);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
+				}
+
+				# Get time detailed information
+				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+
+				# Skip unwanted lines
+				if ($#exclude_time >= 0) {
+					foreach (@exclude_time) {
+						if ($prefix_vars{'t_timestamp'} =~ /$_/) {
+							return;
+						}
+					}
+				}
+				next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+				if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
+					if (!$tmpoutfile) {
+						if ($totalsize) {
+							print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
+						} else {
+							print STDERR ".";
+						}
+					} else {
+						$pipe->print("$cursize\n");
+						$cursize = 0;
+					}
+					$getout = 2;
+					last;
+				}
+
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
+
+				# Extract other information from the line
+				@matches = ($line =~ $pgbouncer_log_parse2);
+				if ($#matches >= 0) {
+					for (my $i = 0 ; $i <= $#pgb_prefix_parse2 ; $i++) {
+						$prefix_vars{$pgb_prefix_parse2[$i]} = $matches[$i];
+					}
+					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv && $prefix_vars{'t_client'});
+				} else {
+					# pgBouncer Statistics appears each minutes in the log
+					if ($prefix_vars{'t_query'} =~ /Stats: (\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/) {
+						$prefix_vars{'t_loglevel'} = 'STATS';
+						$prefix_vars{'t_req/s'} = $1;
+						$prefix_vars{'t_inbytes/s'} = $2;
+						$prefix_vars{'t_outbytes/s'} = $3;
+						$prefix_vars{'t_avgduration'} = $4;
+					}
+				}
+
+				# Store the current timestamp of the log line
+				&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+				# Check if the log line should be excluded from the report
+				if (&validate_log_line($prefix_vars{'t_pid'})) {
+					$prefix_vars{'t_host'} = 'stderr'; # this unused variable is used to store format information when log format is not syslog
+
+					# Process the log line
+					&parse_pgbouncer();
+				}
+
+			} else {
+				# unknown format
+				&logmsg('DEBUG', "Unknown pgbouncer line format: $line");
+			}
+
+			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
+		}
+		if ($last_parsed) {
+			$last_line{current_pos} = $current_offset;
+		}
+
+	# Parse PostgreSQL log file with CSV format
+	} elsif ($format eq 'csv') {
 
 		require Text::CSV_XS;
 		my $csv = Text::CSV_XS->new(
@@ -2872,6 +3032,70 @@ sub store_current_timestamp
 	}
 }
 
+# Method used to check if the log file is produced by pgbouncer
+sub detect_pgbouncer_log
+{
+	my ($file, $saved_date, $look_at_beginning) = @_;
+
+	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
+
+	# Compressed files do not allow seeking
+	if ($iscompressed) {
+		close($lfile);
+		return (1, "log file is compressed");
+		
+	}
+
+	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
+	$gyear += 1900;
+	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+
+	%prefix_vars = ();
+	my $startoffset = 0;
+	# If seeking is not explicitely disabled
+	if (!$look_at_beginning) {
+		# do not seek if filesize is smaller than the seek position
+		if ($saved_last_line{current_pos} < $totalsize) {
+			$lfile->seek($saved_last_line{current_pos} || 0, 0);
+			$startoffset = $saved_last_line{current_pos} || 0;
+		}
+	}
+
+	my $more_lines = 0;
+	my $ispgbouncerlog = 0;
+	while (my $line = <$lfile>) {
+
+		$more_lines++;
+
+		$line =~ s/\r//;
+
+		my @matches = ($line =~ $pgbouncer_log_format);
+		if ($#matches >= 0) {
+			$ispgbouncerlog++;
+			for (my $i = 0 ; $i <= $#pgb_prefix_params ; $i++) {
+				$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
+			}
+		}
+		next if (!$prefix_vars{'t_timestamp'});
+		# This file has already been parsed
+		if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+			close($lfile);
+			return ($ispgbouncerlog, 0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
+		} else {
+			last;
+		}
+	}
+	close($lfile);
+
+	if (!$more_lines) {
+		close($lfile);
+		return ($ispgbouncerlog, 0, "there no new lines in this file");
+	}
+
+	return ($ispgbouncerlog, 1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
+}
+
+
 # Method used to check if the file stores logs after the last incremental position or not
 # This position should have been saved in the incremental file and read in the $last_parsed at
 # start up. Here we just verify that the first date in file is before the last incremental date.
@@ -3115,7 +3339,7 @@ sub normalize_query
 
 	# Normalise alias with quote
 	$orig_query =~ s/AS\s+"([^"]+)"/'AS "' . remove_alias($1) . '"'/eigs;
-	
+
 	# Remove string content
 	$orig_query =~ s/\\'//gs;
 	$orig_query =~ s/'[^']*'/''/gs;
@@ -3379,6 +3603,21 @@ sub set_top_error_sample
 			push(@{$error_info{$q}{app}},       $app);
 			push(@{$error_info{$q}{remote}},    $remote);
 		}
+	}
+}
+
+# Stores top N error sample from pgbouncer log
+sub pgb_set_top_error_sample
+{
+	my ($q, $date, $real_error, $db, $user, $remote) = @_;
+
+	# Stop when we have our number of samples
+	if (!exists $pgb_error_info{$q}{date} || ($#{$pgb_error_info{$q}{date}} < $sample)) {
+		push(@{$pgb_error_info{$q}{date}},      $date);
+		push(@{$pgb_error_info{$q}{error}},     $real_error);
+		push(@{$pgb_error_info{$q}{db}},        $db);
+		push(@{$pgb_error_info{$q}{user}},      $user);
+		push(@{$pgb_error_info{$q}{remote}},    $remote);
 	}
 }
 
@@ -3876,6 +4115,7 @@ Report not supported by text format
 			$idx++;
 		}
 	}
+
 	if (!$disable_query && (scalar keys %normalyzed_info > 0)) {
 		print $fh "\n- Most frequent queries (N) --------------------------------------------\n\n";
 		print $fh "Rank     Times executed     Total duration     Min/Max/Avg duration (s)     Query\n";
@@ -3953,6 +4193,84 @@ Report not supported by text format
 
 	if (!$disable_error) {
 		&show_error_as_text();
+	}
+
+
+	# Show pgbouncer session per database statistics
+	if (exists $pgb_session_info{database}) {
+		print $fh "\n- pgBouncer sessions per database --------------------------------------------\n\n";
+		print $fh "Database     Count     Total Duration     Avg duration (s)\n";
+		foreach my $d (sort keys %{$pgb_session_info{database}}) {
+			print $fh "$d - ", &comma_numbers($pgb_session_info{database}{$d}{count}), " ",
+				&convert_time($pgb_session_info{database}{$d}{duration}), " ",
+				&convert_time($pgb_session_info{database}{$d}{duration} / $pgb_session_info{database}{$d}{count}), "\n";
+		}
+	}
+
+	# Show pgbouncer session per user statistics
+	if (exists $pgb_session_info{user}) {
+		print $fh "\n- pgBouncer sessions per user ------------------------------------------------\n\n";
+		print $fh "User     Count     Total Duration     Avg duration (s)\n";
+		foreach my $d (sort keys %{$pgb_session_info{user}}) {
+			print $fh "$d - ", &comma_numbers($pgb_session_info{user}{$d}{count}), " ", &convert_time($pgb_session_info{user}{$d}{duration}),
+				" ", &convert_time($pgb_session_info{user}{$d}{duration} / $pgb_session_info{user}{$d}{count}), "\n";
+		}
+	}
+
+	# Show pgbouncer session per host statistics
+	if (exists $pgb_session_info{host}) {
+		print $fh "\n- pgBouncer sessions per host ------------------------------------------------\n\n";
+		print $fh "User     Count     Total Duration     Avg duration (s)\n";
+		foreach my $d (sort keys %{$pgb_session_info{host}}) {
+			print $fh "$d - ", &comma_numbers($pgb_session_info{host}{$d}{count}), " ", &convert_time($pgb_session_info{host}{$d}{duration}),
+				" ", &convert_time($pgb_session_info{host}{$d}{duration} / $pgb_session_info{host}{$d}{count}), "\n";
+		}
+	}
+
+	# Show pgbouncer session per application statistics
+	if (exists $pgb_session_info{app}) {
+		print $fh "\n- pgBouncer sessions per application -----------------------------------------\n\n";
+		print $fh "Application  Count     Total Duration     Avg duration (s)\n";
+		foreach my $d (sort keys %{$pgb_session_info{app}}) {
+			print $fh "$d - ", &comma_numbers($pgb_session_info{app}{$d}{count}), " ", &convert_time($pgb_session_info{app}{$d}{duration}),
+				" ", &convert_time($pgb_session_info{app}{$d}{duration} / $pgb_session_info{app}{$d}{count}), "\n";
+		}
+	}
+
+
+	# Show pgbouncer connection per database statistics
+	if (exists $pgb_connection_info{database}) {
+		print $fh "\n- pgBouncer sonnections per database -----------------------------------------\n\n";
+		print $fh "Database     User     Count\n";
+		foreach my $d (sort keys %{$pgb_connection_info{database}}) {
+			print $fh "$d - ", &comma_numbers($pgb_connection_info{database}{$d}), "\n";
+			foreach my $u (sort keys %{$pgb_connection_info{user}}) {
+				next if (!exists $pgb_connection_info{database_user}{$d}{$u});
+				print $fh "\t$u ", &comma_numbers($pgb_connection_info{database_user}{$d}{$u}), "\n";
+			}
+		}
+	}
+
+	# Show pgbouncer connection per user statistics
+	if (exists $pgb_connection_info{user}) {
+		print $fh "\n- pgBouncer connections per user ---------------------------------------------\n\n";
+		print $fh "User     Count\n";
+		foreach my $d (sort keys %{$pgb_connection_info{user}}) {
+			print $fh "$d - ", &comma_numbers($pgb_connection_info{user}{$d}), "\n";
+		}
+	}
+
+	# Show pgbouncer connection per host statistics
+	if (exists $pgb_connection_info{host}) {
+		print $fh "\n- pgBouncer connections per host --------------------------------------------\n\n";
+		print $fh "User     Count\n";
+		foreach my $d (sort keys %{$pgb_connection_info{host}}) {
+			print $fh "$d - ", &comma_numbers($pgb_connection_info{host}{$d}), "\n";
+		}
+	}
+
+	if (!$disable_error) {
+		&show_pgb_error_as_text();
 	}
 
 	print $fh "\n\n";
@@ -4071,6 +4389,41 @@ sub show_error_as_text
 	}
 }
 
+sub show_pgb_error_as_text
+{
+	return if (scalar keys %error_info == 0);
+
+	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
+	my $idx = 1;
+	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
+		next if (!$pgb_error_info{$k}{count});
+		last if ($idx > $top);
+		if ($pgb_error_info{$k}{count} > 1) {
+			my $msg = $k;
+			print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $msg\n";
+			print $fh "--\n";
+			my $j = 1;
+			for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++) {
+				print $fh "\t- Example $j: $pgb_error_info{$k}{date}[$i] - $pgb_error_info{$k}{error}[$i]\n";
+				print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[$i]\n" if ($pgb_error_info{$k}{db}[$i]);
+				print $fh "\t\tUser: $pgb_error_info{$k}{user}[$i]\n" if ($pgb_error_info{$k}{user}[$i]);
+				print $fh "\t\tClient: $pgb_error_info{$k}{remote}[$i]\n" if ($pgb_error_info{$k}{remote}[$i]);
+				$j++;
+			}
+		} else {
+			print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $pgb_error_info{$k}{error}[0]\n";
+			print $fh "--\n";
+			print $fh "\t- Date: $pgb_error_info{$k}{date}[0]\n";
+			print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[0]\n" if ($pgb_error_info{$k}{db}[0]);
+			print $fh "\t\tUser: $pgb_error_info{$k}{user}[0]\n" if ($pgb_error_info{$k}{user}[0]);
+			print $fh "\t\tClient: $pgb_error_info{$k}{remote}[0]\n" if ($pgb_error_info{$k}{remote}[0]);
+		}
+		$idx++;
+	}
+
+}
+
+
 sub html_header
 {
 	my $uri = shift;
@@ -4106,7 +4459,7 @@ sub html_header
 	<a data-placement="bottom" rel="tooltip" data-original-title="PostgreSQL Log Analyzer" href="" id="pgbadger-brand" class="brand">$pgbadger_logo $report_title</a>
 	  <ul class="nav collapse in" id="navigation">
 };
-	if (!$error_only) {
+	if (!$error_only && !$pgbouncer_only) {
 		print $fh qq{
      		<li id="menu-overview" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Overview <span class="caret"></span></a>
 			<ul class="dropdown-menu">
@@ -4144,6 +4497,7 @@ sub html_header
      		</li>
 };
 		}
+
 		if (!$disable_session) {
 			print $fh qq{
      		<li id="menu-sessions" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Sessions <span class="caret"></span></a>
@@ -4252,7 +4606,7 @@ sub html_header
 };
 		}
 	}
-	if (!$disable_error) {
+	if (!$disable_error && !$pgbouncer_only) {
 		print $fh qq{
      		<li id="menu-events" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Events <span class="caret"></span></a>
      			<ul class="dropdown-menu">
@@ -4264,6 +4618,44 @@ sub html_header
      		</li>
 };
 	}
+
+	if (exists $pgb_overall_stat{peak}) {
+		print $fh qq{
+     		<li id="menu-pgbouncer" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">PgBouncer <span class="caret"></span></a>
+     			<ul class="dropdown-menu">
+};
+		if (!$disable_hourly) {
+			print $fh qq{
+     				<li><a href="#pgbsql-traffic">Request Troughput</a></li>
+     				<li><a href="#pgbbytes-traffic">Bytes I/O Throughput</a></li>
+     				<li><a href="#pgbduration-traffic">Queries Average duration</a></li>
+				<li class="divider"></li>
+     				<li><a href="#pgbsimultaneous-sessions">Simultaneous sessions</a></li>
+};
+		}
+		print $fh qq{
+     				<li><a href="#pgbhistogram-session-times">Histogram of sessions times</a></li>
+     				<li><a href="#pgbsessions-per-database">Sessions per database</a></li>
+     				<li><a href="#pgbsessions-per-user">Sessions per user</a></li>
+     				<li><a href="#pgbsessions-per-host">Sessions per host</a></li>
+				<li class="divider"></li>
+};
+		if (!$disable_hourly) {
+			print $fh qq{
+     				<li><a href="#pgbestablished-connections">Established connections</a></li>
+};
+		}
+		print $fh qq{
+     				<li><a href="#pgbconnections-per-database">Connections per database</a></li>
+     				<li><a href="#pgbconnections-per-user">Connections per user</a></li>
+     				<li><a href="#pgbconnections-per-host">Connections per host</a></li>
+				<li class="divider"></li>
+     				<li><a href="#pgbqueries-most-frequent-waiting">Most frequent waiting queries (N)</a></li>
+     			</ul>
+     		</li>
+};
+	}
+
 	print $fh qq{
      	</ul>
      	<a class="pull-right btn btn-info" id="pop-infos" rel="popover" data-html="true" data-placement="bottom" data-original-title="Log Info" data-content="$global_info">
@@ -4867,6 +5259,102 @@ $drawn_graphs{bindpreparequeries_graph}
 
 }
 
+sub print_pgbouncer_stats
+{
+
+	my $request_peak = 0;
+	my $request_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{t_req} <=> $pgb_overall_stat{'peak'}{$a}{t_req}} keys %{$pgb_overall_stat{'peak'}}) {
+		$request_peak = &comma_numbers($pgb_overall_stat{'peak'}{$_}{t_req});
+		$request_peak_date = $_;
+		last;
+	}
+
+	my $inbytes_peak = 0;
+	my $inbytes_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{t_inbytes} <=> $pgb_overall_stat{'peak'}{$a}{t_inbytes}} keys %{$pgb_overall_stat{'peak'}}) {
+		$inbytes_peak = &comma_numbers($pgb_overall_stat{'peak'}{$_}{t_inbytes});
+		$inbytes_peak_date = $_;
+		last;
+	}
+
+	my $outbytes_peak = 0;
+	my $outbytes_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{t_outbytes} <=> $pgb_overall_stat{'peak'}{$a}{t_outbytes}} keys %{$pgb_overall_stat{'peak'}}) {
+		$outbytes_peak = &comma_numbers($pgb_overall_stat{'peak'}{$_}{t_outbytes});
+		$outbytes_peak_date = $_;
+		last;
+	}
+
+	my $avgduration_peak = 0;
+	my $avgduration_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{t_avgduration} <=> $pgb_overall_stat{'peak'}{$a}{t_avgduration}} keys %{$pgb_overall_stat{'peak'}}) {
+		$avgduration_peak = &convert_time($pgb_overall_stat{'peak'}{$_}{t_avgduration});
+		$avgduration_peak_date = $_;
+		last;
+	}
+
+	print $fh qq{
+	<div id="pgbsql-traffic" class="analysis-item row-fluid">
+		<h2 class=""><i class="icon-road"></i> Request Troughput</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$request_peak queries/s</span> <span class="figure-label">Request Peak</span></li>
+					<li><span class="figure">$request_peak_date</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+$drawn_graphs{pgb_requestpersecond_graph}
+		</div>
+	</div><!-- end of sql-traffic -->
+};
+	delete $drawn_graphs{pgb_requestpersecond_graph};
+
+	print $fh qq{
+	<div id="pgbbytes-traffic" class="analysis-item row-fluid">
+		<h2 class=""><i class="icon-road"></i> Bytes I/O Throughput</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$inbytes_peak Bytes/s</span> <span class="figure-label">In Bytes Peak</span></li>
+					<li><span class="figure">$inbytes_peak_date</span> <span class="figure-label">Date</span></li>    
+					<li><span class="figure">$outbytes_peak Bytes/s</span> <span class="figure-label">Out Bytes Peak</span></li>
+					<li><span class="figure">$outbytes_peak_date</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+$drawn_graphs{pgb_bytepersecond_graph}
+		</div>
+	</div><!-- end of select-traffic -->
+};
+	delete $drawn_graphs{pgb_bytepersecond_graph};
+
+	print $fh qq{
+	<div id="pgbduration-traffic" class="analysis-item row-fluid">
+		<h2 class=""><i class="icon-time"></i> Queries Average duration</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$avgduration_peak</span> <span class="figure-label">Average Duration Peak</span></li>
+					<li><span class="figure">$avgduration_peak_date</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+$drawn_graphs{pgb_avgduration_graph}
+		</div>
+	</div><!-- end of duration-traffic -->
+};
+	delete $drawn_graphs{pgb_avgduration_graph};
+
+}
+
 sub compute_query_graphs
 {
 	my %graph_data = ();
@@ -5100,6 +5588,119 @@ sub compute_query_graphs
 
 }
 
+sub compute_pgbouncer_graphs
+{
+	my %graph_data = ();
+	if ($graph) {
+
+		foreach my $tm (sort {$a <=> $b} keys %pgb_per_minute_info) {
+			$tm =~ /(\d{4})(\d{2})(\d{2})/;
+			my $y  = $1 - 1900;
+			my $mo = $2 - 1;
+			my $d  = $3;
+			foreach my $h ("00" .. "23") {
+				next if (!exists $pgb_per_minute_info{$tm}{$h});
+				my %c_dataavg = ();
+				my %s_dataavg = ();
+				foreach my $m ("00" .. "59") {
+
+					my $t = timegm_nocheck(0, $m, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
+
+					next if ($t < $t_min);
+					last if ($t > $t_max);
+
+					# pgBouncer stats are generate each minutes, always keep this interval
+					$graph_data{'request'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_req} || 0) . "],";
+					$graph_data{'inbytes'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_inbytes} || 0) . "],";
+					$graph_data{'outbytes'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_outbytes} || 0) . "],";
+					$graph_data{'avgduration'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_avgduration} || 0) . "],";
+					next if (!exists $pgb_per_minute_info{$tm}{$h}{$m});
+
+					my $rd = &average_per_minutes($m, $avg_minutes);
+
+					if (exists $pgb_per_minute_info{$tm}{$h}{$m}{connection}) {
+
+						# Average per minute
+						$c_dataavg{average}{"$rd"} += $pgb_per_minute_info{$tm}{$h}{$m}{connection}{count};
+
+						# Search minimum and maximum during this minute
+						foreach my $s (keys %{$pgb_per_minute_info{$tm}{$h}{$m}{connection}{second}}) {
+							$c_dataavg{max}{"$rd"} = $pgb_per_minute_info{$tm}{$h}{$m}{connection}{second}{$s}
+								if ($pgb_per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} > $c_dataavg{max}{"$rd"});
+							$c_dataavg{min}{"$rd"} = $pgb_per_minute_info{$tm}{$h}{$m}{connection}{second}{$s}
+								if ($pgb_per_minute_info{$tm}{$h}{$m}{connection}{second}{$s} < $c_dataavg{min}{"$rd"});
+						}
+						delete $pgb_per_minute_info{$tm}{$h}{$m}{connection};
+					}
+
+					if (exists $pgb_per_minute_info{$tm}{$h}{$m}{session}) {
+
+						# Average per minute
+						$s_dataavg{average}{"$rd"} += $pgb_per_minute_info{$tm}{$h}{$m}{session}{count};
+
+						# Search minimum and maximum during this minute
+						foreach my $s (keys %{$pgb_per_minute_info{$tm}{$h}{$m}{session}{second}}) {
+							$s_dataavg{max}{"$rd"} = $pgb_per_minute_info{$tm}{$h}{$m}{session}{second}{$s}
+								if ($pgb_per_minute_info{$tm}{$h}{$m}{session}{second}{$s} > $s_dataavg{max}{"$rd"});
+							$s_dataavg{min}{"$rd"} = $pgb_per_minute_info{$tm}{$h}{$m}{session}{second}{$s}
+								if ($pgb_per_minute_info{$tm}{$h}{$m}{session}{second}{$s} < $s_dataavg{min}{"$rd"});
+						}
+						delete $pgb_per_minute_info{$tm}{$h}{$m}{session};
+					}
+				}
+
+				foreach my $rd (@avgs) {
+					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+					$t += ($timezone*1000);
+
+					next if ($t < $t_min);
+					last if ($t > $t_max);
+
+					if (scalar keys %c_dataavg) { 
+						# Average connections per minute
+						$graph_data{conn_avg} .= "[$t, " . int(($c_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+						# Max connections per minute
+						$graph_data{conn_max} .= "[$t, " . ($c_dataavg{max}{"$rd"} || 0) . "],";
+
+						# Min connections per minute
+						$graph_data{conn_min} .= "[$t, " . ($c_dataavg{min}{"$rd"} || 0) . "],";
+					}
+					if (scalar keys %s_dataavg) { 
+						# Average connections per minute
+						$graph_data{sess_avg} .= "[$t, " . int(($s_dataavg{average}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+						# Max connections per minute
+						$graph_data{sess_max} .= "[$t, " . ($s_dataavg{max}{"$rd"} || 0) . "],";
+
+						# Min connections per minute
+						$graph_data{sess_min} .= "[$t, " . ($s_dataavg{min}{"$rd"} || 0) . "],";
+					}
+				}
+			}
+		}
+		foreach (keys %graph_data) {
+			$graph_data{$_} =~ s/,$//;
+		}
+	}
+
+	$drawn_graphs{'pgb_requestpersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_requestpersecond_graph', $graph_data{request},'',,'','Request per seconds (1 minute average)', '', 'Request per second');
+
+	$drawn_graphs{'pgb_bytepersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_bytepersecond_graph', $graph_data{inbytes},$graph_data{'outbytes'},'','Bytes I/O per seconds (1 minute average)', 'size', 'In b/s', 'Out b/s');
+
+	$drawn_graphs{'pgb_avgduration_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgduration_graph', $graph_data{avgduration},'','', 'Average query duration (1 minute average)', 'duration', 'Duration');
+
+	$drawn_graphs{'pgb_connectionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_connectionspersecond_graph', $graph_data{conn_max},
+		$graph_data{conn_avg}, $graph_data{conn_min}, 'Connections per second (' . $avg_minutes . ' minutes average)',
+		'Connections per second', 'Maximum', 'Average', 'Minimum'
+	);
+
+	$drawn_graphs{'pgb_sessionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_sessionspersecond_graph', $graph_data{sess_max},
+		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions (' . $avg_minutes . ' minutes average)',
+		'Sessions', 'Maximum', 'Average', 'Minimum'
+	);
+
+}
+
 sub print_established_connection
 {
 
@@ -5129,6 +5730,38 @@ $drawn_graphs{connectionspersecond_graph}
 	</div><!-- end of Established connections -->
 };
 	delete $drawn_graphs{connectionspersecond_graph};
+
+}
+
+sub print_established_pgb_connection
+{
+
+	my $connection_peak = 0;
+	my $connection_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{connection} <=> $pgb_overall_stat{'peak'}{$a}{connection}} keys %{$pgb_overall_stat{'peak'}}) {
+		$connection_peak = &comma_numbers($pgb_overall_stat{'peak'}{$_}{connection});
+		$connection_peak_date = $_;
+		last;
+	}
+
+	print $fh qq{
+	<div id="pgbestablished-connections" class="analysis-item row-fluid">
+	<h2 class=""><i class="icon-random"></i> Established Connections</h2>
+	<div class="span3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+				<li><span class="figure">$connection_peak connections</span> <span class="figure-label">Connection Peak</span></li>
+				<li><span class="figure">$connection_peak_date</span> <span class="figure-label">Date</span></li>    
+			</ul>
+		</div>
+	</div>
+	<div class="span8">
+$drawn_graphs{pgb_connectionspersecond_graph}
+		</div>
+	</div><!-- end of Established connections -->
+};
+	delete $drawn_graphs{pgb_connectionspersecond_graph};
 
 }
 
@@ -5209,6 +5842,83 @@ sub print_user_connection
 	delete $drawn_graphs{userconnections_graph};
 }
 
+sub print_user_pgb_connection
+{
+
+	my %infos = ();
+	my $total_count = 0;
+	my $c           = 0;
+	my $conn_user_info = '';
+	my @main_user = ('unknown',0);
+	foreach my $u (sort keys %{$pgb_connection_info{user}}) {
+		$conn_user_info .= "<tr><td>$u</td><td>" .
+				   &comma_numbers($pgb_connection_info{user}{$u}) . "</td></tr>";
+		$total_count += $pgb_connection_info{user}{$u};
+		if ($main_user[1] < $pgb_connection_info{user}{$u}) {
+			$main_user[0] = $u;
+			$main_user[1] = $pgb_connection_info{user}{$u};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_connection_info{user}}) {
+			if ((($pgb_connection_info{user}{$d} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_connection_info{user}{$d} || 0;
+			} else {
+				$infos{"Sum connections < $pie_percentage_limit%"} += $pgb_connection_info{user}{$d} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+			delete $infos{"Sum connections < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_userconnections_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_userconnections', 'Connections per user', %infos);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbconnections-per-user">
+		<h2><i class="icon-user"></i> Connections per user</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_user[0]</span> <span class="figure-label">Main User</span></li>
+					<li><span class="figure">$total_count connections</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbconnections-per-user-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbconnections-per-user-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbconnections-per-user-graph">
+						$drawn_graphs{pgb_userconnections_graph}
+					</div>
+					<div class="tab-pane" id="pgbconnections-per-user-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>User</th>
+									<th>Count</th>
+								</tr>
+							</thead>
+							<tbody>
+							$conn_user_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of connections per user -->
+};
+	delete $drawn_graphs{pgb_userconnections_graph};
+}
+
 sub print_host_connection
 {
 	my %infos = ();
@@ -5284,6 +5994,83 @@ sub print_host_connection
 };
 
 	delete $drawn_graphs{hostconnections_graph};
+}
+
+sub print_host_pgb_connection
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $c           = 0;
+	my $conn_host_info = '';
+	my @main_host = ('unknown',0);
+	foreach my $h (sort keys %{$pgb_connection_info{host}}) {
+		$conn_host_info .= "<tr><td>$h</td><td>" .
+				    &comma_numbers($pgb_connection_info{host}{$h}) . "</td></tr>";
+		$total_count += $pgb_connection_info{host}{$h};
+		if ($main_host[1] < $pgb_connection_info{host}{$h}) {
+			$main_host[0] = $h;
+			$main_host[1] = $pgb_connection_info{host}{$h};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_connection_info{host}}) {
+			if ((($pgb_connection_info{host}{$d} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_connection_info{host}{$d} || 0;
+			} else {
+				$infos{"Sum connections < $pie_percentage_limit%"} += $pgb_connection_info{host}{$d} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+			delete $infos{"Sum connections < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_hostconnections_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_hostconnections', 'Connections per host', %infos);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbconnections-per-host">
+		<h2><i class="icon-sitemap"></i> Connections per host</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_host[0]</span> <span class="figure-label">Main host with $main_host[1] connections</span></li>
+					<li><span class="figure">$total_count</span> <span class="figure-label">Total connections</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbconnections-per-host-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbconnections-per-host-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbconnections-per-host-graph">
+						$drawn_graphs{pgb_hostconnections_graph}
+					</div>
+					<div class="tab-pane" id="pgbconnections-per-host-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Host</th>
+									<th>Count</th>
+								</tr>
+							</thead>
+							<tbody>
+							$conn_host_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of connections per host -->
+};
+
+	delete $drawn_graphs{pgb_hostconnections_graph};
 }
 
 sub print_database_connection
@@ -5367,6 +6154,87 @@ sub print_database_connection
 	delete $drawn_graphs{databaseconnections_graph};
 }
 
+sub print_database_pgb_connection
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $conn_database_info = '';
+	my @main_database = ('unknown',0);
+	foreach my $d (sort keys %{$pgb_connection_info{database}}) {
+		$conn_database_info .= "<tr><td>$d</td><td>&nbsp;</td><td>" .
+					 &comma_numbers($pgb_connection_info{database}{$d}) . "</td></tr>";
+		$total_count += $pgb_connection_info{database}{$d};
+		if ($main_database[1] < $pgb_connection_info{database}{$d}) {
+			$main_database[0] = $d;
+			$main_database[1] = $pgb_connection_info{database}{$d};
+		}
+		foreach my $u (sort keys %{$pgb_connection_info{user}}) {
+			next if (!exists $pgb_connection_info{database_user}{$d}{$u});
+			$conn_database_info .= "<tr><td>&nbsp;</td><td>$u</td><td>" .
+				&comma_numbers($pgb_connection_info{database_user}{$d}{$u}) . "</td></tr>";
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_connection_info{database}}) {
+			if ((($pgb_connection_info{database}{$d} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_connection_info{database}{$d} || 0;
+			} else {
+				$infos{"Sum connections < $pie_percentage_limit%"} += $pgb_connection_info{database}{$d} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum connections < $pie_percentage_limit%"};
+			delete $infos{"Sum connections < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_databaseconnections_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_databaseconnections', 'Connections per database', %infos);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbconnections-per-database">
+		<h2><i class="icon-list-alt"></i> Connections per database</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_database[0]</span> <span class="figure-label">Main Database</span></li>
+					<li><span class="figure">$total_count connections</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbconnections-per-database-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbconnections-per-database-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbconnections-per-database-graph">
+						$drawn_graphs{pgb_databaseconnections_graph}
+					</div>
+					<div class="tab-pane" id="pgbconnections-per-database-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Database</th>
+									<th>User</th>
+									<th>Count</th>
+								</tr>
+							</thead>
+							<tbody>
+							$conn_database_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of connections per database -->
+};
+	delete $drawn_graphs{pgb_databaseconnections_graph};
+}
+
 sub print_simultaneous_session
 {
 
@@ -5399,6 +6267,38 @@ $drawn_graphs{sessionspersecond_graph}
 
 }
 
+sub print_simultaneous_pgb_session
+{
+
+	my $session_peak = 0;
+	my $session_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{session} <=> $pgb_overall_stat{'peak'}{$a}{session}} keys %{$pgb_overall_stat{'peak'}}) {
+		$session_peak = &comma_numbers($pgb_overall_stat{'peak'}{$_}{session});
+		$session_peak_date = $_;
+		last;
+	}
+
+	print $fh qq{
+	<div id="pgbsimultaneous-sessions" class="analysis-item row-fluid">
+	<h2 class=""><i class="icon-random"></i> Simultaneous sessions</h2>
+	<div class="span3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+				<li><span class="figure">$session_peak sessions</span> <span class="figure-label">Session Peak</span></li>
+				<li><span class="figure">$session_peak_date</span> <span class="figure-label">Date</span></li>    
+			</ul>
+		</div>
+	</div>
+	<div class="span8">
+$drawn_graphs{pgb_sessionspersecond_graph}
+		</div>
+	</div><!-- end of Simultaneous sessions -->
+};
+	delete $drawn_graphs{pgb_sessionspersecond_graph};
+
+}
+
 sub print_histogram_session_times
 {
 	my %data = ();
@@ -5422,18 +6322,17 @@ sub print_histogram_session_times
 		if ($overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
 			$most_range = "> $histogram_session_time[-1]ms";
 			$most_range_value = $overall_stat{histogram}{session_time}{"-1"};
-		}
-
 		$drawn_graphs{histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
+		}
 	} else {
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 		$drawn_graphs{histogram_session_times_graph} = qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
 
+
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
 	print $fh qq{
-	<h2><i class="icon-question-sign"></i> Sessions</h2>
 	<div class="analysis-item row-fluid" id="histogram-session-times">
 		<h2><i class="icon-signal"></i> Histogram of session times</h2>
 		<div class="span3">
@@ -5476,7 +6375,80 @@ sub print_histogram_session_times
 	delete $drawn_graphs{histogram_session_times_graph};
 }
 
+sub print_histogram_pgb_session_times
+{
+	my %data = ();
+	my $histogram_info = '';
+	my $most_range = '';
+	my $most_range_value = '';
 
+	for (my $i = 1; $i <= $#histogram_session_time; $i++) {
+                $histogram_info .= "<tr><td>" . &convert_time($histogram_session_time[$i-1]) . '-' . &convert_time($histogram_session_time[$i]) . "</td><td>" . &comma_numbers($pgb_overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]}) .
+                        "</td><td>" . sprintf("%0.2f", ($pgb_overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} * 100) / ($pgb_overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
+		$data{"$histogram_session_time[$i-1]-$histogram_session_time[$i]ms"} = ($pgb_overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} || 0);
+		if ($pgb_overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]} > $most_range_value) {
+			$most_range = "$histogram_session_time[$i-1]-$histogram_session_time[$i]ms";
+			$most_range_value = $pgb_overall_stat{histogram}{session_time}{$histogram_session_time[$i-1]};
+		}
+	}
+	if ($pgb_overall_stat{histogram}{session_total} > 0) {
+		$histogram_info .= "<tr><td> &gt; " . &convert_time($histogram_session_time[-1]) . "</td><td>" . &comma_numbers($pgb_overall_stat{histogram}{session_time}{'-1'}) .
+			"</td><td>" . sprintf("%0.2f", ($pgb_overall_stat{histogram}{session_time}{'-1'} * 100) / ($pgb_overall_stat{histogram}{session_total}||1)) . "%</td></tr>";
+		$data{"> $histogram_session_time[-1]ms"} = ($pgb_overall_stat{histogram}{session_time}{"-1"} || 0);
+		if ($pgb_overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
+			$most_range = "> $histogram_session_time[-1]ms";
+			$most_range_value = $pgb_overall_stat{histogram}{session_time}{"-1"};
+		}
+		$drawn_graphs{pgb_histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_pgb_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
+	} else {
+		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
+		$drawn_graphs{pgb_histogram_session_times_graph} = qq{<tr><td colspan="3">$NODATA</td></tr>};
+	}
+
+	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
+
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbhistogram-session-times">
+		<h2><i class="icon-signal"></i> Histogram of session times</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$most_range_value</span> <span class="figure-label">$most_range duration</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbhistogram-session-times-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbhistogram-session-times-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbhistogram-session-times-graph">
+						$drawn_graphs{pgb_histogram_session_times_graph}
+					</div>
+					<div class="tab-pane" id="pgbhistogram-session-times-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Range</th>
+									<th>Count</th>
+									<th>Percentage</th>
+								</tr>
+							</thead>
+							<tbody>
+							$histogram_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of queries by type -->
+};
+	delete $drawn_graphs{pgb_histogram_session_times_graph};
+}
 
 sub print_user_session
 {
@@ -5559,6 +6531,87 @@ sub print_user_session
 	delete $drawn_graphs{usersessions_graph};
 }
 
+sub print_user_pgb_session
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $c           = 0;
+	my $sess_user_info = '';
+	my @main_user = ('unknown',0);
+	foreach my $u (sort keys %{$pgb_session_info{user}}) {
+		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($pgb_session_info{user}{$u}{count}) .
+				   "</td><td>" . &convert_time($pgb_session_info{user}{$u}{duration}), "</td><td>" .
+				   &convert_time($pgb_session_info{user}{$u}{duration} / $pgb_session_info{user}{$u}{count}) .
+				   "</td></tr>";
+		$total_count += $pgb_session_info{user}{$u}{count};
+		if ($main_user[1] < $pgb_session_info{user}{$u}{count}) {
+			$main_user[0] = $u;
+			$main_user[1] = $pgb_session_info{user}{$u}{count};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_session_info{user}}) {
+			if ((($pgb_session_info{user}{$d}{count} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_session_info{user}{$d}{count} || 0;
+			} else {
+				$infos{"Sum sessions < $pie_percentage_limit%"} += $pgb_session_info{user}{$d}{count} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+			delete $infos{"Sum sessions < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_usersessions_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_usersessions', 'Sessions per user', %infos);
+	$sess_user_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbsessions-per-user">
+		<h2><i class="icon-user"></i> Sessions per user</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_user[0]</span> <span class="figure-label">Main User</span></li>
+					<li><span class="figure">$total_count sessions</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbsessions-per-user-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbsessions-per-user-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbsessions-per-user-graph">
+						$drawn_graphs{pgb_usersessions_graph}
+					</div>
+					<div class="tab-pane" id="pgbsessions-per-user-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>User</th>
+									<th>Count</th>
+									<th>Total Duration</th>
+									<th>Average Duration</th>
+								</tr>
+							</thead>
+							<tbody>
+							$sess_user_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of sessions per user -->
+};
+	delete $drawn_graphs{pgb_usersessions_graph};
+}
+
 sub print_host_session
 {
 	my %infos = ();
@@ -5592,7 +6645,7 @@ sub print_host_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Sessions per host', %infos);
+	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Connections per host', %infos);
 	$sess_host_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
@@ -5639,6 +6692,88 @@ sub print_host_session
 };
 
 	delete $drawn_graphs{hostsessions_graph};
+}
+
+sub print_host_pgb_session
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $c           = 0;
+	my $sess_host_info = '';
+	my @main_host = ('unknown',0);
+	foreach my $h (sort keys %{$pgb_session_info{host}}) {
+		$sess_host_info .= "<tr><td>$h</td><td>" . &comma_numbers($pgb_session_info{host}{$h}{count}) .
+				   "</td><td>" . &convert_time($pgb_session_info{host}{$h}{duration}) . "</td><td>" .
+				   &convert_time($pgb_session_info{host}{$h}{duration} / $pgb_session_info{host}{$h}{count}) .
+				   "</td></tr>";
+		$total_count += $pgb_session_info{host}{$h}{count};
+		if ($main_host[1] < $pgb_session_info{host}{$h}{count}) {
+			$main_host[0] = $h;
+			$main_host[1] = $pgb_session_info{host}{$h}{count};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_session_info{host}}) {
+			if ((($pgb_session_info{host}{$d}{count} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_session_info{host}{$d}{count} || 0;
+			} else {
+				$infos{"Sum sessions < $pie_percentage_limit%"} += $pgb_session_info{host}{$d}{count} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+			delete $infos{"Sum sessions < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_hostsessions', 'Sessions per host', %infos);
+	$sess_host_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbsessions-per-host">
+		<h2><i class="icon-sitemap"></i> Sessions per host</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_host[0]</span> <span class="figure-label">Main Host</span></li>
+					<li><span class="figure">$total_count sessions</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbsessions-per-host-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbsessions-per-host-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbsessions-per-host-graph">
+						$drawn_graphs{pgb_hostsessions_graph}
+					</div>
+					<div class="tab-pane" id="pgbsessions-per-host-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Host</th>
+									<th>Count</th>
+									<th>Total Duration</th>
+									<th>Average Duration</th>
+								</tr>
+							</thead>
+							<tbody>
+							$sess_host_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of sessions per host -->
+};
+
+	delete $drawn_graphs{pgb_hostsessions_graph};
 }
 
 sub print_app_session
@@ -5723,7 +6858,6 @@ sub print_app_session
 	delete $drawn_graphs{appsessions_graph};
 }
 
-
 sub print_database_session
 {
 	my %infos = ();
@@ -5805,6 +6939,89 @@ sub print_database_session
 };
 	delete $drawn_graphs{databasesessions_graph};
 }
+
+sub print_database_pgb_session
+{
+	my %infos = ();
+	my $total_count = 0;
+	my $sess_database_info = '';
+	my @main_database = ('unknown',0);
+	foreach my $d (sort keys %{$pgb_session_info{database}}) {
+		$sess_database_info .=  "<tr><td>$d</td><td>" . &comma_numbers($pgb_session_info{database}{$d}{count}) .
+					"</td><td>" . &convert_time($pgb_session_info{database}{$d}{duration}) . "</td><td>" .
+					&convert_time($pgb_session_info{database}{$d}{duration} / $pgb_session_info{database}{$d}{count}) .
+					"</td></tr>";
+		$total_count += $pgb_session_info{database}{$d}{count};
+		if ($main_database[1] < $pgb_session_info{database}{$d}{count}) {
+			$main_database[0] = $d;
+			$main_database[1] = $pgb_session_info{database}{$d}{count};
+		}
+	}
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort keys %{$pgb_session_info{database}}) {
+			if ((($pgb_session_info{database}{$d}{count} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$d} = $pgb_session_info{database}{$d}{count} || 0;
+			} else {
+				$infos{"Sum sessions < $pie_percentage_limit%"} += $pgb_session_info{database}{$d}{count} || 0;
+				push(@small, $d);
+			}
+		}
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum sessions < $pie_percentage_limit%"};
+			delete $infos{"Sum sessions < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{pgb_databasesessions_graph} = &jqplot_piegraph($graphid++, 'graph_pgb_databasesessions', 'Sessions per database', %infos);
+	$sess_database_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
+
+	$total_count = &comma_numbers($total_count);
+	print $fh qq{
+	<div class="analysis-item row-fluid" id="pgbsessions-per-database">
+		<h2><i class="icon-list-alt"></i> Sessions per database</h2>
+		<div class="span3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_database[0]</span> <span class="figure-label">Main Database</span></li>
+					<li><span class="figure">$total_count sessions</span> <span class="figure-label">Total</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#pgbsessions-per-database-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#pgbsessions-per-database-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="pgbsessions-per-database-graph">
+						$drawn_graphs{pgb_databasesessions_graph}
+					</div>
+					<div class="tab-pane" id="pgbsessions-per-database-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Database</th>
+									<th>User</th>
+									<th>Count</th>
+									<th>Total Duration</th>
+									<th>Average Duration</th>
+								</tr>
+							</thead>
+							<tbody>
+							$sess_database_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of sessions per database -->
+};
+	delete $drawn_graphs{pgb_databasesessions_graph};
+}
+
 
 sub print_checkpoint
 {
@@ -8794,12 +10011,14 @@ sub dump_as_html
 
 	if (!$error_only) {
 
-		# Overall statistics
-		print $fh qq{
+		if (!$pgbouncer_only) {
+			# Overall statistics
+			print $fh qq{
 	<li class="slide active-slide" id="overview-slide">
 };
-		&print_overall_statistics();
+			&print_overall_statistics();
 
+		}
 		# Set graphs limits
 		$overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
 		$t_min = timegm_nocheck(0, $5, $4, $3, $2 - 1, $1) * 1000;
@@ -8811,7 +10030,8 @@ sub dump_as_html
 		$t_max += ($timezone*1000);
 		$t_max += ($avg_minutes * 60000);
 
-		if (!$disable_hourly) {
+		if (!$disable_hourly && !$pgbouncer_only) {
+
 			# Build graphs based on hourly stat
 			&compute_query_graphs();
 
@@ -8823,7 +10043,7 @@ sub dump_as_html
 
 		}
 
-		if (!$disable_connection) {
+		if (!$disable_connection && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="connections-slide">
@@ -8833,20 +10053,17 @@ sub dump_as_html
 
 			# Draw connections information
 			&print_established_connection() if (!$disable_hourly);
-
 			# Show per database/user connections
 			&print_database_connection();
-
 			# Show per user connections
 			&print_user_connection();
-
 			# Show per client ip connections
 			&print_host_connection();
 		}
 
 
 		# Show session per database statistics
-		if (!$disable_session) {
+		if (!$disable_session && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="sessions-slide">
@@ -8869,7 +10086,7 @@ sub dump_as_html
 
 
 		# Display checkpoint and temporary files report
-		if (!$disable_checkpoint) {
+		if (!$disable_checkpoint && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="checkpoints-slide">
@@ -8877,7 +10094,7 @@ sub dump_as_html
 			&print_checkpoint();
 		}
 
-		if (!$disable_temporary) {
+		if (!$disable_temporary && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="tempfiles-slide">
@@ -8889,7 +10106,7 @@ sub dump_as_html
 			&print_tempfile_report();
 		}
 
-		if (!$disable_autovacuum) {
+		if (!$disable_autovacuum && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="vacuums-slide">
@@ -8899,7 +10116,7 @@ sub dump_as_html
 
 		}
 
-		if (!$disable_lock) {
+		if (!$disable_lock && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="locks-slide">
@@ -8911,7 +10128,7 @@ sub dump_as_html
 			&print_lock_queries_report();
 		}
 
-		if (!$disable_query) {
+		if (!$disable_query && !$pgbouncer_only) {
 			print $fh qq{
 		</li>
 		<li class="slide" id="queries-slide">
@@ -8960,6 +10177,49 @@ sub dump_as_html
 			&print_slowest_queries
 		}
 
+		# Show pgbouncer sessions and connections statistics
+		if (exists $pgb_overall_stat{peak}) {
+
+			# Build pgbouncer graph based on hourly stats
+			&compute_pgbouncer_graphs();
+
+			my $active = '';
+			$active = ' active-slide' if ($pgbouncer_only);
+			print $fh qq{
+		</li>
+		<li class="slide$active" id="pgbouncer-slide">
+	<h1 class="page-header"><i class="icon-refresh"></i> pgBouncer</h1>
+
+};
+			# Draw pgbouncer own statistics
+			&print_pgbouncer_stats() if (!$disable_hourly);
+
+			# Draw connections information
+			&print_established_pgb_connection() if (!$disable_hourly);
+
+			# Show per database/user connections
+			&print_database_pgb_connection();
+
+			# Show per user connections
+			&print_user_pgb_connection();
+
+			# Show per client ip connections
+			&print_host_pgb_connection();
+
+			# Show number of simultaneous sessions
+			&print_simultaneous_pgb_session();
+			# Show histogram for session times
+			&print_histogram_pgb_session_times();
+			# Show per database sessions
+			&print_database_pgb_session();
+			# Show per user sessions
+			&print_user_pgb_session();
+			# Show per host sessions
+			&print_host_pgb_session();
+
+			# Show Most Frequent Errors/Events
+			&show_pgb_error_as_html();
+		}
 	}
 
 	# Show errors report
@@ -9385,6 +10645,168 @@ sub show_error_as_html
 
 }
 
+sub show_pgb_error_as_html
+{
+
+	my $main_error = 0;
+	my $total = 0;
+	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
+		next if (!$pgb_error_info{$k}{count});
+		$main_error = &comma_numbers($pgb_error_info{$k}{count}) if (!$main_error);
+		$total += $pgb_error_info{$k}{count};
+	}
+	$total = &comma_numbers($total);
+
+	print $fh qq{
+		<div class="analysis-item row-fluid" id="pgbmost-frequent-errors-events">
+  	  		<h2><i class="icon-warning-sign"></i> Most Frequent Errors/Events</h2>
+			<div class="span3">
+				<h3 class="">Key values</h3>
+				<div class="well key-figures">
+					<ul>
+						<li><span class="figure">$main_error</span> <span class="figure-label">Max number of times the same event was reported</span></li>
+						<li><span class="figure">$total</span> <span class="figure-label">Total events found</span></li>    
+					</ul>
+				</div>  	  
+  	  		</div>
+  	  		<div class="span8">
+				<table class="table table-striped" id="pgbmost-frequent-errors-events-table">
+				<thead>
+					<tr>
+						<th>Rank</th>
+						<th>Times reported</th>
+						<th>Error</th>
+					</tr>
+				</thead>
+				<tbody>
+};
+	my $rank = 1;
+	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
+		next if (!$pgb_error_info{$k}{count});
+		my $count = &comma_numbers($pgb_error_info{$k}{count});
+		my $msg = $k;
+		my $error_level_class = 'text-error';
+		if ($msg =~ /^WARNING: /) {
+			$error_level_class = 'text-warning';
+		} elsif ($msg =~ /^LOG: /) {
+			$error_level_class = 'text-success';
+		} elsif ($msg =~ /^FATAL: /) {
+			$error_level_class = 'text-fatal';
+		} elsif ($msg =~ /^PANIC: /) {
+			$error_level_class = 'text-panic';
+		}
+		my $details = '';
+                my %hourly_count = ();
+                my $days = 0;
+		foreach my $d (sort keys %{$pgb_error_info{$k}{chronos}}) {
+			my $c = 1;
+			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$1} $2";
+			foreach my $h (sort keys %{$pgb_error_info{$k}{chronos}{$d}}) {
+				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+					&comma_numbers($pgb_error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
+				$zday = "";
+				foreach my $m (sort keys %{$pgb_error_info{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$h:$rd"} += $pgb_error_info{$k}{chronos}{$d}{$h}{min}{$m};
+				}
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$h:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+					}
+				}
+			}
+		}
+                # Set graph dataset
+                my %graph_data = ();
+                foreach my $h ("00" .. "23") {
+			foreach my $rd (@histo_avgs) {
+				$graph_data{count} .= "['$h:$rd'," . (int($hourly_count{"$h:$rd"}/$days) || 0) . "],";
+			}
+                }
+		$graph_data{count} =~ s/,$//;
+                %hourly_count = ();
+
+                my $error_histo =
+                &jqplot_histograph($graphid++, 'pgberror_graph_'.$rank, $graph_data{count}, '', 'Avg. events', '');
+
+		# Escape HTML code in error message
+		$msg = &escape_html($msg);
+		print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$count
+					<p><a href="#pgbmost-frequent-errors-events-details-rank-$rank" class="btn btn-mini" data-toggle="collapse">Details</a></p>
+				</td>
+				<td id="pgbmost-frequent-errors-events-examples-details-rank-$rank">
+					<pre><span class="$error_level_class">$msg</span></pre>
+						<!-- Details collapse -->
+					    <div id="pgbmost-frequent-errors-events-details-rank-$rank" class="collapse">
+						<h3>Times Reported <small>Most Frequent Error / Event #$rank</small></h3>
+						$error_histo
+								<table class="table table-stripped table-condensed">
+									<thead>
+										<tr>
+											<th>Day</th>
+											<th>Hour</th>
+											<th>Count</th>
+										</tr>
+									</thead>
+									<tbody>
+										$details
+									</tbody>
+								</table>
+						    <p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#pgbmost-frequent-errors-events-details-rank-$rank">x Hide</button></p>
+						</div><!-- end of details collapse -->
+};
+		print $fh qq{
+<p><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#pgbmost-frequent-errors-events-examples-rank-$rank">Examples</button></p>							   
+} if (($sample > 0) && ($#{$pgb_error_info{$k}{date}} >= 0));
+		print $fh qq{
+						<!-- Examples collapse -->
+						<div id="pgbmost-frequent-errors-events-examples-rank-$rank" class="collapse">
+							<dl>
+};
+
+		for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++) {
+			last if (($sample > 0) && ($i == $sample));
+			# Escape HTML code in error message
+			my $message = &escape_html($pgb_error_info{$k}{error}[$i]);
+			my $details = "Date: " . $pgb_error_info{$k}{date}[$i] . "\n";
+			if ($pgb_error_info{$k}{db}[$i]) {
+				$details .= "<b>Database:</b> $pgb_error_info{$k}{db}[$i] <b>User:</b> $pgb_error_info{$k}{user}[$i] <b>Remote:</b> $pgb_error_info{$k}{remote}[$i] <br/>";
+			}
+			print $fh qq{
+								<dt><span class="$error_level_class">$message</span></dt>
+								<pre>$details</pre>
+};
+		}
+		print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-mini" data-toggle="collapse" data-target="#pgbmost-frequent-errors-events-examples-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of details collapse -->
+					</td>
+				</tr>
+};
+		$rank++;
+	}
+	if (scalar keys %pgb_error_info == 0) {
+		print $fh qq{<tr><td colspan="7">$NODATA</td></tr>};
+	}
+
+	print $fh qq{
+			</tbody>
+			</table>
+		</div>
+	</div><!-- end of pgbmost-frequent-errors-events -->
+};
+
+}
+
 sub load_stats
 {
 
@@ -9392,21 +10814,26 @@ sub load_stats
 
 	my %stats = %{ fd_retrieve($fd) };
 	my %_overall_stat = %{$stats{overall_stat}};
+	my %_pgb_overall_stat = %{$stats{pgb_overall_stat}};
 	my %_overall_checkpoint = %{$stats{overall_checkpoint}};
 	my %_normalyzed_info = %{$stats{normalyzed_info}};
 	my %_error_info = %{$stats{error_info}};
+	my %_pgb_error_info = %{$stats{pgb_error_info}};
 	my %_connection_info = %{$stats{connection_info}};
+	my %_pgb_connection_info = %{$stats{pgb_connection_info}};
 	my %_database_info = %{$stats{database_info}};
 	my %_application_info = %{$stats{application_info}};
 	my %_user_info = %{$stats{user_info}};
 	my %_host_info = %{$stats{host_info}};
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
 	my %_session_info = %{$stats{session_info}};
+	my %_pgb_session_info = %{$stats{pgb_session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
 	my %_cancelled_info = %{$stats{cancelled_info}};
 	my %_logs_type = %{$stats{logs_type}};
 	my %_lock_info = %{$stats{lock_info}};
 	my %_per_minute_info = %{$stats{per_minute_info}};
+	my %_pgb_per_minute_info = %{$stats{pgb_per_minute_info}};
 	my @_top_slowest = @{$stats{top_slowest}};
 	my $_nlines = $stats{nlines};
 	my $_first_log_timestamp = $stats{first_log_timestamp};
@@ -9490,7 +10917,23 @@ sub load_stats
 		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
 	}
 
+	### pgbouncer related overall stats ###
+	foreach my $k (keys %{$_pgb_overall_stat{peak}}) {
+		$pgb_overall_stat{peak}{$k}{connection} += $_pgb_overall_stat{peak}{$k}{connection};
+		$pgb_overall_stat{peak}{$k}{session} += $_pgb_overall_stat{peak}{$k}{session};
+		$pgb_overall_stat{peak}{$k}{t_req} += $_pgb_overall_stat{peak}{$k}{t_req};
+		$pgb_overall_stat{peak}{$k}{t_inbytes} += $_pgb_overall_stat{peak}{$k}{t_inbytes};
+		$pgb_overall_stat{peak}{$k}{t_outbytes} += $_pgb_overall_stat{peak}{$k}{t_outbytes};
+		$pgb_overall_stat{peak}{$k}{t_avgduration} += $_pgb_overall_stat{peak}{$k}{t_avgduration};
+	}
+
+	foreach my $k (keys %{$_pgb_overall_stat{histogram}{session_time}}) {
+		$pgb_overall_stat{histogram}{session_time}{$k} += $_pgb_overall_stat{histogram}{session_time}{$k};
+	}
+	$pgb_overall_stat{histogram}{session_total} += $_pgb_overall_stat{histogram}{session_total};
+
 	### Logs level ###
+
 	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
 		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
 	}
@@ -9582,6 +11025,34 @@ sub load_stats
 		}
 	}
 
+	### pgbouncer connection_info ###
+
+	foreach my $db (keys %{ $_pgb_connection_info{database} }) {
+		$pgb_connection_info{database}{$db} += $_pgb_connection_info{database}{$db};
+	}
+
+	foreach my $db (keys %{ $_pgb_connection_info{database_user} }) {
+		foreach my $user (keys %{ $_pgb_connection_info{database_user}{$db} }) {
+			$pgb_connection_info{database_user}{$db}{$user} += $_pgb_connection_info{database_user}{$db}{$user};
+		}
+	}
+
+	foreach my $user (keys %{ $_pgb_connection_info{user} }) {
+		$pgb_connection_info{user}{$user} += $_pgb_connection_info{user}{$user};
+	}
+
+	foreach my $host (keys %{ $_pgb_connection_info{host} }) {
+		$pgb_connection_info{host}{$host} += $_pgb_connection_info{host}{$host};
+	}
+
+	$pgb_connection_info{count} += $_pgb_connection_info{count};
+
+	foreach my $day (keys %{ $_pgb_connection_info{chronos} }) {
+		foreach my $hour (keys %{ $_pgb_connection_info{chronos}{$day} }) {
+			$pgb_connection_info{chronos}{$day}{$hour}{count} += $_pgb_connection_info{chronos}{$day}{$hour}{count}
+		}
+	}
+
 	### log_files ###
 
 	foreach my $f (@_log_files) {
@@ -9612,6 +11083,29 @@ sub load_stats
 									$_error_info{$q}{user}[$i],
 									$_error_info{$q}{app}[$i],
 									$_error_info{$q}{remote}[$i]
+									);
+		}
+	}
+
+	### pgbouncer error_info ###
+
+	foreach my $q (keys %_pgb_error_info) {
+		$pgb_error_info{$q}{count} += $_pgb_error_info{$q}{count};
+		foreach my $day (keys %{ $_pgb_error_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_pgb_error_info{$q}{chronos}{$day}}) {
+				$pgb_error_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{count};
+				foreach my $min (keys %{$_pgb_error_info{$q}{chronos}{$day}{$hour}{min}}) {
+					$pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min};
+				}
+			}
+		}
+		for (my $i = 0; $i <= $#{$_pgb_error_info{$q}{date}}; $i++) {
+			&pgb_set_top_error_sample(	$q, 
+									$_pgb_error_info{$q}{date}[$i], 
+									$_pgb_error_info{$q}{error}[$i],
+									$_pgb_error_info{$q}{db}[$i],
+									$_pgb_error_info{$q}{user}[$i],
+									$_pgb_error_info{$q}{remote}[$i]
 									);
 		}
 	}
@@ -9683,6 +11177,27 @@ sub load_stats
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest}
 					if ($_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} > $per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest});
+			}
+		}
+	}
+
+	### pgbouncer per_minute_info ###
+
+	foreach my $day (keys %_pgb_per_minute_info) {
+		foreach my $hour (keys %{ $_pgb_per_minute_info{$day} }) {
+			foreach my $min (keys %{ $_pgb_per_minute_info{$day}{$hour} }) {
+				$pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} +=
+					($_pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{session}{count} +=
+					($_pgb_per_minute_info{$day}{$hour}{$min}{session}{count} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_req} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_req} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_inbytes} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_inbytes} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_outbytes} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_outbytes} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} || 0);
 			}
 		}
 	}
@@ -9832,6 +11347,34 @@ sub load_stats
 		$session_info{app}{$app}{duration} += $_session_info{app}{$app}{duration};
 	}
 
+	### pgbouncer session_info ###
+
+	foreach my $db (keys %{ $_pgb_session_info{database}}) {
+		$pgb_session_info{database}{$db}{count} += $_pgb_session_info{database}{$db}{count};
+		$pgb_session_info{database}{$db}{duration} += $_pgb_session_info{database}{$db}{duration};
+	}
+
+	$pgb_session_info{count} += $_pgb_session_info{count};
+
+	foreach my $day (keys %{ $_pgb_session_info{chronos}}) {
+		foreach my $hour (keys %{ $_pgb_session_info{chronos}{$day}}) {
+			$pgb_session_info{chronos}{$day}{$hour}{count} += $_pgb_session_info{chronos}{$day}{$hour}{count};
+			$pgb_session_info{chronos}{$day}{$hour}{duration} += $_pgb_session_info{chronos}{$day}{$hour}{duration};
+		}
+	}
+
+	foreach my $user (keys %{ $_pgb_session_info{user}}) {
+		$pgb_session_info{user}{$user}{count}    += $_pgb_session_info{user}{$user}{count};
+		$pgb_session_info{user}{$user}{duration} += $_pgb_session_info{user}{$user}{duration};
+	}
+
+	$pgb_session_info{duration} += $_pgb_session_info{duration};
+
+	foreach my $host (keys %{ $_pgb_session_info{host}}) {
+		$pgb_session_info{host}{$host}{count}    += $_pgb_session_info{host}{$host}{count};
+		$pgb_session_info{host}{$host}{duration} += $_pgb_session_info{host}{$host}{duration};
+	}
+
 	### tempfile_info ###
 
 	$tempfile_info{count} += $_tempfile_info{count}
@@ -9916,27 +11459,32 @@ sub load_stats
 	return;
 }
 
+# Function used to dump all relevant objects in memory to a single binary file
 sub dump_as_binary
 {
 	my $lfh = shift();
 
 	store_fd({
 		'overall_stat' => \%overall_stat,
+		'pgb_overall_stat' => \%pgb_overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
 		'normalyzed_info' => \%normalyzed_info,
 		'error_info' => \%error_info,
+		'pgb_error_info' => \%pgb_error_info,
 		'connection_info' => \%connection_info,
+		'pgb_connection_info' => \%pgb_connection_info,
 		'database_info' => \%database_info,
 		'application_info' => \%application_info,
 		'user_info' => \%user_info,
 		'host_info' => \%host_info,
 		'checkpoint_info' => \%checkpoint_info,
 		'session_info' => \%session_info,
+		'pgb_session_info' => \%pgb_session_info,
 		'tempfile_info' => \%tempfile_info,
-		'error_info' => \%error_info,
 		'logs_type' => \%logs_type,
 		'lock_info' => \%lock_info,
 		'per_minute_info' => \%per_minute_info,
+		'pgb_per_minute_info' => \%pgb_per_minute_info,
 		'top_slowest' => \@top_slowest,
 		'nlines' => $nlines,
 		'log_files' => \@log_files,
@@ -9960,21 +11508,25 @@ sub dump_as_json
 {
 	my $json = encode_json({
 		'overall_stat' => \%overall_stat,
+		'pgb_overall_stat' => \%pgb_overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
 		'normalyzed_info' => \%normalyzed_info,
 		'error_info' => \%error_info,
+		'pgb_error_info' => \%pgb_error_info,
 		'connection_info' => \%connection_info,
+		'pgb_connection_info' => \%pgb_connection_info,
 		'database_info' => \%database_info,
 		'application_info' => \%application_info,
 		'user_info' => \%user_info,
 		'host_info' => \%host_info,
 		'checkpoint_info' => \%checkpoint_info,
 		'session_info' => \%session_info,
+		'pgb_session_info' => \%pgb_session_info,
 		'tempfile_info' => \%tempfile_info,
-		'error_info' => \%error_info,
 		'logs_type' => \%logs_type,
 		'lock_info' => \%lock_info,
 		'per_minute_info' => \%per_minute_info,
+		'pgb_per_minute_info' => \%pgb_per_minute_info,
 		'top_slowest' => \@top_slowest,
 		'nlines' => $nlines,
 		'log_files' => \@log_files,
@@ -10020,7 +11572,7 @@ sub highlight_code
 		$i++;
 	}
 
-	foreach my $x (sort (keys %SYMBOLS)) {
+	foreach my $x (sort keys %SYMBOLS) {
 		$code =~ s/$x/\$\$PGBGYA\$\$$SYMBOLS{$x}\$\$PGBGYB\$\$/gs;
 	}
 	for (my $x = 0 ; $x <= $#KEYWORDS1 ; $x++) {
@@ -10828,6 +12380,174 @@ sub parse_query
 	return 1;
 }
 
+sub parse_pgbouncer
+{
+
+	my $t_pid = $prefix_vars{'t_pid'};
+	my $t_session_id = $prefix_vars{'t_session_id'} || $prefix_vars{'t_pid'};
+
+	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
+	my $cur_last_log_timestamp = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
+				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
+
+	# Do not parse lines that are not an error message when error only report is requested
+	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
+		return;
+	}
+
+	# Do not parse lines that are an error-like message when error reports are not wanted
+	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ $full_error_regex)) {
+		return;
+	}
+
+	# Replace syslog tabulation rewrite
+	if ($format =~ /syslog/) {
+		$prefix_vars{'t_query'} =~ s/#011/\t/g;
+	}
+
+	if ($prefix_vars{'t_loglevel'} eq 'STATS') {
+
+		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_req} = $prefix_vars{'t_req/s'};
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_req} = $prefix_vars{'t_req/s'};
+		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_inbytes} = $prefix_vars{'t_inbytes/s'};
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_inbytes} = $prefix_vars{'t_inbytes/s'};
+
+		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_outbytes} = $prefix_vars{'t_outbytes/s'};
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_outbytes} = $prefix_vars{'t_outbytes/s'};
+
+		# We need millisecond instead of microsecond from pgbouncer
+		my $duration = int($prefix_vars{'t_avgduration'}/1000);
+		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_avgduration} = $duration;
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_avgduration} = $duration;
+
+		return;
+
+	} elsif ($prefix_vars{'t_loglevel'} =~ $main_error_regex) {
+
+		if ($prefix_vars{'t_loglevel'} eq 'WARNING') {
+
+			if ($prefix_vars{'t_query'} =~ /dropping database '([^']+)' as it does not exist anymore/) {
+				$prefix_vars{t_dbname} = $1;
+			} elsif ($prefix_vars{'t_query'} =~ /^([^:]+): (.*?)\/(.*?)\@([^:]+):\d+ (.*)/) {
+				$prefix_vars{t_query} = $5;
+				$prefix_vars{t_dbname} = $2;
+				$prefix_vars{t_dbuser} = $3;
+				$prefix_vars{t_dbclient} = $4;
+				$prefix_vars{t_session_id} = $1;
+			}
+
+			# Add log level at beginning of the query and normalize it
+			$prefix_vars{'t_query'} = $prefix_vars{'t_loglevel'} . ":  " . $prefix_vars{'t_query'};
+			my $normalized_error = &pgb_normalize_error($prefix_vars{'t_query'});
+
+			# Stores total and normalized error count
+			$pgb_overall_stat{'errors_number'}++;
+			$pgb_error_info{$normalized_error}{count}++;
+
+			# Stores normalized error count per time
+			my $cur_day_str = "$prefix_vars{t_year}$prefix_vars{t_month}$prefix_vars{t_day}";
+			my $cur_hour_str = "$prefix_vars{t_hour}";
+			$pgb_error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+			$pgb_error_info{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$prefix_vars{t_min}}++;
+
+			# Stores normalized query samples
+			if ($sample > 0) {
+				&pgb_set_top_error_sample(  $normalized_error,
+										$cur_last_log_timestamp,
+										$prefix_vars{t_query},
+										$prefix_vars{t_dbname},
+										$prefix_vars{t_dbuser},
+										$prefix_vars{t_client} || $prefix_vars{t_dbclient}
+				);
+			}
+
+		} else {
+			print STDERR "UNPARSED LOG LEVEL: $prefix_vars{'t_loglevel'} => $prefix_vars{'t_query'}\n";
+		}
+	} elsif ($prefix_vars{'t_loglevel'} ne 'LOG') {
+		print STDERR "UNRECOGNIZED LOG LEVEL: $prefix_vars{'t_loglevel'} => $prefix_vars{'t_query'}\n";
+	}
+
+	# Stores connection activity
+	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~ /login attempt: db=([^\s]+) user=([^\s]+)/))
+	{
+		return if ($disable_connection);
+
+		my $usr = $prefix_vars{'t_dbuser'} || $2;
+		my $db  = $prefix_vars{'t_dbname'} || $1;
+		my $host= $prefix_vars{'t_client'} || '';
+		$host = _gethostbyaddr($host) if ($dns_resolv);
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{connection}++;
+
+		$pgb_connection_info{count}++;
+		$pgb_connection_info{user}{$usr}++;
+		$pgb_connection_info{host}{$host}++;
+		$pgb_connection_info{database}{$db}++;
+		$pgb_connection_info{database_user}{$db}{$usr}++;
+		$pgb_connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+
+		if ($graph) {
+			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{connection}{count}++;
+			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{connection}{second}{$prefix_vars{'t_sec'}}++;
+		}
+
+		# set current session workload
+		if ( !$disable_session ) {
+			$pgb_current_sessions{$t_session_id} = $prefix_vars{'t_timestamp'};
+			my $sess_count = scalar keys %pgb_current_sessions;
+			$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{session} = $sess_count;
+			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{count} = $sess_count;
+			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{second}{$prefix_vars{'t_sec'}} = $sess_count;
+		}
+
+		return;
+	}
+
+	# Store session duration
+	if (($prefix_vars{'t_loglevel'} eq 'LOG')
+		&& ($prefix_vars{'t_query'} =~ /\(age=(\d+)\)$/))
+	{
+		return if ($disable_session);
+
+		# Use millisecond for session duration
+		my $time = $1*1000;
+
+		my $usr = $prefix_vars{'t_dbuser'} || '(nousr)';
+		my $db  = $prefix_vars{'t_dbname'} || '(nodb)';
+		my $host= $prefix_vars{'t_client'} || '';
+		$host = _gethostbyaddr($host) if ($dns_resolv && $host);
+
+		# Store time in milliseconds since the connection attempt
+		if ($pgb_current_sessions{$t_session_id} =~ /(\d+):(\d+):(\d+\.\d+)$/) {
+			my $time1 = ($3 * 1000) + ($2 * 60 * 1000) + ($1 * 60 * 60 * 1000);
+			$prefix_vars{'t_timestamp'} =~ /(\d+):(\d+):(\d+\.\d+)$/;
+			my $time2 = ($3 * 1000) + ($2 * 60 * 1000) + ($1 * 60 * 60 * 1000);
+			$time = $time2 - $time1;
+		}
+		$pgb_session_info{count}++;
+		$pgb_session_info{duration} += $time;
+		$pgb_session_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
+		$pgb_session_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{duration} += $time;
+		$pgb_session_info{database}{$db}{count}++;
+		$pgb_session_info{database}{$db}{duration} += $time;
+		$pgb_session_info{user}{$usr}{count}++;
+		$pgb_session_info{user}{$usr}{duration} += $time;
+		$pgb_session_info{host}{$host}{count}++;
+		$pgb_session_info{host}{$host}{duration} += $time;
+		my $k = &get_hist_inbound($time, @histogram_session_time);
+		$pgb_overall_stat{histogram}{session_time}{$k}++;
+		$pgb_overall_stat{histogram}{session_total}++;
+
+		delete $pgb_current_sessions{$t_session_id};
+
+		return;
+	}
+
+	return 1;
+}
+
+# Remain current parsed information into memory for subsequent use
 sub set_current_infos
 {
 
@@ -11353,6 +13073,22 @@ sub normalize_error
 	return $orig_query;
 }
 
+# Normalize pgbouncer error messages
+sub pgb_normalize_error
+{
+	my $orig_query = shift;
+
+	return if (!$orig_query);
+
+	# Replace changing parameter by ...
+	$orig_query =~ s/"[^"]*"/"..."/g;
+	$orig_query =~ s/'[^']*'/'...'/g;
+	$orig_query =~ s/\(.*\)/\(...\)/g;
+
+	# Need more normalization stuff here
+	return $orig_query;
+}
+
 sub average_per_minutes
 {
 	my $val = shift;
@@ -11387,7 +13123,7 @@ sub autodetect_format
 	my $nline  = 0;
 	my $fmt    = '';
 
-	localdie("FATAL: can't open file $file, $!\n") unless(open(TESTFILE, $file));
+	localdie("FATAL: when detecting binary file, can't open file $file, $!\n") unless(open(TESTFILE, $file));
 	my $fltf = <TESTFILE>;
 	close(TESTFILE);
 	# is file in binary format ?
@@ -11436,6 +13172,17 @@ sub autodetect_format
 			{
 				$fmt = 'stderr';
 				$nfound++;
+			} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*):/) {
+				# pgbouncer log file can be parsed with other postgresql file 
+				# so even if it is given at first position, set default format
+				# to stderr. Try to look for format at next file.
+				$fmt = autodetect_format($log_files[1]) if ($#log_files >= 1);
+				# If we just have one single pgbouncer file, force pgbouncer_only to 1
+				if ($#log_files == 0) {
+					$pgbouncer_only = 1;
+					$fmt = 'stderr';
+				}
+				$nfound++ if ($fmt);
 			}
 			last if (($nfound > 10) || ($nline > 5000));
 		}
@@ -11743,58 +13490,58 @@ sub build_log_line_prefix_regex
 		my ($query, $remove_white_tokens) = @_;
 
 		my $re = qr{
-        (
-                (?:--)[\ \t\S]*      # single line comments
-                |
-                (?:\-\|\-) # range operator "is adjacent to"
-                |
-                (?:\->>|\->|\#>>|\#>|\?\&|\?)  # Json Operators
-                |
-                (?:\#<=|\#>=|\#<>|\#<|\#=) # compares tinterval and reltime
-                |
-                (?:>>=|<<=) # inet operators
-                |
-                (?:!!|\@\@\@) # deprecated factorial and full text search  operators
-                |
-                (?:\|\|\/|\|\/) # square root and cube root
-                |
-                (?:\@\-\@|\@\@|\#\#|<\->|<<\||\|>>|\&<\||\&<|\|\&>|\&>|<\^|>\^|\?\#|\#|\?<\||\?\-\||\?\-|\?\|\||\?\||\@>|<\@|\~=)
-                                 # Geometric Operators
-                |
-                (?:~<=~|~>=~|~>~|~<~) # string comparison for pattern matching operator families
-                |
-                (?:!~~|!~~\*|~~\*|~~) # LIKE operators
-                |
-                (?:!~\*|!~|~\*) # regular expression operators
-                |
-                (?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
-                |
-                (?:<>|<=>|>=|<=|==|!=|=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
-                |
-                [\[\]\(\),;.]            # punctuation (parenthesis, comma)
-                |
-                \'\'(?!\')              # empty single quoted string
-                |
-                \"\"(?!\"")             # empty double quoted string
-                |
-                "(?>(?:(?>[^"\\]+)|""|\\.)*)+" # anything inside double quotes, ungreedy
-                |
-                `(?>(?:(?>[^`\\]+)|``|\\.)*)+` # anything inside backticks quotes, ungreedy
-                |
-                '(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything inside single quotes, ungreedy.
-                |
-                /\*[\ \t\r\n\S]*?\*/      # C style comments
-                |
-                (?:[\w:@]+(?:\.(?:\w+|\*)?)*) # words, standard named placeholders, db.table.*, db.*
-                |
-                (?:\$\w+\$)
-                |
-                (?: \$_\$ | \$\d+ | \${1,2} | \$\w+\$ ) # dollar expressions - eg $_$ $3 $$ $BODY$
-                |
-                \n                      # newline
-                |
-                [\t\ ]+                 # any kind of white spaces
-        )
+	(
+		(?:--)[\ \t\S]*      # single line comments
+		|
+		(?:\-\|\-) # range operator "is adjacent to"
+		|
+		(?:\->>|\->|\#>>|\#>|\?\&|\?)  # Json Operators
+		|
+		(?:\#<=|\#>=|\#<>|\#<|\#=) # compares tinterval and reltime
+		|
+		(?:>>=|<<=) # inet operators
+		|
+		(?:!!|\@\@\@) # deprecated factorial and full text search  operators
+		|
+		(?:\|\|\/|\|\/) # square root and cube root
+		|
+		(?:\@\-\@|\@\@|\#\#|<\->|<<\||\|>>|\&<\||\&<|\|\&>|\&>|<\^|>\^|\?\#|\#|\?<\||\?\-\||\?\-|\?\|\||\?\||\@>|<\@|\~=)
+				 # Geometric Operators
+		|
+		(?:~<=~|~>=~|~>~|~<~) # string comparison for pattern matching operator families
+		|
+		(?:!~~|!~~\*|~~\*|~~) # LIKE operators
+		|
+		(?:!~\*|!~|~\*) # regular expression operators
+		|
+		(?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
+		|
+		(?:<>|<=>|>=|<=|==|!=|=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
+		|
+		[\[\]\(\),;.]            # punctuation (parenthesis, comma)
+		|
+		\'\'(?!\')              # empty single quoted string
+		|
+		\"\"(?!\"")             # empty double quoted string
+		|
+		"(?>(?:(?>[^"\\]+)|""|\\.)*)+" # anything inside double quotes, ungreedy
+		|
+		`(?>(?:(?>[^`\\]+)|``|\\.)*)+` # anything inside backticks quotes, ungreedy
+		|
+		'(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything inside single quotes, ungreedy.
+		|
+		/\*[\ \t\r\n\S]*?\*/      # C style comments
+		|
+		(?:[\w:@]+(?:\.(?:\w+|\*)?)*) # words, standard named placeholders, db.table.*, db.*
+		|
+		(?:\$\w+\$)
+		|
+		(?: \$_\$ | \$\d+ | \${1,2} | \$\w+\$ ) # dollar expressions - eg $_$ $3 $$ $BODY$
+		|
+		\n                      # newline
+		|
+		[\t\ ]+                 # any kind of white spaces
+	)
 }smx;
 
 		my @query = ();
