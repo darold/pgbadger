@@ -4630,7 +4630,7 @@ sub html_header
 };
 		if (!$disable_hourly) {
 			print $fh qq{
-     				<li><a href="#pgbsql-traffic">Request Troughput</a></li>
+     				<li><a href="#pgbsql-traffic">Request Throughput</a></li>
      				<li><a href="#pgbbytes-traffic">Bytes I/O Throughput</a></li>
      				<li><a href="#pgbduration-traffic">Queries Average duration</a></li>
 				<li class="divider"></li>
@@ -5301,7 +5301,7 @@ sub print_pgbouncer_stats
 
 	print $fh qq{
 	<div id="pgbsql-traffic" class="analysis-item row-fluid">
-		<h2 class=""><i class="icon-road"></i> Request Troughput</h2>
+		<h2 class=""><i class="icon-road"></i> Request Throughput</h2>
 		<div class="span3">
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
