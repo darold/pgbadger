@@ -3045,9 +3045,7 @@ sub detect_pgbouncer_log
 
 	# Compressed files do not allow seeking
 	if ($iscompressed) {
-		close($lfile);
-		return (1, "log file is compressed");
-		
+		$look_at_beginning = 1;	
 	}
 
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
@@ -3081,8 +3079,11 @@ sub detect_pgbouncer_log
 			}
 		}
 		next if (!$prefix_vars{'t_timestamp'});
+		if ($iscompressed) {
+			close($lfile);
+			return ($ispgbouncerlog, 0, "log file is compressed start at offset 0");
 		# This file has already been parsed
-		if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+		} elsif ($saved_date gt $prefix_vars{'t_timestamp'}) {
 			close($lfile);
 			return ($ispgbouncerlog, 0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
 		} else {
