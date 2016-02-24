@@ -141,6 +141,7 @@ Options:
                              the same time.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
+    --pgbouncer-only       : only show pgbouncer related menu in the header.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -306,6 +307,24 @@ There are also some pie charts about distribution of:
 
 All charts are zoomable and can be saved as PNG images. SQL queries reported are
 highlighted and beautified automatically.
+
+pgBadger is also able to parse pgbouncer log files and to create the following
+reports:
+
+	Request Throughput
+	Bytes I/O Throughput
+	Queries Average duration
+	Simultaneous sessions
+	Histogram of sessions times
+	Sessions per database
+	Sessions per user
+	Sessions per host
+	Established connections
+	Connections per database
+	Connections per user
+	Connections per host
+	Most used reserved pools
+	Most Frequent Errors/Events
 
 You can also have incremental reports with one report per day and a cumulative
 report per week. Two multiprocess modes are available to speed up log parsing,

@@ -1,3 +1,48 @@
+2016-02-22 version 8.0 
+
+This is a major release that adds support to pgbouncer log files.
+New pgbouncer reports are:
+
+  * Request Throughput
+  * Bytes I/O Throughput
+  * Queries Average duration
+  * Simultaneous sessions
+  * Histogram of sessions times
+  * Sessions per database
+  * Sessions per user
+  * Sessions per host
+  * Established connections
+  * Connections per database
+  * Connections per user
+  * Connections per host
+  * Most used reserved pools
+  * Most Frequent Errors/Events
+
+pgbouncer log files can be parsed together with PostgreSQL logs.
+
+It also adds a two new command line options:
+
+  * --pgbouncer-only to only show pgbouncer related reports.
+  * --rebuild to be able to rebuild all html reports in incremental
+    output directory where binary data files are still available.
+
+This release fixes a major bug introduced with journalctl code that
+was prevented the use of multiprocess feature.
+
+Here the complete list of other changes:
+
+  - Fix progress bar with pgbouncer (only events are increased).
+  - Sort %SYMBOLE hashtable for remove "!=" / "=" bug. Thanks to
+    Nicolas Gollet for the patch.
+  - Fix incorrect numbers on positional parameters in report Queries
+    generating most temporary files. Thanks to Oskar Wiksten for the
+    report.
+  - Update operators list in SQL code beautifier with last update in
+    pgFormatter. Thanks to Laurenz Albe for the report and the list
+    of missing operators.
+  - Cosmetic change to code and add some more debug information.
+
+
 2016-01-18 version 7.3 
 
 This is a maintenance release to fix a major bug that was breaking
