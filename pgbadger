@@ -13682,6 +13682,8 @@ sub build_log_line_prefix_regex
 		|
 		[\[\]\(\),;.]            # punctuation (parenthesis, comma)
 		|
+		E\'\'(?!\')              # empty escaped single quoted string
+		|
 		\'\'(?!\')              # empty single quoted string
 		|
 		\"\"(?!\"")             # empty double quoted string
@@ -13689,6 +13691,8 @@ sub build_log_line_prefix_regex
 		"(?>(?:(?>[^"\\]+)|""|\\.)*)+" # anything inside double quotes, ungreedy
 		|
 		`(?>(?:(?>[^`\\]+)|``|\\.)*)+` # anything inside backticks quotes, ungreedy
+		|
+		E'(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything escaped inside single quotes, ungreedy.
 		|
 		'(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything inside single quotes, ungreedy.
 		|
