@@ -29,7 +29,7 @@ $VERSION = '1.0';
 my $PSQL_BIN     = 'psql';
 my $TMP_DIR      = File::Spec->tmpdir() || '/tmp';
 
-my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY TO', 'CTE', 'DDL', 'TCL');
 
 # Where statistics are stored in pgbadger binary files
 my %overall_stat        = ();

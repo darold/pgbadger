@@ -61,7 +61,7 @@ my @tempfiles    = ();
 my $parent_pid   = $$;
 my $interrupt    = 0;
 my $tmp_last_parsed = '';
-my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY TO', 'CTE', 'DDL', 'TCL');
 my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="jqplot-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
@@ -789,7 +789,7 @@ my $regex_prefix_dbclient = qr/(?:client|remote)=([^,]*)/;
 my $regex_prefix_dbappname = qr/app=([^,]*)/;
 
 # Set pattern to look for query type
-my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY)/is;
+my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
 
 
 # Loading excluded query from file if any
@@ -4873,6 +4873,8 @@ sub print_general_activity
 		my $zday = "$abbr_month{$1} $2";
 		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$d}}) {
 			my %cur_period_info = ();
+			my $read_average_duration = 0;
+			my $read_average_count = 0;
 			my $write_average_duration = 0;
 			my $write_average_count = 0;
 			my %all_query_duration=();
@@ -4896,12 +4898,18 @@ sub print_general_activity
 			$cur_period_info{average} = $cur_period_info{duration} / ($cur_period_info{count} || 1);
 			$cur_period_info{'SELECT'}{average} = $cur_period_info{'SELECT'}{duration} / ($cur_period_info{'SELECT'}{count} || 1);
 
+			$read_average_duration = ($cur_period_info{'SELECT'}{duration} +
+					$cur_period_info{'COPY TO'}{duration});
+			$read_average_count = ($cur_period_info{'SELECT'}{count} +
+					$cur_period_info{'COPY TO'}{count});
 			$write_average_duration = ($cur_period_info{'INSERT'}{duration} +
 					$cur_period_info{'UPDATE'}{duration} +
-					$cur_period_info{'DELETE'}{duration});
+					$cur_period_info{'DELETE'}{duration} +
+					$cur_period_info{'COPY FROM'}{duration});
 			$write_average_count = ($cur_period_info{'INSERT'}{count} +
 					$cur_period_info{'UPDATE'}{count} +
-					$cur_period_info{'DELETE'}{count});
+					$cur_period_info{'DELETE'}{count} +
+					$cur_period_info{'COPY FROM'}{count});
 			$zday = "&nbsp;" if ($c > 1);
 			$c++;
 
@@ -4909,21 +4917,21 @@ sub print_general_activity
 			my $min = &convert_time($cur_period_info{min});
 			my $max = &convert_time($cur_period_info{max});
 			my $average = &convert_time($cur_period_info{average});
-                        my %percentile =  ();
+			my %percentile =  ();
 			foreach my $lp (@LATENCY_PERCENTILE) {
-		 		$cur_period_info{$lp}{percentileindex} = int(@{$all_query_duration{'query'}} * $lp / 100) ;
-                        	@{$all_query_duration{'query'}}= sort{ $a <=> $b } @{$all_query_duration{'query'}};
-                        	$cur_period_info{$lp}{percentile} = $all_query_duration{'query'}[$cur_period_info{$lp}{percentileindex}];
+				$cur_period_info{$lp}{percentileindex} = int(@{$all_query_duration{'query'}} * $lp / 100) ;
+				@{$all_query_duration{'query'}}= sort{ $a <=> $b } @{$all_query_duration{'query'}};
+				$cur_period_info{$lp}{percentile} = $all_query_duration{'query'}[$cur_period_info{$lp}{percentileindex}];
 				$percentile{$lp} =  &convert_time($cur_period_info{$lp}{percentile});
 
-                        	$cur_period_info{'SELECT'}{$lp}{percentileindex} = int(@{$all_query_duration{'SELECT'}} * $lp / 100) ;
-                        	@{$all_query_duration{'SELECT'}}= sort{ $a <=> $b } @{$all_query_duration{'SELECT'}};
-                        	$cur_period_info{'SELECT'}{$lp}{percentile} = $all_query_duration{'SELECT'}[$cur_period_info{'SELECT'}{$lp}{percentileindex}];
-				$percentile{'SELECT'}{$lp} =  &convert_time($cur_period_info{'SELECT'}{$lp}{percentile});
+				@{$all_query_duration{'READ'}}= sort{ $a <=> $b } (@{$all_query_duration{'SELECT'}}, @{$all_query_duration{'COPY TO'}});
+				$cur_period_info{'READ'}{$lp}{percentileindex} = int(@{$all_query_duration{'READ'}} * $lp / 100) ;
+				$cur_period_info{'READ'}{$lp}{percentile} = $all_query_duration{'READ'}[$cur_period_info{'READ'}{$lp}{percentileindex}];
+				$percentile{'READ'}{$lp} =  &convert_time($cur_period_info{'READ'}{$lp}{percentile});
 
-				@{$all_query_duration{'WRITE'}}=  sort{ $a <=> $b } (@{$all_query_duration{'INSERT'}},@{$all_query_duration{'UPDATE'}},@{$all_query_duration{'DELETE'}});
-                        	$cur_period_info{'WRITE'}{$lp}{percentileindex} = int(@{$all_query_duration{'WRITE'}} * $lp / 100) ;
-                        	$cur_period_info{'WRITE'}{$lp}{percentile} = $all_query_duration{'WRITE'}[$cur_period_info{'WRITE'}{$lp}{percentileindex}];
+				@{$all_query_duration{'WRITE'}}=  sort{ $a <=> $b } (@{$all_query_duration{'INSERT'}},@{$all_query_duration{'UPDATE'}},@{$all_query_duration{'DELETE'}},@{$all_query_duration{'COPY FROM'}});
+				$cur_period_info{'WRITE'}{$lp}{percentileindex} = int(@{$all_query_duration{'WRITE'}} * $lp / 100) ;
+				$cur_period_info{'WRITE'}{$lp}{percentile} = $all_query_duration{'WRITE'}[$cur_period_info{'WRITE'}{$lp}{percentileindex}];
 				$percentile{'WRITE'}{$lp} =  &convert_time($cur_period_info{'WRITE'}{$lp}{percentile});	
 			}
 			$queries .= qq{
@@ -4941,22 +4949,25 @@ sub print_general_activity
 			$queries .= qq{
 					</tr>};
 			$count = &comma_numbers($cur_period_info{'SELECT'}{count});
-			$average = &convert_time($cur_period_info{'SELECT'}{average});
+			my $copyto_count = &comma_numbers($cur_period_info{'COPY TO'}{count});
+			$average = &convert_time($read_average_duration / ($read_average_count || 1));
 			$select_queries .= qq{
 					<tr>
 						<td>$zday</td>
 						<td>$h</td>
 						<td>$count</td>
+						<td>$copyto_count</td>
 						<td>$average</td>
 };
 			foreach my $lp (@LATENCY_PERCENTILE) {
-				$select_queries .= "<td>$percentile{'SELECT'}{$lp}</td>\n";
+				$select_queries .= "<td>$percentile{'READ'}{$lp}</td>\n";
 			}
 			$select_queries .= qq{
 					</tr>};
 			my $insert_count = &comma_numbers($cur_period_info{'INSERT'}{count});
 			my $update_count = &comma_numbers($cur_period_info{'UPDATE'}{count});
 			my $delete_count = &comma_numbers($cur_period_info{'DELETE'}{count});
+			my $copyfrom_count = &comma_numbers($cur_period_info{'COPY FROM'}{count});
 			my $write_average = &convert_time($write_average_duration / ($write_average_count || 1));
 			$write_queries .= qq{
 					<tr>
@@ -4965,6 +4976,7 @@ sub print_general_activity
 						<td>$insert_count</td>
 						<td>$update_count</td>
 						<td>$delete_count</td>
+						<td>$copyfrom_count</td>
 						<td>$write_average</td>} ;
 			foreach my $lp (@LATENCY_PERCENTILE) {
 				$write_queries .= "<td>$percentile{'WRITE'}{$lp}</td>\n";
@@ -5021,7 +5033,7 @@ sub print_general_activity
 	<div class="span11 tabbable tabs-left">
 		<ul class="nav nav-tabs">
 			<li class="active"><a href="#general-activity-queries" data-toggle="tab">Queries</a></li>
-		    <li><a href="#general-activity-select-queries" data-toggle="tab">SELECT Queries</a></li>
+		    <li><a href="#general-activity-select-queries" data-toggle="tab">Read Queries</a></li>
 			<li><a href="#general-activity-write-queries" data-toggle="tab">Write Queries</a></li>
 			<li><a href="#general-activity-prepared-queries" data-toggle="tab">Prepared Queries</a></li>
 			<li><a href="#general-activity-connections" data-toggle="tab">Connections</a></li>
@@ -5053,7 +5065,8 @@ sub print_general_activity
 						<tr>
 							<th>Day</th>
 							<th>Hour</th>
-							<th>Count</th>
+							<th>SELECT</th>
+							<th>COPY TO</th>
 							<th>Average Duration</th>
 							<th>Latency Percentile(90)</th>
 							<th>Latency Percentile(95)</th>
@@ -5073,6 +5086,7 @@ sub print_general_activity
 							<th>INSERT</th>
 							<th>UPDATE</th>
 							<th>DELETE</th>
+							<th>COPY FROM</th>
 							<th>Average Duration</th>
 							<th>Latency Percentile(90)</th>
 							<th>Latency Percentile(95)</th>
@@ -11008,14 +11022,10 @@ sub load_stats
 	$overall_stat{errors_number} += $_overall_stat{errors_number};
 	$overall_stat{queries_duration} += $_overall_stat{queries_duration};
 
-	$overall_stat{DELETE} += $_overall_stat{DELETE}
-		if exists $_overall_stat{DELETE};
-	$overall_stat{UPDATE} += $_overall_stat{UPDATE}
-		if exists $_overall_stat{UPDATE};
-	$overall_stat{INSERT} += $_overall_stat{INSERT}
-		if exists $_overall_stat{INSERT};
-	$overall_stat{SELECT} += $_overall_stat{SELECT}
-		if exists $_overall_stat{SELECT};
+	foreach my $a (@SQL_ACTION) {
+		$overall_stat{$a} += $_overall_stat{$a}
+		if exists $_overall_stat{$a};
+	}
 
 	$overall_checkpoint{checkpoint_warning} += $_overall_checkpoint{checkpoint_warning};
 	$overall_checkpoint{checkpoint_write} = $_overall_checkpoint{checkpoint_write}
@@ -13034,9 +13044,15 @@ sub store_queries
 				$action = uc($1);
 				# If this is a copy statement try to find if this is a write or read statement
 				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/is))) {
-					$action = 'INSERT';
+					$action = 'COPY FROM';
 				} elsif ($action eq 'COPY') {
-					$action = 'SELECT';
+					$action = 'COPY TO';
+				} elsif ($action eq 'WITH') {
+					$action = 'CTE';
+				} elsif ($action eq 'CREATE' || $action eq 'DROP' || $action eq 'ALTER' || $action eq 'TRUNCATE') {
+					$action = 'DDL';
+				} elsif ($action eq 'BEGIN' || $action eq 'COMMIT' || $action eq 'ROLLBACK' || $action eq 'START' || $action eq 'END' || $action eq 'SAVEPOINT') {
+					$action = 'TCL';
 				}
 			} else {
 				$action = 'OTHERS';
