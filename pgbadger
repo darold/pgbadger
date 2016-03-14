@@ -12578,7 +12578,7 @@ sub parse_pgbouncer
 
 	} elsif ($prefix_vars{'t_loglevel'} =~ $main_error_regex) {
 
-		if ($prefix_vars{'t_loglevel'} eq 'WARNING') {
+		if (($prefix_vars{'t_loglevel'} eq 'WARNING') || ($prefix_vars{'t_loglevel'} eq 'ERROR')) {
 
 			if ($prefix_vars{'t_query'} =~ /dropping database '([^']+)' as it does not exist anymore/) {
 				$prefix_vars{t_dbname} = $1;
@@ -12588,6 +12588,8 @@ sub parse_pgbouncer
 				$prefix_vars{t_dbuser} = $3;
 				$prefix_vars{t_dbclient} = $4;
 				$prefix_vars{t_session_id} = $1;
+			} else {
+				$prefix_vars{'t_query'} =~ s/^S: //;
 			}
 
 			# Add log level at beginning of the query and normalize it
@@ -12622,7 +12624,6 @@ sub parse_pgbouncer
 				$pgb_pool_info{$pool}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 				$pgb_pool_info{$pool}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$prefix_vars{t_min}}++;
 			}
-
 
 		} else {
 			print STDERR "UNPARSED LOG LEVEL: $prefix_vars{'t_loglevel'} => $prefix_vars{'t_query'}\n";
