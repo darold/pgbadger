@@ -24,7 +24,7 @@ use IO::File;
 use IO::Handle;
 use Storable qw(store_fd fd_retrieve);
 
-$VERSION = '1.0';
+$VERSION = '2.0';
 
 my $PSQL_BIN     = 'psql';
 my $TMP_DIR      = File::Spec->tmpdir() || '/tmp';
@@ -33,20 +33,26 @@ my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY T
 
 # Where statistics are stored in pgbadger binary files
 my %overall_stat        = ();
+my %pgb_overall_stat    = ();
 my %overall_checkpoint  = ();
 my @top_slowest         = ();
 my %normalyzed_info     = ();
 my %error_info          = ();
+my %pgb_error_info      = ();
 my %logs_type           = ();
 my %per_minute_info     = ();
+my %pgb_per_minute_info = ();
+my %pgb_pool_info       = ();
 my %lock_info           = ();
 my %tempfile_info       = ();
 my %connection_info     = ();
+my %pgb_connection_info = ();
 my %database_info       = ();
 my %application_info    = ();
 my %user_info           = ();
 my %host_info           = ();
 my %session_info        = ();
+my %pgb_session_info    = ();
 my %conn_received       = ();
 my %checkpoint_info     = ();
 my %autovacuum_info     = ();
@@ -345,22 +351,31 @@ sub load_stats
 
 	my $fd = shift;
 
+	no strict;
+
 	my %stats = %{ fd_retrieve($fd) };
 	my %_overall_stat = %{$stats{overall_stat}};
+	my %_pgb_overall_stat = %{$stats{pgb_overall_stat}};
 	my %_overall_checkpoint = %{$stats{overall_checkpoint}};
 	my %_normalyzed_info = %{$stats{normalyzed_info}};
 	my %_error_info = %{$stats{error_info}};
+	my %_pgb_error_info = %{$stats{pgb_error_info}};
+	my %_pgb_pool_info = %{$stats{pgb_pool_info}};
 	my %_connection_info = %{$stats{connection_info}};
+	my %_pgb_connection_info = %{$stats{pgb_connection_info}};
 	my %_database_info = %{$stats{database_info}};
 	my %_application_info = %{$stats{application_info}};
 	my %_user_info = %{$stats{user_info}};
 	my %_host_info = %{$stats{host_info}};
 	my %_checkpoint_info = %{$stats{checkpoint_info}};
 	my %_session_info = %{$stats{session_info}};
+	my %_pgb_session_info = %{$stats{pgb_session_info}};
 	my %_tempfile_info = %{$stats{tempfile_info}};
+	my %_cancelled_info = %{$stats{cancelled_info}};
 	my %_logs_type = %{$stats{logs_type}};
 	my %_lock_info = %{$stats{lock_info}};
 	my %_per_minute_info = %{$stats{per_minute_info}};
+	my %_pgb_per_minute_info = %{$stats{pgb_per_minute_info}};
 	my @_top_slowest = @{$stats{top_slowest}};
 	my $_nlines = $stats{nlines};
 	my $_first_log_timestamp = $stats{first_log_timestamp};
@@ -370,6 +385,7 @@ sub load_stats
 	my %_autoanalyze_info = %{$stats{autoanalyze_info}};
 	my @_top_locked_info = @{$stats{top_locked_info}};
 	my @_top_tempfile_info = @{$stats{top_tempfile_info}};
+	my @_top_cancelled_info = @{$stats{top_cancelled_info}};
 
 	### overall_stat ###
 
@@ -398,14 +414,10 @@ sub load_stats
 	$overall_stat{errors_number} += $_overall_stat{errors_number};
 	$overall_stat{queries_duration} += $_overall_stat{queries_duration};
 
-	$overall_stat{DELETE} += $_overall_stat{DELETE}
-		if exists $_overall_stat{DELETE};
-	$overall_stat{UPDATE} += $_overall_stat{UPDATE}
-		if exists $_overall_stat{UPDATE};
-	$overall_stat{INSERT} += $_overall_stat{INSERT}
-		if exists $_overall_stat{INSERT};
-	$overall_stat{SELECT} += $_overall_stat{SELECT}
-		if exists $_overall_stat{SELECT};
+	foreach my $a (@SQL_ACTION) {
+		$overall_stat{$a} += $_overall_stat{$a}
+		if exists $_overall_stat{$a};
+	}
 
 	$overall_checkpoint{checkpoint_warning} += $_overall_checkpoint{checkpoint_warning};
 	$overall_checkpoint{checkpoint_write} = $_overall_checkpoint{checkpoint_write}
@@ -420,12 +432,19 @@ sub load_stats
 		$overall_stat{peak}{$k}{session} += $_overall_stat{peak}{$k}{session};
 		$overall_stat{peak}{$k}{tempfile_size} += $_overall_stat{peak}{$k}{tempfile_size};
 		$overall_stat{peak}{$k}{tempfile_count} += $_overall_stat{peak}{$k}{tempfile_count};
+		$overall_stat{peak}{$k}{cancelled_size} += $_overall_stat{peak}{$k}{cancelled_size};
+		$overall_stat{peak}{$k}{cancelled_count} += $_overall_stat{peak}{$k}{cancelled_count};
 	}
 
 	foreach my $k (keys %{$_overall_stat{histogram}{query_time}}) {
 		$overall_stat{histogram}{query_time}{$k} += $_overall_stat{histogram}{query_time}{$k};
 	}
-	$overall_stat{histogram}{total} += $_overall_stat{histogram}{total};
+	$overall_stat{histogram}{query_total} += $_overall_stat{histogram}{total};
+	$overall_stat{histogram}{query_total} += $_overall_stat{histogram}{query_total};
+	foreach my $k (keys %{$_overall_stat{histogram}{session_time}}) {
+		$overall_stat{histogram}{session_time}{$k} += $_overall_stat{histogram}{session_time}{$k};
+	}
+	$overall_stat{histogram}{session_total} += $_overall_stat{histogram}{session_total};
 
 	foreach my $k ('prepare', 'bind','execute') {
 		$overall_stat{$k} += $_overall_stat{$k};
@@ -436,7 +455,25 @@ sub load_stats
 		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
 	}
 
+	### pgbouncer related overall stats ###
+	foreach my $k (keys %{$_pgb_overall_stat{peak}}) {
+		$pgb_overall_stat{peak}{$k}{connection} += $_pgb_overall_stat{peak}{$k}{connection};
+		$pgb_overall_stat{peak}{$k}{session} += $_pgb_overall_stat{peak}{$k}{session};
+		$pgb_overall_stat{peak}{$k}{t_req} += $_pgb_overall_stat{peak}{$k}{t_req};
+		$pgb_overall_stat{peak}{$k}{t_inbytes} += $_pgb_overall_stat{peak}{$k}{t_inbytes};
+		$pgb_overall_stat{peak}{$k}{t_outbytes} += $_pgb_overall_stat{peak}{$k}{t_outbytes};
+		$pgb_overall_stat{peak}{$k}{t_avgduration} += $_pgb_overall_stat{peak}{$k}{t_avgduration};
+	}
+
+	foreach my $k (keys %{$_pgb_overall_stat{histogram}{session_time}}) {
+		$pgb_overall_stat{histogram}{session_time}{$k} += $_pgb_overall_stat{histogram}{session_time}{$k};
+	}
+	$pgb_overall_stat{histogram}{session_total} += $_pgb_overall_stat{histogram}{session_total};
+
+	$pgb_overall_stat{errors_number} += $_pgb_overall_stat{errors_number};
+
 	### Logs level ###
+
 	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
 		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
 	}
@@ -501,14 +538,66 @@ sub load_stats
 
 			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count}
 
+###############################################################################
+# May be used in the future to display more detailed information on connection
+#
+#			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database} }) {
+#				$connection_info{chronos}{$day}{$hour}{database}{$db} += $_connection_info{chronos}{$day}{$hour}{database}{$db};
+#			}
+#
+#			foreach my $db (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user} }) {
+#				foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{database_user}{$db} }) {
+#					$connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user} +=
+#						$_connection_info{chronos}{$day}{$hour}{database_user}{$db}{$user};
+#				}
+#			}
+#
+#			foreach my $user (keys %{ $_connection_info{chronos}{$day}{$hour}{user} }) {
+#				$connection_info{chronos}{$day}{$hour}{user}{$user} +=
+#					$_connection_info{chronos}{$day}{$hour}{user}{$user};
+#			}
+#
+#			foreach my $host (keys %{ $_connection_info{chronos}{$day}{$hour}{host} }) {
+#				$connection_info{chronos}{$day}{$hour}{host}{$host} +=
+#					$_connection_info{chronos}{$day}{$hour}{host}{$host};
+#			}
+###############################################################################
 		}
 	}
 
-        ### log_files ###
+	### pgbouncer connection_info ###
 
-        foreach my $f (@_log_files) {
-                push(@log_files, $f) if (!grep(m#^$f$#, @_log_files));
-        }
+	foreach my $db (keys %{ $_pgb_connection_info{database} }) {
+		$pgb_connection_info{database}{$db} += $_pgb_connection_info{database}{$db};
+	}
+
+	foreach my $db (keys %{ $_pgb_connection_info{database_user} }) {
+		foreach my $user (keys %{ $_pgb_connection_info{database_user}{$db} }) {
+			$pgb_connection_info{database_user}{$db}{$user} += $_pgb_connection_info{database_user}{$db}{$user};
+		}
+	}
+
+	foreach my $user (keys %{ $_pgb_connection_info{user} }) {
+		$pgb_connection_info{user}{$user} += $_pgb_connection_info{user}{$user};
+	}
+
+	foreach my $host (keys %{ $_pgb_connection_info{host} }) {
+		$pgb_connection_info{host}{$host} += $_pgb_connection_info{host}{$host};
+	}
+
+	$pgb_connection_info{count} += $_pgb_connection_info{count};
+
+	foreach my $day (keys %{ $_pgb_connection_info{chronos} }) {
+		foreach my $hour (keys %{ $_pgb_connection_info{chronos}{$day} }) {
+			$pgb_connection_info{chronos}{$day}{$hour}{count} += $_pgb_connection_info{chronos}{$day}{$hour}{count}
+		}
+	}
+
+	### log_files ###
+
+	foreach my $f (@_log_files) {
+		push(@log_files, $f) if (!grep(m#^$f$#, @_log_files));
+	}
 
 	### error_info ###
 
@@ -535,6 +624,43 @@ sub load_stats
 									$_error_info{$q}{app}[$i],
 									$_error_info{$q}{remote}[$i]
 									);
+		}
+	}
+
+	### pgbouncer error_info ###
+
+	foreach my $q (keys %_pgb_error_info) {
+		$pgb_error_info{$q}{count} += $_pgb_error_info{$q}{count};
+		foreach my $day (keys %{ $_pgb_error_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_pgb_error_info{$q}{chronos}{$day}}) {
+				$pgb_error_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{count};
+				foreach my $min (keys %{$_pgb_error_info{$q}{chronos}{$day}{$hour}{min}}) {
+					$pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min};
+				}
+			}
+		}
+		for (my $i = 0; $i <= $#{$_pgb_error_info{$q}{date}}; $i++) {
+			&pgb_set_top_error_sample(	$q, 
+									$_pgb_error_info{$q}{date}[$i], 
+									$_pgb_error_info{$q}{error}[$i],
+									$_pgb_error_info{$q}{db}[$i],
+									$_pgb_error_info{$q}{user}[$i],
+									$_pgb_error_info{$q}{remote}[$i]
+									);
+		}
+	}
+
+	### pgbouncer pool_info ###
+
+	foreach my $q (keys %_pgb_pool_info) {
+		$pgb_pool_info{$q}{count} += $_pgb_pool_info{$q}{count};
+		foreach my $day (keys %{ $_pgb_pool_info{$q}{chronos} }) {
+			foreach my $hour (keys %{$_pgb_pool_info{$q}{chronos}{$day}}) {
+				$pgb_pool_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{count};
+				foreach my $min (keys %{$_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}}) {
+					$pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min};
+				}
+			}
 		}
 	}
 
@@ -566,13 +692,12 @@ sub load_stats
 						($_per_minute_info{$day}{$hour}{$min}{query}{second}{$sec} || 0);
 				}
 				foreach my $action (@SQL_ACTION) {
-					if (exists $_per_minute_info{$day}{$hour}{$min}{$action}) {
-						$per_minute_info{$day}{$hour}{$min}{$action}{count} += $_per_minute_info{$day}{$hour}{$min}{$action}{count};
-						$per_minute_info{$day}{$hour}{$min}{$action}{duration} += $_per_minute_info{$day}{$hour}{$min}{$action}{duration};
-						foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
-							$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
-								($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
-						}
+					next if (!exists $_per_minute_info{$day}{$hour}{$min}{$action});
+					$per_minute_info{$day}{$hour}{$min}{$action}{count} += ($_per_minute_info{$day}{$hour}{$min}{$action}{count} || 0);
+					$per_minute_info{$day}{$hour}{$min}{$action}{duration} += ($_per_minute_info{$day}{$hour}{$min}{$action}{duration} || 0);
+					foreach my $sec (keys %{ $_per_minute_info{$day}{$hour}{$min}{$action}{second} }) {
+						$per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} +=
+							($_per_minute_info{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
 					}
 				}
 				foreach my $k ('prepare', 'bind','execute') {
@@ -580,7 +705,13 @@ sub load_stats
 						$per_minute_info{$day}{$hour}{$min}{$k} += $_per_minute_info{$day}{$hour}{$min}{$k};
 					}
 				}
+				foreach my $log (keys %{ $_per_minute_info{$day}{$hour}{$min}{log_level} }) {
+					$per_minute_info{$day}{$hour}{$min}{log_level}{$log} +=
+						($_per_minute_info{$day}{$hour}{$min}{log_level}{$log} || 0);
+				}
 
+				$per_minute_info{$day}{$hour}{$min}{cancelled}{count} += $_per_minute_info{$day}{$hour}{$min}{cancelled}{count}
+						if defined $_per_minute_info{$day}{$hour}{$min}{cancelled}{count};
 				$per_minute_info{$day}{$hour}{$min}{tempfile}{count} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{count}
 						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{count};
 				$per_minute_info{$day}{$hour}{$min}{tempfile}{size} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{size}
@@ -600,6 +731,27 @@ sub load_stats
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest}
 					if ($_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} > $per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest});
+			}
+		}
+	}
+
+	### pgbouncer per_minute_info ###
+
+	foreach my $day (keys %_pgb_per_minute_info) {
+		foreach my $hour (keys %{ $_pgb_per_minute_info{$day} }) {
+			foreach my $min (keys %{ $_pgb_per_minute_info{$day}{$hour} }) {
+				$pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} +=
+					($_pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{session}{count} +=
+					($_pgb_per_minute_info{$day}{$hour}{$min}{session}{count} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_req} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_req} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_inbytes} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_inbytes} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_outbytes} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_outbytes} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} += 
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} || 0);
 			}
 		}
 	}
@@ -638,6 +790,15 @@ sub load_stats
 			foreach my $k (keys %{$_normalyzed_info{$stmt}{samples}{$dt}} ) {
 				$normalyzed_info{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$stmt}{samples}{$dt}{$k};
 			}
+		}
+
+		# Keep only the top N samples
+		my $i = 1;
+		foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$stmt}{samples}}) {
+			if ($i > $sample) {
+				delete $normalyzed_info{$stmt}{samples}{$k};
+			}
+			$i++;
 		}
 
 		$normalyzed_info{$stmt}{count} += $_normalyzed_info{$stmt}{count};
@@ -690,6 +851,21 @@ sub load_stats
 				$normalyzed_info{$stmt}{tempfiles}{maxsize} = $_normalyzed_info{$stmt}{tempfiles}{maxsize};
 			}
 		}
+
+		if (exists $_normalyzed_info{$stmt}{cancelled}) {
+			$normalyzed_info{$stmt}{cancelled}{count} += $_normalyzed_info{$stmt}{cancelled}{count};
+		}
+
+		foreach my $u (keys %{$_normalyzed_info{$stmt}{users}} ) {
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{users}{$u}} ) {
+				$normalyzed_info{$stmt}{users}{$u}{$k} += $_normalyzed_info{$stmt}{users}{$u}{$k};
+			}
+		}
+		foreach my $u (keys %{$_normalyzed_info{$stmt}{apps}} ) {
+			foreach my $k (keys %{$_normalyzed_info{$stmt}{apps}{$u}} ) {
+				$normalyzed_info{$stmt}{apps}{$u}{$k} += $_normalyzed_info{$stmt}{apps}{$u}{$k};
+			}
+		}
 	}
 
 	### session_info ###
@@ -718,6 +894,39 @@ sub load_stats
 	foreach my $host (keys %{ $_session_info{host}}) {
 		$session_info{host}{$host}{count}    += $_session_info{host}{$host}{count};
 		$session_info{host}{$host}{duration} += $_session_info{host}{$host}{duration};
+	}
+
+	foreach my $app (keys %{ $_session_info{app}}) {
+		$session_info{app}{$app}{count}    += $_session_info{app}{$app}{count};
+		$session_info{app}{$app}{duration} += $_session_info{app}{$app}{duration};
+	}
+
+	### pgbouncer session_info ###
+
+	foreach my $db (keys %{ $_pgb_session_info{database}}) {
+		$pgb_session_info{database}{$db}{count} += $_pgb_session_info{database}{$db}{count};
+		$pgb_session_info{database}{$db}{duration} += $_pgb_session_info{database}{$db}{duration};
+	}
+
+	$pgb_session_info{count} += $_pgb_session_info{count};
+
+	foreach my $day (keys %{ $_pgb_session_info{chronos}}) {
+		foreach my $hour (keys %{ $_pgb_session_info{chronos}{$day}}) {
+			$pgb_session_info{chronos}{$day}{$hour}{count} += $_pgb_session_info{chronos}{$day}{$hour}{count};
+			$pgb_session_info{chronos}{$day}{$hour}{duration} += $_pgb_session_info{chronos}{$day}{$hour}{duration};
+		}
+	}
+
+	foreach my $user (keys %{ $_pgb_session_info{user}}) {
+		$pgb_session_info{user}{$user}{count}    += $_pgb_session_info{user}{$user}{count};
+		$pgb_session_info{user}{$user}{duration} += $_pgb_session_info{user}{$user}{duration};
+	}
+
+	$pgb_session_info{duration} += $_pgb_session_info{duration};
+
+	foreach my $host (keys %{ $_pgb_session_info{host}}) {
+		$pgb_session_info{host}{$host}{count}    += $_pgb_session_info{host}{$host}{count};
+		$pgb_session_info{host}{$host}{duration} += $_pgb_session_info{host}{$host}{duration};
 	}
 
 	### tempfile_info ###
@@ -798,6 +1007,8 @@ sub load_stats
 		$autoanalyze_info{peak}{system_usage}{date} = $_autoanalyze_info{peak}{system_usage}{date};
 	}
 
+	use strict;
+ 
 	return;
 }
 

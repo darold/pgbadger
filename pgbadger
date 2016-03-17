@@ -4324,6 +4324,8 @@ sub show_error_as_text
 	foreach my $k (sort {$error_info{$b}{count} <=> $error_info{$a}{count}} keys %error_info) {
 		next if (!$error_info{$k}{count});
 		last if ($idx > $top);
+		last if (!$error_info{$k}{count});
+
 		if ($error_info{$k}{count} > 1) {
 			my $msg = $k;
 			$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
@@ -4355,7 +4357,7 @@ sub show_error_as_text
 				print $fh "\t\tDatabase: $error_info{$k}{db}[$i]\n" if ($error_info{$k}{db}[$i]);
 				$j++;
 			}
-		} else {
+		} elsif ($error_info{$k}{error}[0]) {
 			if (   ($error_info{$k}{error}[0] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
