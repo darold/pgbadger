@@ -1592,8 +1592,9 @@ $td = timediff($t2, $t1);
 $td = timediff($t2, $t0);
 &logmsg('DEBUG', "the total execution time took: " . timestr($td));
 
-# Remove pidfile
+# Remove pidfile and temporary file
 unlink("$PID_DIR/pgbadger.pid");
+unlink("$last_parsed.tmp") if (-e "$last_parsed.tmp");
 
 exit 0;
 
@@ -3589,7 +3590,7 @@ sub set_top_error_sample
 	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote) = @_;
 
 	# Stop when we have our number of samples
-	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}} < $sample)) {
+	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}}+1 < $sample)) {
 		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$q}{error}})) ) {
 			if ($anonymize) {
 				$context = &anonymize_query($context);
@@ -3920,6 +3921,7 @@ Report not supported by text format
 			my $k = $top_locked_queries[$i]->[0];
 			my $j = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				last if ($j > $sample);
 				my $ttl = $top_locked_info[$i]->[1] || '';
 				my $db = " - $normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
@@ -3981,6 +3983,7 @@ Report not supported by text format
 			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					last if ($j > $sample);
 					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
@@ -4037,6 +4040,7 @@ Report not supported by text format
 			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					last if ($j > $sample);
 					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
@@ -4106,16 +4110,17 @@ Report not supported by text format
 				. &convert_time($normalyzed_info{$k}{average})
 				. " - $q\n";
 			print $fh "--\n";
-			my $i = 1;
+			my $j = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				last if ($j > $sample);
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
 				$db .= ", bind query: yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
-				print $fh "\t- Example $i: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
-				$i++;
+				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", $normalyzed_info{$k}{samples}{$d}{query}, "\n";
+				$j++;
 			}
 			$idx++;
 		}
@@ -4145,6 +4150,7 @@ Report not supported by text format
 			print $fh "--\n";
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				last if ($i > $sample);
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
@@ -4182,6 +4188,7 @@ Report not supported by text format
 			print $fh "--\n";
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				last if ($i > $sample);
 				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
@@ -4245,7 +4252,7 @@ Report not supported by text format
 
 	# Show pgbouncer connection per database statistics
 	if (exists $pgb_connection_info{database}) {
-		print $fh "\n- pgBouncer sonnections per database -----------------------------------------\n\n";
+		print $fh "\n- pgBouncer connections per database -----------------------------------------\n\n";
 		print $fh "Database     User     Count\n";
 		foreach my $d (sort keys %{$pgb_connection_info{database}}) {
 			print $fh "$d - ", &comma_numbers($pgb_connection_info{database}{$d}), "\n";
@@ -4312,7 +4319,13 @@ Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
 	&show_error_as_text();
 
 	print $fh "\n\n";
+
+	&show_pgb_error_as_text();
+
+	print $fh "\n\n";
+
 	print $fh "Report generated by pgBadger $VERSION ($project_url).\n";
+
 }
 
 sub show_error_as_text
@@ -4326,18 +4339,20 @@ sub show_error_as_text
 		last if ($idx > $top);
 		last if (!$error_info{$k}{count});
 
+		my $msg = $k;
+		$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
+		$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
+		$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
+		$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
+		$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
+		$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
+
 		if ($error_info{$k}{count} > 1) {
-			my $msg = $k;
-			$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
-			$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
-			$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
-			$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
-			$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
-			$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
+				last if ($i == $sample);
 				if (   ($error_info{$k}{error}[$i] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
@@ -4369,14 +4384,19 @@ sub show_error_as_text
 				$logs_type{ERROR}--;
 				$logs_type{LOG}++;
 			}
-			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
-			print $fh "--\n";
-			print $fh "\t- Date: $error_info{$k}{date}[0]\n";
-			print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n"       if ($error_info{$k}{detail}[0]);
-			print $fh "\t\tContext: $error_info{$k}{context}[0]\n"     if ($error_info{$k}{context}[0]);
-			print $fh "\t\tHint: $error_info{$k}{hint}[0]\n"           if ($error_info{$k}{hint}[0]);
-			print $fh "\t\tStatement: $error_info{$k}{statement}[0]\n" if ($error_info{$k}{statement}[0]);
-			print $fh "\t\tDatabase: $error_info{$k}{db}[0]\n" if ($error_info{$k}{db}[0]);
+			if ($sample) {
+				print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $error_info{$k}{error}[0]\n";
+				print $fh "--\n";
+				print $fh "\t- Date: $error_info{$k}{date}[0]\n";
+				print $fh "\t\tDetail: $error_info{$k}{detail}[0]\n"       if ($error_info{$k}{detail}[0]);
+				print $fh "\t\tContext: $error_info{$k}{context}[0]\n"     if ($error_info{$k}{context}[0]);
+				print $fh "\t\tHint: $error_info{$k}{hint}[0]\n"           if ($error_info{$k}{hint}[0]);
+				print $fh "\t\tStatement: $error_info{$k}{statement}[0]\n" if ($error_info{$k}{statement}[0]);
+				print $fh "\t\tDatabase: $error_info{$k}{db}[0]\n" if ($error_info{$k}{db}[0]);
+			} else {
+				print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
+				print $fh "--\n";
+			}
 		}
 		$idx++;
 	}
@@ -4398,19 +4418,20 @@ sub show_error_as_text
 
 sub show_pgb_error_as_text
 {
-	return if (scalar keys %error_info == 0);
+	return if (scalar keys %pgb_error_info == 0);
 
 	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
 	my $idx = 1;
 	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
 		next if (!$pgb_error_info{$k}{count});
 		last if ($idx > $top);
+		my $msg = $k;
 		if ($pgb_error_info{$k}{count} > 1) {
-			my $msg = $k;
 			print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++) {
+				last if ($i == $sample);
 				print $fh "\t- Example $j: $pgb_error_info{$k}{date}[$i] - $pgb_error_info{$k}{error}[$i]\n";
 				print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[$i]\n" if ($pgb_error_info{$k}{db}[$i]);
 				print $fh "\t\tUser: $pgb_error_info{$k}{user}[$i]\n" if ($pgb_error_info{$k}{user}[$i]);
@@ -4418,18 +4439,22 @@ sub show_pgb_error_as_text
 				$j++;
 			}
 		} else {
-			print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $pgb_error_info{$k}{error}[0]\n";
-			print $fh "--\n";
-			print $fh "\t- Date: $pgb_error_info{$k}{date}[0]\n";
-			print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[0]\n" if ($pgb_error_info{$k}{db}[0]);
-			print $fh "\t\tUser: $pgb_error_info{$k}{user}[0]\n" if ($pgb_error_info{$k}{user}[0]);
-			print $fh "\t\tClient: $pgb_error_info{$k}{remote}[0]\n" if ($pgb_error_info{$k}{remote}[0]);
+			if ($sample) {
+				print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $pgb_error_info{$k}{error}[0]\n";
+				print $fh "--\n";
+				print $fh "\t- Date: $pgb_error_info{$k}{date}[0]\n";
+				print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[0]\n" if ($pgb_error_info{$k}{db}[0]);
+				print $fh "\t\tUser: $pgb_error_info{$k}{user}[0]\n" if ($pgb_error_info{$k}{user}[0]);
+				print $fh "\t\tClient: $pgb_error_info{$k}{remote}[0]\n" if ($pgb_error_info{$k}{remote}[0]);
+			} else {
+				print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $msg\n";
+				print $fh "--\n";
+			}
 		}
 		$idx++;
 	}
 
 }
-
 
 sub html_header
 {
@@ -8781,6 +8806,7 @@ sub print_lock_queries_report
 		if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 			my $idx = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+				last if ($idx > $sample);
 				$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 				$md5 = '';
 				$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -8946,6 +8972,7 @@ sub print_tempfile_report
 			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $idx = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					last if ($idx > $sample);
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 					my $md5 = '';
 					$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -9089,6 +9116,7 @@ sub print_cancelled_report
 			if (scalar keys %{$normalyzed_info{$k}{samples}}) {
 				my $idx = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+					last if ($idx > $sample);
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 					my $md5 = '';
 					$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -9508,6 +9536,7 @@ sub print_time_consuming
 
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			last if ($idx > $sample);
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
 			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
@@ -9740,6 +9769,7 @@ sub print_most_frequent
 
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			last if ($idx > $sample);
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
 			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
@@ -9976,6 +10006,7 @@ sub print_slowest_queries
 
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
+			last if ($idx > $sample);
 			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
 			$details .= " - <b>Duration:</b> " . &convert_time($d);
 			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
@@ -11995,6 +12026,9 @@ sub parse_query
 		return;
 	}
 
+	# Store a counter of logs type
+	$logs_type{$prefix_vars{'t_loglevel'}}++;
+
 	# Do not parse lines that are not an error message when error only report is requested
 	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
 		return;
@@ -12004,9 +12038,6 @@ sub parse_query
 	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ $full_error_regex)) {
 		return;
 	}
-
-	# Store a counter of logs type
-	$logs_type{$prefix_vars{'t_loglevel'}}++;
 
 	# Replace syslog tabulation rewrite
 	if ($format =~ /syslog/) {
@@ -13402,7 +13433,7 @@ sub progress_bar
 	} elsif ($format eq 'binary') {
 		my $file = $_[-1];
 		sprintf(
-			"Loaded %d queries and %d events from binary file %s...\r",
+			"Loaded %d queries and %d events, reading binary file %s...\r",
 			$overall_stat{'queries_number'}, ($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $file
 		);
 	} else {
