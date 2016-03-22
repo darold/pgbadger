@@ -598,7 +598,7 @@ for (my $i = 0 ; $i < 60 ; $i += $histo_avg_minutes) {
 }
 
 # Set error like log level regex
-my $parse_regex      = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
+my $parse_regex      = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT|LOCATION)/;
 my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
 
@@ -849,7 +849,7 @@ if ($log_line_prefix) {
 		$log_line_prefix =
 			  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
 			. $log_line_prefix
-			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
@@ -858,30 +858,30 @@ if ($log_line_prefix) {
 		$log_line_prefix =
 			  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
 			. $log_line_prefix
-			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 		push(@prefix_params, 't_loglevel', 't_query');
 	} elsif ($format eq 'stderr') {
 		$orphan_stderr_line = qr/$log_line_prefix/;
-		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 		$compiled_prefix = qr/$log_line_prefix/;
 		push(@prefix_params, 't_loglevel', 't_query');
 	}
 } elsif ($format eq 'syslog') {
 	$compiled_prefix =
-qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 		't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'syslog2') {
 	$format = 'syslog';
 	$compiled_prefix =
-qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 	push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 		't_logprefix', 't_loglevel', 't_query');
 } elsif ($format eq 'stderr') {
 	$compiled_prefix =
-qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 	$orphan_stderr_line = qr/^(\d+-\d+-\d+\s\d+:\d+:\d+)[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*/;
 }
@@ -2451,7 +2451,7 @@ sub process_file
 						$cursize = 0;
 					}
 				}
-				next if ($row->[11] !~ $parse_regex);
+				next if ( ($row->[11] !~ $parse_regex)  || ($row->[11] eq 'LOCATION'));
 
 				# Extract the date
 				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
@@ -2597,8 +2597,11 @@ sub process_file
 					# skip non postgresql lines
 					next if ($prefix_vars{'t_ident'} ne $ident);
 
+					# Skip location information
+					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
+
 					# Store temporary files and locks information
-					if (($prefix_vars{'t_pid'} ne $cur_pid) || ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
+					if (($prefix_vars{'t_pid'} ne $cur_pid) && ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
 						&store_temporary_and_lock_infos($cur_pid);
 					}
 
@@ -2751,8 +2754,11 @@ sub process_file
 						$prefix_vars{$prefix_params[$i]} = $matches[$i];
 					}
 
+					# Skip location information
+					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
+
 					# Stores temporary files and lock information
-					if (($prefix_vars{'t_pid'} ne $cur_pid) || ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
+					if (($prefix_vars{'t_pid'} ne $cur_pid) && ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
 						&store_temporary_and_lock_infos($cur_pid);
 					}
 
@@ -2810,7 +2816,9 @@ sub process_file
 
 					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
-						$prefix_vars{'t_host'} = 'stderr'; # this unused variable is used to store format information when log format is not syslog
+						# this unused variable is used to store format information
+						# when log format is not syslog
+						$prefix_vars{'t_host'} = 'stderr';
 
 						# Process the log line
 						&parse_query();
@@ -2823,6 +2831,7 @@ sub process_file
 						my $lbl = lc($1);
 						$line =~ s/ERROR:\s+//;
 						if (exists $cur_temp_info{$cur_pid}{size}) {
+print STDERR "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU ($cur_pid): $line\n";
 							$cur_temp_info{$cur_pid}{query} .= $line;
 						} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 							$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
