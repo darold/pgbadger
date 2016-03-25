@@ -1289,10 +1289,20 @@ if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{da
 			closedir DIR;
 			foreach my $d (sort { $a <=> $b } @ddays) {
 				my $weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-				if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
-					&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
-					&cleanup_directory("$outdir/$y/$m/$d", 1);
-					push(@rmdays, $d);
+				if ($#obsolete_weeks >= 0) {
+					if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
+						&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
+						&cleanup_directory("$outdir/$y/$m/$d", 1);
+						push(@rmdays, $d);
+					}
+				} else {
+					# Remove obsolte days when we are in binary mode
+					# with noreport - there's no week-N directory
+					if ("$y$weekNumber" lt $limit) {
+						&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
+						&cleanup_directory("$outdir/$y/$m/$d", 1);
+						push(@rmdays, $d);
+					}
 				}
 			}
 			if ($#ddays == $#rmdays) {
