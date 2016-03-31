@@ -4365,6 +4365,7 @@ sub show_error_as_text
 		$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 		$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
 		$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
+		$msg =~ s/ERROR:  (using stale statistics)/LOG:  $1/;
 
 		if ($error_info{$k}{count} > 1) {
 			print $fh "$idx) " . &comma_numbers($error_info{$k}{count}) . " - $msg\n";
@@ -4378,6 +4379,7 @@ sub show_error_as_text
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (using stale statistics)/LOG:  $1/)
 					)
 				{
 					$logs_type{ERROR}--;
@@ -4398,6 +4400,7 @@ sub show_error_as_text
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (using stale statistics)/LOG:  $1/)
 				)
 			{
 				$logs_type{ERROR}--;
@@ -10361,6 +10364,7 @@ sub print_log_level
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (using stale statistics)/LOG:  $1/)
 				)
 				{
 					$logs_type{ERROR}--;
@@ -10374,6 +10378,7 @@ sub print_log_level
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (using stale statistics)/LOG:  $1/)
 				)
 			{
 				$logs_type{ERROR}--;
@@ -10583,6 +10588,7 @@ sub show_error_as_html
 		$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
 		$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
 		$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
+		$msg =~ s/ERROR:  (using stale statistics)/LOG:  $1/;
 		my $error_level_class = 'text-error';
 		if ($msg =~ /^WARNING: /) {
 			$error_level_class = 'text-warning';
@@ -11999,6 +12005,8 @@ sub parse_query
 		} elsif ($prefix_vars{'t_query'} =~ /ending cancel to blocking autovacuum/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		} elsif ($prefix_vars{'t_query'} =~ /skipping analyze of/) {
+			$prefix_vars{'t_loglevel'} = 'ERROR';
+		} elsif ($prefix_vars{'t_query'} =~ /using stale statistics/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		}
 
