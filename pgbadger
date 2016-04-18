@@ -462,14 +462,14 @@ if (-e "$PID_DIR/pgbadger.pid") {
 		unlink("$PID_DIR/pgbadger.pid");
 	} else {
 		print "FATAL: an other process is already started or remove the file, see $PID_DIR/pgbadger.pid\n";
-		exit 1;
+		exit 3;
 	}
 }
 
 # Create pid file
 unless(open(OUT, ">$PID_DIR/pgbadger.pid")) {
 	print "FATAL: can't create pid file $PID_DIR/pgbadger.pid, $!\n";
-	exit 1;
+	exit 3;
 }
 print OUT $$;
 close(OUT);
@@ -570,7 +570,12 @@ if ($logfile_list) {
 
 # Logfile is a mandatory parameter when journalctl command is not set.
 if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd) {
-	localdie("FATAL: you must give a log file as command line parameter.\n\n");
+	if (!$quiet) {
+		localdie("FATAL: you must give a log file at command line parameter.\n\n");
+	} else {
+		unlink("$PID_DIR/pgbadger.pid");
+		exit 4;
+	}
 }
 
 # Remove follow option from journalctl command to prevent infinit loop
