@@ -1473,7 +1473,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 	# Terminate the process logger
 	foreach my $k (keys %RUNNING_PIDS) {
-		kill(10, $k);
+		kill('USR1', $k);
 		%RUNNING_PIDS = ();
 	}
 
@@ -2938,7 +2938,7 @@ print STDERR "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU ($cur_
 
 	# Inform the parent that it should stop parsing other files
 	if ($terminate) {
-		kill(12, $parent_pid);
+		kill('USR2', $parent_pid);
 		return $terminate;
 	}
 
@@ -3026,7 +3026,7 @@ print STDERR "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU ($cur_
 
 	# Inform the parent that it should stop parsing other files
 	if ($getout) {
-		kill(12, $parent_pid);
+		kill('USR2', $parent_pid);
 	}
 
 	# Save last line into temporary file
