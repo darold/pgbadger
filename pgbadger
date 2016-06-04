@@ -12173,7 +12173,7 @@ sub parse_query
 			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
 		} elsif ($filepath =~ /\.\d+"$/) {
 			# Temporary store the current request to keep temporary file query in memory
-			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} || $cur_info{$t_pid}{query} if (!exists $cur_temp_info{$t_pid}{query});
+			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} if (!exists $cur_temp_info{$t_pid}{query});
 		}
 		if (!exists $cur_temp_info{$t_pid}{timestamp}) {
 			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
