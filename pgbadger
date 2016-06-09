@@ -13299,7 +13299,7 @@ sub normalize_error
 	return if (!$orig_query);
 
 	# Remove character position
-	$orig_query =~ s/ at character \d+//;
+	$orig_query =~ s/ at character \d+.*//s;
 
 	# Remove encoding detail
 	$orig_query =~ s/(byte sequence for encoding).*/$1/;
