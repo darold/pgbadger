@@ -2282,8 +2282,11 @@ sub process_file
 		&logmsg('DEBUG', "Starting reading file $remote_host:$logfile...");
 	}
 
-	# Detect if we are parsing a pgbouncer file
-	my ($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
+	my $is_pgbouncer_format = 0;
+	if ($logfile ne '-') {
+		# Detect if we are parsing a pgbouncer file
+		my ($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
+	}
 
 	# Parse pgbouncer logfile
 	if ($is_pgbouncer_format) {
