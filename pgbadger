@@ -552,7 +552,7 @@ if ($logfile_list) {
 		} elsif (!$remote_host) {
 			localdie("FATAL: logfile $file must exist!\n") if (not -f $file);
 			if (-z $file) {
-				print "WARNING: file $file is empty\n";
+				print "WARNING: file $file is empty\n" if (!$quiet);
 				next;
 			}
 			push(@log_files, $file);
