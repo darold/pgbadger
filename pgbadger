@@ -3103,6 +3103,18 @@ sub detect_pgbouncer_log
 				$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
 			}
 		}
+		else {
+			my @matches = ($line =~ $pgbouncer_log_parse1);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$ispgbouncerlog++ if ($pgb_prefix_parse1[$i] eq 't_loglevel'
+						&& $matches[$i] eq 'LOG'
+						&& $pgb_prefix_parse1[$i+1] eq 't_query'
+						&& $matches[$i+1] =~ /^Stats:/);
+					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
+				}
+			}
+		}
 		next if (!$prefix_vars{'t_timestamp'});
 		if ($iscompressed) {
 			close($lfile);
