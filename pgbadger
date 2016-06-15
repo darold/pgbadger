@@ -9006,7 +9006,8 @@ sub print_tempfile_report
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 					my $md5 = '';
 					$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
-					my $details = "Duration: " . &convert_time($d) . "<br />";
+					my $details = "Date: " . $normalyzed_info{$k}{samples}{$d}{date} . "<br />";
+					$details .= "Duration: " . &convert_time($d) . "<br />";
 					$details .= "Database: $normalyzed_info{$k}{samples}{$d}{db}<br/>" if ($normalyzed_info{$k}{samples}{$d}{db});
 					$details .= "User: $normalyzed_info{$k}{samples}{$d}{user}<br/>" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$details .= "Remote: $normalyzed_info{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$k}{samples}{$d}{remote});
