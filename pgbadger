@@ -16155,7 +16155,7 @@ function create_bargraph (divid, title, ytitle, data, y2title) {
 function pretty_print_number(val, scale, type) 
 {
 
-	if ( (scale == undefined) || ((scale == 0) && (val != 0) && (Math.abs(val) < 1)) ) {
+	if ( (scale == undefined) || ((scale == 0) && (val != 0)) ) {
 		scale = 1;
 	};
 
@@ -16186,7 +16186,7 @@ function pretty_print_number(val, scale, type)
 				val = (val / 1000);
 				return val.toFixed(scale) + " sec";
 			} else {
-				return val + " ms";
+				return val.toFixed(scale) + " ms";
 			}
 		} else {
 			if (Math.abs(val) >= 1000000000000000) {
