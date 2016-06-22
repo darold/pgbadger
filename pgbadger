@@ -2283,9 +2283,11 @@ sub process_file
 	}
 
 	my $is_pgbouncer_format = 0;
+	my $retcode = 0;
+	my $msg = '';
 	if ($logfile ne '-') {
 		# Detect if we are parsing a pgbouncer file
-		my ($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
+		($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
 	}
 
 	# Parse pgbouncer logfile
@@ -3104,6 +3106,14 @@ sub detect_pgbouncer_log
 			$ispgbouncerlog++;
 			for (my $i = 0 ; $i <= $#pgb_prefix_params ; $i++) {
 				$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
+			}
+		} else {
+			@matches = ($line =~ $pgbouncer_log_parse1);
+			if (($#matches >= 0) && ($matches[-1] =~ /^Stats:/) ) {
+				$ispgbouncerlog++;
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
+				}
 			}
 		}
 		next if (!$prefix_vars{'t_timestamp'});
@@ -13436,7 +13446,12 @@ sub autodetect_format
 			last if (($nfound > 10) || ($nline > 5000));
 		}
 		$tfile->close();
-		if (!$format) {
+		# When --pgbouncer-only is used force the format to stderr as
+		# we don't have to care of log format with pgbouncer only report
+		if (!$format && $pgbouncer_only) {
+			$pgbouncer_only = 1;
+			$fmt = 'stderr';
+		} elsif (!$format) {
 			if (!$fmt || ($nfound < 10)) {
 				localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
 			}
