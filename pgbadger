@@ -2851,7 +2851,6 @@ sub process_file
 						my $lbl = lc($1);
 						$line =~ s/ERROR:\s+//;
 						if (exists $cur_temp_info{$cur_pid}{size}) {
-print STDERR "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU ($cur_pid): $line\n";
 							$cur_temp_info{$cur_pid}{query} .= $line;
 						} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 							$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
