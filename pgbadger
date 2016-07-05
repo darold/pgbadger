@@ -11844,6 +11844,8 @@ sub highlight_code
 	$code =~ s/('[^']*')/<span class="st0">$1<\/span>/gs;
 	$code =~ s/(`[^`]*`)/<span class="st0">$1<\/span>/gs;
 
+	$code =~ s/\$\$PGBGY(A|B)\$\$//gs;
+
 	return $code;
 }
 
