@@ -39,11 +39,10 @@ Options:
 			     run as single process.
     -J | --Jobs number     : number of log file to parse in parallel. Default
                              is 1, run as single process.
-    -l | --last-parsed file: allow incremental log parsing by registering the
-                             last datetime and line parsed. Useful if you want
-                             to watch errors since last run or if you want one
-                             report per day with a log rotated each week.
-    -L | logfile-list file : file containing a list of log file to parse.
+    -l | --last-parsed file: allow you to change the path to the file containing
+                             the last parsed information. Default is LAST_PARSED
+                             in the incremental output directory.
+    -L | --logfile-list file:file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
     -M | --no-multiline    : do not collect multiline statement to avoid garbage
@@ -138,7 +137,7 @@ Options:
 				journalctl -u postgresql-9.5
     --pid-dir dirpath      : set the path of the directory where the pid file
                              will be written to be able to run two pgbadger at
-                             the same time.
+			     the same time.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show pgbouncer related menu in the header.
@@ -167,19 +166,19 @@ Examples:
 		       /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 	# Log prefix with stderr log output
-	pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' 
+	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' 
 			/pglog/postgresql-2012-08-21*
-	pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
-	pgbadger -j 8 /pglog/postgresql-9.1-main.log
+	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
 
 
 Generate Tsung sessions XML file with select queries only:
 
-    pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
 
 Reporting errors every week by cron job:
 
@@ -222,8 +221,8 @@ or worst, call it from a remote host:
 
     pgbadger -r 192.168.1.159 --journalctl 'journalctl -u postgresql-9.5'
 
-you don't need to specify any log file at command line, but if you have others
-PostgreSQL log files to parse, you can add them as usual.
+you don't need to specify any log file at command line, but if you have other
+PostgreSQL log file to parse, you can add them as usual.
 
 To rebuild all incremantal html reports after, proceed as follow:
 
