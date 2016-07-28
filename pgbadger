@@ -1654,9 +1654,10 @@ Options:
 			     run as single process.
     -J | --Jobs number     : number of log file to parse in parallel. Default
                              is 1, run as single process.
-    -l | --last-parsed file: allow you to change the path to the file containing
-                             the last parsed information. Default is LAST_PARSED
-                             in the incremental output directory.
+    -l | --last-parsed file: allow incremental log parsing by registering the
+                             last datetime and line parsed. Useful if you want
+                             to watch errors since last run or if you want one
+                             report per day with a log rotated each week.
     -L | --logfile-list file:file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
