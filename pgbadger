@@ -51,7 +51,7 @@ use FileHandle;
 use Socket;
 use constant EBCDIC => "\t" ne "\011";
 
-$VERSION = '8.1';
+$VERSION = '8.2b';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
@@ -531,6 +531,7 @@ if ($#ARGV >= 0) {
 
 }
 
+# Read list of log file to parse from a file
 if ($logfile_list) {
 
 	if (!-e $logfile_list) {
@@ -607,21 +608,21 @@ my $parse_regex      = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|
 my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
 
-my $pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
-my @pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
-
-my $pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.*)/;
-my @pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
-my $pgbouncer_log_parse2 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
-my @pgb_prefix_parse2 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
-
 # Set syslog prefix regex
-my $other_syslog_line =
-	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-my $orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+my $other_syslog_line = '';
+my $orphan_syslog_line = '';
 my $orphan_stderr_line = '';
+my $pgbouncer_log_format =  '';
+my $pgbouncer_log_parse1 = '';
+my $pgbouncer_log_parse2 = '';
 
-# Set default format, with multiple files format will be autodetected each time.
+# Variable to store parsed data following the line prefix
+my @prefix_params = ();
+my @pgb_prefix_params = ();
+my @pgb_prefix_parse1 = ();
+my @pgb_prefix_parse2 = ();
+
+# Set default format, with multiple files format will be autodetected each time.i
 # This default format will be used when the autodetection fail.
 my $frmt = '';
 if (!$rebuild) {
@@ -645,13 +646,6 @@ if (!$rebuild) {
 	$incremental = 1;
 }
 $format ||= $frmt;
-
-if ($format eq 'syslog2') {
-	$other_syslog_line =
-		qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-	$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
-}
-
 
 # Set default top query
 $top ||= 20;
@@ -844,63 +838,6 @@ if ($#include_query >= 0) {
 	}
 }
 
-# Compile custom log line prefix prefix
-my @prefix_params = ();
-if ($log_line_prefix) {
-	# Build parameters name that will be extracted from the prefix regexp
-	@prefix_params = &build_log_line_prefix_regex();
-	&check_regex($log_line_prefix, '--prefix');
-	if ($format eq 'syslog') {
-		$log_line_prefix =
-			  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
-			. $log_line_prefix
-			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-		$compiled_prefix = qr/$log_line_prefix/;
-		unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
-		push(@prefix_params, 't_loglevel', 't_query');
-	} elsif ($format eq 'syslog2') {
-		$format = 'syslog';
-		$log_line_prefix =
-			  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
-			. $log_line_prefix
-			. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-		$compiled_prefix = qr/$log_line_prefix/;
-		unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
-		push(@prefix_params, 't_loglevel', 't_query');
-	} elsif ($format eq 'stderr') {
-		$orphan_stderr_line = qr/$log_line_prefix/;
-		$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-		$compiled_prefix = qr/$log_line_prefix/;
-		push(@prefix_params, 't_loglevel', 't_query');
-	}
-} elsif ($format eq 'syslog') {
-	$compiled_prefix =
-qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-	push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
-		't_logprefix', 't_loglevel', 't_query');
-} elsif ($format eq 'syslog2') {
-	$format = 'syslog';
-	$compiled_prefix =
-qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-	push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
-		't_logprefix', 't_loglevel', 't_query');
-} elsif ($format eq 'stderr') {
-	$compiled_prefix =
-qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-	push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
-	$orphan_stderr_line = qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*/;
-}
-
-sub check_regex
-{
-	my ($pattern, $varname) = @_;
-
-	eval {m/$pattern/i;};
-	if ($@) {
-		localdie("FATAL: '$varname' invalid regex '$pattern', $!\n");
-	}
-}
-
 # Check start/end date time
 if ($from) {
 	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
@@ -1026,18 +963,6 @@ my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
 # Inbounds of session times histogram
 my @histogram_session_time = (0, 500, 1000, 30000, 60000, 600000, 1800000, 3600000, 28800000);
 
-# Get inbounds of query times histogram
-sub get_hist_inbound
-{
-	my ($duration, @histogram) = @_;
-
-	for (my $i = 0; $i <= $#histogram; $i++) {
-		return $histogram[$i-1] if ($histogram[$i] > $duration);
-	}
-
-	return -1;
-}
-
 # Where statistics are stored
 my %overall_stat        = ();
 my %pgb_overall_stat    = ();
@@ -1073,7 +998,9 @@ my %cur_cancel_info     = ();
 my %cur_lock_info       = ();
 my $nlines              = 0;
 my %last_line           = ();
+my %pgb_last_line       = ();
 our %saved_last_line    = ();
+our %pgb_saved_last_line= ();
 my %tsung_session       = ();
 my @top_locked_info     = ();
 my @top_tempfile_info   = ();
@@ -1169,16 +1096,27 @@ if ($incremental) {
 # Reading last line parsed
 if ($last_parsed && -e $last_parsed) {
 	if (open(IN, "$last_parsed")) {
-		my $line = <IN>;
+		my @content = <IN>;
 		close(IN);
-		($saved_last_line{datetime}, $saved_last_line{current_pos}, $saved_last_line{orig}) = split(/\t/, $line, 3);
-		# Preserve backward compatibility with version < 5
-		if ($saved_last_line{current_pos} =~ /\D/) {
-			$saved_last_line{orig} = $saved_last_line{current_pos} . "\t" . $saved_last_line{orig};
-			$saved_last_line{current_pos} = 0;
+		foreach my $line (@content) {
+			chomp($line);
+			next if (!$line);
+			my ($datetime, $current_pos, $orig, @others) = split(/\t/, $line);
+			# Last parsed line with pgbouncer log starts with this keyword
+			if ($datetime eq 'pgbouncer') {
+				$pgb_saved_last_line{datetime} = $current_pos;
+				$pgb_saved_last_line{current_pos} = $orig;
+				$pgb_saved_last_line{orig} = join("\t", @others);
+			} else {
+				$saved_last_line{datetime} = $datetime;
+				$saved_last_line{current_pos} = $current_pos;
+				$saved_last_line{orig} = $orig;
+			}
 		}
+		# Those two log format must be read from start of the file
 		if ( ($format eq 'binary') || ($format eq 'csv') ) {
 			$saved_last_line{current_pos} = 0;
+			$pgb_saved_last_line{current_pos} = 0 if ($format eq 'binary');
 		}
 
 	} else {
@@ -1189,13 +1127,18 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 
 # Clean the incremental directory if the feature is not disabled
-if (!$noclean && $saved_last_line{datetime} && $outdir) {
+if (!$noclean && $outdir && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime})) {
 
+	my $last_year  = '';
+	my $last_month = '';
+	my $last_day   = '';
 	# Search the current week following the last parse date
-	$saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /;
-	my $last_year  = $1;
-	my $last_month = $2;
-	my $last_day   = $3;
+	if ( ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) || ($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ) {
+		$last_year  = $1;
+		$last_month = $2;
+		$last_day   = $3;
+	}
+
 	# Get the week number following the date
 	my $wn = &get_week_number($last_year, $last_month, $last_day);
 	# Get the days of the current week where binary files must be preserved
@@ -1243,82 +1186,86 @@ if (!$noclean && $saved_last_line{datetime} && $outdir) {
 }
 
 # Clear storage when a retention is specified in incremental mode
-if ( $saved_last_line{datetime} && $outdir && $retention && ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
+if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) ) {
 
-	# Search the current week following the last parse date
-	my $limit = $1;
-	my $wn = &get_week_number($1, $2, $3);
-	if (($wn - $retention) < 1) {
-		$limit--;
-		$limit .= "52";
-	} else {
-		$limit .= sprintf("%02d", $wn - $retention);
-	}
+	if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
+				($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
 
-	# Find obsolete weeks dir that shoud be cleaned
-	unless(opendir(DIR, "$outdir")) {
-		localdie("Error: can't opendir $outdir: $!");
-	}
-	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
-	closedir DIR;
-	my @obsolete_weeks = ();
-	foreach my $y (sort { $a <=> $b } @dyears) {
-		unless(opendir(DIR, "$outdir/$y")) {
-			localdie("Error: can't opendir $outdir/$y: $!");
+		# Search the current week following the last parse date
+		my $limit = $1;
+		my $wn = &get_week_number($1, $2, $3);
+		if (($wn - $retention) < 1) {
+			$limit--;
+			$limit .= "52";
+		} else {
+			$limit .= sprintf("%02d", $wn - $retention);
 		}
-		my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
+
+		# Find obsolete weeks dir that shoud be cleaned
+		unless(opendir(DIR, "$outdir")) {
+			localdie("Error: can't opendir $outdir: $!");
+		}
+		my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
-		foreach my $w (sort { $a <=> $b } @weeks) {
-			$w =~ /^week-(\d+)$/;
-			if ("$y$1" lt $limit) {
-				&logmsg('DEBUG', "Removing obsolete week directory $outdir/$y/week-$1");
-				&cleanup_directory("$outdir/$y/week-$1", 1);
-				push(@obsolete_weeks, "$y$1");
+		my @obsolete_weeks = ();
+		foreach my $y (sort { $a <=> $b } @dyears) {
+			unless(opendir(DIR, "$outdir/$y")) {
+				localdie("Error: can't opendir $outdir/$y: $!");
 			}
-		}
-	}
-	# Now removed the corresponding days 
-	foreach my $y (sort { $a <=> $b } @dyears) {
-		unless(opendir(DIR, "$outdir/$y")) {
-			localdie("Error: can't opendir $outdir/$y: $!");
-		}
-		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
-		closedir DIR;
-		my @rmmonths = ();
-		foreach my $m (sort { $a <=> $b } @dmonths) {
-			unless(opendir(DIR, "$outdir/$y/$m")) {
-				localdie("Error: can't opendir $outdir/$y/$m: $!");
-			}
-			my @rmdays = ();
-			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+			my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
 			closedir DIR;
-			foreach my $d (sort { $a <=> $b } @ddays) {
-				my $weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-				if ($#obsolete_weeks >= 0) {
-					if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
-						&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
-						&cleanup_directory("$outdir/$y/$m/$d", 1);
-						push(@rmdays, $d);
-					}
-				} else {
-					# Remove obsolte days when we are in binary mode
-					# with noreport - there's no week-N directory
-					if ("$y$weekNumber" lt $limit) {
-						&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
-						&cleanup_directory("$outdir/$y/$m/$d", 1);
-						push(@rmdays, $d);
-					}
+			foreach my $w (sort { $a <=> $b } @weeks) {
+				$w =~ /^week-(\d+)$/;
+				if ("$y$1" lt $limit) {
+					&logmsg('DEBUG', "Removing obsolete week directory $outdir/$y/week-$1");
+					&cleanup_directory("$outdir/$y/week-$1", 1);
+					push(@obsolete_weeks, "$y$1");
 				}
 			}
-			if ($#ddays == $#rmdays) {
-				&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y/$m");
-				rmdir("$outdir/$y/$m");
-				push(@rmmonths, $m);
-			}
 		}
-		if ($#dmonths == $#rmmonths) {
-			&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y");
-			rmdir("$outdir/$y");
+		# Now removed the corresponding days 
+		foreach my $y (sort { $a <=> $b } @dyears) {
+			unless(opendir(DIR, "$outdir/$y")) {
+				localdie("Error: can't opendir $outdir/$y: $!");
+			}
+			my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
+			closedir DIR;
+			my @rmmonths = ();
+			foreach my $m (sort { $a <=> $b } @dmonths) {
+				unless(opendir(DIR, "$outdir/$y/$m")) {
+					localdie("Error: can't opendir $outdir/$y/$m: $!");
+				}
+				my @rmdays = ();
+				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+				closedir DIR;
+				foreach my $d (sort { $a <=> $b } @ddays) {
+					my $weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					if ($#obsolete_weeks >= 0) {
+						if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
+							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
+							&cleanup_directory("$outdir/$y/$m/$d", 1);
+							push(@rmdays, $d);
+						}
+					} else {
+						# Remove obsolte days when we are in binary mode
+						# with noreport - there's no week-N directory
+						if ("$y$weekNumber" lt $limit) {
+							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
+							&cleanup_directory("$outdir/$y/$m/$d", 1);
+							push(@rmdays, $d);
+						}
+					}
+				}
+				if ($#ddays == $#rmdays) {
+					&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y/$m");
+					rmdir("$outdir/$y/$m");
+					push(@rmmonths, $m);
+				}
+			}
+			if ($#dmonths == $#rmmonths) {
+				&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y");
+				rmdir("$outdir/$y");
+			}
 		}
 	}
 
@@ -1333,34 +1280,52 @@ unshift(@given_log_files, $journalctl_cmd) if ($journalctl_cmd);
 
 # Verify that the file has not changed for incremental move
 if (!$remote_host) {
-	if ($saved_last_line{current_pos} > 0) {
-		my @tmpfilelist = ();
-		# Removed files that have already been parsed during previous runs
-		foreach my $f (@given_log_files) {
-			if ($f eq '-') {
-				&logmsg('DEBUG', "waiting for log entries from stdin.");
-				$saved_last_line{current_pos} = 0;
-				push(@tmpfilelist, $f);
-			} elsif ( $journalctl_cmd && ($f eq $journalctl_cmd) ) {
-				my $since = '';
-				if ( ($journalctl_cmd !~ /--since|-S/) && ($saved_last_line{datetime} =~ /^(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/) ) {
-					$since = " --since='$1-$2-$3 $4:$5:$6'";
-				}
-				&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
-				push(@tmpfilelist, "$f $since");
-			} else {
-				my ($retcode, $msg) = &check_file_changed($f, $saved_last_line{datetime});
+	my @tmpfilelist = ();
+	# Removed files that have already been parsed during previous runs
+	foreach my $f (@given_log_files) {
+		if ($f eq '-') {
+			&logmsg('DEBUG', "waiting for log entries from stdin.");
+			$saved_last_line{current_pos} = 0;
+			push(@tmpfilelist, $f);
+		} elsif ( $journalctl_cmd && ($f eq $journalctl_cmd) ) {
+			my $since = '';
+			if ( ($journalctl_cmd !~ /--since|-S/) && ($saved_last_line{datetime} =~ /^(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/) ) {
+				$since = " --since='$1-$2-$3 $4:$5:$6'";
+			}
+			&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
+			push(@tmpfilelist, "$f $since");
+		} else {
+
+			# Auto detect log format for proper parsing
+			my $fmt = autodetect_format($f);
+
+			# Set regex to parse the log file 
+			set_parser_regex($fmt);
+
+			if (($fmt ne 'pgbouncer') && ($saved_last_line{current_pos} > 0)) {
+				my ($retcode, $msg) = &check_file_changed($f, $fmt, $saved_last_line{datetime}, $saved_last_line{current_pos});
 				if (!$retcode) {
 					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
 				} else {
 					push(@tmpfilelist, $f);
 				}
+			} elsif (($fmt eq 'pgbouncer') && ($pgb_saved_last_line{current_pos} > 0)) {
+				my ($retcode, $msg) = &check_file_changed($f, $fmt, $pgb_saved_last_line{datetime}, $pgb_saved_last_line{current_pos});
+				if (!$retcode) {
+					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
+				} else {
+					push(@tmpfilelist, $f);
+				}
+			} else {
+				push(@tmpfilelist, $f);
 			}
 		}
-		@given_log_files = ();
-		push(@given_log_files, @tmpfilelist);
 	}
+	@given_log_files = ();
+	push(@given_log_files, @tmpfilelist);
+
 } else {
+
 	# Disable multi process when using ssh to parse remote log
 	if ($queue_size > 1) {
 		&logmsg('DEBUG', "parallel processing through ssh is not supported with remote file.");
@@ -1368,19 +1333,23 @@ if (!$remote_host) {
 	$queue_size = 1;
 }
 
-# log files must be erased when loading stats from binary format
+# Disable parallel processing in binary mode
 if ($format eq 'binary') {
 	if (($queue_size > 1) || ($job_per_file > 1)) {
-		&logmsg('DEBUG', "parallel processing is not supported with binary format.");
+		&logmsg('DEBUG', "parallel processing is not supported with binary format.") if (!$quiet);
 	}
 	$queue_size = 1;
 	$job_per_file = 1;
 }
 
+# Pipe used for progress bar in multiprocess
 my $pipe;
 
 # Seeking to an old log position is not possible outside incremental mode
-$saved_last_line{current_pos} = 0 if (!$last_parsed);
+if (!$last_parsed) {
+	$saved_last_line{current_pos} = 0;
+	$pgb_saved_last_line{current_pos} = 0;
+}
 
 # Start parsing all given files using multiprocess
 if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
@@ -1422,10 +1391,17 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 			sleep(1);
 		}
 
-		# Do not use split method with compressed files
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) ) {
+		# Get log format of the current file
+		my $fmt = &autodetect_format($logfile);
+
+		# Set regex to parse the log file
+		set_parser_regex($fmt);
+
+		# Do not use split method with compressed files and stdin
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile ne '-') &&
+						 (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) ) {
 			# Create multiple processes to parse one log file by chunks of data
-			my @chunks = &split_logfile($logfile);
+			my @chunks = split_logfile($logfile, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
 			&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
 			for (my $i = 0; $i < $#chunks; $i++) {
 				while ($child_count >= $parallel_process) {
@@ -1440,7 +1416,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 				last if ($interrupt);
 				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 				spawn sub {
-					&process_file($logfile, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
+					&process_file($logfile, $fmt, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
 				};
 				$child_count++;
 			} 
@@ -1450,7 +1426,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 			# Start parsing one file per parallel process
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 			spawn sub {
-				&process_file($logfile, $tempfiles[-1]->[0]);
+				&process_file($logfile, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
 			};
 			$child_count++;
 
@@ -1493,7 +1469,14 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 	# Multiprocessing disabled, parse log files one by one
 	foreach my $logfile ( @given_log_files ) {
-		last if (&process_file($logfile, '', $saved_last_line{current_pos}));
+
+		# Get log format of the current file
+		my $fmt = autodetect_format($logfile);
+
+		# Set regex to parse the log file 
+		set_parser_regex($fmt);
+
+		last if (&process_file($logfile, $fmt, '', ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos}));
 	}
 }
 
@@ -1503,14 +1486,21 @@ if ($last_parsed) {
 		while (my $line = <IN>) {
 			chomp($line);
 			$line =~ s/\r//;
-			my ($d, $p, $l) = split(/\t/, $line, 3);
-			if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
-				$last_line{datetime} = $d;
-				if ($p =~ /^\d+$/) {
+			my ($d, $p, $l, @o) = split(/\t/, $line);
+			if ($d ne 'pgbouncer') {
+				if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
+					$last_line{datetime} = $d;
 					$last_line{orig} = $l;
 					$last_line{current_pos} = $p;
-				} else {
-					$last_line{orig} = $p . "\t" . $l;
+				}
+			} else {
+				$d = $p;
+				$p = $l;
+				$l = join("\t", @o);
+				if (!$pgb_last_line{datetime} || ($d gt $pgb_last_line{datetime})) {
+					$pgb_last_line{datetime} = $d;
+					$pgb_last_line{orig} = $l;
+					$pgb_last_line{current_pos} = $p;
 				}
 			}
 		}
@@ -1520,10 +1510,22 @@ if ($last_parsed) {
 }
 
 # Save last line parsed
-if ($last_parsed && $last_line{datetime} && $last_line{orig}) {
+if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime}) && ($last_line{orig} || $pgb_last_line{orig}) ) {
 	if (open(OUT, ">$last_parsed")) {
-		$last_line{current_pos} ||= 0;
-		print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+		if ($last_line{datetime}) {
+			$last_line{current_pos} ||= 0;
+			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+		} elsif ($saved_last_line{datetime}) {
+			$saved_last_line{current_pos} ||= 0;
+			print OUT "$saved_last_line{datetime}\t$saved_last_line{current_pos}\t$saved_last_line{orig}\n";
+		}
+		if ($pgb_last_line{datetime}) {
+			$pgb_last_line{current_pos} ||= 0;
+			print OUT "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
+		} elsif ($pgb_saved_last_line{datetime}) {
+			$pgb_saved_last_line{current_pos} ||= 0;
+			print OUT "pgbouncer\t$pgb_saved_last_line{datetime}\t$pgb_saved_last_line{current_pos}\t$pgb_saved_last_line{orig}\n";
+		}
 		close(OUT);
 	} else {
 		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
@@ -1585,17 +1587,20 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 
 	# Look for directory where report must be generated
 	my @build_directories = ();
-	if (open(IN, "$last_parsed.tmp")) {
-		while (my $l = <IN>) {
-			chomp($l);
-			$l =~ s/\r//;
-			push(@build_directories, $l) if (!grep(/^$l$/, @build_directories));
+	if (-e "$last_parsed.tmp") {
+		if (open(IN, "$last_parsed.tmp")) {
+			while (my $l = <IN>) {
+				chomp($l);
+				$l =~ s/\r//;
+				push(@build_directories, $l) if (!grep(/^$l$/, @build_directories));
+			}
+			close(IN);
+			unlink("$last_parsed.tmp");
+		} else {
+			&logmsg('ERROR', "can't read file $last_parsed.tmp, $!");
 		}
-		close(IN);
-		unlink("$last_parsed.tmp");
 	} else {
-		&logmsg('WARNING', "can't read file $last_parsed.tmp, $!");
-		&logmsg('HINT', "maybe there's no new entries in your log since last run.");
+		&logmsg('DEBUG', "no new entries in your log(s) since last run.");
 	}
 	&build_incremental_reports(@build_directories);
 
@@ -1852,6 +1857,109 @@ it will also update all ressources file (JS and CSS).
 
 	exit 0;
 }
+
+# Get inbounds of query times histogram
+sub get_hist_inbound
+{
+	my ($duration, @histogram) = @_;
+
+	for (my $i = 0; $i <= $#histogram; $i++) {
+		return $histogram[$i-1] if ($histogram[$i] > $duration);
+	}
+
+	return -1;
+}
+
+# Compile custom log line prefix prefix
+sub set_parser_regex
+{
+	my $fmt = shift;
+
+	@prefix_params = ();
+
+	if ($fmt eq 'pgbouncer') {
+
+		$pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
+		@pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+
+		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.*)/;
+		@pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
+		$pgbouncer_log_parse2 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
+		@pgb_prefix_parse2 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+	} elsif ($log_line_prefix) {
+
+		# Build parameters name that will be extracted from the prefix regexp
+		@prefix_params = &build_log_line_prefix_regex();
+		&check_regex($log_line_prefix, '--prefix');
+
+		if ($fmt eq 'syslog') {
+			$log_line_prefix =
+				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
+				. $log_line_prefix
+				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			$compiled_prefix = qr/$log_line_prefix/;
+			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+			push(@prefix_params, 't_loglevel', 't_query');
+			$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+			$orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+		} elsif ($fmt eq 'syslog2') {
+			$fmt = 'syslog';
+			$log_line_prefix =
+				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
+				. $log_line_prefix
+				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			$compiled_prefix = qr/$log_line_prefix/;
+			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+			push(@prefix_params, 't_loglevel', 't_query');
+			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+			$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
+		} elsif ($fmt eq 'stderr') {
+			$orphan_stderr_line = qr/$log_line_prefix/;
+			$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			$compiled_prefix = qr/$log_line_prefix/;
+			push(@prefix_params, 't_loglevel', 't_query');
+
+		}
+
+	} elsif ($fmt eq 'syslog') {
+
+		$compiled_prefix =
+	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
+			't_logprefix', 't_loglevel', 't_query');
+		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+		$orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
+
+	} elsif ($fmt eq 'syslog2') {
+
+		$fmt = 'syslog';
+		$compiled_prefix =
+	qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
+			't_logprefix', 't_loglevel', 't_query');
+		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+		$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
+
+	} elsif ($fmt eq 'stderr') {
+
+		$compiled_prefix =
+	qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
+		$orphan_stderr_line = qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*/;
+
+	}
+}
+
+sub check_regex
+{
+	my ($pattern, $varname) = @_;
+
+	eval {m/$pattern/i;};
+	if ($@) {
+		localdie("FATAL: '$varname' invalid regex '$pattern', $!\n");
+	}
+}
+
 
 sub build_incremental_reports
 {
@@ -2214,7 +2322,7 @@ sub multiprocess_progressbar
 ####
 sub process_file
 {
-	my ($logfile, $tmpoutfile, $start_offset, $stop_offset, $chunk_pos) = @_;
+	my ($logfile, $fmt, $tmpoutfile, $start_offset, $stop_offset, $chunk_pos) = @_;
 
 	my $old_queries_count = 0;
 	my $old_errors_count  = 0;
@@ -2248,11 +2356,15 @@ sub process_file
 	# Get file handle and size of the file
 	my ($lfile, $totalsize) = &get_log_file($logfile);
 	# Reset the start position if file is smaller that the current start offset
-	$start_offset = 0 if ($start_offset > $totalsize);
+	if ($start_offset > $totalsize) {
+		&logmsg('DEBUG', "Starting offset $start_offset is greater than total size $totalsize for file $logfile");
+		&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
+		$start_offset = 0 ;
+	}
 	# Check if the first date in the log are after the last date saved
-	if (($format ne 'binary') && ($format ne 'csv')) {
+	if (($fmt ne 'binary') && ($fmt ne 'csv')) {
 		if ($start_offset && !$chunk_pos) {
-			my ($retcode, $msg) = &check_file_changed($logfile, $saved_last_line{datetime}, 1);
+			my ($retcode, $msg) = check_file_changed($logfile, $fmt, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
 			if ($retcode) {
 				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile, $msg");
 				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
@@ -2282,16 +2394,8 @@ sub process_file
 		&logmsg('DEBUG', "Starting reading file $remote_host:$logfile...");
 	}
 
-	my $is_pgbouncer_format = 0;
-	my $retcode = 0;
-	my $msg = '';
-	if ($logfile ne '-') {
-		# Detect if we are parsing a pgbouncer file
-		($is_pgbouncer_format, $retcode, $msg) = &detect_pgbouncer_log($logfile, $saved_last_line{datetime}, 1);
-	}
-
 	# Parse pgbouncer logfile
-	if ($is_pgbouncer_format) {
+	if ($fmt eq 'pgbouncer') {
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
@@ -2385,7 +2489,7 @@ sub process_file
 				}
 
 				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
+				next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 				# Extract other information from the line
 				@matches = ($line =~ $pgbouncer_log_parse2);
@@ -2413,7 +2517,7 @@ sub process_file
 					$prefix_vars{'t_host'} = 'stderr'; # this unused variable is used to store format information when log format is not syslog
 
 					# Process the log line
-					&parse_pgbouncer();
+					&parse_pgbouncer($fmt);
 				}
 
 			} else {
@@ -2424,11 +2528,11 @@ sub process_file
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
 		if ($last_parsed) {
-			$last_line{current_pos} = $current_offset;
+			$pgb_last_line{current_pos} = $current_offset;
 		}
 
 	# Parse PostgreSQL log file with CSV format
-	} elsif ($format eq 'csv') {
+	} elsif ($fmt eq 'csv') {
 
 		require Text::CSV_XS;
 		my $csv = Text::CSV_XS->new(
@@ -2497,7 +2601,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, join(',', @$row)));
+					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, join(',', @$row)));
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
@@ -2525,7 +2629,7 @@ sub process_file
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
 						# Parse the query now
-						&parse_query();
+						&parse_query($fmt);
 						if (&store_queries($prefix_vars{'t_pid'})) {
 							delete $cur_info{$prefix_vars{'t_pid'}};
 						}
@@ -2541,7 +2645,7 @@ sub process_file
 		}
 
 	}
-	elsif ($format eq 'binary') {
+	elsif ($fmt eq 'binary') {
 		&load_stats($lfile);
 	}
 	else { # Format is not CSV.
@@ -2604,7 +2708,7 @@ sub process_file
 			%prefix_vars = ();
 
 			# Parse syslog lines
-			if ($format =~ /syslog/) {
+			if ($fmt =~ /syslog/) {
 
 				@matches = ($line =~ $compiled_prefix);
 
@@ -2667,7 +2771,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
+					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 					$goon = 1;
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
@@ -2684,7 +2788,7 @@ sub process_file
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
 						# Process the log line
-						&parse_query();
+						&parse_query($fmt);
 					}
 
 				} elsif ($goon && ($line =~ $other_syslog_line)) {
@@ -2766,7 +2870,7 @@ sub process_file
 					&logmsg('DEBUG', "Unknown syslog line format: $line");
 				}
 
-			} elsif ($format eq 'stderr') {
+			} elsif ($fmt eq 'stderr') {
 
 				@matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
@@ -2822,7 +2926,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($prefix_vars{'t_timestamp'}, $line));
+					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 					$cur_pid = $prefix_vars{'t_pid'};
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 
@@ -2841,7 +2945,7 @@ sub process_file
 						$prefix_vars{'t_host'} = 'stderr';
 
 						# Process the log line
-						&parse_query();
+						&parse_query($fmt);
 					}
 
 				# Collect additional query information
@@ -2985,10 +3089,9 @@ sub process_file
 	}
 
 	%cur_info = ();
-
 	# In incremental mode data are saved to disk per day
-	if ($incremental && $last_line{datetime}) {
-		$incr_date = $last_line{datetime};
+	if ($incremental && ($last_line{datetime} || (($fmt eq 'pgbouncer') && $pgb_last_line{datetime}))) {
+		$incr_date = ($fmt eq 'pgbouncer') ? $pgb_last_line{datetime} : $last_line{datetime};
 		$incr_date =~ s/\s.*$//;
 		# set path and create subdirectories
 		if ($incr_date =~ /^(\d+)-(\d+)-(\d+)/) {
@@ -3028,23 +3131,30 @@ sub process_file
 
 	}
 
-	# Inform the parent that it should stop parsing other files
-	if ($getout) {
-		kill('USR2', $parent_pid);
-	}
-
 	# Save last line into temporary file
-	if ($last_parsed && scalar keys %last_line) {
+	if ($last_parsed && (scalar keys %last_line || scalar keys %pgb_last_line)) {
 		if (open(OUT, ">>$tmp_last_parsed")) {
 			flock(OUT, 2) || return $getout;
-			$last_line{current_pos} ||= 0;
-
-			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+			if ($fmt eq 'pgbouncer') {
+				$pgb_last_line{current_pos} ||= 0;
+				&logmsg('DEBUG', "Saving pgbouncer last parsed line into $tmp_last_parsed ($pgb_last_line{datetime}\t$pgb_last_line{current_pos})");
+				print OUT "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
+			} else {
+				$last_line{current_pos} ||= 0;
+				&logmsg('DEBUG', "Saving last parsed line into $tmp_last_parsed ($last_line{datetime}\t$last_line{current_pos})");
+				print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+			}
 			close(OUT);
 		} else {
 			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
 		}
 	}
+
+	# Inform the parent that it should stop parsing other files
+	if ($getout) {
+		kill('USR2', $parent_pid);
+	}
+
 
 	return $getout;
 }
@@ -3134,7 +3244,7 @@ sub detect_pgbouncer_log
 		return ($ispgbouncerlog, 0, "there no new lines in this file");
 	}
 
-	return ($ispgbouncerlog, 1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
+	return ($ispgbouncerlog, 1, "reach the end of detect_pgbouncer_log() with start date: $saved_date and file size: $totalsize") ;
 }
 
 
@@ -3143,7 +3253,7 @@ sub detect_pgbouncer_log
 # start up. Here we just verify that the first date in file is before the last incremental date.
 sub check_file_changed
 {
-	my ($file, $saved_date, $look_at_beginning) = @_;
+	my ($file, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
 
 	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
 
@@ -3163,9 +3273,9 @@ sub check_file_changed
 	# If seeking is not explicitely disabled
 	if (!$look_at_beginning) {
 		# do not seek if filesize is smaller than the seek position
-		if ($saved_last_line{current_pos} < $totalsize) {
-			$lfile->seek($saved_last_line{current_pos} || 0, 0);
-			$startoffset = $saved_last_line{current_pos} || 0;
+		if ($saved_pos < $totalsize) {
+			$lfile->seek($saved_pos || 0, 0);
+			$startoffset = $saved_pos || 0;
 		}
 	}
 
@@ -3176,7 +3286,7 @@ sub check_file_changed
 
 		$line =~ s/\r//;
 
-		if ($format =~ /syslog/) {
+		if ($fmt =~ /syslog/) {
 
 			my @matches = ($line =~ $compiled_prefix);
 			if ($#matches >= 0) {
@@ -3197,16 +3307,9 @@ sub check_file_changed
 				}
 				$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-				# This file has already been parsed
-				if ($saved_date gt $prefix_vars{'t_timestamp'}) {
-					close($lfile);
-					return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
-				} else {
-					last;
-				}
 			}
 
-		} elsif ($format eq 'stderr') {
+		} elsif ($fmt eq 'stderr') {
 
 			my @matches = ($line =~ $compiled_prefix);
 			if ($#matches >= 0) {
@@ -3224,16 +3327,28 @@ sub check_file_changed
 					}
 				}
 			}
-			next if (!$prefix_vars{'t_timestamp'});
-			# This file has already been parsed
-			if ($saved_date gt $prefix_vars{'t_timestamp'}) {
-				close($lfile);
-				return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
-				return 0;
-			} else {
-				last;
+
+		} elsif ($fmt eq 'pgbouncer') {
+
+			my @matches = ($line =~ $pgbouncer_log_parse1);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
+				}
 			}
 		}
+
+		# Unwanted line
+		next if (!$prefix_vars{'t_timestamp'});
+
+		# This file has already been parsed
+		if ($saved_date gt $prefix_vars{'t_timestamp'}) {
+			close($lfile);
+			return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
+		} else {
+			last;
+		}
+
 	}
 	close($lfile);
 
@@ -3251,9 +3366,9 @@ sub check_file_changed
 # start up.
 sub check_incremental_position
 {
-	my ($cur_date, $line) = @_;
+	my ($fmt, $cur_date, $line) = @_;
 
-	if ($last_parsed) {
+	if ($last_parsed && ($fmt ne 'pgbouncer')) {
 		if ($saved_last_line{datetime}) {
 			if ($cur_date lt $saved_last_line{datetime}) {
 				return 0;
@@ -3263,6 +3378,16 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
+	} elsif ($last_parsed) {
+		if ($pgb_saved_last_line{datetime}) {
+			if ($cur_date lt $pgb_saved_last_line{datetime}) {
+				return 0;
+			} elsif (!$pgb_last_line{datetime} && ($cur_date eq $pgb_saved_last_line{datetime})) {
+				return 0 if ($line ne $pgb_saved_last_line{orig});
+			}
+		}
+		$pgb_last_line{datetime} = $cur_date;
+		$pgb_last_line{orig}     = $line;
 	}
 
 	# In incremental mode data are saved to disk per day
@@ -12004,6 +12129,7 @@ sub parse_log_prefix
 
 sub parse_query
 {
+	my $fmt = shift;
 
 	my $t_pid = $prefix_vars{'t_pid'};
 
@@ -12042,7 +12168,7 @@ sub parse_query
 			# when we will parse the query that has been killed
 			$overall_stat{'peak'}{$cur_last_log_timestamp}{cancelled_count}++;
 			$cur_cancel_info{$t_pid}{count}++;
-			if ($format eq 'csv') {
+			if ($fmt eq 'csv') {
 				$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
 			}
 			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
@@ -12087,7 +12213,7 @@ sub parse_query
 	}
 
 	# Replace syslog tabulation rewrite
-	if ($format =~ /syslog/) {
+	if ($fmt =~ /syslog/) {
 		$prefix_vars{'t_query'} =~ s/#011/\t/g;
 	}
 
@@ -12126,7 +12252,7 @@ sub parse_query
 		# Store current lock information that will be used later
 		# when we will parse the query responsible for the locks
 		$cur_lock_info{$t_pid}{wait} = $3;
-		if ($format eq 'csv') {
+		if ($fmt eq 'csv') {
 			$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
 			$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 			$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
@@ -12184,7 +12310,7 @@ sub parse_query
 		$tempfile_info{maxsize} = $cur_temp_info{$t_pid}{size} if ($tempfile_info{maxsize} < $cur_temp_info{$t_pid}{size});
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $2;
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_count}++;
-		if ($format eq 'csv') {
+		if ($fmt eq 'csv') {
 			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
 		} elsif ($filepath =~ /\.\d+"$/) {
 			# Temporary store the current request to keep temporary file query in memory
@@ -12338,7 +12464,7 @@ sub parse_query
 
 		$cur_info{$t_pid}{vacuum} = $1;
 
-		if ($format eq 'csv') {
+		if ($fmt eq 'csv') {
 			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
 				$autovacuum_info{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $1;
 			}
@@ -12523,7 +12649,7 @@ sub parse_query
 	####
 	if (exists $cur_info{$t_pid}{query}) {
 		# when switching to a new log message
-		if ( ($prefix_vars{'t_loglevel'} eq 'LOG') || ($format eq 'csv') || ($prefix_vars{'t_loglevel'} =~ $main_error_regex) ) {
+		if ( ($prefix_vars{'t_loglevel'} eq 'LOG') || ($fmt eq 'csv') || ($prefix_vars{'t_loglevel'} =~ $main_error_regex) ) {
 			if (&store_queries($t_pid)) {
 				delete $cur_info{$t_pid};
 			}
@@ -12613,7 +12739,7 @@ sub parse_query
 		return;
 	}
 
-	if ( ($format eq 'csv') && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
+	if ( ($fmt eq 'csv') && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
 		$cur_info{$t_pid}{detail} = $prefix_vars{'t_detail'};
 		$cur_info{$t_pid}{hint} = $prefix_vars{'t_hint'};
 		$cur_info{$t_pid}{context} = $prefix_vars{'t_context'};
@@ -12626,6 +12752,7 @@ sub parse_query
 
 sub parse_pgbouncer
 {
+	my $fmt = shift;
 
 	my $t_pid = $prefix_vars{'t_pid'};
 	my $t_session_id = $prefix_vars{'t_session_id'} || $prefix_vars{'t_pid'};
@@ -12642,11 +12769,6 @@ sub parse_pgbouncer
 	# Do not parse lines that are an error-like message when error reports are not wanted
 	if ($disable_error && ($prefix_vars{'t_loglevel'} =~ $full_error_regex)) {
 		return;
-	}
-
-	# Replace syslog tabulation rewrite
-	if ($format =~ /syslog/) {
-		$prefix_vars{'t_query'} =~ s/#011/\t/g;
 	}
 
 	if ($prefix_vars{'t_loglevel'} eq 'STATS') {
@@ -13390,7 +13512,7 @@ sub autodetect_format
 	if ( $fltf =~ /^pst\d/ ) {
 		$fmt = 'binary';
 	}
-	else { # try to detect syslogs or csv
+	else { # try to detect syslogs, stderr, csv or pgbouncer format
 		my ($tfile, $totalsize) = &get_log_file($file);
 		my %ident_name = ();
 		while (my $line = <$tfile>) {
@@ -13399,14 +13521,25 @@ sub autodetect_format
 			next if (!$line);
 			$nline++;
 
+			# Are pgbouncer syslog lines ?
+			if ($line =~ /^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/) {
+				localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
+
+			} elsif ($line =~
+	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
+			   )
+			{
+				localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
+
 			# Are syslog lines ?
-			if ($line =~
+			} elsif ($line =~
 	/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 			   )
 			{
 				$fmt = 'syslog';
 				$nfound++;
 				$ident_name{$1}++;
+
 			} elsif ($line =~
 	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 			   )
@@ -13415,7 +13548,7 @@ sub autodetect_format
 				$nfound++;
 				$ident_name{$1}++;
 
-				# Are stderr lines ?
+			# Are csv lines ?
 			} elsif (
 				(
 					$line =~
@@ -13426,32 +13559,30 @@ sub autodetect_format
 			{
 				$fmt = 'csv';
 				$nfound++;
+
+			# Are stderr lines ?
 			} elsif ($line =~
 	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 				)
 			{
 				$fmt = 'stderr';
 				$nfound++;
-			} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*):/) {
-				# pgbouncer log file can be parsed with other postgresql file 
-				# so even if it is given at first position, set default format
-				# to stderr. Try to look for format at next file.
-				$fmt = autodetect_format($log_files[1]) if ($#log_files >= 1);
+
+			# Are pgbouncer lines ?
+			} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*|Stats):/) {
+				$fmt = 'pgbouncer';
 				# If we just have one single pgbouncer file, force pgbouncer_only to 1
-				if ($#log_files == 0) {
-					$pgbouncer_only = 1;
-					$fmt = 'stderr';
-				}
-				$nfound++ if ($fmt);
+				$pgbouncer_only = 1 if ($#log_files == 0);
+				$nfound++;
 			}
 			last if (($nfound > 10) || ($nline > 5000));
 		}
 		$tfile->close();
-		# When --pgbouncer-only is used force the format to stderr as
-		# we don't have to care of log format with pgbouncer only report
+
+		# When --pgbouncer-only is used force the format
 		if (!$format && $pgbouncer_only) {
 			$pgbouncer_only = 1;
-			$fmt = 'stderr';
+			$fmt = 'pgbouncer';
 		} elsif (!$format) {
 			if (!$fmt || ($nfound < 10)) {
 				localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
@@ -14302,6 +14433,7 @@ sub get_log_file
 sub split_logfile
 {
 	my $logf = shift;
+	my $saved_pos = shift;
 
 	# CSV file can't be parsed using multiprocessing
 	return (0, -1) if ( $format eq 'csv' );
@@ -14309,13 +14441,9 @@ sub split_logfile
 	# get file size
 	my $totalsize = (stat("$logf"))[7] || 0;
 
-	# Real size of the file is unknown, try to find it
+	# Real size of a compressed file is unknown, try to find it
 	# bz2 does not report real size
-	if ($totalsize <= 16777216) { #16MB
-		#If the file is very small, many jobs actually make the parsing take longer
-		#What is an acceptable file size????
-		$queue_size = 0;
-	} elsif ($logf =~ /\.(gz|zip|xz)$/i) {
+	if ($logf =~ /\.(gz|zip|xz)$/i) {
 		$totalsize = 0;
 		my $cmd_file_size = $gzip_uncompress_size;
 		if ($logf =~ /\.zip$/i) {
@@ -14326,19 +14454,26 @@ sub split_logfile
 		$cmd_file_size =~ s/\%f/$logf/g;
 		$totalsize = `$cmd_file_size`;
 		chomp($totalsize);
-		$queue_size = 0;
+		return (0, $totalsize) if ($totalsize);
 	} elsif ($logf =~ /\.bz2$/i) {
 		$totalsize = 0;
-		$queue_size = 0;
 	}
 
+	# Only uncompressed file can be splitted
 	return (0, -1) if (!$totalsize);
 
 	my @chunks = (0);
-	my $i = 1;
-	if ($last_parsed && $saved_last_line{current_pos} && ($saved_last_line{current_pos} < $totalsize)) {
-		$chunks[0] = $saved_last_line{current_pos};
+	# Seek to the last saved position
+	if ($last_parsed && $saved_pos) {
+		if ($saved_pos < $totalsize) {
+			$chunks[0] = $saved_pos;
+		}
 	}
+	# With small files splitting is inefficient
+	if ($totalsize <= 16777216) {
+		return ($chunks[0], $totalsize);
+	}
+	my $i = 1;
 	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
 	while ($i < $queue_size) {
 		my $pos = int(($totalsize/$queue_size) * $i);
