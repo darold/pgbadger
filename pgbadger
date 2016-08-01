@@ -1886,37 +1886,38 @@ sub set_parser_regex
 		@pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
 		$pgbouncer_log_parse2 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[:\d]* (.*)/;
 		@pgb_prefix_parse2 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+
 	} elsif ($log_line_prefix) {
 
 		# Build parameters name that will be extracted from the prefix regexp
-		@prefix_params = &build_log_line_prefix_regex();
-		&check_regex($log_line_prefix, '--prefix');
+		my $llp = '';
+		($llp, @prefix_params) = &build_log_line_prefix_regex($log_line_prefix);
 
 		if ($fmt eq 'syslog') {
-			$log_line_prefix =
+			$llp =
 				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
-				. $log_line_prefix
+				. $llp
 				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-			$compiled_prefix = qr/$log_line_prefix/;
+			$compiled_prefix = qr/$llp/;
 			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
 			$orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 		} elsif ($fmt eq 'syslog2') {
 			$fmt = 'syslog';
-			$log_line_prefix =
+			$llp =
 				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
-				. $log_line_prefix
+				. $llp
 				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-			$compiled_prefix = qr/$log_line_prefix/;
+			$compiled_prefix = qr/$llp/;
 			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
 			$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
 		} elsif ($fmt eq 'stderr') {
-			$orphan_stderr_line = qr/$log_line_prefix/;
-			$log_line_prefix = '^' . $log_line_prefix . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
-			$compiled_prefix = qr/$log_line_prefix/;
+			$orphan_stderr_line = qr/$llp/;
+			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
+			$compiled_prefix = qr/$llp/;
 			push(@prefix_params, 't_loglevel', 't_query');
 
 		}
@@ -13797,6 +13798,8 @@ EOF
 
 sub build_log_line_prefix_regex
 {
+	my $llp = shift;
+
 	my %regex_map = (
 		'%a' => [('t_appname',      '(.*)')],                                   # application name
 		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-\.]*)')],                                         # user name
@@ -13816,15 +13819,19 @@ sub build_log_line_prefix_regex
 		'%e' => [('t_sqlstate',          '([0-9a-zA-Z]+)')],                                              # SQL state
 	);
 	my @param_list = ();
-	$log_line_prefix =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
-	$log_line_prefix =~ s/\%l([^\d])\d+/\%l$1\\d\+/;
-	$log_line_prefix =~ s/\%q//;
-	while ($log_line_prefix =~ s/(\%[audrhptmlscvxie])/$regex_map{"$1"}->[1]/) {
+	$llp =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
+	$llp =~ s/\%l([^\d])\d+/\%l$1\\d\+/;
+	$llp =~ s/\%q//;
+	while ($llp =~ s/(\%[audrhptmlscvxie])/$regex_map{"$1"}->[1]/) {
 		push(@param_list, $regex_map{"$1"}->[0]);
 	}
 	# replace %% by a single %
-	$log_line_prefix =~ s/\%\%/\%/;
-	return @param_list;
+	$llp =~ s/\%\%/\%/;
+
+	# Check regex in log line prefix from command line
+	&check_regex($llp, '--prefix');
+
+	return ($llp, @param_list);
 }
 
 # Inclusion of Perl package SQL::Beautify
