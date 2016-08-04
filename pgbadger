@@ -4876,6 +4876,28 @@ sub html_footer
 	print $fh qq{
 		</li>
 	</ul> <!-- end of slides -->
+
+  <!-- Modal -->
+  <div class="modal fade" id="pgbadgerModal" role="dialog">
+    <div class="modal-dialog">
+    
+      <!-- Modal content-->
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title">Right click + "Save image as ..." to save the graph as PNG image</h4>
+        </div>
+        <div class="modal-body">
+          <img src="" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
 </div> <!-- End of main-container -->
 
 <footer>
@@ -16116,29 +16138,26 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
     color: #5f5555;
  }
 
+ #pgbadgerModal .modal-dialog
+ {
+     height: 100%;
+     width: 800px;
+     overflow-y: hidden;
+     background-color: white;
+ }
+
 WRFILE: pgbadger.js
 
 /* <![CDATA[ */
 
 function create_download_button (buttonid, cssclass) {
-	document.writeln('<input type="button" class="'+cssclass+'" value="Download" id="download'+buttonid+'" onclick="return false;">');
+	document.writeln('<button type="button" id="download'+buttonid+'" class="btn btn-info" data-toggle="modal" data-target="#pgbadgerModal">Download</button>');
 }
 
 function add_download_button_event (buttonid, divid) {
 
 	jQuery('#download'+buttonid).click( function() {
-		$('#'+divid).jqplotViewImage();
-		var nagent = navigator.userAgent.toLowerCase();
-		if (nagent.indexOf('chrome') > -1) {
-			$('#'+divid).jqplotViewImage();
-		} else {
-			var imgData = $('#'+divid).jqplotToImageStr({});
-			var w = window.open('chart.html');
-			w.document.open("text/html");
-			w.document.write("<img src='"+imgData+"' />");
-			w.document.close();
-			w = null;
-		}
+		$('#pgbadgerModal img').attr('src', $('#'+divid).jqplotToImageStr({}));
 	});
 
 }
