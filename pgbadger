@@ -2831,13 +2831,13 @@ sub process_file
 					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
 						$cur_cancel_info{$cur_pid}{query} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $t_query if (!$nomultiline);
+						$cur_info{$cur_pid}{statement} .= "\n" . $t_query if (!$nomultiline && !$error_only);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $t_query if (!$nomultiline);
+						$cur_info{$cur_pid}{query} .= "\n" . $t_query if (!$nomultiline && !$error_only);
 					}
 
 				# Collect orphaned lines of multiline queries
@@ -2858,13 +2858,13 @@ sub process_file
 					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
 						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
+						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline && !$error_only);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline);
+						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
 					}
 
 				} else {
@@ -3011,13 +3011,13 @@ sub process_file
 					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
 						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
+						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline && !$error_only);
 					} elsif (exists $cur_info{$cur_pid}{context}) {
 						$cur_info{$cur_pid}{context} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{detail}) {
 						$cur_info{$cur_pid}{detail} .= "\n" . $line;
 					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline);
+						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
 					}
 
 				# Collect orphaned lines of multiline queries
