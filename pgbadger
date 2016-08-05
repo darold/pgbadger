@@ -610,8 +610,6 @@ my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
 
 # Set syslog prefix regex
 my $other_syslog_line = '';
-my $orphan_syslog_line = '';
-my $orphan_stderr_line = '';
 my $pgbouncer_log_format =  '';
 my $pgbouncer_log_parse1 = '';
 my $pgbouncer_log_parse2 = '';
@@ -1902,7 +1900,6 @@ sub set_parser_regex
 			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-			$orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 		} elsif ($fmt eq 'syslog2') {
 			$fmt = 'syslog';
 			$llp =
@@ -1913,9 +1910,7 @@ sub set_parser_regex
 			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-			$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
 		} elsif ($fmt eq 'stderr') {
-			$orphan_stderr_line = qr/$llp/;
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
 			push(@prefix_params, 't_loglevel', 't_query');
@@ -1929,7 +1924,6 @@ sub set_parser_regex
 		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-		$orphan_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:/;
 
 	} elsif ($fmt eq 'syslog2') {
 
@@ -1939,14 +1933,12 @@ sub set_parser_regex
 		push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-		$orphan_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:/;
 
 	} elsif ($fmt eq 'stderr') {
 
 		$compiled_prefix =
 	qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
-		$orphan_stderr_line = qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*/;
 
 	}
 }
@@ -2799,73 +2791,20 @@ sub process_file
 					$t_query =~ s/#011/\t/g;
 					next if ($t_query eq "\t");
 
-					if ($cur_info{$cur_pid}{vacuum} && ($t_query =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
-						if ($t_query =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
-							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
-						}
-						if ($t_query =~ m#^\tsystem usage: CPU .* sec elapsed (.*) sec#) {
-							if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
-								$autovacuum_info{peak}{system_usage}{elapsed} = $1;
-								$autovacuum_info{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
-								$autovacuum_info{peak}{system_usage}{date} = 
-									"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
-									"$cur_info{$cur_pid}{hour}:$cur_info{$cur_pid}{min}:$cur_info{$cur_pid}{sec}";
-							}
-						}
-						next;
-					} elsif ( $cur_info{$cur_pid}{parameters} && (($t_query =~ /[,\s]*\$(\d+)\s=\s/) || ($t_query =~ /^('[^']*')$/)) ) {
-						# stores bind parameters if any
-						$cur_info{$cur_pid}{parameters} .= " $t_query";
-						next;
-					} 
-
 					# Some log line may be written by applications
-					next if ($line =~ /\bLOG:  /);
+					next if ($t_query =~ /\bLOG:  /);
 
-					if (exists $cur_plan_info{$cur_pid}{duration}) {
-						$cur_plan_info{$cur_pid}{plan} .= "\n" . $t_query;
-					} elsif (exists $cur_temp_info{$cur_pid}{query}) {
-						$cur_temp_info{$cur_pid}{query} .= "\n" . $t_query;
-					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-						$cur_lock_info{$cur_pid}{query} .= "\n" . $t_query;
-					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
-						$cur_cancel_info{$cur_pid}{query} .= "\n" . $t_query;
-					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $t_query if (!$nomultiline && !$error_only);
-					} elsif (exists $cur_info{$cur_pid}{context}) {
-						$cur_info{$cur_pid}{context} .= "\n" . $t_query;
-					} elsif (exists $cur_info{$cur_pid}{detail}) {
-						$cur_info{$cur_pid}{detail} .= "\n" . $t_query;
-					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $t_query if (!$nomultiline && !$error_only);
-					}
+					# Parse orphan lines to append inforamtion to the right place
+					&parse_orphan_line($cur_pid, $t_query);
 
 				# Collect orphaned lines of multiline queries
-				} elsif ($cur_pid && ($line !~ $orphan_syslog_line)) {
+				} elsif ($cur_pid) {
 
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					if (exists $cur_plan_info{$cur_pid}{duration}) {
-						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{parameters}) {
-						# stores bind parameters if any
-						$cur_info{$cur_pid}{parameters} .= "\n" . $line;
-					} elsif (exists $cur_temp_info{$cur_pid}{query}) {
-						$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
-						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline && !$error_only);
-					} elsif (exists $cur_info{$cur_pid}{context}) {
-						$cur_info{$cur_pid}{context} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{detail}) {
-						$cur_info{$cur_pid}{detail} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
-					}
+					# Parse orphan lines to append inforamtion to the right place
+					&parse_orphan_line($cur_pid, $line);
 
 				} else {
 					&logmsg('DEBUG', "Unknown syslog line format: $line");
@@ -2950,91 +2889,19 @@ sub process_file
 					}
 
 				# Collect additional query information
-				} elsif ($cur_pid && ($line !~ $orphan_stderr_line)) {
-
-					if ($line =~ s/^(STATEMENT|DETAIL|HINT):\s+//) {
-						my $lbl = lc($1);
-						$line =~ s/ERROR:\s+//;
-						if (exists $cur_temp_info{$cur_pid}{size}) {
-							$cur_temp_info{$cur_pid}{query} .= $line;
-						} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-							$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-						} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
-							$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
-						} else {
-							$cur_info{$cur_pid}{$lbl} = $line;
-						}
-						next;
-					} elsif ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
-						if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
-							$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
-						}
-						if ($line =~ m#^\tsystem usage: CPU .* sec elapsed (.*) sec#) {
-							if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
-								$autovacuum_info{peak}{system_usage}{elapsed} = $1;
-								$autovacuum_info{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
-								$autovacuum_info{peak}{system_usage}{date} = 
-									"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
-									"$cur_info{$cur_pid}{hour}:$cur_info{$cur_pid}{min}:$cur_info{$cur_pid}{sec}";
-							}
-						}
-						next;
-					} elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) ) {
-						# stores bind parameters if any
-						$cur_info{$cur_pid}{parameters} .= " $line";
-						next;
-					} 
+				} elsif ($cur_pid) {
 
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					if (exists $cur_plan_info{$cur_pid}{duration}) {
-						$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{parameters}) {
-						# stores bind parameters if any
-						$cur_info{$cur_pid}{parameters} .= "\n" . $line;
-					} elsif (exists $cur_temp_info{$cur_pid}{size}) {
-						if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
-							$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
-							$cur_temp_info{$cur_pid}{timestamp} = $cur_info{$cur_pid}{'timestamp'};
-							$cur_temp_info{$cur_pid}{dbname}    = $cur_info{$cur_pid}{'dbname'};
-							$cur_temp_info{$cur_pid}{dbuser}    = $cur_info{$cur_pid}{'dbuser'};
-							$cur_temp_info{$cur_pid}{dbclient}  = $cur_info{$cur_pid}{'client'} || $cur_info{$cur_pid}{'dbclient'};
-							$cur_temp_info{$cur_pid}{dbappname} = $cur_info{$cur_pid}{'appname'};
-							delete $cur_info{$cur_pid};
-						}
-						if (exists $cur_temp_info{$cur_pid}{query} && $cur_temp_info{$cur_pid}{query}) {
-							$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
-						}
-					} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-						$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
-						$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{statement}) {
-						$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline && !$error_only);
-					} elsif (exists $cur_info{$cur_pid}{context}) {
-						$cur_info{$cur_pid}{context} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{detail}) {
-						$cur_info{$cur_pid}{detail} .= "\n" . $line;
-					} elsif (exists $cur_info{$cur_pid}{query}) {
-						$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
-					}
+					# Parse orphan lines to append inforamtion to the right place
+					&parse_orphan_line($cur_pid, $line);
 
-				# Collect orphaned lines of multiline queries
-				} elsif ($cur_pid && ($cur_info{$cur_pid}{query})) {
+				} else {
 
-					$cur_info{$cur_pid}{detail} .= "\n" . $line;
-
-				} elsif (exists $cur_plan_info{$cur_pid}{duration}) {
-
-					$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
-
+					# unknown format
+					&logmsg('DEBUG', "Unknown line format: $line");
 				}
-
-			} else {
-
-				# unknown format
-				&logmsg('DEBUG', "Unknown line format: $line");
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
@@ -3159,6 +3026,78 @@ sub process_file
 
 	return $getout;
 }
+
+sub parse_orphan_line
+{
+	my ($cur_pid, $line) = @_;
+
+	# Store vacuum related information
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+		if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
+			$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
+		}
+		if ($line =~ m#^\tsystem usage: CPU .* sec elapsed (.*) sec#) {
+			if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
+				$autovacuum_info{peak}{system_usage}{elapsed} = $1;
+				$autovacuum_info{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
+				$autovacuum_info{peak}{system_usage}{date} = 
+					"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
+					"$cur_info{$cur_pid}{hour}:$cur_info{$cur_pid}{min}:$cur_info{$cur_pid}{sec}";
+			}
+		}
+
+	# stores bind parameters if parameter syntax is detected
+	} elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) ) {
+
+		$cur_info{$cur_pid}{parameters} .= " $line" if (!$error_only);
+
+	} elsif (exists $cur_plan_info{$cur_pid}{duration}) {
+
+		$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
+
+	# If we have previously stored a temporary file query, append to that query
+	} elsif (exists $cur_temp_info{$cur_pid}{size}) {
+		if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
+			$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
+			$cur_temp_info{$cur_pid}{timestamp} = $cur_info{$cur_pid}{'timestamp'};
+			$cur_temp_info{$cur_pid}{dbname}    = $cur_info{$cur_pid}{'dbname'};
+			$cur_temp_info{$cur_pid}{dbuser}    = $cur_info{$cur_pid}{'dbuser'};
+			$cur_temp_info{$cur_pid}{dbclient}  = $cur_info{$cur_pid}{'client'} || $cur_info{$cur_pid}{'dbclient'};
+			$cur_temp_info{$cur_pid}{dbappname} = $cur_info{$cur_pid}{'appname'};
+			delete $cur_info{$cur_pid};
+		}
+		if (exists $cur_temp_info{$cur_pid}{query} && $cur_temp_info{$cur_pid}{query}) {
+			$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
+		}
+
+	# If we have previously stored a query that generates locks, append to that query
+	} elsif (exists $cur_lock_info{$cur_pid}{query}) {
+
+		$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+	# If we have previously stored a cancelled query, append to that query
+	} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
+
+		$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
+
+	# Otherwise append the orphan line to the corresponding part of the query
+	} else {
+		# Append to the error statement if one is defined
+		if (exists $cur_info{$cur_pid}{statement}) {
+			$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
+		# Append to the error context if one is defined
+		} elsif (exists $cur_info{$cur_pid}{context}) {
+			$cur_info{$cur_pid}{context} .= "\n" . $line;
+		# Append to the query detail if one is defined
+		} elsif ($error_only && exists $cur_info{$cur_pid}{detail}) {
+			$cur_info{$cur_pid}{detail} .= "\n" . $line;
+		# After all append to the query if one is defined
+		} elsif (exists $cur_info{$cur_pid}{query}) {
+			$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
+		}
+	}
+
+}
+
 
 # Store the current timestamp of the log line
 sub store_current_timestamp
@@ -12249,7 +12188,10 @@ sub parse_query
 	if ($cur_info{$t_pid}{loglevel} =~ $main_error_regex) {
 		# and current one is detailed information
 		if ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
-			$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
+			# Store error details only if this is not a parameter list (never present with errors)
+			if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
+				$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
+			}
 			return;
 		}
 	}
@@ -13072,7 +13014,8 @@ sub store_queries
 	my $t_pid  = shift;
 	my $end  = shift;
 
-	return 0 if (!$end && $log_duration && ($cur_info{$t_pid}{duration} eq ''));
+	# With separate log_duration and log_statement wait duration before storing the entry
+	return 0 if (!$end && $log_duration && ($cur_info{$t_pid}{duration} eq '') && ($cur_info{$t_pid}{log_level} eq 'LOG'));
 
 	# Remove comments if required
 	if ($remove_comment) {
@@ -13369,6 +13312,7 @@ sub store_queries
 			}
 		}
 	}
+
 	return 1;
 }
 
