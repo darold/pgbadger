@@ -607,6 +607,7 @@ for (my $i = 0 ; $i < 60 ; $i += $histo_avg_minutes) {
 my $parse_regex      = qr/^(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT|LOCATION)/;
 my $full_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC|DETAIL|HINT|STATEMENT|CONTEXT)/;
 my $main_error_regex = qr/^(WARNING|ERROR|FATAL|PANIC)/;
+my $main_log_regex = qr/^(LOG|WARNING|ERROR|FATAL|PANIC)/;
 
 # Set syslog prefix regex
 my $other_syslog_line = '';
@@ -2623,9 +2624,10 @@ sub process_file
 
 						# Parse the query now
 						&parse_query($fmt);
-						if (&store_queries($prefix_vars{'t_pid'})) {
-							delete $cur_info{$prefix_vars{'t_pid'}};
-						}
+
+						# The information can be saved immediately with csvlog
+						&store_queries($prefix_vars{'t_pid'});
+						delete $cur_info{$prefix_vars{'t_pid'}};
 					}
 				}
 			}
@@ -2717,11 +2719,6 @@ sub process_file
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
 
-					# Store temporary files and locks information
-					if (($prefix_vars{'t_pid'} ne $cur_pid) && ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
-						&store_temporary_and_lock_infos($cur_pid);
-					}
-
 					# Standard syslog format does not have year information, months are
 					# three letters and days are not always with 2 digits.
 					if ($prefix_vars{'t_month'} !~ /\d/) {
@@ -2765,7 +2762,6 @@ sub process_file
 
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
-					$cur_pid = $prefix_vars{'t_pid'};
 					$goon = 1;
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 
@@ -2780,9 +2776,16 @@ sub process_file
 					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
+						# The information can be saved when we are switching to a new main message
+						if ($cur_pid && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)) {
+							&store_queries($cur_pid);
+							delete $cur_info{$cur_pid};
+						}
+
 						# Process the log line
 						&parse_query($fmt);
 					}
+					$cur_pid = $prefix_vars{'t_pid'};
 
 				} elsif ($goon && ($line =~ $other_syslog_line)) {
 
@@ -2820,11 +2823,6 @@ sub process_file
 
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
-
-					# Stores temporary files and lock information
-					if (($prefix_vars{'t_pid'} ne $cur_pid) && ($prefix_vars{'t_query'} !~ /temporary file: path ".*\.\d+", size/)) {
-						&store_temporary_and_lock_infos($cur_pid);
-					}
 
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
@@ -2867,7 +2865,6 @@ sub process_file
 
 					# Jump to the last line parsed if required
 					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
-					$cur_pid = $prefix_vars{'t_pid'};
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
 
 					# Store the current timestamp of the log line
@@ -2884,9 +2881,16 @@ sub process_file
 						# when log format is not syslog
 						$prefix_vars{'t_host'} = 'stderr';
 
+						# The information can be saved when we are switching to a new main message
+						if ($cur_pid && $prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/) {
+							&store_queries($cur_pid);
+							delete $cur_info{$cur_pid};
+						}
+
 						# Process the log line
 						&parse_query($fmt);
 					}
+					$cur_pid = $prefix_vars{'t_pid'};
 
 				# Collect additional query information
 				} elsif ($cur_pid) {
@@ -3057,23 +3061,14 @@ sub parse_orphan_line
 
 	# If we have previously stored a temporary file query, append to that query
 	} elsif (exists $cur_temp_info{$cur_pid}{size}) {
-		if (exists $cur_info{$cur_pid}{query} && !$cur_temp_info{$cur_pid}{query}) {
-			$cur_temp_info{$cur_pid}{query} = $cur_info{$cur_pid}{query};
-			$cur_temp_info{$cur_pid}{timestamp} = $cur_info{$cur_pid}{'timestamp'};
-			$cur_temp_info{$cur_pid}{dbname}    = $cur_info{$cur_pid}{'dbname'};
-			$cur_temp_info{$cur_pid}{dbuser}    = $cur_info{$cur_pid}{'dbuser'};
-			$cur_temp_info{$cur_pid}{dbclient}  = $cur_info{$cur_pid}{'client'} || $cur_info{$cur_pid}{'dbclient'};
-			$cur_temp_info{$cur_pid}{dbappname} = $cur_info{$cur_pid}{'appname'};
-			delete $cur_info{$cur_pid};
-		}
-		if (exists $cur_temp_info{$cur_pid}{query} && $cur_temp_info{$cur_pid}{query}) {
-			$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
-		}
+
+		$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 
 	# If we have previously stored a query that generates locks, append to that query
 	} elsif (exists $cur_lock_info{$cur_pid}{query}) {
 
 		$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
+
 	# If we have previously stored a cancelled query, append to that query
 	} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
 
@@ -3354,7 +3349,7 @@ sub check_incremental_position
 			foreach my $pid (keys %cur_lock_info) {
 				&store_temporary_and_lock_infos($pid);
 			}
-
+			# Stores tsung sessions
 			if ($extension eq 'tsung') {
 				foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
 					&store_tsung_session($pid);
@@ -12138,6 +12133,8 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+		} elsif (exists $cur_cancel_info{$t_pid}) {
+			&store_temporary_and_lock_infos($t_pid);
 		}
 	}
 
@@ -12184,16 +12181,56 @@ sub parse_query
 		return;
 	}
 
-	# Stores the error's detail if previous line was an error
-	if ($cur_info{$t_pid}{loglevel} =~ $main_error_regex) {
-		# and current one is detailed information
-		if ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) {
-			# Store error details only if this is not a parameter list (never present with errors)
-			if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
-				$cur_info{$t_pid}{"\L$1\E"} .= $prefix_vars{'t_query'};
-			}
+
+	# Save previous temporary file information with same pid to not overwrite it
+	if ($prefix_vars{'t_loglevel'} =~ $main_log_regex) {
+		if (($prefix_vars{'t_query'} !~ /temporary file: path .*, size \d+/) && exists $cur_temp_info{$t_pid}) {
+			&store_temporary_and_lock_infos($t_pid);
+		}
+		if (($prefix_vars{'t_query'} !~ /acquired [^\s]+ on [^\s]+ .* after [0-9\.]+ ms/) && exists $cur_lock_info{$t_pid}) {
+			&store_temporary_and_lock_infos($t_pid);
+		}
+	}
+
+	# Special cases when a STATEMENT is parsed
+	if ($prefix_vars{'t_loglevel'} eq 'STATEMENT') {
+		# Stores temporary file statement if a temporary record with the same pid exists
+		if ( exists $cur_temp_info{$t_pid} ) {
+			# Store query of the last temporary file found.
+			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
 			return;
 		}
+
+		# Stores query related to last lock information
+		if (exists $cur_lock_info{$t_pid}{wait}) {
+			$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+			$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			return;
+		}
+
+		# Stores query related to cancelled queries information
+		if (exists $cur_cancel_info{$t_pid}{count}) {
+			$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_query'};
+			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
+			$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
+			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
+			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			return;
+		}
+	}
+
+	# Stores the error's detail if previous line was an error
+	if (($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
+		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
+			# Store error details only if this is not a parameter list (never present with errors)
+			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
+		}
+		return;
 	}
 
 	# set current session workload
@@ -12228,77 +12265,34 @@ sub parse_query
 		return;
 	}
 
-	# Stores query related to temporary file information
-	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid}{size}) {
-		$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-		$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-		$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-		$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-		$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-		$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-		return;
-	}
-
-	# Stores query related to last lock information
-	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_lock_info{$t_pid}{wait}) {
-		$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-		$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-		$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-		$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-		$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-		$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-		return;
-	}
-
-	# Stores query related to cancelled queries information
-	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_cancel_info{$t_pid}{count}) {
-		$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-		$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-		$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-		$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-		$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-		$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
-		return;
-	}
-
 	# Stores temporary files activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path (.*), size (\d+)/)) {
 		return if ($disable_temporary);
 		my $filepath = $1;
+		my $size = $2;
 		$tempfile_info{count}++;
-		$tempfile_info{size} += $2;
+		$tempfile_info{size} += $size;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{count}++;
-		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{size} += $2;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{size} += $size;
+
 		# Store current temporary file information that will be used later
 		# when we will parse the query responsible for the tempfile
-		$cur_temp_info{$t_pid}{size} += $2;
+		$cur_temp_info{$t_pid}{size} += $size;
+		$cur_temp_info{$t_pid}{query} = ''; # initialyze the query
 		$tempfile_info{maxsize} = $cur_temp_info{$t_pid}{size} if ($tempfile_info{maxsize} < $cur_temp_info{$t_pid}{size});
-		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $2;
+		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $size;
 		$overall_stat{'peak'}{$cur_last_log_timestamp}{tempfile_count}++;
 		if ($fmt eq 'csv') {
 			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
-		} elsif ($filepath =~ /\.\d+"$/) {
-			# Temporary store the current request to keep temporary file query in memory
-			$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{statement} if (!exists $cur_temp_info{$t_pid}{query});
 		}
+		# Stores information related to first created temporary file
 		if (!exists $cur_temp_info{$t_pid}{timestamp}) {
-			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-			$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
+			$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'} || '';
+			$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'} || '';
+			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} || '';
 			$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} || '';
 		}
-		return;
-	}
-
-	# Stores query related to last created temporary file
-	if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && $cur_temp_info{$t_pid}{size}) {
-		$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_query'};
-		$cur_temp_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
-		$cur_temp_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
-		$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
-		$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
-		$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 		return;
 	}
 
@@ -12607,18 +12601,6 @@ sub parse_query
 	if ($prefix_vars{'t_detail'} =~ /parameters: (.*)/) {
 		$cur_info{$t_pid}{parameters} = "$1";
 		# go look at other params
-	}
-
-	####
-	# Register previous query storage into global statistics before starting to store current query
-	####
-	if (exists $cur_info{$t_pid}{query}) {
-		# when switching to a new log message
-		if ( ($prefix_vars{'t_loglevel'} eq 'LOG') || ($fmt eq 'csv') || ($prefix_vars{'t_loglevel'} =~ $main_error_regex) ) {
-			if (&store_queries($t_pid)) {
-				delete $cur_info{$t_pid};
-			}
-		}
 	}
 
 	####
@@ -13026,9 +13008,6 @@ sub store_queries
 	if ($anonymize && exists $cur_info{$t_pid}{query}) {
 		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
 	}
-
-	# Stores temporary files and lock information
-	&store_temporary_and_lock_infos($t_pid);
 
 	return 0 if (!exists $cur_info{$t_pid});
 	return 1 if (!$cur_info{$t_pid}{year});
