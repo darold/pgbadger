@@ -3076,6 +3076,7 @@ sub parse_orphan_line
 
 	# Otherwise append the orphan line to the corresponding part of the query
 	} else {
+
 		# Append to the error statement if one is defined
 		if (exists $cur_info{$cur_pid}{statement}) {
 			$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
@@ -8918,7 +8919,7 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
-				<div id="query-a-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
+				<div id="query-a-$rank" class="sql sql-middlesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 				 $example
 			<!-- Examples collapse -->
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
@@ -9084,7 +9085,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
-					<div id="query-c-$rank" class="sql sql-largesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
+					<div id="query-c-$rank" class="sql sql-middlesize"><i class="icon-copy" title="Click to select query"></i>$query</div>$md5
 					$example
 				<!-- Examples collapse -->
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
@@ -12192,6 +12193,16 @@ sub parse_query
 		}
 	}
 
+	# Stores the error's detail if previous line was an error
+	if (($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
+		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
+			# Store error details only if this is not a parameter list (never present with errors)
+			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
+		}
+		return;
+	}
+
+
 	# Special cases when a STATEMENT is parsed
 	if ($prefix_vars{'t_loglevel'} eq 'STATEMENT') {
 		# Stores temporary file statement if a temporary record with the same pid exists
@@ -12222,15 +12233,6 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 			return;
 		}
-	}
-
-	# Stores the error's detail if previous line was an error
-	if (($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
-		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
-			# Store error details only if this is not a parameter list (never present with errors)
-			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
-		}
-		return;
 	}
 
 	# set current session workload
@@ -13088,7 +13090,6 @@ sub store_queries
 
 	# Store the collected information into global statistics
 	if ($cur_info{$t_pid}{loglevel} =~ $main_error_regex) {
-
 		# Add log level at beginning of the query and normalize it
 		$cur_info{$t_pid}{query} = $cur_info{$t_pid}{loglevel} . ":  " . $cur_info{$t_pid}{query};
 		my $normalized_error = &normalize_error($cur_info{$t_pid}{query});
