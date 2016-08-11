@@ -4438,9 +4438,8 @@ sub show_error_as_text
 
 		my $msg = $k;
 		$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
-		$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
+		$msg =~ s/ERROR:  (database system was)/LOG:  $1/;
 		$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
-		$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
 		$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
 		$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
 		$msg =~ s/ERROR:  (using stale statistics)/LOG:  $1/;
@@ -4452,8 +4451,7 @@ sub show_error_as_text
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
 				last if ($i == $sample);
 				if (   ($error_info{$k}{error}[$i] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
@@ -4473,8 +4471,7 @@ sub show_error_as_text
 			}
 		} elsif ($error_info{$k}{error}[0]) {
 			if (   ($error_info{$k}{error}[0] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
@@ -10460,8 +10457,7 @@ sub print_log_level
 		if ($error_info{$k}{count} > 1) {
 			for (my $i = 0 ; $i <= $#{$error_info{$k}{date}} ; $i++) {
 				if (   ($error_info{$k}{error}[$i] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
-					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (database system was)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 					|| ($error_info{$k}{error}[$i] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
@@ -10474,8 +10470,7 @@ sub print_log_level
 			}
 		} else {
 			if (   ($error_info{$k}{error}[0] =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was shut down)/LOG:  $1/)
-				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/)
+				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (database system was)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (recovery has paused)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/)
 				|| ($error_info{$k}{error}[0] =~ s/ERROR:  (skipping analyze of)/LOG:  $1/)
@@ -10684,8 +10679,7 @@ sub show_error_as_html
 		my $count = &comma_numbers($error_info{$k}{count});
 		my $msg = $k;
 		$msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
-		$msg =~ s/ERROR:  (database system was shut down)/LOG:  $1/;
-		$msg =~ s/ERROR:  (database system was interrupted while in recovery)/LOG:  $1/;
+		$msg =~ s/ERROR:  (database system was)/LOG:  $1/;
 		$msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
 		$msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
 		$msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
@@ -12100,9 +12094,7 @@ sub parse_query
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} =~ /parameter "[^"]+" changed to "[^"]+"/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
-		} elsif ($prefix_vars{'t_query'} =~ /database system was shut down at /) {
-			$prefix_vars{'t_loglevel'} = 'ERROR';
-		} elsif ($prefix_vars{'t_query'} =~ /database system was interrupted while in recovery/) {
+		} elsif ($prefix_vars{'t_query'} =~ /database system was/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		} elsif ($prefix_vars{'t_query'} =~ /recovery has paused/) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
@@ -13390,7 +13382,7 @@ sub normalize_error
 	$orig_query =~ s/"[^"]*"/"..."/g;
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
-	$orig_query =~ s/(database system was shut down at).*/$1 .../;
+	$orig_query =~ s/(database system was.* at (?:log time )?).*/$1 .../;
 	$orig_query =~ s/(relation) \d+ (deleted while still in use)/$1 ... $2/g;
 	$orig_query =~ s/[0-9A-F]{24}/.../g; # Remove WAL filename
 	$orig_query =~ s/, u_uuid: [^,]+, file_path:.*/. Retrying/g;
