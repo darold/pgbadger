@@ -1,3 +1,49 @@
+2016-08-11 version 8.2 
+
+This is a maintenance release that fix some minor bug. There is also
+some performances improvement up to 20% on huge files and some new
+interesting features:
+
+   * Multiprocessing can be used with pgbouncer log files.
+   * pgBouncer and PostgreSQL log files can be used together in
+     incremental mode.
+   * With default or same prefix, stderr and syslog file can be
+     parsed together, csvlog format can always be used.
+   * Use a modal dialog window to download graphs as png images.
+   * Add pl/pgSQL function information to queries when available.
+
+Here are the complete list of changes:
+
+    - Fix report of database system messages.
+    - Fix multi line statement concatenation after an error.
+    - Fix box size for report of queries generating the most
+      temporary files and the most waiting queries.
+    - Rewrite code to better handle multi-line queries.
+    - Fix garbage in examples of event queries with error only mode
+      (option -w). Thanks to Thomas Reiss for the report.
+    - Fix getting dataset related to query duration with the use of
+      auto_explain. Thanks to tom__b for the patch.
+    - Use a modal dialog window to download graphs as png images.
+    - Huge rewrite of the incremental mechanism applied to log files
+      to handle PostgreSQL and pgbouncer logs at the same time.
+    - Multiprocess can be used with pgbouncer log.
+    - Add code to remove remaining keyword placeholders tags.
+    - Fix an other possible case of truncated date in LAST_PARSED file
+      Thanks to brafaeloliveira for the report.
+    - Set default scale 1 in pretty_print_number() js function.
+    - Fix auto-detection of pgbouncer files that contain only stats
+      lines. Thanks to Glyn Astill for the patch.
+    - Add date to samples of queries generating most temporary files.
+    - Do not display warning message of empty log when quiet mode is
+      enable.
+    - Fix reading from stdin by disabling pgbouncer format detection.
+      Thanks to Robert Vargason for the patch.
+    - Fix case of duplicate normalized error message with "nonstandard
+      use of ...".
+    - Fix storage of current temporary file related request.
+    - Use the mnemonic rather than a signal number in kill calls.
+      Thanks to Komeda Shinji for the patch.
+
 2016-04-21 version 8.1 
 
 This is a maintenance release that fix a major issue introduced with
