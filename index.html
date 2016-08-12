@@ -1517,6 +1517,100 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">8.2</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-02-11</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This is a maintenance release that fix some minor bug. There is also
+some performances improvement up to 20% on huge files and some new
+interesting features:
+</p>
+<pre>
+   * Multiprocessing can be used with pgbouncer log files.
+   * pgBouncer and PostgreSQL log files can be used together in
+     incremental mode.
+   * With default or same prefix, stderr and syslog file can be
+     parsed together, csvlog format can always be used.
+   * Use a modal dialog window to download graphs as png images.
+   * Add pl/pgSQL function information to queries when available.
+</pre>
+<p>
+Here are the complete list of changes:
+</p>
+<pre>
+    - Fix report of database system messages.
+    - Fix multi line statement concatenation after an error.
+    - Fix box size for report of queries generating the most
+      temporary files and the most waiting queries.
+    - Rewrite code to better handle multi-line queries.
+    - Fix garbage in examples of event queries with error only mode
+      (option -w). Thanks to Thomas Reiss for the report.
+    - Fix getting dataset related to query duration with the use of
+      auto_explain. Thanks to tom__b for the patch.
+    - Use a modal dialog window to download graphs as png images.
+    - Huge rewrite of the incremental mechanism applied to log files
+      to handle PostgreSQL and pgbouncer logs at the same time.
+    - Multiprocess can be used with pgbouncer log.
+    - Add code to remove remaining keyword placeholders tags.
+    - Fix an other possible case of truncated date in LAST_PARSED file
+      Thanks to brafaeloliveira for the report.
+    - Set default scale 1 in pretty_print_number() js function.
+    - Fix auto-detection of pgbouncer files that contain only stats
+      lines. Thanks to Glyn Astill for the patch.
+    - Add date to samples of queries generating most temporary files.
+    - Do not display warning message of empty log when quiet mode is
+      enable.
+    - Fix reading from stdin by disabling pgbouncer format detection.
+      Thanks to Robert Vargason for the patch.
+    - Fix case of duplicate normalized error message with "nonstandard
+      use of ...".
+    - Fix storage of current temporary file related request.
+    - Use the mnemonic rather than a signal number in kill calls.
+      Thanks to Komeda Shinji for the patch.
+</pre>
+		</div>
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">8.1</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-04-21</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This is a maintenance release that fix a major issue introduced with
+support to pgbouncer that prevent parsing of compressed PostgreSQL
+log files and adds some improvements.
+</p>
+<p>
+Here are the complete list of changes:
+</p>
+<pre>
+  - Fix one case where pid file remain after dying.
+  - Add requirement of log_error_verbosity = default to documentation.
+  - Report message "LOG: using stale statistics instead of current ones because
+    stats collector is not responding" in events view.
+  - Remove obsolete days when we are in binary mode with --noreport
+  - Fix wrong report of statements responsible of temporary files. Thanks to Luan
+    Nicolini Marcondes for the report. This patch also exclude line with log level LOCATION to be parsed.
+  - Fix limit on number of sample at report generation and remove pending LAST_PARSED.tmp file.
+  - Update load_stat() function and global variables to support pgbouncer statistics. Update version to 2.0.
+  - Handle more kind or query types. Thanks to julien Rouhaud for the patch.
+  - Fix pgbouncer log parser to handle message: FATAL: the database system is shutting down
+  - Fix whitespace placed in between the E and the quote character. Thanks to clijunky for the report.
+  - Fix a major issue introduced with support to pgbouncer that prevent parsing of compressed PostgreSQL
+    log files. Thanks to Levente Birta for the report.
+</pre>
+		</div>
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">8.0</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2016-02-22</span> <span class="figure-label">Date</span></li>    
 				</ul>
@@ -2605,7 +2699,7 @@ PostgreSQL log files to parse, you can add them as usual.</p>
 	<h1 class="page-header"><i class="icon-dashboard"></i> Samples reports</h1>
 
 	<div id="samples-v7" class="analysis-item row-fluid">
-	<h2 class=""><i class="icon-bar-chart"></i> v7.x sample reports with pgbouncer statistis</h2>
+	<h2 class=""><i class="icon-bar-chart"></i> v8.x and v7.x sample reports with pgbouncer statistis</h2>
 	<div class="span8">
 	<p>The sample report generated by pbBadger v7.x can be found <a href="samplev7.html" target="_new">here</a>.
 	</div><!-- end of Sample reports -->
