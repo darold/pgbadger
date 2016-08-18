@@ -13387,7 +13387,10 @@ sub normalize_error
 	$orig_query =~ s/(relation) \d+ (deleted while still in use)/$1 ... $2/g;
 	$orig_query =~ s/[0-9A-F]{24}/.../g; # Remove WAL filename
 	$orig_query =~ s/, u_uuid: [^,]+, file_path:.*/. Retrying/g;
-	$orig_query =~ s/ PID \d+//;
+	$orig_query =~ s/( for)? PID \d+//;
+	$orig_query =~ s/ TIMELINE \d+/ TIMELINE n/;
+	$orig_query =~ s/ [0-9A-F]+\/[0-9A-F]+ / x\/x /;
+	$orig_query =~ s/ BASE_BACKUP LABEL '[^']*'.*/ BASE_BACKUP LABEL '...'/;
 
 	# Need more normalization stuff here
 	return $orig_query;
