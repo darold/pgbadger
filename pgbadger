@@ -1948,7 +1948,7 @@ sub set_parser_regex
 	} elsif ($fmt eq 'stderr') {
 
 		$compiled_prefix =
-	qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 
 	}
@@ -2843,6 +2843,11 @@ sub process_file
 						if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
 							$prefix_vars{'t_timestamp'} .= $1;
 						}
+					} elsif ($prefix_vars{'t_timestamp'} =~ /^\d{10}(\.\d{3})$/) {
+						my $ms = $1;
+						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
+						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
+						 $prefix_vars{'t_timestamp'} .= $ms;
 					}
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
@@ -12099,7 +12104,7 @@ sub parse_query
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
-
+ 
 		$prefix_vars{'t_loglevel'} = 'ERROR' if (&change_log_level($prefix_vars{'t_query'}));
 
 	} elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only) {
@@ -13495,7 +13500,7 @@ sub autodetect_format
 
 			# Are stderr lines ?
 			} elsif ($line =~
-	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+	/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 				)
 			{
 				$fmt = 'stderr';
