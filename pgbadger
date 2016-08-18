@@ -1391,7 +1391,12 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Get log format of the current file
-		my $fmt = &autodetect_format($logfile);
+		my $fmt = $format || 'stderr';
+		if (!$remote_host && !$journalctl_cmd) {
+			$fmt = &autodetect_format($logfile);
+		} else {
+			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
+		}
 
 		# Set regex to parse the log file
 		set_parser_regex($fmt);
@@ -1470,7 +1475,12 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 	foreach my $logfile ( @given_log_files ) {
 
 		# Get log format of the current file
-		my $fmt = autodetect_format($logfile);
+		my $fmt = $format || 'stderr';
+		if (!$remote_host && !$journalctl_cmd) {
+			$fmt = &autodetect_format($logfile);
+		} else {
+			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
+		}
 
 		# Set regex to parse the log file 
 		set_parser_regex($fmt);
