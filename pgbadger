@@ -1938,7 +1938,7 @@ sub set_parser_regex
 	} elsif ($fmt eq 'stderr') {
 
 		$compiled_prefix =
-	qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 
 	}
@@ -13489,7 +13489,7 @@ sub autodetect_format
 			} elsif (
 				(
 					$line =~
-					/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
+					/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
 				)
 				&& ($line =~ tr/,/,/ >= 12)
 				)
@@ -13499,7 +13499,7 @@ sub autodetect_format
 
 			# Are stderr lines ?
 			} elsif ($line =~
-	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+	/\d+-\d+-\d+ \d+:\d+:\d+[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 				)
 			{
 				$fmt = 'stderr';
@@ -13747,7 +13747,7 @@ sub build_log_line_prefix_regex
 		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
 		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
 		'%l' => [('t_session_line', '(\d+)')],                                                        # session line number
-		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2} \d{2}):\d{2}:\d{2}(?: [A-Z\d]{3,6})?')],    # session start timestamp
+		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2} \d{2}):\d{2}:\d{2}(?: [A-Z\+\-\d]{3,6})?')],    # session start timestamp
 		'%c' => [('t_session_id',        '([0-9a-f\.]*)')],                                               # session ID
 		'%v' => [('t_virtual_xid',       '([0-9a-f\.\/]*)')],                                             # virtual transaction ID
 		'%x' => [('t_xid',               '([0-9a-f\.\/]*)')],                                             # transaction ID
