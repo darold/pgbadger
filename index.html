@@ -1517,8 +1517,40 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">8.3</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-08-27</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This is a maintenance release that fix some minor bugs. This release
+also adds replication command messages statistics to the Events
+reports.
+</p>
+<pre>
+   - Fix auto-detection of stderr format with timestamp as epoch (%n).
+   - Fix histogram over multiples days to be cumulative per hour, not
+     an average of the number of event per day.
+   - Fix parsing of remote file that was failing when the file does
+     not exists locally. Thanks to clomdd for the report.
+   - Detect timezones like GMT+3 on CSV logs. Thanks to jacksonfoz
+     for the patch.
+   - Add replication command messages statistics to the Events
+     reports. Thanks to Michael Paquier for the feature request.
+</pre>
+<p>
+This is the last minor version of the 8.x series, next major version
+will include an upgrade of boostrap and jquery library which need
+some major rewrite.
+</p>
+		</div>
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">8.2</span> <span class="figure-label">version</span></li>
-					<li><span class="figure">2016-02-11</span> <span class="figure-label">Date</span></li>    
+					<li><span class="figure">2016-08-11</span> <span class="figure-label">Date</span></li>    
 				</ul>
 			</div>
 		</div>
