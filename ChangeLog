@@ -1,3 +1,23 @@
+2016-08-27 - v8.3
+
+This is a maintenance release that fix some minor bugs. This release
+also adds replication command messages statistics to the Events
+reports.
+
+   - Fix auto-detection of stderr format with timestamp as epoch (%n).
+   - Fix histogram over multiples days to be cumulative per hour, not
+     an average of the number of event per day.
+   - Fix parsing of remote file that was failing when the file does
+     not exists locally. Thanks to clomdd for the report.
+   - Detect timezones like GMT+3 on CSV logs. Thanks to jacksonfoz
+     for the patch.
+   - Add replication command messages statistics to the Events
+     reports. Thanks to Michael Paquier for the feature request.
+
+This is the last minor version of the 8.x series, next major version
+will include an upgrade of boostrap and jquery library which need
+some major rewrite.
+
 2016-08-11 version 8.2 
 
 This is a maintenance release that fix some minor bug. There is also
