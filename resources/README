@@ -1,0 +1,57 @@
+Ressources files are collected from their respective download places as follow:
+
+jqPlot:
+-------
+
+mkdir jqPlot-1.0.8/ && cd jqPlot-1.0.8/
+wget http://www.jqplot.com/download/jquery.jqplot.1.0.8r1250.tar.gz
+tar xzf jquery.jqplot.1.0.8r1250.tar.gz
+cp dist/jquery.jqplot.js /home/git/pgbadger/resources/
+cp dist/jquery.jqplot.css /home/git/pgbadger/resources/
+cp dist/jquery.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.pieRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.barRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.dateAxisRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.canvasTextRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.categoryAxisRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.canvasAxisTickRenderer.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.highlighter.js /home/git/pgbadger/resources/
+cp dist/plugins/jqplot.cursor.js /home/git/pgbadger/resources/
+cd ..
+
+Bootstrap:
+----------
+
+wget https://github.com/twbs/bootstrap/archive/v3.3.7.zip
+unzip v3.3.7.zip bootstrap-3.3.7/dist/js/bootstrap.js bootstrap-3.3.7/dist/css/bootstrap.css
+
+cp bootstrap-3.3.7/dist/js/bootstrap.js  /home/git/pgbadger/resources/
+cp bootstrap-3.3.7/dist/css/bootstrap.css  /home/git/pgbadger/resources/
+
+Fontawesome:
+------------
+http://fontawesome.io/3.2.1/assets/font-awesome.zip
+unzip font-awesome.zip font-awesome/css/font-awesome.css font-awesome/fonts/fontawesome-webfont.ttf
+
+cp font-awesome/css/font-awesome.css /home/git/pgbadger/resources/fontawesome.css
+cp font-awesome/font/fontawesome-webfont.ttf /home/git/pgbadger/resources/font/
+
+Note that the hyphen is removed from font-awesome.css during the copy for
+backward compatibility.
+
+bean:
+-----
+
+wget https://github.com/fat/bean/archive/v1.0.14.tar.gz
+tar xzf v1.0.14.tar.gz  bean-1.0.14/src/bean.js
+
+cp bean-1.0.14/src/bean.js /home/git/pgbadger/resources/
+
+underscore.js:
+--------------
+
+wget http://underscorejs.org/underscore.js -O /home/git/pgbadger/resources/underscore.js
+
+Then file are minified using yui-compressor and the font embedded using the
+Perl script tools/updt_embedded_rsc.pl
+

@@ -1,0 +1,7 @@
+------------------------------------------------------------------------------
+ updt_embedded_rsc.pl - script to update all embedded javascript and css
+                        snippets into the pgbadger Perl script.
+
+ This program is open source, licensed under the PostgreSQL Licence.
+ For license terms, see the LICENSE file.
+------------------------------------------------------------------------------
