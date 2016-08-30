@@ -13678,6 +13678,7 @@ sub jqplot_piegraph
 	foreach my $k (sort keys %data) {
 		$datadef .= "['$k', $data{$k}],";
 	}
+	$datadef =~ s/,$//;
 
 	return <<EOF;
 <div id="$divid" class="jqplot-graph piegraph"></div>
