@@ -26,6 +26,10 @@ if (!-d $RSC_DIR) {
 	die "FATAL: can't find directory: $RSC_DIR.\n";
 }
 
+# Apply patch on jquery.jqplot.js to fix infinite loop
+# May be removed with next jqplot release update
+`patch -r - -s  -N resources/jquery.jqplot.js -i resources/patch-jquery.jqplot.js`;
+
 # Generate all minified resources files
 foreach my $f (@rsc_list) {
 	my $dest = $f;
