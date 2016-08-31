@@ -14665,21 +14665,6 @@ sub localdie
 	exit 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 __DATA__
 
 WRFILE: jquery.jqplot.min.css
