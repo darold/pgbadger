@@ -31,6 +31,7 @@ if (!-d $RSC_DIR) {
 `patch -r - -s  -N resources/jquery.jqplot.js -i resources/patch-jquery.jqplot.js`;
 
 # Generate all minified resources files
+mkdir "$RSC_DIR/min";
 foreach my $f (@rsc_list) {
 	my $dest = $f;
 	$dest =~ s/\.(js|css)$/.min.$1/;
@@ -72,7 +73,7 @@ close(IN);
 # Write script base to destination file
 open(OUT, ">$DEST_TMP_FILE") or die "FATAL: can't write to file $DEST_TMP_FILE, $!\n";
 print OUT $content;
-print OUT "\n__DATA__\n";
+print OUT "__DATA__\n";
 
 # Append each minified resources file
 foreach my $f (@min_rsc_list) {
