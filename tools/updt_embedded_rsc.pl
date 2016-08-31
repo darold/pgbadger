@@ -41,8 +41,8 @@ foreach my $f (@rsc_list) {
 }
 
 # Embedded fontawesome webfont into the CSS file as base64 data
-print `base64 -w 0 $RSC_DIR/font/fontawesome-webfont.ttf > $RSC_DIR/font/fontawesome-webfont.b64`;
-open(IN, "$RSC_DIR/font/fontawesome-webfont.b64") or die "FATAL: can't open file $RSC_DIR/font/fontawesome-webfont.b64, $!\n";
+print `base64 -w 0 $RSC_DIR/font/FontAwesome.otf > $RSC_DIR/font/FontAwesome.otf.b64`;
+open(IN, "$RSC_DIR/font/FontAwesome.otf.b64") or die "FATAL: can't open file $RSC_DIR/font/FontAwesome.otf.b64, $!\n";
 my $b64_font = <IN>;
 close(IN);
 
@@ -52,7 +52,7 @@ my @content = <IN>;
 close(IN);
 open(OUT, ">$RSC_DIR/min/fontawesome.min.css") or die "FATAL: can't write to file $RSC_DIR/min/fontawesome.min.css\n";
 foreach my $l (@content) {
-	$l =~ s|;src:url.* format.* format\('svg'\);|;src: url('data:font\/truetype;charset=utf-8;base64,$b64_font') format('truetype');|;
+	$l =~ s|;src:url.* format.* format\('svg'\);|;src: url('data:font\/opentype;charset=utf-8;base64,$b64_font') format('truetype');|;
 	print OUT $l;
 }
 close(OUT);
