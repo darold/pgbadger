@@ -34,7 +34,7 @@ http://fontawesome.io/3.2.1/assets/font-awesome.zip
 unzip font-awesome.zip font-awesome/css/font-awesome.css font-awesome/fonts/fontawesome-webfont.ttf
 
 cp font-awesome/css/font-awesome.css /home/git/pgbadger/resources/fontawesome.css
-cp font-awesome/font/fontawesome-webfont.ttf /home/git/pgbadger/resources/font/
+cp font-awesome/font/FontAwesome.otf /home/git/pgbadger/resources/font/
 
 Note that the hyphen is removed from font-awesome.css during the copy for
 backward compatibility.
