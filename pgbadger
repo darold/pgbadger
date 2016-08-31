@@ -8975,14 +8975,13 @@ sub print_lock_queries_report
 				$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 				$md5 = '';
 				$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
-				my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
-				$details .= " - <b>Duration:</b> " . &convert_time($d) if ($normalyzed_info{$k}{samples}{$d}{duration});
-				$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
-				$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
-				$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
-				$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
-				$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
-				$details .= " ]";
+				my $details = "<b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}\n";
+				$details .= "<b>Duration:</b> " . &convert_time($d) . "\n" if ($normalyzed_info{$k}{samples}{$d}{duration});
+				$details .= "<b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+				$details .= "<b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+				$details .= "<b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+				$details .= "<b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+				$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				my $explain = '';
 				if ($normalyzed_info{$k}{samples}{$d}{plan}) {
 					my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
@@ -9141,13 +9140,13 @@ sub print_tempfile_report
 					$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 					my $md5 = '';
 					$md5 = 'md5: ' . md5_hex($normalyzed_info{$k}{samples}{$d}{query}) if ($enable_checksum);
-					my $details = "Date: " . $normalyzed_info{$k}{samples}{$d}{date} . "<br />";
-					$details .= "Duration: " . &convert_time($d) . "<br />";
-					$details .= "Database: $normalyzed_info{$k}{samples}{$d}{db}<br/>" if ($normalyzed_info{$k}{samples}{$d}{db});
-					$details .= "User: $normalyzed_info{$k}{samples}{$d}{user}<br/>" if ($normalyzed_info{$k}{samples}{$d}{user});
-					$details .= "Remote: $normalyzed_info{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$k}{samples}{$d}{remote});
-					$details .= "Application: $normalyzed_info{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$k}{samples}{$d}{app});
-					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$k}{samples}{$d}{bind});
+					my $details = "<b>Date:</b> " . $normalyzed_info{$k}{samples}{$d}{date} . "\n";
+					$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+					$details .= "<b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+					$details .= "<b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+					$details .= "<b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+					$details .= "<b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+					$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 					print $fh qq{
 						<dt>
 						<div id="query-c-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
@@ -9650,7 +9649,7 @@ sub print_time_consuming
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
 				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
-					my $details = "[<b>User:</b> $u";
+					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
 					$details .= " ]\n";
@@ -9677,7 +9676,7 @@ sub print_time_consuming
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
 				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
-					my $details = "[<b>Application:</b> $u";
+					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
 					$details .= " ]\n";
@@ -9703,14 +9702,13 @@ sub print_time_consuming
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			last if ($idx > $sample);
-			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
-			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
-			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
-			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
-			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
-			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
-			$details .= " ]";
+			my $details = "<b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}\n";
+			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+			$details .= "<b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+			$details .= "<b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+			$details .= "<b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+			$details .= "<b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
 				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
@@ -9883,7 +9881,7 @@ sub print_most_frequent
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
 				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
-					my $details = "[<b>User:</b> $u";
+					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
 					$details .= " ]\n";
@@ -9909,7 +9907,7 @@ sub print_most_frequent
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
 				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
-					my $details = "[<b>Application:</b> $u";
+					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
 					$details .= " ]\n";
@@ -9936,14 +9934,13 @@ sub print_most_frequent
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			last if ($idx > $sample);
-			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
-			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
-			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
-			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
-			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
-			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
-			$details .= " ]";
+			my $details = "<b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}\n";
+			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+			$details .= "<b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+			$details .= "<b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+			$details .= "<b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+			$details .= "<b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
 				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
@@ -10120,7 +10117,7 @@ sub print_slowest_queries
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
 				if ($normalyzed_info{$k}{users}{$u}{duration} > 0) {
-					my $details = "[<b>User:</b> $u";
+					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{users}{$u}{count}";
 					$details .= " ]\n";
@@ -10146,7 +10143,7 @@ sub print_slowest_queries
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
 				if ($normalyzed_info{$k}{apps}{$u}{duration} > 0) {
-					my $details = "[<b>Application:</b> $u";
+					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$k}{apps}{$u}{count}";
 					$details .= " ]\n";
@@ -10173,14 +10170,13 @@ sub print_slowest_queries
 		my $idx = 1;
 		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			last if ($idx > $sample);
-			my $details = "[ <b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}";
-			$details .= " - <b>Duration:</b> " . &convert_time($d);
-			$details .= " - <b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
-			$details .= " - <b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
-			$details .= " - <b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
-			$details .= " - <b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
-			$details .= " - <b>Bind query:</b> yes" if ($normalyzed_info{$k}{samples}{$d}{bind});
-			$details .= " ]";
+			my $details = "<b>Date:</b> $normalyzed_info{$k}{samples}{$d}{date}\n";
+			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+			$details .= "<b>Database:</b> $normalyzed_info{$k}{samples}{$d}{db}\n" if ($normalyzed_info{$k}{samples}{$d}{db});
+			$details .= "<b>User:</b> $normalyzed_info{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$k}{samples}{$d}{user});
+			$details .= "<b>Remote:</b> $normalyzed_info{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$k}{samples}{$d}{remote});
+			$details .= "<b>Application:</b> $normalyzed_info{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$k}{samples}{$d}{app});
+			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
 				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
@@ -10806,26 +10802,31 @@ sub show_error_as_html
 			last if (($sample > 0) && ($i == $sample));
 			# Escape HTML code in error message
 			my $message = &escape_html($error_info{$k}{error}[$i]);
-			my $details = "<b>Date:</b> " . $error_info{$k}{date}[$i] . "<br/>\n";
+			my $details = "<b>Date:</b> " . $error_info{$k}{date}[$i] . "\n";
+			my $info    = '';
 			if ($error_info{$k}{detail}[$i]) {
-				$details .= "<b>Detail:</b> " . &escape_html($error_info{$k}{detail}[$i]) . "<br/>";
+				$info .= "<b>Detail:</b> " . &escape_html($error_info{$k}{detail}[$i]) . "<br/>";
 			}
 			if ($error_info{$k}{context}[$i]) {
-				$details .= "<b>Context:</b> " . &escape_html($error_info{$k}{context}[$i]) . "<br/>";
+				$info .= "<b>Context:</b> " . &escape_html($error_info{$k}{context}[$i]) . "<br/>";
 			}
 			if ($error_info{$k}{hint}[$i]) {
-				$details .= "<b>Hint:</b> " . &escape_html($error_info{$k}{hint}[$i]) . "<br/>";
+				$info .= "<b>Hint:</b> " . &escape_html($error_info{$k}{hint}[$i]) . "<br/>";
 			}
 			if ($error_info{$k}{statement}[$i]) {
-				$details .= "<b>Statement:</b> " . &escape_html($error_info{$k}{statement}[$i]) . "<br/>";
+				$info .= "<b>Statement:</b> " . &escape_html($error_info{$k}{statement}[$i]) . "<br/>";
 			}
 			if ($error_info{$k}{db}[$i]) {
-				$details .= "<b>Database:</b> $error_info{$k}{db}[$i] <b>User:</b> $error_info{$k}{user}[$i] <b>Remote:</b> $error_info{$k}{remote}[$i]<br/>";
+				$details .= "<b>Database:</b> $error_info{$k}{db}[$i]\n";
+				$details .= "<b>Application:</b> $error_info{$k}{app}[$i]\n";
+				$details .= "<b>User:</b> $error_info{$k}{user}[$i]\n";
+				$details .= "<b>Remote:</b> $error_info{$k}{remote}[$i]\n";
 			}
 			$details =~ s/<br\/>$//s;
 			print $fh qq{
 								<dt><span class="$error_level_class">$message</span></dt>
-								<p>$details</p>
+								<p>$info</p>
+								<pre>$details</pre>
 };
 		}
 		print $fh qq{
