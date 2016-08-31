@@ -136,7 +136,7 @@ pqWlzXuI3r17lyRZW1vLsLAwwa26s5tMJnNlZaVsSXfk0tLSpJCQkA9yufwrAIaEhAg9PT389OmT
 /65Wq6nVaklSIMnGxkYePHiQ165d4+TkJEnSarUSAE0m08+5ublxv72rfzchuTo0NPT9gQMHvIZ2
 S0sLAUxeuXIl9Yde+t2LpvT09J9yc3P/3dLS4uzp6eGTJ0+EwsLCz9HR0WUklQBQWFj4Y/+FIImo
 qCixqwXwk8FgKACwPy8vzyIqmpqa8IeJG6DvJv8DFUCCOQ08CmkAAAAASUVORK5CYII=
-" class="pull-left">';
+" class="pull-left" style="width:50px;height:auto">';
 my $pgbadger_ico =
         'data:image/x-icon;base64,
 AAABAAEAIyMQAAEABAA8BAAAFgAAACgAAAAjAAAARgAAAAEABAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -2185,6 +2185,8 @@ sub write_resources
 	my @contents = ();
 	my $endfile = '';
 	my $file = '';
+	my $major_version = $VERSION;
+	$major_version =~ s/\..*//;
 	while (my $l = <DATA>) {
 		if ($l =~ /^WRFILE: ([^\s]+)/) {
 			$file = $1;
@@ -2203,13 +2205,16 @@ sub write_resources
 			}
 			$rscfh->close() if (defined $rscfh);
 			if ($file =~ /\.css$/i) {
-				push(@contents, "<link href=\"EDIT_URI/$file\" rel=\"stylesheet\">\n");
+				push(@contents, "<link href=\"EDIT_URI/$major_version/$file\" rel=\"stylesheet\">\n");
 			} elsif ($file =~ /\.js$/i) {
-					push(@contents, "<script type=\"text/javascript\" src=\"EDIT_URI/$file\"></script>\n");
+					push(@contents, "<script type=\"text/javascript\" src=\"EDIT_URI/$major_version/$file\"></script>\n");
 			}
-			if (!-e "$outdir/$file") {
-				$rscfh = new IO::File ">$outdir/$file";
-				localdie("FATAL: can't write file $outdir/$file\n") if (not defined $rscfh);
+			if (!-e "$outdir/$major_version") {
+				mkdir("$outdir/$major_version");
+			}
+			if (!-e "$outdir/$major_version/$file") {
+				$rscfh = new IO::File ">$outdir/$major_version/$file";
+				localdie("FATAL: can't write file $outdir/$major_version/$file\n") if (not defined $rscfh);
 			}
 			next;
 		}
