@@ -8990,7 +8990,7 @@ sub print_lock_queries_report
 				}
 				print $fh qq{
 					<dt>
-						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></li>$query</div>$md5
+						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					</dt>
 					<pre>$details</pre>
 					$explain
