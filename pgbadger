@@ -6534,8 +6534,8 @@ sub print_histogram_session_times
 		if ($overall_stat{histogram}{session_time}{"-1"} > $most_range_value) {
 			$most_range = "> $histogram_session_time[-1]ms";
 			$most_range_value = $overall_stat{histogram}{session_time}{"-1"};
-		$drawn_graphs{histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
 		}
+		$drawn_graphs{histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
 	} else {
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 		$drawn_graphs{histogram_session_times_graph} = qq{<tr><td colspan="3">$NODATA</td></tr>};
