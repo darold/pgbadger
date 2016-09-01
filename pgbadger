@@ -781,10 +781,10 @@ if ($error_only && $disable_error) {
 }
 
 # Set default search pattern for database, user name, application name and host in log_line_prefix
-my $regex_prefix_dbname = qr/db=([^,]*)/;
-my $regex_prefix_dbuser = qr/user=([^,]*)/;
-my $regex_prefix_dbclient = qr/(?:client|remote)=([^,]*)/;
-my $regex_prefix_dbappname = qr/app=([^,]*)/;
+my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
+my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
+my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,]*)/;
+my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
 
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
@@ -3818,6 +3818,7 @@ Average queries per sessions: $avg_queries
 Average queries duration per sessions: $avg_duration
 };
 		foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
+			next if (!$session_info{count});
 			print $fh "Session peak: ", &comma_numbers($overall_stat{'peak'}{$_}{session}), " sessions at $_";
 			last;
 		}
@@ -4938,7 +4939,7 @@ sub print_overall_statistics
 	my $query_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{query} <=> $overall_stat{'peak'}{$a}{query}} keys %{$overall_stat{'peak'}}) {
 		$query_peak = &comma_numbers($overall_stat{'peak'}{$_}{query});
-		$query_peak_date = $_;
+		$query_peak_date = $_ if ($query_peak);
 		last;
 	}
 	my $avg_queries = &comma_numbers(int($overall_stat{'queries_number'}/($session_info{count} || 1)));
@@ -4961,12 +4962,13 @@ sub print_overall_statistics
 	my $session_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{connection} <=> $overall_stat{'peak'}{$a}{connection}} keys %{$overall_stat{'peak'}}) {
 		$connection_peak = &comma_numbers($overall_stat{'peak'}{$_}{connection});
-		$connection_peak_date = $_;
+		$connection_peak_date = $_ if ($connection_peak);
 		last;
 	}
 	foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
+		next if (!$session_count);
 		$session_peak = &comma_numbers($overall_stat{'peak'}{$_}{session});
-		$session_peak_date = $_;
+		$session_peak_date = $_ if ($session_peak);
 		last;
 	}
         my $main_error = 0;
@@ -5359,15 +5361,14 @@ sub print_sql_traffic
 	my $query_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{query} <=> $overall_stat{'peak'}{$a}{query}} keys %{$overall_stat{'peak'}}) {
 		$query_peak = &comma_numbers($overall_stat{'peak'}{$_}{query});
-		$query_peak_date = $_;
+		$query_peak_date = $_ if ($query_peak);
 		last;
 	}
-
 	my $select_peak = 0;
 	my $select_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{select} <=> $overall_stat{'peak'}{$a}{select}} keys %{$overall_stat{'peak'}}) {
 		$select_peak = &comma_numbers($overall_stat{'peak'}{$_}{select});
-		$select_peak_date = $_;
+		$select_peak_date = $_ if ($select_peak);
 		last;
 	}
 
@@ -5375,9 +5376,10 @@ sub print_sql_traffic
 	my $write_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{write} <=> $overall_stat{'peak'}{$a}{write}} keys %{$overall_stat{'peak'}}) {
 		$write_peak = &comma_numbers($overall_stat{'peak'}{$_}{write});
-		$write_peak_date = $_;
+		$write_peak_date = $_ if ($write_peak);
 		last;
 	}
+
 	my $fmt_duration = &convert_time($overall_stat{'queries_duration'});
 
 	print $fh qq{
@@ -5925,7 +5927,7 @@ sub print_established_connection
 	my $connection_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{connection} <=> $overall_stat{'peak'}{$a}{connection}} keys %{$overall_stat{'peak'}}) {
 		$connection_peak = &comma_numbers($overall_stat{'peak'}{$_}{connection});
-		$connection_peak_date = $_;
+		$connection_peak_date = $_ if ($connection_peak);
 		last;
 	}
 
@@ -6459,7 +6461,7 @@ sub print_simultaneous_session
 	my $session_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{session} <=> $overall_stat{'peak'}{$a}{session}} keys %{$overall_stat{'peak'}}) {
 		$session_peak = &comma_numbers($overall_stat{'peak'}{$_}{session});
-		$session_peak_date = $_;
+		$session_peak_date = $_ if ($session_peak);
 		last;
 	}
 
@@ -7562,7 +7564,7 @@ sub print_temporary_file
 	my $tempfile_size_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{tempfile_size} <=> $overall_stat{'peak'}{$a}{tempfile_size}} keys %{$overall_stat{'peak'}}) {
 		$tempfile_size_peak = &pretty_print_size($overall_stat{'peak'}{$_}{tempfile_size});
-		$tempfile_size_peak_date = $_;
+		$tempfile_size_peak_date = $_ if ($tempfile_size_peak);
 		last;
 	}
 	print $fh qq{
@@ -7574,7 +7576,7 @@ sub print_temporary_file
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
 			<ul>
-				<li><span class="figure">$tempfile_size_peak</span> <span class="figure-label">Temp Files Peak</span></li>
+				<li><span class="figure">$tempfile_size_peak</span> <span class="figure-label">Temp Files size Peak</span></li>
 				<li><span class="figure">$tempfile_size_peak_date</span> <span class="figure-label">Date</span></li>
 			</ul>
 		</div>
@@ -7590,7 +7592,7 @@ $drawn_graphs{temporarydata_graph}
 	my $tempfile_count_peak_date = '';
 	foreach (sort {$overall_stat{'peak'}{$b}{tempfile_count} <=> $overall_stat{'peak'}{$a}{tempfile_count}} keys %{$overall_stat{'peak'}}) {
 		$tempfile_count_peak = &comma_numbers($overall_stat{'peak'}{$_}{tempfile_count});
-		$tempfile_count_peak_date = $_;
+		$tempfile_count_peak_date = $_ if ($tempfile_count_peak);
 		last;
 	}
 	print $fh qq{
@@ -12026,6 +12028,26 @@ sub validate_log_line
 {
 	my ($t_pid) = @_;
 
+	# Set details about connection if prefix doesn't included them
+	# and log_connection is enabled
+	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
+		if ( !$prefix_vars{'t_client'} && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/) ) {
+			$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
+			return 1;
+		} elsif ( !$prefix_vars{'t_dbname'} && ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+)(?: database=([^\s]+))?/) ) {
+			$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
+			$current_sessions{$prefix_vars{'t_pid'}}{database} = $2;
+		}
+	}
+
+	# Set details from previous connection line
+	$prefix_vars{'t_dbname'} = $current_sessions{$t_pid}{database}
+		if (!$prefix_vars{'t_dbname'} && exists $current_sessions{$t_pid}{database});
+	$prefix_vars{'t_dbuser'} = $current_sessions{$t_pid}{user}
+		if (!$prefix_vars{'t_user'} && exists $current_sessions{$t_pid}{user});
+	$prefix_vars{'t_client'} = $current_sessions{$t_pid}{host}
+		if (!$prefix_vars{'t_client'} && exists $current_sessions{$t_pid}{host});
+
 	# Look at particular cases of vacuum/analyze that have the database
 	# name inside the log message so that they could be associated
 	if ($prefix_vars{'t_query'} =~ / of table "([^\.]+)\.[^\.]+\.[^\.]+":/) {
@@ -12312,6 +12334,7 @@ sub parse_query
 
 	# Stores pre-connection activity
 	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/)) {
+		$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
 		$conn_received{$t_pid} = _gethostbyaddr($conn_received{$t_pid}) if ($dns_resolv);
@@ -12320,9 +12343,10 @@ sub parse_query
 
 	# Stores connection activity
 	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
-		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) /))
+		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+)(?: database=([^\s]+))?/))
 	{
-		$current_sessions{$prefix_vars{'t_pid'}} = 1 if (!$disable_session);
+		$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
+		$current_sessions{$prefix_vars{'t_pid'}}{database} = $2;
 
 		return if ($disable_connection);
 
