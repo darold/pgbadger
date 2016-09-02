@@ -1517,6 +1517,83 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 		<div class="span3">
 			<div class="well key-figures">
 				<ul>
+					<li><span class="figure">9.0</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2016-09-02</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This major release of pgBadger is a port to bootstrap 3 and a version
+upgrade of all resources files (CSS and Javascript). There's also some
+bugs fixes and features enhancements.
+</p>
+<p>
+Backward compatibility with old incremental report might be preserved.
+</p>
+<pre>
+  - Sources and licences of resources files are now on a dedicated
+    subdirectory. A script to update their minified version embedded
+    in pgbager script has been added. Thanks to Christoph Berg for
+    the help and feature request.
+
+  - Try to detect user/database/host from connection strings if
+    log_connection is enabled and log_line_prefix doesn't include
+    them.
+    
+    Extend the regex to autodetect database name, user name, client
+    ip address and application name. The regex now are the following:
+    
+    	db => qr/(?:db|database)=([^,]*)/;
+    	user => qr/(?:user|usr)=([^,]*)/;
+    	client => qr/(?:client|remote|ip|host)=([^,]*)/;
+    	appname => qr/(?:app|application)=([^,]*)/;
+    
+  - Add backward compatibility with older version of pgbadger in
+    incremental mode by creating a subdirectory for new CSS and
+    Javascript files. This subdirectory is named with the major
+    version number of pgbadger.
+    
+  - Increase the size of the pgbadger logo that appears too small
+    with the new font size.
+
+  - Normalize detailed information in all reports.
+
+  - Fix duplicate copy icon in locks report.
+
+  - Fix missing chart on histogram of session time. Thanks to
+    Guillaume Lelarge for the report.
+
+  - Add LICENSE file noting the licenses used by the resource
+    files. Thanks to Christoph Berg for the patch.
+
+  - Add patch to jqplot library to fix an infinite loop when trying
+    to download some charts. Thanks to Julien Tachoires for the help
+    to solve this issue.
+    
+  - Script tools/updt_embedded_rsc.pl will apply the patch to resource
+    file resources/jquery.jqplot.js and doesn't complain if it has
+    already been applied.
+
+  - Remove single last comma at end of pie chart dataset. Thanks to
+    Julien Tachoires for the report.
+
+  - Change display of normalized error
+
+  - Remove unused or auto-generated files
+
+  - Update all resources files (js+css) and create a directory to
+    include source of javascript libraries used in pgbadger. There is
+    also a new script tools/updt_embedded_rsc.pl the can be used to
+    generate the minified version of those files and embedded them
+    into pgbadger.  This script will also embedded the FontAwesome.otf
+    open truetype font into the fontawesome.css file.
+</pre>
+		</div>
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
 					<li><span class="figure">8.3</span> <span class="figure-label">version</span></li>
 					<li><span class="figure">2016-08-27</span> <span class="figure-label">Date</span></li>    
 				</ul>
