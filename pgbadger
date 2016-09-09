@@ -2746,6 +2746,12 @@ sub process_file
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
+					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
+						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
+						# Remove the port part
+						$prefix_vars{'t_client'} =~ s/\(.*//;
+					}
+
 					# Skip unwanted lines
 					if ($#exclude_time >= 0) {
 						foreach (@exclude_time) {
@@ -2854,6 +2860,12 @@ sub process_file
 					}
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+
+					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
+						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
+						# Remove the port part
+						$prefix_vars{'t_client'} =~ s/\(.*//;
+					}
 
 					# Skip unwanted lines
 					if ($#exclude_time >= 0) {
