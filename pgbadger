@@ -2324,6 +2324,29 @@ sub multiprocess_progressbar
 	exit 0;
 }
 
+sub update_progress_bar
+{
+	my ($tmpoutfile, $nlines, $stop_offset, $totalsize, $cursize, $old_queries_count, $old_errors_count) = @_;
+
+	if (!$tmpoutfile) {
+		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+			if ($totalsize) {
+				print STDERR &progress_bar($$cursize, $stop_offset || $totalsize, 25, '=');
+			} else {
+				print STDERR ".";
+			}
+		}
+	} else {
+		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+			$pipe->print("$$cursize " . ($overall_stat{'queries_number'} - $$old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $$old_errors_count) . "\n");
+			$$old_queries_count = $overall_stat{'queries_number'};
+			$$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
+			$$cursize = 0;
+		}
+	}
+}
+
+
 ####
 # Main function called per each parser process
 ####
@@ -2442,22 +2465,7 @@ sub process_file
 			$nlines++;
 			next if (!$line);
 
-			if (!$tmpoutfile) {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					if ($totalsize) {
-						print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
-					} else {
-						print STDERR ".";
-					}
-				}
-			} else {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
-					$old_queries_count = $overall_stat{'queries_number'};
-					$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-					$cursize = 0;
-				}
-			}
+			&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 
 			%prefix_vars = ();
 
@@ -2472,25 +2480,10 @@ sub process_file
 					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
 
 				# Skip unwanted lines
-				if ($#exclude_time >= 0) {
-					foreach (@exclude_time) {
-						if ($prefix_vars{'t_timestamp'} =~ /$_/) {
-							return;
-						}
-					}
-				}
-				next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-				if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
-					if (!$tmpoutfile) {
-						if ($totalsize) {
-							print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
-						} else {
-							print STDERR ".";
-						}
-					} else {
-						$pipe->print("$cursize\n");
-						$cursize = 0;
-					}
+				my $res = &skip_unwanted_line();
+				next if ($res == 1);
+				if ($res == -1) {
+					&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 					$getout = 2;
 					last;
 				}
@@ -2566,22 +2559,8 @@ sub process_file
 				# Set progress statistics
 				$cursize += length(join(',', @$row));
 				$nlines++;
-				if (!$tmpoutfile) {
-					if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-						if ($totalsize) {
-							print STDERR &progress_bar($cursize, $totalsize, 25, '=');
-						} else {
-							print STDERR ".";
-						}
-					}
-				} else {
-					if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-						$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
-						$old_queries_count = $overall_stat{'queries_number'};
-						$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-						$cursize = 0;
-					}
-				}
+				&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
+
 				next if ( ($row->[11] !~ $parse_regex)  || ($row->[11] eq 'LOCATION'));
 
 				# Extract the date
@@ -2595,14 +2574,10 @@ sub process_file
 					$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
 
 					# Skip unwanted lines
-					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-					if ($to && ($to lt $prefix_vars{'t_timestamp'})) {
-						if ($tmpoutfile) {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
-							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-							$cursize = 0;
-						}
+					my $res = &skip_unwanted_line();
+					next if ($res == 1);
+					if ($res == -1) {
+						&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 						$getout = 2;
 						last CSVLOOP;
 					}
@@ -2696,22 +2671,7 @@ sub process_file
 			$nlines++;
 			next if (!$line);
 
-			if (!$tmpoutfile) {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					if ($totalsize) {
-						print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
-					} else {
-						print STDERR ".";
-					}
-				}
-			} else {
-				if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-					$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
-					$old_queries_count = $overall_stat{'queries_number'};
-					$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-					$cursize = 0;
-				}
-			}
+			&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 
 			%prefix_vars = ();
 
@@ -2753,28 +2713,10 @@ sub process_file
 					}
 
 					# Skip unwanted lines
-					if ($#exclude_time >= 0) {
-						foreach (@exclude_time) {
-							if ($prefix_vars{'t_timestamp'} =~ /$_/) {
-								return;
-							}
-						}
-					}
-
-					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-					if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
-						if (!$tmpoutfile) {
-							if ($totalsize) {
-								print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
-							} else {
-								print STDERR ".";
-							}
-						} else {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
-							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-							$cursize = 0;
-						}
+					my $res = &skip_unwanted_line();
+					next if ($res == 1);
+					if ($res == -1) {
+						&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 						$getout = 2;
 						last;
 					}
@@ -2868,27 +2810,10 @@ sub process_file
 					}
 
 					# Skip unwanted lines
-					if ($#exclude_time >= 0) {
-						foreach (@exclude_time) {
-							if ($prefix_vars{'t_timestamp'} =~ /$_/) {
-								return;
-							}
-						}
-					}
-					next if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-					if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
-						if (!$tmpoutfile) {
-							if ($totalsize) {
-								print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=');
-							} else {
-								print STDERR ".";
-							}
-						} else {
-							$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'})- $old_errors_count) . "\n");
-							$old_queries_count = $overall_stat{'queries_number'};
-							$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
-							$cursize = 0;
-						}
+					my $res = &skip_unwanted_line();
+					next if ($res == 1);
+					if ($res == -1) {
+						&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 						$getout = 2;
 						last;
 					}
@@ -14705,6 +14630,30 @@ sub localdie
 	unlink("$PID_DIR/pgbadger.pid");
 
 	exit 1;
+}
+
+sub skip_unwanted_line
+{
+
+	# Skip unwanted lines
+	if ($#exclude_time >= 0) {
+		my $found = 0;
+		foreach (@exclude_time) {
+			if ($prefix_vars{'t_timestamp'} =~ /$_/) {
+				$found = 1;
+				last;
+			}
+		}
+		return 1 if ($found);
+	}
+
+	return 1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+
+	if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
+		return -1;
+	}
+
+	return 0;
 }
 
 __DATA__
