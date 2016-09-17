@@ -1780,7 +1780,7 @@ some additional options to fully control the ssh connection.
     --ssh-user username      connection login name. Default to running user.
     --ssh-identity file      path to the identity file to use.
     --ssh-timeout second     timeout to ssh connection failure. Default 10 secs.
-    --ssh-options  options   list of -o options to use for the ssh connection.
+    --ssh-option  options    list of -o options to use for the ssh connection.
 			     Options always used:
                                  -o ConnectTimeout=\$ssh_timeout
                                  -o PreferredAuthentications=hostbased,publickey
