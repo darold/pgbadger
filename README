@@ -14,9 +14,9 @@ SYNOPSIS
 
     Options:
 
-        -a | --average minutes : number of minutes to build the average graphs of
-                                 queries and connections. Default 5 minutes.
-        -A | --histo-avg minutes: number of minutes to build the histogram graphs
+        -a | --average N       : number of minutes to build the average graphs
+                                 of queries and connections. Default 5 minutes.
+        -A | --histo-average N : number of minutes to build the histogram graphs
                                  of queries. Default 60 minutes.
         -b | --begin datetime  : start date/time for the data to be parsed in log.
         -B | --bar-graph       : use bar graph instead of line by default.
