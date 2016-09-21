@@ -275,6 +275,7 @@ my $enable_checksum         = 0;
 my $timezone                = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
+my $week_start_monday       = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -432,6 +433,7 @@ my $result = GetOptions(
 	'pid-dir=s'		   => \$PID_DIR,
 	'rebuild!'                 => \$rebuild,
 	'pgbouncer-only!'          => \$pgbouncer_only,
+	'start-monday!'            => \$week_start_monday,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1238,7 +1240,12 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 				closedir DIR;
 				foreach my $d (sort { $a <=> $b } @ddays) {
-					my $weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					my $weekNumber = '';
+					if (!$week_start_monday) {
+						$weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					} else {
+						$weekNumber = sprintf("%02d", POSIX::strftime("%W", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					}
 					if ($#obsolete_weeks >= 0) {
 						if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
 							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
@@ -1771,6 +1778,8 @@ Options:
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show pgbouncer related menu in the header.
+    --start-monday         : in incremental mode, calendar's weeks start on
+                             sunday. Use this otpion to start on monday.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -14452,7 +14461,13 @@ sub get_week_number
 	if ($datefmt ne "$year-$month-$day") {
 		return -1;
 	}
-	my $weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $month - 1, $year - 1900);
+	my $weekNumber = '';
+	if (!$week_start_monday) {
+		$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $month - 1, $year - 1900);
+	} else {
+		$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $month - 1, $year - 1900);
+	}
+	
 
 	return sprintf("%02d", $weekNumber+1);
 }
@@ -14464,7 +14479,15 @@ sub get_day_of_week
 
 #       %w     The day of the week as a decimal, range 0 to 6, Sunday being 0.
 
-	my $weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
+	my $weekDay = '';
+	if (!$week_start_monday) {
+		# Start on sunday = 0
+		$weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
+	} else {
+		# Start on monday = 1
+		$weekDay = POSIX::strftime("%u", 1,1,1,$day,--$month,$year-1900);
+		$weekDay--;
+	}
 
 	return $weekDay;
 }
@@ -14501,7 +14524,12 @@ sub get_wdays_per_month
 			if ($datefmt ne "$y-$m-$day") {
 				next;
 			}
-			my $weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $m - 1, $y - 1900);
+			my $weekNumber = '';
+			if (!$week_start_monday) {
+				$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $m - 1, $y - 1900);
+			} else {
+				$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
+			}
 			if ( ($weekNumber == $wn) || ( ($weekNumber eq '00') && (($wn == 1) || ($wn >= 52)) ) ) {
 				push(@retdays, "$year-$m-$day");
 				return @retdays if ($#retdays == 6);
@@ -14527,8 +14555,11 @@ sub get_calendar
 
 	my $str = "<table class=\"table table-striped table-hover table-condensed\">\n";
 	my @wday = qw(Su Mo Tu We Th Fr Sa);
-	#my @wday = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 	my @std_day = qw(Su Mo Tu We Th Fr Sa);
+	if ($week_start_monday) {
+		@wday = qw(Mo Tu We Th Fr Sa Su);
+		@std_day = qw(Mo Tu We Th Fr Sa Su);
+	}
 	my %day_lbl = ();
 	for (my $i = 0; $i <= $#wday; $i++) {
 		$day_lbl{$wday[$i]} = $wday[$i];

@@ -140,6 +140,8 @@ SYNOPSIS
         --rebuild              : used to rebuild all html reports in incremental
                                  output directories where there is binary data files.
         --pgbouncer-only       : only show pgbouncer related menu in the header.
+        --start-monday         : in incremental mode, calendar's weeks start on
+                                 sunday. Use this otpion to start on monday.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
