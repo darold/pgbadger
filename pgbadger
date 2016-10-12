@@ -1,4 +1,3 @@
-#!/usr/bin/env perl
 #------------------------------------------------------------------------------
 #
 # pgBadger - Advanced PostgreSQL log analyzer
@@ -4403,6 +4402,7 @@ sub change_log_level
 	return 1 if ($msg =~ /skipping analyze of/);
 	return 1 if ($msg =~ /using stale statistics/);
 	return 1 if ($msg =~ /replication command:/);
+	return 1 if ($msg =~ /still waiting for/);
 
 	return 0;
 }
@@ -4418,6 +4418,7 @@ sub revert_log_level
 	return ($msg, 1) if ($msg =~ s/ERROR:  (skipping analyze of)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (using stale statistics)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (received replication command:)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (.*still waiting for)/LOG:  $1/);
 
 	return ($msg, 0);
 }
@@ -12666,7 +12667,7 @@ sub parse_query
 	# Log line that could not be parsed
 	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if ($prefix_vars{'t_query'} !~
-/incomplete startup packet|connection|receive|unexpected EOF|still waiting for [^\s]+Lock|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+/incomplete startup packet|connection|receive|unexpected EOF|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
 			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
@@ -13387,13 +13388,14 @@ sub normalize_error
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
 	$orig_query =~ s/(database system was.* at (?:log time )?).*/$1 .../;
-	$orig_query =~ s/(relation) \d+ (deleted while still in use)/$1 ... $2/g;
 	$orig_query =~ s/[0-9A-F]{24}/.../g; # Remove WAL filename
 	$orig_query =~ s/, u_uuid: [^,]+, file_path:.*/. Retrying/g;
 	$orig_query =~ s/( for)? PID \d+//;
 	$orig_query =~ s/ TIMELINE \d+/ TIMELINE n/;
 	$orig_query =~ s/ [0-9A-F]+\/[0-9A-F]+ / x\/x /;
 	$orig_query =~ s/ BASE_BACKUP LABEL '[^']*'.*/ BASE_BACKUP LABEL '...'/;
+	$orig_query =~ s/(transaction|relation|database|process) \d+/$1 .../g;
+	$orig_query =~ s/after \d+\.\d+/after .../;
 
 	# Need more normalization stuff here
 	return $orig_query;
