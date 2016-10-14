@@ -786,6 +786,13 @@ sub load_stats
 
 	foreach my $stmt (keys %_normalyzed_info) {
 
+		if (!$_normalyzed_info{$stmt}{count}) {
+			$normalyzed_info{$stmt}{average} = 0;
+		} else {
+			$normalyzed_info{$stmt}{average} = $_normalyzed_info{$stmt}{duration} / $_normalyzed_info{$stmt}{count};
+			$normalyzed_info{$stmt}{average} =~ s/(\.\d{3}).*/$1/;
+		}
+
 		foreach my $dt (keys %{$_normalyzed_info{$stmt}{samples}} ) {
 			foreach my $k (keys %{$_normalyzed_info{$stmt}{samples}{$dt}} ) {
 				$normalyzed_info{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$stmt}{samples}{$dt}{$k};
@@ -1227,6 +1234,8 @@ sub csv_times_consuming_queries
                 foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 			# Do not process request that are slower than $max_duration
 			next if ( $max_duration && ( $d > $max_duration) );
+
+			$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
 
 			$csv->print ($fhcsv, [
 				$normalyzed_info{$k}{samples}{$d}{db},
