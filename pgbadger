@@ -1306,7 +1306,7 @@ if (!$remote_host) {
 			my $fmt = autodetect_format($f);
 
 			# Set regex to parse the log file 
-			set_parser_regex($fmt);
+			$fmt = set_parser_regex($fmt);
 
 			if (($fmt ne 'pgbouncer') && ($saved_last_line{current_pos} > 0)) {
 				my ($retcode, $msg) = &check_file_changed($f, $fmt, $saved_last_line{datetime}, $saved_last_line{current_pos});
@@ -1406,7 +1406,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Set regex to parse the log file
-		set_parser_regex($fmt);
+		$fmt = set_parser_regex($fmt);
 
 		# Do not use split method with compressed files and stdin
 		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile ne '-') &&
@@ -1490,7 +1490,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Set regex to parse the log file 
-		set_parser_regex($fmt);
+		$fmt = set_parser_regex($fmt);
 
 		last if (&process_file($logfile, $fmt, '', ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos}));
 	}
@@ -1960,7 +1960,15 @@ sub set_parser_regex
 	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 
+	} elsif ($fmt eq 'default') {
+
+		$fmt = 'stderr';
+		$compiled_prefix =
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_timestamp', 't_pid', 't_logprefix', 't_loglevel', 't_query');
 	}
+
+	return $fmt;
 }
 
 sub check_regex
@@ -13507,6 +13515,13 @@ sub autodetect_format
 				$fmt = 'csv';
 				$nfound++;
 
+			# Are default stderr lines since 10.0 ?
+			} elsif ($line =~
+	/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+				)
+			{
+				$fmt = 'default';
+				$nfound++;
 			# Are stderr lines ?
 			} elsif ($line =~
 	/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
@@ -13514,6 +13529,7 @@ sub autodetect_format
 			{
 				$fmt = 'stderr';
 				$nfound++;
+
 
 			# Are pgbouncer lines ?
 			} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*|Stats):/) {
