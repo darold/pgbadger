@@ -276,6 +276,7 @@ my $timezone                = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
+my $use_sessionid_as_pid    = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -2798,6 +2799,7 @@ sub process_file
 					for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 						$prefix_vars{$prefix_params[$i]} = $matches[$i];
 					}
+					$prefix_vars{'t_pid'} = $prefix_vars{'t_session_id'} if ($use_sessionid_as_pid);
 
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
@@ -13791,6 +13793,10 @@ sub build_log_line_prefix_regex
 	}
 	# replace %% by a single %
 	$llp =~ s/\%\%/\%/;
+
+	# t_session_id (%c) can naturaly replace pid as unique session id
+	# when it is given in log_line_prefix and pid is not present.
+	$use_sessionid_as_pid = 1 if ( grep(/t_session_id/, @param_list) && !grep(/t_pid/, @param_list) );
 
 	# Check regex in log line prefix from command line
 	&check_regex($llp, '--prefix');
