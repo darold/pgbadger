@@ -7623,7 +7623,7 @@ $drawn_graphs{temporaryfile_graph}
 				</table>
 			</div>
 		</div> <!-- end of div tab-content -->
-		<span class="pull-right">&uarr; <small><a href="#tempfiles-activity" class="">Back to the top of the <em>Temporay Files Activity</em> table</a></small></span>
+		<span class="pull-right">&uarr; <small><a href="#tempfiles-activity" class="">Back to the top of the <em>Temporary Files Activity</em> table</a></small></span>
 	</div>
 
 </div><!-- end of tempfile activity -->
@@ -7961,7 +7961,7 @@ $drawn_graphs{autovacuum_graph}
 				</table>
 			</div>
 		</div> <!-- end of div tab-content -->
-		<span class="pull-right">&uarr; <small><a href="#vacuums-activity" class="">Back to the top of the <em>Temporay Files Activity</em> table</a></small></span>
+		<span class="pull-right">&uarr; <small><a href="#vacuums-activity" class="">Back to the top of the <em>Temporary Files Activity</em> table</a></small></span>
 	</div>
 
 </div><!-- end of vacuum activity -->
