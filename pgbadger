@@ -786,7 +786,7 @@ if ($error_only && $disable_error) {
 # Set default search pattern for database, user name, application name and host in log_line_prefix
 my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
-my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,]*)/;
+my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,\(]*)/;
 my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
 
 # Set pattern to look for query type
