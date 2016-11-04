@@ -628,7 +628,7 @@ my @pgb_prefix_parse2 = ();
 # This default format will be used when the autodetection fail.
 my $frmt = '';
 if (!$rebuild) {
-	if (!$remote_host) {
+	if (!$remote_host && ($ARGV[0] ne '-')) {
 		if ($journalctl_cmd) {
 			$frmt = 'syslog2';
 		} else {
@@ -1400,7 +1400,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		# Get log format of the current file
 		my $fmt = $format || 'stderr';
-		if (!$remote_host && !$journalctl_cmd) {
+		if (!$remote_host && ($logfile ne '-') && !$journalctl_cmd) {
 			$fmt = &autodetect_format($logfile);
 		} else {
 			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
@@ -2448,7 +2448,6 @@ sub process_file
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
-		my $goon = 0;
 		my $has_exclusion = 0;
 		if ($#exclude_line >= 0) {
 			$has_exclusion = 1;
