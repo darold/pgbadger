@@ -144,6 +144,8 @@ Options:
     --pgbouncer-only       : only show pgbouncer related menu in the header.
     --start-monday         : in incremental mode, calendar's weeks start on
                              sunday. Use this otpion to start on monday.
+    --normalized-only      : only dump all normalized query to out.txt
+
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
