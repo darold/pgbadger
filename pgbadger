@@ -1675,8 +1675,9 @@ Options:
     -D | --dns-resolv      : client ip adresses are replaced by their DNS name.
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog, syslog2, stderr and csv.
-			     Default: stderr.
+    -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
+			     pgbouncer. Use this option when pgbadger is not
+                             able to auto-detect the log format Default: stderr.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
