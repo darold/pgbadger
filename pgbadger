@@ -497,7 +497,7 @@ if ($remote_host) {
 	}
 }
 
-# Add journalctl command to the file list si on le trouve pas déjà
+# Add journalctl command to the file list if not already found
 if ($journalctl_cmd) {
 	if (!grep(/^\Q$journalctl_cmd\E$/, @ARGV)) {
 		$journalctl_cmd .= " --output='short-iso'";
