@@ -3039,11 +3039,11 @@ sub parse_orphan_line
 	my ($cur_pid, $line) = @_;
 
 	# Store vacuum related information
-	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t(pages|tuples|buffer usage|avg read rate|system usage):/)) {
-		if ($line =~ /^\t(pages|tuples): (\d+) removed, (\d+) remain/) {
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t?(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+		if ($line =~ /^\t?(pages|tuples): (\d+) removed, (\d+) remain/) {
 			$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 		}
-		if ($line =~ m#^\tsystem usage: CPU .* sec elapsed (.*) sec#) {
+		if ($line =~ m#^\t?system usage: CPU .* sec elapsed (.*) sec#) {
 			if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
 				$autovacuum_info{peak}{system_usage}{elapsed} = $1;
 				$autovacuum_info{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
@@ -7797,7 +7797,7 @@ sub print_analyze_per_table
 
 	print $fh qq{
 	<div class="analysis-item row" id="analyzes-per-table">
-		<h2><i class="glyphicon icon-table"></i> Analyses per table</h2>
+		<h2><i class="glyphicon icon-table"></i> Analyzes per table</h2>
 		<div class="col-md-3">
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
@@ -8045,7 +8045,7 @@ sub print_vacuum_per_table
 		$infos{$small[0]} = $infos{"Sum vacuums < $pie_percentage_limit%"};
 		delete $infos{"Sum vacuums < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{tablevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tablevacuums', 'Analyzes per tables', %infos);
+	$drawn_graphs{tablevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tablevacuums', 'Vacuums per tables', %infos);
 	$vacuum_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -8234,7 +8234,7 @@ sub print_vacuum_page_removed
 		$infos_page{$small[0]} = $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 		delete $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{pagevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_pagevacuums', 'Tuples removed per tables', %infos_page);
+	$drawn_graphs{pagevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_pagevacuums', 'Pages removed per tables', %infos_page);
 	$vacuum_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
