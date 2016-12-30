@@ -8003,7 +8003,7 @@ $drawn_graphs{autovacuum_graph}
 				</table>
 			</div>
 		</div> <!-- end of div tab-content -->
-		<span class="pull-right">&uarr; <small><a href="#vacuums-activity" class="">Back to the top of the <em>Autocacuum Activity</em> table</a></small></span>
+		<span class="pull-right">&uarr; <small><a href="#vacuums-activity" class="">Back to the top of the <em>Autovacuum Activity</em> table</a></small></span>
 	</div>
 
 </div><!-- end of vacuum activity -->
