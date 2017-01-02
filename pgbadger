@@ -13442,6 +13442,7 @@ sub normalize_error
 	$orig_query =~ s/ BASE_BACKUP LABEL '[^']*'.*/ BASE_BACKUP LABEL '...'/;
 	$orig_query =~ s/(transaction|relation|database|process) \d+/$1 .../g;
 	$orig_query =~ s/after \d+\.\d+/after .../;
+	$orig_query =~ s/cannot drop ([^\s]+) [^\s]+ /cannot drop $1 ... /;
 	$orig_query =~ s/\[[^\]]+\]/.../g;
 
 	# Need more normalization stuff here
