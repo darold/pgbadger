@@ -13438,7 +13438,7 @@ sub normalize_error
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
 	$orig_query =~ s/(database system was.* at (?:log time )?).*/$1 .../;
 	$orig_query =~ s/[0-9A-F]{24}/.../g; # Remove WAL filename
-	$orig_query =~ s/, u_uuid: [^,]+, file_path:.*/. Retrying/g;
+	$orig_query =~ s/, u_uuid: [^,]+, file_path:.*/. Retrying/;
 	$orig_query =~ s/( for)? PID \d+//;
 	$orig_query =~ s/ TIMELINE \d+/ TIMELINE n/;
 	$orig_query =~ s/ [0-9A-F]+\/[0-9A-F]+ / x\/x /;
@@ -13447,7 +13447,12 @@ sub normalize_error
 	$orig_query =~ s/after \d+\.\d+/after .../;
 	$orig_query =~ s/cannot drop ([^\s]+) [^\s]+ /cannot drop $1 ... /;
 	$orig_query =~ s/\[[^\]]+\]/.../g;
-	$orig_query =~ s/(character with byte sequence) .* (in encoding)/$1 ... $2/g;
+	$orig_query =~ s/(character with byte sequence) .* (in encoding)/$1 ... $2/;
+	$orig_query =~ s/(invalid input syntax for [^:]+:).*/$1 .../;
+	$orig_query =~ s/character (.*?) of encoding/character ... of encoding/;
+	$orig_query =~ s/(unterminated quoted string at or near) "[^"]+"/$1 "..."/;
+	$orig_query =~ s/on page \d+ of relation/on page ... of relation/;
+	$orig_query =~ s/(side location conflict at ).*/$1 .../;
 
 	# Need more normalization stuff here
 	return $orig_query;
