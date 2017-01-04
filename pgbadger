@@ -3061,7 +3061,7 @@ sub parse_orphan_line
 
 		$cur_info{$cur_pid}{parameters} .= " $line" if (!$error_only);
 
-	} elsif (exists $cur_plan_info{$cur_pid}{duration}) {
+	} elsif (exists $cur_plan_info{$cur_pid}) {
 
 		$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
 
@@ -12943,7 +12943,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 
 	# Extract the query part from the plan
-	if (exists $cur_plan_info{$t_pid}{plan} && ($cur_plan_info{$t_pid}{plan} ne '')) {
+	if (exists $cur_plan_info{$t_pid} && exists $cur_plan_info{$t_pid}{plan} && $cur_plan_info{$t_pid}{plan} ne '') {
 		my $key = 'query';
 		my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
 		$plan[0] =~ s/^\s*Query Text:\s+//;
