@@ -13447,6 +13447,7 @@ sub normalize_error
 	$orig_query =~ s/after \d+\.\d+/after .../;
 	$orig_query =~ s/cannot drop ([^\s]+) [^\s]+ /cannot drop $1 ... /;
 	$orig_query =~ s/\[[^\]]+\]/.../g;
+	$orig_query =~ s/(character with byte sequence) .* (in encoding)/$1 ... $2/g;
 
 	# Need more normalization stuff here
 	return $orig_query;
