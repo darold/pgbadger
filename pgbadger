@@ -13827,7 +13827,7 @@ sub build_log_line_prefix_regex
 		'%c' => [('t_session_id',        '([0-9a-f\.]*)')],                                               # session ID
 		'%v' => [('t_virtual_xid',       '([0-9a-f\.\/]*)')],                                             # virtual transaction ID
 		'%x' => [('t_xid',               '([0-9a-f\.\/]*)')],                                             # transaction ID
-		'%i' => [('t_command',           '([0-9a-zA-Z\.\-\_]*)')],                                        # command tag
+		'%i' => [('t_command',           '([0-9a-zA-Z\.\-\_\s]*)')],                                        # command tag
 		'%e' => [('t_sqlstate',          '([0-9a-zA-Z]+)')],                                              # SQL state
 	);
 	my @param_list = ();
