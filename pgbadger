@@ -2174,7 +2174,7 @@ sub build_incremental_reports
 		closedir DIR;
 		my $i = 1;
 		foreach my $m (sort {$a <=> $b } @ymonths) {
-			print $fh "<td><span class=\"col-md-3\">", &get_calendar($y, $m), "</span></td>\n";
+			print $fh "<td><span>", &get_calendar($y, $m), "</span></td>\n";
 			print $fh "</tr>\n<tr>\n" if ( ($i%4) == 0 );
 			$i++;
 		}
