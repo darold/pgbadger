@@ -13864,7 +13864,7 @@ sub build_log_line_prefix_regex
 
 	use Carp;
 
-	# Keywords from SQL-92, SQL-99 and SQL-2003.
+	# Keywords from SQL-92, SQL-99, SQL-2003, SQL-2008 and SQL-2011 specifics keywords.
 	use constant KEYWORDS => qw(
 		ABSOLUTE ACTION ADD AFTER ALL ALLOCATE ALTER AND ANY ARE ARRAY AS ASC
 		ASENSITIVE ASSERTION ASYMMETRIC AT ATOMIC AUTHORIZATION AVG BEFORE BEGIN
@@ -13873,10 +13873,10 @@ sub build_log_line_prefix_regex
 		CHAR_LENGTH CHECK CLOB CLOSE COALESCE COLLATE COLLATION COLUMN COMMIT
 		CONDITION CONNECT CONNECTION CONSTRAINT CONSTRAINTS CONSTRUCTOR CONTAINS
 		CONTINUE CONVERT CORRESPONDING COUNT CREATE CROSS CUBE CURRENT CURRENT_DATE
-		CURRENT_DEFAULT_TRANSFORM_GROUP CURRENT_PATH CURRENT_ROLE CURRENT_TIME
-		CURRENT_TIMESTAMP CURRENT_TRANSFORM_GROUP_FOR_TYPE CURRENT_USER CURSOR
-		CYCLE DATA DATE DAY DEALLOCATE DEC DECIMAL DECLARE DEFAULT DEFERRABLE
-		DEFERRED DELETE DEPTH DEREF DESC DESCRIBE DESCRIPTOR DETERMINISTIC
+		CURRENT_DEFAULT_TRANSFORM_GROUP CURRENT_CATALOG CURRENT_PATH CURRENT_ROLE
+		CURRENT_SCHEMA CURRENT_TIME CURRENT_TIMESTAMP CURRENT_TRANSFORM_GROUP_FOR_TYPE
+		CURRENT_USER CURSOR CYCLE DATA DATE DAY DEALLOCATE DEC DECIMAL DECLARE DEFAULT
+		DEFERRABLE DEFERRED DELETE DEPTH DEREF DESC DESCRIBE DESCRIPTOR DETERMINISTIC
 		DIAGNOSTICS DISCONNECT DISTINCT DO DOMAIN DOUBLE DROP DYNAMIC EACH ELEMENT
 		ELSE ELSEIF END EPOCH EQUALS ESCAPE EXCEPT EXCEPTION EXEC EXECUTE EXISTS
 		EXIT EXTERNAL EXTRACT FALSE FETCH FILTER FIRST FLOAT FOR FOREIGN FOUND FREE
@@ -13887,7 +13887,7 @@ sub build_log_line_prefix_regex
 		LIMIT LOCAL LOCALTIME LOCALTIMESTAMP LOCATOR LOOP LOWER MAP MATCH MAX
 		MEMBER MERGE METHOD MIN MINUTE MODIFIES MODULE MONTH MULTISET NAMES
 		NATIONAL NATURAL NCHAR NCLOB NEW NEXT NO NONE NOT NULL NULLIF NUMERIC
-		OBJECT OCTET_LENGTH OF OLD ON ONLY OPEN OPTION OR ORDER ORDINALITY OUT
+		OBJECT OCTET_LENGTH OF OFFSET OLD ON ONLY OPEN OPTION OR ORDER ORDINALITY OUT
 		OUTER OUTPUT OVER OVERLAPS PAD PARAMETER PARTIAL PARTITION PATH POSITION
 		PRECISION PREPARE PRESERVE PRIMARY PRIOR PRIVILEGES PROCEDURE PUBLIC RANGE
 		READ READS REAL RECURSIVE REF REFERENCES REFERENCING RELATIVE RELEASE
@@ -13902,69 +13902,76 @@ sub build_log_line_prefix_regex
 		UNTIL UPDATE UPPER USAGE USER USING VALUE VALUES VARCHAR VARYING VIEW WHEN
 		WHENEVER WHERE WHILE WINDOW WITH WITHIN WITHOUT WORK WRITE YEAR ZONE
 	);
-
+	use constant FUNCTIONS => qw();
 
 	sub tokenize_sql
 	{
 		my ($query, $remove_white_tokens) = @_;
 
 		my $re = qr{
-	(
-		(?:--)[\ \t\S]*      # single line comments
-		|
-		(?:\-\|\-) # range operator "is adjacent to"
-		|
-		(?:\->>|\->|\#>>|\#>|\?\&|\?)  # Json Operators
-		|
-		(?:\#<=|\#>=|\#<>|\#<|\#=) # compares tinterval and reltime
-		|
-		(?:>>=|<<=) # inet operators
-		|
-		(?:!!|\@\@\@) # deprecated factorial and full text search  operators
-		|
-		(?:\|\|\/|\|\/) # square root and cube root
-		|
-		(?:\@\-\@|\@\@|\#\#|<\->|<<\||\|>>|\&<\||\&<|\|\&>|\&>|<\^|>\^|\?\#|\#|\?<\||\?\-\||\?\-|\?\|\||\?\||\@>|<\@|\~=)
-				 # Geometric Operators
-		|
-		(?:~<=~|~>=~|~>~|~<~) # string comparison for pattern matching operator families
-		|
-		(?:!~~|!~~\*|~~\*|~~) # LIKE operators
-		|
-		(?:!~\*|!~|~\*) # regular expression operators
-		|
-		(?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
-		|
-		(?:<>|<=>|>=|<=|==|!=|=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?) # operators and tests
-		|
-		[\[\]\(\),;.]            # punctuation (parenthesis, comma)
-		|
-		E\'\'(?!\')              # empty escaped single quoted string
-		|
-		\'\'(?!\')              # empty single quoted string
-		|
-		\"\"(?!\"")             # empty double quoted string
-		|
-		"(?>(?:(?>[^"\\]+)|""|\\.)*)+" # anything inside double quotes, ungreedy
-		|
-		`(?>(?:(?>[^`\\]+)|``|\\.)*)+` # anything inside backticks quotes, ungreedy
-		|
-		E'(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything escaped inside single quotes, ungreedy.
-		|
-		'(?>(?:(?>[^'\\]+)|''|\\.)*)+' # anything inside single quotes, ungreedy.
-		|
-		/\*[\ \t\r\n\S]*?\*/      # C style comments
-		|
-		(?:[\w:@]+(?:\.(?:\w+|\*)?)*) # words, standard named placeholders, db.table.*, db.*
-		|
-		(?:\$\w+\$)
-		|
-		(?: \$_\$ | \$\d+ | \${1,2} | \$\w+\$ ) # dollar expressions - eg $_$ $3 $$ $BODY$
-		|
-		\n                      # newline
-		|
-		[\t\ ]+                 # any kind of white spaces
-	)
+    (
+        (?:--)[\ \t\S]*      # single line comments
+        |
+        (?:\-\|\-) # range operator "is adjacent to"
+        |
+        (?:\->>|\->|\#>>|\#>|\?\&|\?)  # Json Operators
+        |
+        (?:\#<=|\#>=|\#<>|\#<|\#=) # compares tinterval and reltime
+        |
+        (?:>>=|<<=) # inet operators
+        |
+        (?:!!|\@\@\@) # deprecated factorial and full text search  operators
+        |
+        (?:\|\|\/|\|\/) # square root and cube root
+        |
+        (?:\@\-\@|\@\@|\#\#|<\->|<<\||\|>>|\&<\||\&<|\|\&>|\&>|<\^|>\^|\?\#|\#|\?<\||\?\-\||\?\-|\?\|\||\?\||\@>|<\@|\~=)
+				# Geometric Operators
+        |
+        (?:~<=~|~>=~|~>~|~<~) # string comparison for pattern matching operator families
+        |
+        (?:!~~|!~~\*|~~\*|~~) # LIKE operators
+        |
+        (?:!~\*|!~|~\*) # regular expression operators
+        |
+        (?:\*=|\*<>|\*<=|\*>=|\*<|\*>) # composite type comparison operators
+        |
+        (?:<>|<=>|>=|<=|==|!=|=|!|<<|>>|<|>|\|\||\||&&|&|-|\+|\*(?!/)|/(?!\*)|\%|~|\^|\?)
+                                  # operators and tests
+        |
+        [\[\]\(\),;.]            # punctuation (parenthesis, comma)
+        |
+        E\'\'(?!\')              # escape empty single quoted string
+        |
+        \'\'(?!\')              # empty single quoted string
+        |
+        \"\"(?!\"")             # empty double quoted string
+        |
+        "(?>(?:(?>[^"\\]+)|""|\\.)*)+"
+                                # anything inside double quotes, ungreedy
+        |
+        `(?>(?:(?>[^`\\]+)|``|\\.)*)+`
+                                # anything inside backticks quotes, ungreedy
+        |
+        E'(?>(?:(?>[^'\\]+)|''|\\.)*)+'
+                                # anything escaped inside single quotes, ungreedy.
+        |
+        '(?>(?:(?>[^'\\]+)|''|\\.)*)+'
+                                # anything inside single quotes, ungreedy.
+        |
+        /\*[\ \t\r\n\S]*?\*/      # C style comments
+        |
+        (?:[\w:@]+(?:\.(?:\w+|\*)?)*)
+                                # words, standard named placeholders, db.table.*, db.*
+        |
+        (?:\$\w+\$)
+        |
+        (?: \$_\$ | \$\d+ | \${1,2} | \$\w+\$ )
+                                # dollar expressions - eg $_$ $3 $$ $BODY$
+        |
+        \n                      # newline
+        |
+        [\t\ ]+                 # any kind of white spaces
+    )
 }smx;
 
 		my @query = ();
@@ -13973,7 +13980,6 @@ sub build_log_line_prefix_regex
 		if ($remove_white_tokens) {
 			@query = grep(!/^[\s\n\r]*$/, @query);
 		}
-
 		return wantarray ? @query : \@query;
 	}
 
@@ -13988,15 +13994,21 @@ sub build_log_line_prefix_regex
 		$self->{spaces}      = 4    unless defined($self->{spaces});
 		$self->{space}       = ' '  unless defined($self->{space});
 		$self->{break}       = "\n" unless defined($self->{break});
+		$self->{break}       = ' '  unless ($self->{spaces} != 0);
 		$self->{wrap}        = {}   unless defined($self->{wrap});
 		$self->{keywords}    = []   unless defined($self->{keywords});
+		$self->{functions}   = []   unless defined($self->{functions});
 		$self->{rules}       = {}   unless defined($self->{rules});
-		$self->{uc_keywords} = 0    unless defined $self->{uc_keywords};
+		$self->{uc_keywords} = 0    unless defined($self->{uc_keywords});
+		$self->{uc_functions}= 0    unless defined($self->{uc_functions});
+		$self->{no_comments} = 0    unless defined($self->{no_comments});
 
-		push(@{$self->{keywords}}, KEYWORDS);
+		push @{$self->{keywords}}, KEYWORDS;
+		push @{$self->{functions}}, FUNCTIONS;
 
 		# Initialize internal stuff.
 		$self->{_level} = 0;
+        @{$self->{have_from_clause}} = qw( extract overlay substring trim );
 
 		return $self;
 	}
@@ -14030,7 +14042,7 @@ sub build_log_line_prefix_regex
 		$self->{_level_stack} = [];
 		$self->{_new_line}    = 1;
 
-		my $last = '';
+		my $last;
 		$self->{_tokens} = [tokenize_sql($self->query, 1)];
 
 		while (defined(my $token = $self->_token)) {
@@ -14043,14 +14055,18 @@ sub build_log_line_prefix_regex
 
 			elsif ($token eq '(') {
 				$self->_add_token($token);
-				$self->_new_line;
-				push @{$self->{_level_stack}}, $self->{_level};
-				$self->_over unless $last and uc($last) eq 'WHERE';
+				if ( ($self->_next_token ne ')') && ($self->_next_token ne '*') ) {
+                    $self->{ '_has_from' } = 1 if ($last && grep(/^\Q$last\E$/i, @{$self->{have_from_clause}}));
+					push @{$self->{_level_stack}}, $self->{_level};
+					$self->_over unless $last and uc($last) eq 'WHERE';
+				}
 			}
 
 			elsif ($token eq ')') {
-#				$self->_new_line;
-				$self->{_level} = pop(@{$self->{_level_stack}}) || 0;
+                $self->{ '_has_from' } = 0;
+                if ( ($last ne '(') && ($last ne '*') )  {
+                    $self->{_level} = pop(@{$self->{_level_stack}}) || 0;
+                }
 				$self->_add_token($token);
 				$self->_new_line if ($self->_next_token
 							and $self->_next_token !~ /^AS$/i
@@ -14060,33 +14076,56 @@ sub build_log_line_prefix_regex
 							and $self->_next_token ne ','
 					);
 			}
-
 			elsif ($token eq ',') {
 				$self->_add_token($token);
-				$self->_new_line;
+				$self->_new_line if (!$self->{ '_is_in_where' });
 			}
 
 			elsif ($token eq ';') {
+                $self->{ '_has_from' } = 0;
+                $self->{ '_is_in_where' } = 0;
 				$self->_add_token($token);
+				$self->{break} = "\n" unless ($self->{spaces} != 0);
 				$self->_new_line;
 
 				# End of statement; remove all indentation.
 				@{$self->{_level_stack}} = ();
 				$self->{_level} = 0;
+				$self->{break} = ' ' unless ($self->{spaces} != 0);
 			}
 
 			elsif ($token =~ /^(?:SELECT|FROM|WHERE|HAVING|BEGIN|SET)$/i) {
-				$self->_back if ($last and $last ne '(' and $last ne 'FOR');
-				$self->_new_line;
-				$self->_add_token($token);
-				$self->_new_line if ((($token ne 'SET') || $last) and $self->_next_token and $self->_next_token ne '(' and $self->_next_token ne ';');
-				$self->_over;
+
+               if (($token =~ /^FROM$/i) && $self->{ '_has_from' } ) {
+                   $self->{ '_has_from' } = 0;
+                    $self->_new_line;
+                   $self->_add_token( $token );
+                    $self->_new_line;
+               }
+               else
+               {
+                   # if we're not in a sub-select, make sure these always are
+                   # at the far left (col 1)
+                   $self->_back if ( $last and $last ne '(' and $last ne 'FOR' );
+
+                   $self->_new_line;
+                   $self->_add_token( $token );
+                   $self->_new_line if ( ( ( $token ne 'SET' ) || $last ) and $self->_next_token and $self->_next_token ne '(' and $self->_next_token ne ';' );
+                   $self->_over;
+               }
+               if ($token =~ /^WHERE$/i) {
+                    $self->{ '_is_in_where' } = 1;
+               } else {
+                    $self->{ '_is_in_where' } = 0;
+               }
+
 			}
 
 			elsif ($token =~ /^(?:GROUP|ORDER|LIMIT)$/i) {
 				$self->_back;
 				$self->_new_line;
 				$self->_add_token($token);
+                $self->{ '_is_in_where' } = 0;
 			}
 
 			elsif ($token =~ /^(?:BY)$/i) {
@@ -14124,47 +14163,54 @@ sub build_log_line_prefix_regex
 				$self->_over;
 			}
 
-			elsif ($token =~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS)$/i) {
-				$self->_back;
-				$self->_new_line;
+			elsif ($token =~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL)$/i) {
+				$self->_back unless $last and $last eq ')';
+				if ($token =~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) {
+					$self->_new_line;
+					$self->_over if ($self->{_level} == 0);
+				}
+				if ( ($token =~ /(?:INNER|OUTER)$/i) && ($last !~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) ) {
+					$self->_new_line;
+					$self->_over if ($self->{_level} == 0);
+				}
 				$self->_add_token($token);
-				$self->_over;
 			}
 
 			elsif ($token =~ /^(?:JOIN)$/i) {
-				if ($last and $last !~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS)$/) {
+				if (!$last or $last !~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL)$/i) {
 					$self->_new_line;
 				}
-
 				$self->_add_token($token);
+                if ( $last && $last =~ /^(?:INNER|OUTER)$/i ) {
+					$self->_over;
+				}
 			}
 
 			elsif ($token =~ /^(?:AND|OR)$/i) {
-				$self->_new_line;
+				if (!$last or ($last !~ /^(?:CREATE)$/i) ) {
+					$self->_new_line;
+				}
 				$self->_add_token($token);
-#				$self->_new_line;
 			}
 
 			elsif ($token =~ /^--/) {
 				if (!$self->{no_comments}) {
 					$self->_add_token($token);
+					$self->{break} = "\n" unless ($self->{spaces} != 0);
 					$self->_new_line;
+					$self->{break} = ' ' unless ($self->{spaces} != 0);
 				}
 			}
 
 			elsif ($token =~ /^\/\*.*\*\/$/s) {
 				if (!$self->{no_comments}) {
-					$token =~ s/\n\s+\*/\n\*/gs;
+					$token =~ s/\n[\s\t]+\*/\n\*/gs;
 					$self->_new_line;
 					$self->_add_token($token);
+					$self->{break} = "\n" unless ($self->{spaces} != 0);
 					$self->_new_line;
+					$self->{break} = " " unless ($self->{spaces} != 0);
 				}
-			}
-
-			elsif ($token =~ /^(?:FOR)$/i) {
-				$self->_new_line;
-				$self->_over;
-				$self->_add_token($token);
 			}
 
 			elsif ($token =~ /^(?:USING)$/i) {
@@ -14198,22 +14244,37 @@ sub build_log_line_prefix_regex
 			}
 
 			if ($wrap) {
-				$token = $wrap->[0] . $token . $wrap->[1];
+                    $token = $wrap->[0] . $token . $wrap->[1];
 			}
 		}
 
 		my $last_is_dot = defined($last_token) && $last_token eq '.';
 
 		if (!$self->_is_punctuation($token) and !$last_is_dot) {
-			$self->{_output} .= $self->_indent;
+
+			my $sp = $self->_indent;
+            if ( (!defined($last_token) || $last_token ne '(') && ($token ne ')') && ($token !~ /^::/) ) {
+                    $self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
+            }
+		    $token =~ s/\n/\n$sp/gs;
 		}
 
 		# uppercase keywords
-		$token = uc $token
-			if $self->_is_keyword($token)
-				and $self->{uc_keywords};
+		if ($self->{uc_keywords} && $self->_is_keyword($token)) {
+			$token = lc($token) if ($self->{uc_keywords} == 1);
+			$token = uc($token) if ($self->{uc_keywords} == 2);
+			$token = ucfirst(lc($token)) if ($self->{uc_keywords} == 3);
+		}
+		# uppercase functions
+		if ($self->{uc_functions} && (my $fct = $self->_is_function($token))) {
+			$token =~ s/$fct/\L$fct\E/i if ($self->{uc_functions} == 1);
+			$token =~ s/$fct/\U$fct\E/i if ($self->{uc_functions} == 2);
+			$fct = ucfirst(lc($fct));
+			$token =~ s/$fct/$fct/i if ($self->{uc_functions} == 3);
+		}
 
 		$self->{_output} .= $token;
+        $self->{_output} =~ s/\(\s+\(/\(\(/gs;
 
 		# This can't be the beginning of a new line anymore.
 		$self->{_new_line} = 0;
@@ -14281,6 +14342,16 @@ sub build_log_line_prefix_regex
 		return ~~ grep {$_ eq uc($token)} @{$self->{keywords}};
 	}
 
+	# Check if a token is a known SQL function.
+	sub _is_function
+	{
+		my ($self, $token) = @_;
+
+		my @ret = grep($token =~ /\b[\.]*$_$/i, @{$self->{functions}});
+
+		return $ret[0];
+	}
+
 	# Add new keywords to highlight.
 	sub add_keywords
 	{
@@ -14288,6 +14359,16 @@ sub build_log_line_prefix_regex
 
 		for my $keyword (@_) {
 			push @{$self->{keywords}}, ref($keyword) ? @{$keyword} : $keyword;
+		}
+	}
+
+	# Add new functions to highlight.
+	sub add_functions
+	{
+		my $self = shift;
+
+		for my $function (@_) {
+			push @{$self->{functions}}, ref($function) ? @{$function} : $function;
 		}
 	}
 
@@ -14313,7 +14394,7 @@ sub build_log_line_prefix_regex
 			return $rule if (grep {uc($token) eq uc($_)} @$list);
 		}
 
-		return undef;
+		return;
 	}
 
 	sub _process_rule
