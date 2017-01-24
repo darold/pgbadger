@@ -161,6 +161,53 @@ AOAAAABgAAAA4AAAAOAAAADgAAAA4AAAAOAAAADgAAAA4AAAAGAAAADgAAAA4AAAAOAAAADgAAAA
 /Af/4AAAAP//v//gAAAA/////+AAAAA
 ';
 
+my %CLASS_ERROR_CODE = (
+	'00' => 'Successful Completion',
+	'01' => 'Warning',
+	'02' => 'No Data (this is also a warning class per the SQL standard)',
+	'03' => 'SQL Statement Not Yet Complete',
+	'08' => 'Connection Exception',
+	'09' => 'Triggered Action Exception',
+	'0A' => 'Feature Not Supported',
+	'0B' => 'Invalid Transaction Initiation',
+	'0F' => 'Locator Exception',
+	'0L' => 'Invalid Grantor',
+	'0P' => 'Invalid Role Specification',
+	'0Z' => 'Diagnostics Exception',
+	'20' => 'Case Not Found',
+	'21' => 'Cardinality Violation',
+	'22' => 'Data Exception',
+	'23' => 'Integrity Constraint Violation',
+	'24' => 'Invalid Cursor State',
+	'25' => 'Invalid Transaction State',
+	'26' => 'Invalid SQL Statement Name',
+	'27' => 'Triggered Data Change Violation',
+	'28' => 'Invalid Authorization Specification',
+	'2B' => 'Dependent Privilege Descriptors Still Exist',
+	'2D' => 'Invalid Transaction Termination',
+	'2F' => 'SQL Routine Exception',
+	'34' => 'Invalid Cursor Name',
+	'38' => 'External Routine Exception',
+	'39' => 'External Routine Invocation Exception',
+	'3B' => 'Savepoint Exception',
+	'3D' => 'Invalid Catalog Name',
+	'3F' => 'Invalid Schema Name',
+	'40' => 'Transaction Rollback',
+	'42' => 'Syntax Error or Access Rule Violation',
+	'44' => 'WITH CHECK OPTION Violation',
+	'53' => 'Insufficient Resources',
+	'54' => 'Program Limit Exceeded',
+	'55' => 'Object Not In Prerequisite State',
+	'57' => 'Operator Intervention',
+	'58' => 'System Error (errors external to PostgreSQL itself)',
+	'72' => 'Snapshot Failure',
+	'F0' => 'Configuration File Error',
+	'HV' => 'Foreign Data Wrapper Error (SQL/MED)',
+	'P0' => 'PL/pgSQL Error',
+	'XX' => 'Internal Error',
+);
+
+
 ####
 # method used to fork as many child as wanted
 ##
@@ -985,6 +1032,7 @@ my %error_info          = ();
 my %pgb_error_info      = ();
 my %pgb_pool_info       = ();
 my %logs_type           = ();
+my %errors_code         = ();
 my %per_minute_info     = ();
 my %pgb_per_minute_info = ();
 my %lock_info           = ();
@@ -2303,6 +2351,7 @@ sub init_stats_vars
 	%pgb_error_info      = ();
 	%pgb_pool_info       = ();
 	%logs_type           = ();
+	%errors_code         = ();
 	%per_minute_info     = ();
 	%pgb_per_minute_info = ();
 	%lock_info           = ();
@@ -3690,7 +3739,9 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote) = @_;
+	my ($q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote, $sqlstate) = @_;
+
+	$errors_code{$sqlstate}++ if ($sqlstate);
 
 	# Stop when we have our number of samples
 	if (!exists $error_info{$q}{date} || ($#{$error_info{$q}{date}}+1 < $sample)) {
@@ -3711,6 +3762,7 @@ sub set_top_error_sample
 			push(@{$error_info{$q}{user}},      $user);
 			push(@{$error_info{$q}{app}},       $app);
 			push(@{$error_info{$q}{remote}},    $remote);
+			push(@{$error_info{$q}{sqlstate}},  $sqlstate);
 		}
 	}
 }
@@ -4547,6 +4599,21 @@ sub show_error_as_text
 			print $fh "$d\t\t", &comma_numbers($logs_type{$d}), "\t", sprintf("%0.2f", ($logs_type{$d} * 100) / $total_logs), "%\n";
 		}
 	}
+
+	if (scalar keys %errors_code > 0) {
+		print $fh "\n- Logs per type ---------------------------------------------\n\n";
+
+		my $total_logs = 0;
+		foreach my $d (keys %errors_code) {
+			$total_logs += $errors_code{$d};
+		}
+		print $fh "Errors class			code	Count	Percentage\n";
+		foreach my $d (sort keys %errors_code) {
+			next if (!$errors_code{$d});
+			print $fh "$CLASS_ERROR_CODE{$d}\t$d\t\t", &comma_numbers($errors_code{$d}), "\t", sprintf("%0.2f", ($errors_code{$d} * 100) / $total_logs), "%\n";
+		}
+	}
+
 }
 
 sub show_pgb_error_as_text
@@ -4779,11 +4846,13 @@ sub html_header
 		}
 	}
 	if (!$disable_error && !$pgbouncer_only) {
+		my $sqlstate_report = '<li><a href="#error-code">Error class distribution</a></li>' if (scalar keys %errors_code > 0);
 		print $fh qq{
      		<li id="menu-events" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Events <span class="caret"></span></a>
      			<ul class="dropdown-menu">
      				<li><a href="#log-levels">Log levels</a></li>
      				<li><a href="#minutes-errors-levels">Events distribution</a></li>
+				$sqlstate_report
 				<li class="divider"></li>
      				<li><a href="#most-frequent-errors-events">Most frequent errors/events</a></li>
      			</ul>        
@@ -10465,6 +10534,9 @@ sub dump_as_html
 		# Show log level distribution
 		&print_log_level();
 
+		# Show error code distribution
+		&print_error_code() if (scalar keys %errors_code > 0);
+
 		# Show Most Frequent Errors/Events
 		&show_error_as_html();
 	}
@@ -10679,6 +10751,99 @@ $drawn_graphs{'eventspersecond_graph'}
 
 }
 
+sub print_error_code
+{
+	my %infos = ();
+	my %class_error = ();
+	my $ret = 0;
+
+	my $total_logs = 0;
+	foreach my $d (sort keys %errors_code) {
+		$total_logs += $errors_code{$d};
+		$d =~ /^(..)/;
+		$class_error{$1} += $errors_code{$d};
+	}
+
+	my $errorclass_info = '';
+	foreach my $d (sort keys %class_error) {
+		next if (!$class_error{$d});
+		$errorclass_info .= "<tr><td>$CLASS_ERROR_CODE{$d}</td><td>$d</td><td>" . &comma_numbers($class_error{$d}) .
+			"</td><td>" . sprintf("%0.2f", ($class_error{$d} * 100) / ($total_logs||1)) . "%</td></tr>";
+	}
+	my %graph_data = ();
+	my %max_events = ();
+	my $most_present = '';
+	if ($graph) {
+		my @small = ();
+		foreach my $d (sort { $class_error{$b} <=> $class_error{$a} } keys %class_error) {
+			$most_present = $CLASS_ERROR_CODE{$d} if (!$most_present);
+			if ((($class_error{$d} * 100) / ($total_logs || 1)) > $pie_percentage_limit) {
+				$infos{$CLASS_ERROR_CODE{$d}} = $class_error{$d} || 0;
+			} else {
+				$infos{"Sum error classes < $pie_percentage_limit%"} += $class_error{$d} || 0;
+				push(@small, $CLASS_ERROR_CODE{$d});
+			}
+		}
+
+		if ($#small == 0) {
+			$infos{$small[0]} = $infos{"Sum error classes < $pie_percentage_limit%"};
+			delete $infos{"Sum error classes < $pie_percentage_limit%"};
+		}
+	}
+
+	$drawn_graphs{errorclass_graph} = &jqplot_piegraph($graphid++, 'graph_errorclass', 'Error class distribution', %infos);
+	if (!$total_logs) {
+		$errorclass_info = qq{<tr><td colspan="7">$NODATA</td></tr>};
+	}
+	$total_logs = &comma_numbers($total_logs);
+	print $fh qq{
+	<div class="analysis-item row" id="error-code">
+		<h2><i class="glyphicon icon-tags"></i> Error class distribution</h2>
+		<div class="col-md-3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$total_logs</span> <span class="figure-label">Errors count</span></li>
+					<li><span class="figure">$most_present</span> <span class="figure-label">most present error class</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="col-md-9">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#error-code-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#error-code-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="error-code-graph">
+						$drawn_graphs{errorclass_graph}
+					</div>
+					<div class="tab-pane" id="error-code-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Class</th>
+									<th>Code</th>
+									<th>Count</th>
+									<th>Percentage</th>
+								</tr>
+							</thead>
+							<tbody>
+							$errorclass_info
+							</tbody>
+						</table>    
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of event flow -->
+
+};
+	delete $drawn_graphs{errorclass_graph};
+
+}
+
+
 sub show_error_as_html
 {
 
@@ -10831,6 +10996,7 @@ sub show_error_as_html
 				$details .= "<b>Application:</b> $error_info{$k}{app}[$i]\n";
 				$details .= "<b>User:</b> $error_info{$k}{user}[$i]\n";
 				$details .= "<b>Remote:</b> $error_info{$k}{remote}[$i]\n";
+				$details .= "<b>Code:</b> $error_info{$k}{sqlstate}[$i]\n";
 			}
 			$details =~ s/<br\/>$//s;
 			print $fh qq{
@@ -11176,6 +11342,7 @@ sub load_stats
 	my %_tempfile_info = %{$stats{tempfile_info}};
 	my %_cancelled_info = %{$stats{cancelled_info}};
 	my %_logs_type = %{$stats{logs_type}};
+	my %_errors_code = %{$stats{errors_code}};
 	my %_lock_info = %{$stats{lock_info}};
 	my %_per_minute_info = %{$stats{per_minute_info}};
 	my %_pgb_per_minute_info = %{$stats{pgb_per_minute_info}};
@@ -11279,6 +11446,12 @@ sub load_stats
 
 	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT)) {
 		$logs_type{$l} += $_logs_type{$l} if exists $_logs_type{$l};
+	}
+
+	### Errors code ###
+
+	foreach my $c (keys %_errors_code) {
+		$errors_code{$c} += $_errors_code{$c};
 	}
 
 	### database_info ###
@@ -11425,7 +11598,8 @@ sub load_stats
 									$_error_info{$q}{db}[$i],
 									$_error_info{$q}{user}[$i],
 									$_error_info{$q}{app}[$i],
-									$_error_info{$q}{remote}[$i]
+									$_error_info{$q}{remote}[$i],
+									$_error_info{$q}{sqlstate}[$i]
 									);
 		}
 	}
@@ -12941,6 +13115,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} if (!$cur_info{$t_pid}{dbappname});
 	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if (!$cur_info{$t_pid}{date});
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
+	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
 
 	# Extract the query part from the plan
 	if (exists $cur_plan_info{$t_pid} && exists $cur_plan_info{$t_pid}{plan} && $cur_plan_info{$t_pid}{plan} ne '') {
@@ -13151,7 +13326,8 @@ sub store_queries
 									$cur_info{$t_pid}{dbname}, 
 									$cur_info{$t_pid}{dbuser},
 									$cur_info{$t_pid}{dbappname},
-									$cur_info{$t_pid}{dbclient}
+									$cur_info{$t_pid}{dbclient},
+									$cur_info{$t_pid}{sqlstate},
 			);
 		}
 
