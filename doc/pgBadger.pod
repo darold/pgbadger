@@ -299,6 +299,7 @@ periods of five minutes:
 	Autovacuum and autoanalyze statistics.
 	Cancelled queries.
 	Error events (panic, fatal, error and warning).
+	Error class distribution.
 
 There are also some pie charts about distribution of:
 

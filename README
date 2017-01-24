@@ -298,6 +298,7 @@ FEATURE
             Autovacuum and autoanalyze statistics.
             Cancelled queries.
             Error events (panic, fatal, error and warning).
+            Error class distribution.
 
     There are also some pie charts about distribution of:
 
@@ -609,7 +610,7 @@ JSON FORMAT
 AUTHORS
     pgBadger is an original work from Gilles Darold.
 
-    The pgBadger logo is an original creation of Damien Cazeils.
+    The pgBadger logo is an original creation of Damien Clochard.
 
     The pgBadger v4.x design comes from the "Art is code" company.
 
