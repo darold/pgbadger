@@ -1,3 +1,71 @@
+2017-01-24 - v9.1
+
+This release of pgBadger is a maintenance release that adds some new
+features.
+
+  * Add report of error class distribution when SQLState is available
+    in the log_line_prefix (see %e placeholder).
+  * Update SQL Beautifier to pgFormatter v1.6 code.
+  * Improve error message normalization.
+  * Add --normalized-only option to generate a text file containing all
+    normalized queries found in a log with count.
+  * Allow %c (session id) to replace %p (pid) as unique session id.
+  * Add waiting for lock messages to event reports.
+  * Add --start-monday option to start calendar weeks in Monday
+    instead of default to Sunday.
+
+There's also some bugs fixes and features enhancements.
+
+  - Add report of error class distribution when SQLState is available
+    in the log line prefix. Thanks to jacks33 for the feature request.
+  - Fix incremental global index on resize. Thanks to clomdd for the
+    report.
+  - Fix command tag log_line_prefix placeholder %i to allow space
+    character.
+  - Fix --exclude-line options and removing of obsolete directory
+    when retention is enabled and --noreport is used.
+  - Fix typo in "vacuum activity table". Thanks to Nicolas Gollet for
+    the patch.
+  - Fix autovacuum report. Thanks to Nicolas Gollet for the patch.
+  - Fix author of pgbadger's logo - Damien Cazeils and English in
+    comments. Thanks to Thibaut Madelaine for the patch.
+  - Add information about pgbouncer log format in the -f option.
+    Thanks to clomdd for the report.
+  - Add --normalized-only information in documentation.
+  - Fix broken report of date-time introduced in previous patch.
+  - Fix duration/query association when log_duration=on and
+    log_statement=all. Thanks to Eric Jensen for the report.
+  - Fix normalization of messages about advisory lock. Thanks to
+    Thibaut Madelaine for the report.
+  - Fix report of auto_explain output. Thanks to fch77700 for the
+    report.
+  - Fix unwanted log format auto detection with log entry from stdin.
+    Thanks to Jesus Adolfo Parra for the report.
+  - Add left open parentheses to the "stop" chars of regex to look
+    for db client in the prefix to handle the PostgreSQL client
+    string format that includes source port. Thanks to Jon Nelson
+    for the patch.
+  - Fix some spelling errors. Thanks to Jon Nelson for the patch.
+  - Allow %c (session id) to replace %p (pid) as unique session id.
+    Thanks to Jerryliuk for the report.
+  - Allow pgbadger to parse default log_line_prefix that will be
+    probably used in 10.0: '%m [%p] '
+  - Fix missing first line with interpreter call.
+  - Fix missing Avg values in CSV report. Thanks to Yosuke Tomita
+    for the report.
+  - Fix error message in autodetect_format() method.
+  - Add --start-monday option to start calendar weeks in Monday
+    instead of default to Sunday. Thanks to Joosep Mae for the feature
+    request.
+  - Fix --histo-average option. Thanks to Yves Martin for the report.
+  - Remove plural form of --ssh-option in documentation. Thanks to
+    mark-a-s for the report.
+  - Fix --exclude-time filter and rewrite code to skip unwanted line
+    as well code to update the progress bar. Thanks to Michael
+    Chesterton for the report.
+  - Fix support to %r placeholder in prefix instead of %h.
+
+
 2016-09-02 - v9.0
 
 This major release of pgBadger is a port to bootstrap 3 and a version
