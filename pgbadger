@@ -9476,6 +9476,8 @@ sub print_histogram_query_times
 		}
 	}
 	if ($overall_stat{histogram}{query_total} > 0) {
+
+		$data{"> $histogram_query_time[-1]ms"} = ($overall_stat{histogram}{query_time}{"-1"} || 0);
 		$histogram_info .= "<tr><td> &gt; $histogram_query_time[-1]ms</td><td>" . &comma_numbers($overall_stat{histogram}{query_time}{'-1'}) .
 			"</td><td>" . sprintf("%0.2f", ($overall_stat{histogram}{query_time}{'-1'} * 100) / ($overall_stat{histogram}{query_total}||1)) . "%</td></tr>";
 		$data{"> $histogram_query_time[-1]ms"} = $overall_stat{histogram}{query_time}{"-1"} if ($overall_stat{histogram}{query_time}{"-1"} > 0);
@@ -13971,7 +13973,8 @@ sub jqplot_duration_histograph
                 my $lbl = "'" . &convert_time($range->[$i-1]) . '-' . &convert_time($range->[$i]) . "'";
 		$bars .= "[ $lbl, $data{$k}],";
 	}
-	$bars =~ s/,$//;
+	my $k = "> $range->[-1]ms";
+	$bars .= "[ '> " . &convert_time($range->[-1]) . "', $data{$k}]";
 	my $title = '';
 
 	return <<EOF;
