@@ -1467,6 +1467,8 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		my $fmt = $format || 'stderr';
 		if (!$remote_host && ($logfile ne '-') && !$journalctl_cmd) {
 			$fmt = &autodetect_format($logfile);
+			$fmt ||= $format;
+			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 		} else {
 			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
 		}
@@ -1551,6 +1553,8 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		my $fmt = $format || 'stderr';
 		if (!$remote_host && !$journalctl_cmd) {
 			$fmt = &autodetect_format($logfile);
+			$fmt ||= $format;
+			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 		} else {
 			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
 		}
@@ -1991,13 +1995,13 @@ sub set_parser_regex
 		} elsif ($fmt eq 'syslog2') {
 			$fmt = 'syslog';
 			$llp =
-				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
+				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*'
 				. $llp
 				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
 			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
-			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*)/;
 		} elsif ($fmt eq 'stderr') {
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
@@ -2017,10 +2021,10 @@ sub set_parser_regex
 
 		$fmt = 'syslog';
 		$compiled_prefix =
-	qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
-		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
+		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*)/;
 
 	} elsif ($fmt eq 'stderr') {
 
