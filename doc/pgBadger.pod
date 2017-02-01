@@ -241,8 +241,8 @@ it will also update all ressources file (JS and CSS).
 =head1 DESCRIPTION
 
 pgBadger is a PostgreSQL log analyzer built for speed with fully
-reports from your PostgreSQL log file. It's a single and small Perl script
-Perl script that outperforms any other PostgreSQL log analyzer.
+reports from your PostgreSQL log file. It's a single and small Perl script that
+outperforms any other PostgreSQL log analyzer.
 
 It is written in pure Perl and uses a javascript library (flotr2) to draw
 graphs so that you don't need to install any additional Perl modules or
