@@ -12230,6 +12230,8 @@ sub validate_log_line
 		if (!$prefix_vars{'t_user'} && exists $current_sessions{$t_pid}{user});
 	$prefix_vars{'t_client'} = $current_sessions{$t_pid}{host}
 		if (!$prefix_vars{'t_client'} && exists $current_sessions{$t_pid}{host});
+	# Clear storage, the authorized session will be reparsed after
+	delete $current_sessions{$prefix_vars{'t_pid'}};
 
 	# Look at particular cases of vacuum/analyze that have the database
 	# name inside the log message so that they could be associated
@@ -12588,7 +12590,6 @@ sub parse_query
 			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+)/))
 	{
 		return if ($disable_session);
-
 		delete $current_sessions{$prefix_vars{'t_pid'}};
 		if ($extension eq 'tsung') {
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
