@@ -687,7 +687,7 @@ if (!$rebuild) {
 		if ($journalctl_cmd) {
 			$frmt = 'syslog2';
 		} else {
-			localdie("FATAL: you must give a log file format (-f or --format) when using remote connection.\n\n");
+			$frmt = &autodetect_format($log_files[0]);
 		}
 	}
 } else {
@@ -1465,7 +1465,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		# Get log format of the current file
 		my $fmt = $format || 'stderr';
-		if (!$remote_host && ($logfile ne '-') && !$journalctl_cmd) {
+		if ($logfile ne '-' && !$journalctl_cmd) {
 			$fmt = &autodetect_format($logfile);
 			$fmt ||= $format;
 			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
@@ -1551,7 +1551,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		# Get log format of the current file
 		my $fmt = $format || 'stderr';
-		if (!$remote_host && !$journalctl_cmd) {
+		if (!$journalctl_cmd) {
 			$fmt = &autodetect_format($logfile);
 			$fmt ||= $format;
 			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
@@ -13690,6 +13690,7 @@ sub autodetect_format
 	my $nfound = 0;
 	my $nline  = 0;
 	my $fmt    = '';
+	my %ident_name = ();
 
 	localdie("FATAL: when looking for log file format, can't open file $file, $!\n") unless(open(TESTFILE, $file));
 	my $fltf = <TESTFILE>;
@@ -13699,93 +13700,34 @@ sub autodetect_format
 		$fmt = 'binary';
 	}
 	else { # try to detect syslogs, stderr, csv or pgbouncer format
-		my ($tfile, $totalsize) = &get_log_file($file);
-		my %ident_name = ();
+		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
 		while (my $line = <$tfile>) {
 			chomp($line);
 			$line =~ s/\r//;
 			next if (!$line);
 			$nline++;
 
-			# Are pgbouncer syslog lines ?
-			if ($line =~ /^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/) {
-				localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
-
-			} elsif ($line =~
-	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
-			   )
-			{
-				localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
-
-			# Are syslog lines ?
-			} elsif ($line =~
-	/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
-			   )
-			{
-				$fmt = 'syslog';
-				$nfound++;
-				$ident_name{$1}++;
-
-			} elsif ($line =~
-	/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
-			   )
-			{
-				$fmt = 'syslog2';
-				$nfound++;
-				$ident_name{$1}++;
-
-			# Are csv lines ?
-			} elsif (
-				(
-					$line =~
-					/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
-				)
-				&& ($line =~ tr/,/,/ >= 12)
-				)
-			{
-				$fmt = 'csv';
-				$nfound++;
-
-			# Are default stderr lines since 10.0 ?
-			} elsif ($line =~
-	/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
-				)
-			{
-				$fmt = 'default';
-				$nfound++;
-			# Are stderr lines ?
-			} elsif ($line =~
-	/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
-				)
-			{
-				$fmt = 'stderr';
-				$nfound++;
-
-
-			# Are pgbouncer lines ?
-			} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*|Stats):/) {
-				$fmt = 'pgbouncer';
-				# If we just have one single pgbouncer file, force pgbouncer_only to 1
-				$pgbouncer_only = 1 if ($#log_files == 0);
-				$nfound++;
-			}
+			my ($f, $i) = search_log_format($line);
+			$nfound++ if ($f);
+			$fmt = $f;
+			$ident_name{$i}++ if ($i);
 			last if (($nfound > 10) || ($nline > 5000));
 		}
 		$tfile->close();
+	}
 
-		# When --pgbouncer-only is used force the format
-		if (!$format && $pgbouncer_only) {
-			$pgbouncer_only = 1;
-			$fmt = 'pgbouncer';
-		} elsif (!$format) {
-			if (!$fmt || ($nfound < 10)) {
-				localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
-			}
+	# When --pgbouncer-only is used force the format
+	if (!$format && $pgbouncer_only) {
+		$pgbouncer_only = 1;
+		$fmt = 'pgbouncer';
+	} elsif (!$format) {
+		if (!$fmt || ($nfound < 10)) {
+			localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
 		}
+	}
 
-		if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
-			$ident = (keys %ident_name)[0];
-		}
+	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
+		$ident = (keys %ident_name)[0];
 	}
 
 	&logmsg('DEBUG', "Autodetected log format '$fmt' from $file");
@@ -13793,9 +13735,78 @@ sub autodetect_format
 	return $fmt;
 }
 
+sub search_log_format
+{
+	my $line = shift;
+
+	my $fmt = '';
+	my $ident_name = '';
+
+	# Are pgbouncer syslog lines ?
+	if ($line =~ /^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/) {
+		localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
+
+	} elsif ($line =~
+/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
+	   )
+	{
+		localdie("FATAL: parsing pgbouncer log from syslog is not supported.\n");
+
+	# Are syslog lines ?
+	} elsif ($line =~
+/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+	   )
+	{
+		$fmt = 'syslog';
+		$ident_name = $1;
+
+	} elsif ($line =~
+/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+	   )
+	{
+		$fmt = 'syslog2';
+		$ident_name = $1;
+
+	# Are csv lines ?
+	} elsif (
+		(
+			$line =~
+			/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
+		)
+		&& ($line =~ tr/,/,/ >= 12)
+		)
+	{
+		$fmt = 'csv';
+
+	# Are default stderr lines since 10.0 ?
+	} elsif ($line =~
+/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+		)
+	{
+		$fmt = 'default';
+
+	# Are stderr lines ?
+	} elsif ($line =~
+/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+		)
+	{
+		$fmt = 'stderr';
+
+
+	# Are pgbouncer lines ?
+	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*|Stats):/) {
+		$fmt = 'pgbouncer';
+		# If we just have one single pgbouncer file, force pgbouncer_only to 1
+		$pgbouncer_only = 1 if ($#log_files == 0);
+	}
+
+	return ($fmt, $ident_name);
+}
+
 sub progress_bar
 {
 	my ($got, $total, $width, $char, $queries, $errors) = @_;
+
 	$width ||= 25;
 	$char  ||= '=';
 	my $num_width = length $total;
@@ -14620,8 +14631,11 @@ sub build_log_line_prefix_regex
 sub get_log_file
 {
 	my $logf = shift;
+	my $sample_only = shift;
 
 	my $lfile = undef;
+
+	chomp($logf);
 
 	# get file size
 	my $totalsize = 0;
@@ -14649,39 +14663,59 @@ sub get_log_file
 		if (!$remote_host) {
 			open($lfile, "$logf |") || localdie("FATAL: cannot read output of commanf: $logf. $!\n");
 		} else {
-			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
-			# Open a pipe to remote journalctl program
-			open($lfile,"$ssh_command \"$logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
+			if (!$sample_only) {
+				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
+				# Open a pipe to remote journalctl program
+				open($lfile,"$ssh_command \"$logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
+			} else {
+				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf -n 100\" |");
+				# Open a pipe to remote journalctl program
+				open($lfile,"$ssh_command \"$logf -n 100\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf -n 100\". $!\n");
+			}
 		}
 		$iscompressed = 0;
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
 			open($lfile, $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 		} else {
-			&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
-			# Open a pipe to zcat program for compressed log
-			open($lfile,"$ssh_command \"cat $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
+			if (!$sample_only) {
+				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
+				# Open a pipe to cat program
+				open($lfile,"$ssh_command \"cat $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
+			} else {
+				# Open a pipe to cat program
+				open($lfile,"$ssh_command \"tail -n 100 $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
+			}
 		}
 		$totalsize = 0 if ($logf eq '-');
 		$iscompressed = 0;
 	} else {
 		my $uncompress = $zcat;
+		my $sample_cmd = 'zgrep';
 		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $bzcat;
+			$sample_cmd = 'bzgrep';
 		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $ucat;
 		}
 		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $xzcat;
+			$sample_cmd = 'xzgrep';
 		}
 		if (!$remote_host) {
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
 			open($lfile,"$uncompress \"$logf\" |") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
 		} else {
-			&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
-			# Open a pipe to zcat program for compressed log
-			open($lfile,"$ssh_command \"$uncompress $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
+			if (!$sample_only) {
+				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
+				# Open a pipe to zcat program for compressed log
+				open($lfile,"$ssh_command \"$uncompress $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
+			} else {
+				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
+				# Open a pipe to zcat program for compressed log
+				open($lfile,"$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+			}
 		}
 
 
