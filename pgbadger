@@ -13696,11 +13696,11 @@ sub autodetect_format
 		localdie("FATAL: when looking for log file format, can't open file $file, $!\n") unless(open(TESTFILE, $file));
 		my $fltf = <TESTFILE>;
 		close(TESTFILE);
-	}
 
-	# is file in binary format ?
-	if ( $fltf =~ /^pst\d/ ) {
-		$fmt = 'binary';
+		# is file in binary format ?
+		if ( $fltf =~ /^pst\d/ ) {
+			$fmt = 'binary';
+		}
 	}
 	else { # try to detect syslogs, stderr, csv or pgbouncer format
 		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
