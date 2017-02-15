@@ -13692,9 +13692,12 @@ sub autodetect_format
 	my $fmt    = '';
 	my %ident_name = ();
 
-	localdie("FATAL: when looking for log file format, can't open file $file, $!\n") unless(open(TESTFILE, $file));
-	my $fltf = <TESTFILE>;
-	close(TESTFILE);
+	if (!$remote_host) {
+		localdie("FATAL: when looking for log file format, can't open file $file, $!\n") unless(open(TESTFILE, $file));
+		my $fltf = <TESTFILE>;
+		close(TESTFILE);
+	}
+
 	# is file in binary format ?
 	if ( $fltf =~ /^pst\d/ ) {
 		$fmt = 'binary';
