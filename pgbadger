@@ -14368,7 +14368,7 @@ sub build_log_line_prefix_regex
 					$self->_new_line;
 					$self->_over if ($self->{_level} == 0);
 				}
-				if ( ($token =~ /(?:INNER|OUTER)$/i) && ($last !~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) ) {
+				if ( ($token =~ /(?:INNER|OUTER)$/i) && (!$last or $last !~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) ) {
 					$self->_new_line;
 					$self->_over if ($self->{_level} == 0);
 				}
