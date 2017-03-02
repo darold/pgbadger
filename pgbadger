@@ -4812,7 +4812,7 @@ sub html_header
      			</ul>
 		</li>
 };
-	}
+		}
 		if (!$disable_query) {
 			if (!$disable_type) {
 				print $fh qq{
@@ -4827,16 +4827,18 @@ sub html_header
 				<li class="divider"></li>
      				<li><a href="#queries-cancelled-number">Number of cancelled queries</a></li>
 };
-			}
-			if ($#top_cancelled_info >= 0) {
-				print $fh qq{
+				if ($#top_cancelled_info >= 0) {
+					print $fh qq{
      				<li><a href="#queries-generating-most-cancellation">Queries generating the most cancellation (N)</a></li>
      				<li><a href="#queries-generating-most-cancelled">Most cancelled queries</a></li>
 };
-			}
-			print $fh qq{
+				}
+				print $fh qq{
      			</ul>     
      		</li>
+};
+			}
+			print $fh qq{
      		<li id="menu-topqueries" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Top <span class="caret"></span></a>
      			<ul class="dropdown-menu">
      				<li><a href="#histogram-query-times">Histogram of query times</a></li>
