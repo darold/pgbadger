@@ -1731,11 +1731,11 @@ Options:
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
-    -D | --dns-resolv      : client ip adresses are replaced by their DNS name.
+    -D | --dns-resolv      : client ip addresses are replaced by their DNS name.
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
-			     pgbouncer. Use this option when pgbadger is not
+			     pgbouncer. Use this option when pgBadger is not
                              able to auto-detect the log format Default: stderr.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
@@ -1774,9 +1774,9 @@ Options:
     -q | --quiet           : don't print anything to stdout, not even a progress
 			     bar.
     -r | --remote-host ip  : set the host where to execute the cat command on
-			     remote logfile to parse localy the file.
-    -R | --retention N     : number of week to keep in incremental mode. Default
-			     to 0, disabled. Used to set the number of weel to
+			     remote logfile to parse locally the file.
+    -R | --retention N     : number of weeks to keep in incremental mode. Default
+			     to 0, disabled. Used to set the number of weeks to
 			     keep in output directory. Older weeks and days
 			     directory are automatically removed.
     -s | --sample number   : number of query samples to store. Default: 3.
@@ -1791,12 +1791,12 @@ Options:
     -w | --watch-mode      : only report errors just like logwatch could do.
     -x | --extension       : output format. Values: text, html, bin, json or
                              tsung. Default: html
-    -X | --extra-files     : in incremetal mode allow pgbadger to write CSS and
+    -X | --extra-files     : in incremental mode allow pgBadger to write CSS and
 			     JS files in the output directory as separate files.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
                              zcat or bzcat or unzip is not in your path.
-    -Z | --timezone +/-XX  : Set the number of hour(s) from GMT of the timezone.
-                             Use this to adjust date/time in javascript graphs.
+    -Z | --timezone +/-XX  : Set the number of hours from GMT of the timezone.
+                             Use this to adjust date/time in JavaScript graphs.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
                              from the report. For example: "^(VACUUM|COMMIT)"
@@ -1830,27 +1830,27 @@ Options:
                              You can use this option multiple times.
     --exclude-appname name : exclude entries for the specified application name
 			     from report. Example: "pg_dump".
-    --exclude-line regex   : pgbadger will start to exclude any log entry that
+    --exclude-line regex   : pgBadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple
 			     time.
     --anonymize            : obscure all literals in queries, useful to hide
                              confidential data.
-    --noreport             : prevent pgbadger to create reports in incremental
+    --noreport             : prevent pgBadger to create reports in incremental
 			     mode.
-    --log-duration         : force pgbadger to associate log entries generated
+    --log-duration         : force pgBadger to associate log entries generated
                              by both log_duration = on and log_statement = 'all'
     --enable-checksum      : used to add a md5 sum under each query report.
     --journalctl command   : command to use to replace PostgreSQL logfile by
 			     a call to journalctl. Basically it might be:
 				journalctl -u postgresql-9.5
     --pid-dir dirpath      : set the path of the directory where the pid file
-                             will be written to be able to run two pgbadger at
+                             will be written to be able to run two pgBadger at
 			     the same time.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
-    --pgbouncer-only       : only show pgbouncer related menu in the header.
+    --pgbouncer-only       : only show PgBouncer related menu in the header.
     --start-monday         : in incremental mode, calendar's weeks start on
-                             sunday. Use this otpion to start on monday.
+                             sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
@@ -1916,7 +1916,7 @@ reports:
 	-O /var/www/pg_reports/
 
 If you have a pg_dump at 23:00 and 13:00 each day during half an hour, you can
-use pgbadger as follow to exclude these period from the report:
+use pgBadger as follow to exclude these period from the report:
 
     pgbadger --exclude-time "2013-09-.* (23|13):.*" postgresql.log 
 
@@ -1935,13 +1935,13 @@ or worst, call it from a remote host:
 you don't need to specify any log file at command line, but if you have other
 PostgreSQL log file to parse, you can add them as usual.
 
-To rebuild all incremantal html reports after, proceed as follow:
+To rebuild all incremental html reports after, proceed as follow:
 
     rm /path/to/reports/*.js
     rm /path/to/reports/*.css
     pgbadger -X -I -O /path/to/reports/ --rebuild
 
-it will also update all ressources file (JS and CSS).
+it will also update all resource files (JS and CSS).
 
 };
 
