@@ -3519,8 +3519,11 @@ sub normalize_query
 	# Remove hexadecimal numbers
 	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/gs;
 
+	# Remove bind parameters
+	$orig_query =~ s/\$\d+/\?/gs;
+
 	# Remove IN values
-	$orig_query =~ s/\bin\s*\([\'0x,\s]*\)/in (...)/gs;
+	$orig_query =~ s/\bin\s*\([\'0x,\s\?]*\)/in (...)/gs;
 
 	# Remove curor names in CURSOR and IN clauses
 	$orig_query =~ s/\b(declare|in)\s+"[^"]+"/$1 "..."/gs;
