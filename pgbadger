@@ -915,6 +915,9 @@ if ($to) {
                 $to = "$1-$2-$3 $4:$5:$6.$7"
         }
 }
+if ($from && $to && ($from gt $to)) {
+	localdie("FATAL: begin date is after end time!\n") ;
+}
 
 # Stores the last parsed line from log file to allow incremental parsing
 my $LAST_LINE = '';
