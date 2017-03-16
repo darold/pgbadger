@@ -12426,6 +12426,9 @@ sub parse_query
 			# Store error details only if this is not a parameter list (never present with errors)
 			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
 		}
+		if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid}{query} eq '')) {
+			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
+		}
 		return;
 	}
 
