@@ -951,10 +951,10 @@ my @pg_keywords = qw(
 
 my @redshift_keywords =  qw(
 	AES128 AES256 ALLOWOVERWRITE BACKUP BLANKSASNULL BYTEDICT BZIP2 CREDENTIALS CURRENT_USER_ID
-	DEFLATE DEFRAG DELTA DELTA32K DISABLE EMPTYASNULL ENABLE ENCODE ENCRYPT ENCRYPTION EXPLICIT
-	GLOBALDICT256 GLOBALDICT64K GZIP LUN LUNS LZO LZOP MINUS MOSTLY13 MOSTLY32 MOSTLY8 NEW
+	DEFLATE DEFRAG DELTA DELTA32K DISABLE DISTKEY EMPTYASNULL ENABLE ENCODE ENCRYPT ENCRYPTION EXPLICIT
+	GLOBALDICT256 GLOBALDICT64K GZIP INTERLEAVED LUN LUNS LZO LZOP MINUS MOSTLY13 MOSTLY32 MOSTLY8 NEW
 	OFFLINE OFFSET OID OLD PARALLEL PERCENT PERMISSIONS RAW READRATIO RECOVER RESPECT REJECTLOG
-	RESORT RESTORE SYSDATE TAG TDES TEXT255 TEXT32K TIMESTAMP TOP TRUNCATECOLUMNS WALLET
+	RESORT RESTORE SORTKEY SYSDATE TAG TDES TEXT255 TEXT32K TIMESTAMP TOP TRUNCATECOLUMNS WALLET
 );
 
 my @beautify_pg_keywords = qw(
@@ -14259,9 +14259,9 @@ sub build_log_line_prefix_regex
 	{
 		my ($self) = @_;
 
-		$self->{_output}      = '';
+		$self->{_output}	  = '';
 		$self->{_level_stack} = [];
-		$self->{_new_line}    = 1;
+		$self->{_new_line}	= 1;
 
 		my $last;
 		$self->{_tokens} = [tokenize_sql($self->query, 1)];
@@ -14269,42 +14269,68 @@ sub build_log_line_prefix_regex
 		while (defined(my $token = $self->_token)) {
 			my $rule = $self->_get_rule($token);
 
+			if ($token =~ /^CREATE$/i) {
+				  $self->{ '_is_in_create' } = 1;
+			} elsif ($token =~ /^(AS|IS|RETURN)$/) {
+				  $self->{ '_is_in_create' } = 0;
+			}
 			# Allow custom rules to override defaults.
 			if ($rule) {
 				$self->_process_rule($rule, $token);
 			}
 
 			elsif ($token eq '(') {
+				$self->{ '_is_in_create' }++ if ($self->{ '_is_in_create' });
 				$self->_add_token($token);
+				if ((uc($last) eq 'AS') || ($self->{ '_is_in_create' } == 2)) {
+					$self->_new_line;
+				}
+				if (!$self->{'_is_in_function'} && $last && grep(/^\Q$last\E$/i, @KEYWORDS2)) {
+					$self->{'_is_in_function'} = 1;
+				} elsif ($self->{'_is_in_function'}) {
+					$self->{'_is_in_function'}++;
+				}
 				if ( ($self->_next_token ne ')') && ($self->_next_token ne '*') ) {
-                    $self->{ '_has_from' } = 1 if ($last && grep(/^\Q$last\E$/i, @{$self->{have_from_clause}}));
+					$self->{ '_has_from' } = 1 if ($last && grep(/^\Q$last\E$/i, @{$self->{have_from_clause}}));
 					push @{$self->{_level_stack}}, $self->{_level};
 					$self->_over unless $last and uc($last) eq 'WHERE';
 				}
 			}
 
 			elsif ($token eq ')') {
-                $self->{ '_has_from' } = 0;
-                if ( ($last ne '(') && ($last ne '*') )  {
-                    $self->{_level} = pop(@{$self->{_level_stack}}) || 0;
-                }
+				$self->{ '_is_in_create' }-- if ($self->{ '_is_in_create' });
+				$self->{ '_has_from' } = 0;
+				if ($self->{ '_is_in_function' }) {
+					$self->{ '_is_in_function' }--;
+				}
+				$self->_new_line if ($self->_next_token =~ /^SELECT$/i);
+				if ( ($last ne '(') && ($last ne '*') )  {
+					$self->{_level} = pop(@{$self->{_level_stack}}) || 0;
+				}
 				$self->_add_token($token);
-				$self->_new_line if ($self->_next_token
+				if ($self->{ '_is_in_create' } <= 1) {
+					my $next_tok = quotemeta($self->_next_token);
+					$self->_new_line if ($self->_next_token
 							and $self->_next_token !~ /^AS$/i
 							and $self->_next_token ne ')'
 							and $self->_next_token !~ /::/
 							and $self->_next_token ne ';'
 							and $self->_next_token ne ','
+							and !exists $SYMBOLS{$next_tok}
 					);
+				}
 			}
 			elsif ($token eq ',') {
 				$self->_add_token($token);
-				$self->_new_line if (!$self->{ '_is_in_where' });
+				$self->_new_line if (!$self->{ 'no_break' } && !$self->{ '_is_in_function' } && $self->_next_token !~ /^('|\-\-)/ && !$self->{ '_is_in_where' });
 			}
 
 			elsif ($token eq ';') {
-                $self->{ '_has_from' } = 0;
-                $self->{ '_is_in_where' } = 0;
+				$self->{ '_has_from' } = 0;
+				$self->{ '_is_in_where' } = 0;
+				$self->{ '_is_in_from' } = 0;
+				$self->{ '_is_an_update' } = 0;
+				$self->{ '_is_in_create' } = 0;
 				$self->_add_token($token);
 				$self->{break} = "\n" unless ($self->{spaces} != 0);
 				$self->_new_line;
@@ -14314,39 +14340,52 @@ sub build_log_line_prefix_regex
 				$self->{_level} = 0;
 				$self->{break} = ' ' unless ($self->{spaces} != 0);
 			}
+			elsif ($token =~ /^(?:SELECT|UPDATE|FROM|WHERE|HAVING|BEGIN|SET|RETURNING|VALUES)$/i) {
 
-			elsif ($token =~ /^(?:SELECT|FROM|WHERE|HAVING|BEGIN|SET)$/i) {
+			   $self->{ 'no_break' } = 0;
 
-               if (($token =~ /^FROM$/i) && $self->{ '_has_from' } ) {
-                   $self->{ '_has_from' } = 0;
-                    $self->_new_line;
-                   $self->_add_token( $token );
-                    $self->_new_line;
-               }
-               else
-               {
-                   # if we're not in a sub-select, make sure these always are
-                   # at the far left (col 1)
-                   $self->_back if ( $last and $last ne '(' and $last ne 'FOR' );
+			   if (($token =~ /^FROM$/i) && $self->{ '_has_from' } ) {
+				   $self->{ '_has_from' } = 0;
+					$self->_new_line;
+				   $self->_add_token( $token );
+					$self->_new_line;
+			   }
+			   else
+			   {
+				   # if we're not in a sub-select, make sure these always are
+				   # at the far left (col 1)
+				   $self->_back if ( $last and $last ne '(' and uc($last) ne 'FOR' and uc($last) ne 'KEY' );
 
-                   $self->_new_line;
-                   $self->_add_token( $token );
-                   $self->_new_line if ( ( ( $token ne 'SET' ) || $last ) and $self->_next_token and $self->_next_token ne '(' and $self->_next_token ne ';' );
-                   $self->_over;
-               }
-               if ($token =~ /^WHERE$/i) {
-                    $self->{ '_is_in_where' } = 1;
-               } else {
-                    $self->{ '_is_in_where' } = 0;
-               }
+				   $self->_new_line if ( $last and uc($last) ne 'FOR' and uc($last) ne 'KEY' );
+				   $self->_add_token( $token );
+				   if ( $token !~ /^SET$/i || $self->{ '_is_an_update' } ) {
+					   $self->_new_line if ($self->_next_token and $self->_next_token ne '(' and $self->_next_token ne ';' );
+				   }
+				   $self->_over;
+			   }
+			   if ($token =~ /^UPDATE$/i and !$last) {
+				  $self->{ '_is_an_update' } = 1;
+			   }
 
+			   if ($token =~ /^WHERE$/i) {
+					$self->{ '_is_in_where' } = 1;
+					$self->{ 'is_in_from' } = 0;
+			   } else {
+					$self->{ '_is_in_where' } = 0;
+					if ($token =~ /^FROM$/i) {
+						$self->{ 'is_in_from' } = 1;
+					} else {
+						$self->{ 'is_in_from' } = 0;
+					}
+			   }
 			}
 
 			elsif ($token =~ /^(?:GROUP|ORDER|LIMIT)$/i) {
 				$self->_back;
 				$self->_new_line;
 				$self->_add_token($token);
-                $self->{ '_is_in_where' } = 0;
+				$self->{ '_is_in_where' } = 0;
+				$self->{ '_is_in_from' } = 0;
 			}
 
 			elsif ($token =~ /^(?:BY)$/i) {
@@ -14377,20 +14416,22 @@ sub build_log_line_prefix_regex
 			}
 
 			elsif ($token =~ /^(?:UNION|INTERSECT|EXCEPT)$/i) {
+				$self->{ 'no_break' } = 0;
 				$self->_back unless $last and $last eq '(';
 				$self->_new_line;
 				$self->_add_token($token);
-				$self->_new_line if ($self->_next_token and $self->_next_token ne '(');
+				$self->_new_line if ($self->_next_token and $self->_next_token ne '(' and $self->_next_token !~ /^ALL$/i);
 				$self->_over;
 			}
 
 			elsif ($token =~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL)$/i) {
+				$self->{ 'no_break' } = 0;
 				$self->_back unless $last and $last eq ')';
 				if ($token =~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) {
 					$self->_new_line;
 					$self->_over if ($self->{_level} == 0);
 				}
-				if ( ($token =~ /(?:INNER|OUTER)$/i) && (!$last or $last !~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) ) {
+				if ( ($token =~ /(?:INNER|OUTER)$/i) && ($last !~ /(?:LEFT|RIGHT|CROSS|NATURAL)$/i) ) {
 					$self->_new_line;
 					$self->_over if ($self->{_level} == 0);
 				}
@@ -14398,16 +14439,18 @@ sub build_log_line_prefix_regex
 			}
 
 			elsif ($token =~ /^(?:JOIN)$/i) {
+				$self->{ 'no_break' } = 0;
 				if (!$last or $last !~ /^(?:LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL)$/i) {
 					$self->_new_line;
 				}
 				$self->_add_token($token);
-                if ( $last && $last =~ /^(?:INNER|OUTER)$/i ) {
+				if ( $last && $last =~ /^(?:INNER|OUTER)$/i ) {
 					$self->_over;
 				}
 			}
 
 			elsif ($token =~ /^(?:AND|OR)$/i) {
+				$self->{ 'no_break' } = 0;
 				if (!$last or ($last !~ /^(?:CREATE)$/i) ) {
 					$self->_new_line;
 				}
@@ -14434,13 +14477,18 @@ sub build_log_line_prefix_regex
 				}
 			}
 
-			elsif ($token =~ /^(?:USING)$/i) {
-				$self->_new_line;
+			elsif ($token =~ /^USING$/i) {
+				if (!$self->{ 'is_in_from' }) {
+					$self->_new_line;
+				} else {
+					# USING from join clause disable line break
+					$self->{ 'no_break' } = 1;
+				}
 				$self->_add_token($token);
 			}
 
 			else {
-				$self->_add_token($token, $last);
+					$self->_add_token($token, $last);
 			}
 
 			$last = $token;
@@ -14449,6 +14497,7 @@ sub build_log_line_prefix_regex
 		$self->_new_line;
 
 		$self->{_output};
+
 	}
 
 	# Add a token to the beautified string.
@@ -14465,7 +14514,7 @@ sub build_log_line_prefix_regex
 			}
 
 			if ($wrap) {
-                    $token = $wrap->[0] . $token . $wrap->[1];
+					$token = $wrap->[0] . $token . $wrap->[1];
 			}
 		}
 
@@ -14474,10 +14523,12 @@ sub build_log_line_prefix_regex
 		if (!$self->_is_punctuation($token) and !$last_is_dot) {
 
 			my $sp = $self->_indent;
-            if ( (!defined($last_token) || $last_token ne '(') && ($token ne ')') && ($token !~ /^::/) ) {
-                    $self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
-            }
-		    $token =~ s/\n/\n$sp/gs;
+			if ( (!defined($last_token) || $last_token ne '(') && ($token ne ')') && ($token !~ /^::/) ) {
+					$self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
+			} elsif ( ($self->{ '_is_in_create' } == 2) && ($last_token eq '(')) {
+					$self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
+			}
+			$token =~ s/\n/\n$sp/gs;
 		}
 
 		# uppercase keywords
@@ -14495,7 +14546,7 @@ sub build_log_line_prefix_regex
 		}
 
 		$self->{_output} .= $token;
-        $self->{_output} =~ s/\(\s+\(/\(\(/gs;
+		$self->{_output} =~ s/\(\s+\(/\(\(/gs;
 
 		# This can't be the beginning of a new line anymore.
 		$self->{_new_line} = 0;
