@@ -13658,6 +13658,7 @@ sub normalize_error
 	$orig_query =~ s/(unterminated quoted string at or near) "[^"]+"/$1 "..."/;
 	$orig_query =~ s/on page \d+ of relation/on page ... of relation/;
 	$orig_query =~ s/(side location conflict at ).*/$1 .../;
+	$orig_query =~ s/(permission denied for ^\s]+) .*/$1 .../;
 
 	# Need more normalization stuff here
 	return $orig_query;
