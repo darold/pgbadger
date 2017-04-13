@@ -14263,6 +14263,7 @@ sub build_log_line_prefix_regex
 		$self->{_output}	  = '';
 		$self->{_level_stack} = [];
 		$self->{_new_line}	= 1;
+		$self->{ '_is_in_create' } = 0;
 
 		my $last;
 		$self->{_tokens} = [tokenize_sql($self->query, 1)];
@@ -14524,12 +14525,18 @@ sub build_log_line_prefix_regex
 		if (!$self->_is_punctuation($token) and !$last_is_dot) {
 
 			my $sp = $self->_indent;
-			if ( (!defined($last_token) || $last_token ne '(') && ($token ne ')') && ($token !~ /^::/) ) {
-					$self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
-			} elsif ( ($self->{ '_is_in_create' } == 2) && ($last_token eq '(')) {
-					$self->{_output} .= $sp if (!defined($last_token) || $last_token ne '::');
+			if ( (!defined($last_token) || $last_token ne '(') && $token ne ')' && ($token !~ /^::/) ) {
+			    $self->{ '_output' } .= $sp if ($token ne ')'
+							    && defined($last_token)
+							    && $last_token ne '::'
+							    && ($token ne '(' || !$self->_is_function( $last_token ))
+				);
+			    $self->{ '_output' } .= $sp if (!defined($last_token) && $token);
+			} elsif ( $self->{ '_is_in_create' } == 2 && defined($last_token)) {
+			    $self->{ '_output' } .= $sp if ($last_token ne '::' and ($last_token ne '(' || !$self->{ '_is_in_index' }));
 			}
 			$token =~ s/\n/\n$sp/gs;
+
 		}
 
 		# uppercase keywords
