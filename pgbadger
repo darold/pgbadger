@@ -2721,7 +2721,7 @@ sub process_file
 				}
 			}
 			if (!$csv->eof()) {
-				warn "FATAL: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
+				warn "WARNING: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
 				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
 				print STDERR "reset CSV parser\n";
 				$csv->SetDiag(0);
