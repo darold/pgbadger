@@ -14056,7 +14056,7 @@ sub build_log_line_prefix_regex
 	$llp =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
 	$llp =~ s/\%l([^\d])\d+/\%l$1\\d\+/;
 	$llp =~ s/\%q//;
-	while ($llp =~ s/(\%[audrhptmlscvxie])/$regex_map{"$1"}->[1]/) {
+	while ($llp =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
 		push(@param_list, $regex_map{"$1"}->[0]);
 	}
 	# replace %% by a single %
