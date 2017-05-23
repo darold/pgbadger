@@ -553,10 +553,12 @@ if ($journalctl_cmd) {
 }
 
 # Log files to be parsed are passed as command line arguments
+my $empty_files = 1;
 if ($#ARGV >= 0) {
 	foreach my $file (@ARGV) {
 		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
 			push(@log_files, $file);
+			$empty_files = 0;
 		} elsif ($file ne '-') {
 			if (!$remote_host) {
 				localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
@@ -565,6 +567,7 @@ if ($#ARGV >= 0) {
 					next;
 				}
 				push(@log_files, $file);
+				$empty_files = 0;
 			} else {
 				# Get files from remote host
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
@@ -572,12 +575,14 @@ if ($#ARGV >= 0) {
 				foreach my $f (@rfiles) {
 					push(@log_files, $f);
 				}
+				$empty_files = 0;
 			}
 		} else {
 			if ($logfile_list) {
 				localdie("FATAL: stdin input - can not be used with logfile list (-L).\n");
 			}
 			push(@log_files, $file);
+			$empty_files = 0;
 		}
 	}
 
@@ -602,12 +607,14 @@ if ($logfile_list) {
 		}
 		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
 			push(@log_files, $file);
+			$empty_files = 0;
 		} elsif (!$remote_host) {
 			localdie("FATAL: logfile $file must exist!\n") if (not -f $file);
 			if (-z $file) {
 				print "WARNING: file $file is empty\n" if (!$quiet);
 				next;
 			}
+			$empty_files = 0;
 			push(@log_files, $file);
 		} else {
 			# Get files from remote host
@@ -616,9 +623,16 @@ if ($logfile_list) {
 			foreach my $f (@rfiles) {
 				push(@log_files, $f);
 			}
+			$empty_files = 0;
 		}
 	}
+}
 
+# Do not warn if all log files are empty
+if (!$rebuild && $empty_files) {
+	&logmsg('DEBUG', "All log files are empty, exiting...");
+	unlink("$PID_DIR/pgbadger.pid");
+	exit 0;
 }
 
 # Logfile is a mandatory parameter when journalctl command is not set.
