@@ -53,5 +53,6 @@ underscore.js:
 wget http://underscorejs.org/underscore.js -O /home/git/pgbadger/resources/underscore.js
 
 Then file are minified using yui-compressor and the font embedded using the
-Perl script tools/updt_embedded_rsc.pl
+Perl script tools/updt_embedded_rsc.pl This script also embedded all minified
+files into the pgbadger Perl script.
 
