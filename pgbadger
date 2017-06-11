@@ -4798,6 +4798,7 @@ sub html_header
      			<ul class="dropdown-menu">
      				<li><a href="#checkpoints-buffers">Checkpoints buffers</a></li>
      				<li><a href="#checkpoints-files">Checkpoints files</a></li>
+     				<li><a href="#checkpoints-distance">Checkpoints distance</a></li>
      				<li><a href="#checkpoint-activity">Checkpoint activity</a></li> 
      			</ul>
      		</li>
@@ -7384,6 +7385,15 @@ sub print_checkpoint
 							$chk_dataavg{file_recycled}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{file_recycled} || 0);
 						}
 					}
+					if (exists $checkpoint_info{distance} || exists $checkpoint_info{estimate}) {
+						$chk_dataavg{distance}{"$rd"} = 0 if (!exists $chk_dataavg{distance}{"$rd"});
+						$chk_dataavg{estimate}{"$rd"} = 0 if (!exists $chk_dataavg{estimate}{"$rd"});
+						if (exists $per_minute_info{$tm}{$h}{$m}{checkpoint}) {
+							$chk_dataavg{distance}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{distance} || 0) * 1000;
+							$chk_dataavg{distance_count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{distance_count} || 1);
+							$chk_dataavg{estimate}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{checkpoint}{estimate} || 0) * 1000;
+						}
+					}
 				}
 
 				foreach my $rd (@avgs) {
@@ -7399,6 +7409,10 @@ sub print_checkpoint
 						$graph_data{file_added} .= "[$t, " . ($chk_dataavg{file_added}{"$rd"} || 0) . "],";
 						$graph_data{file_removed} .= "[$t, " . ($chk_dataavg{file_removed}{"$rd"} || 0) . "],";
 						$graph_data{file_recycled} .= "[$t, " . ($chk_dataavg{file_recycled}{"$rd"} || 0) . "],";
+					}
+					if (exists $chk_dataavg{distance} || $chk_dataavg{estimate}) {
+						$graph_data{distance} .= "[$t, " . int(($chk_dataavg{distance}{"$rd"}/($chk_dataavg{distance_count}{"$rd"} || 1)) || 0) . "],";
+						$graph_data{estimate} .= "[$t, " . int(($chk_dataavg{estimate}{"$rd"}/($chk_dataavg{distance_count}{"$rd"} || 1)) || 0) . "],";
 					}
 				}
 			}
@@ -7417,6 +7431,12 @@ sub print_checkpoint
 		&jqplot_linegraph($graphid++, 'checkpointfiles_graph', $graph_data{file_added},
 			$graph_data{file_removed}, $graph_data{file_recycled}, 'Checkpoint Wal files usage (' . $avg_minutes . ' minutes period)',
 			'Number of files', 'Added', 'Removed', 'Recycled'
+		);
+
+	$drawn_graphs{checkpointdistance_graph} =
+		&jqplot_linegraph($graphid++, 'checkpointdistance_graph', $graph_data{distance},
+			$graph_data{estimate}, '', 'Checkpoint mean distance and estimate (' . $avg_minutes . ' minutes period)',
+			'Number of bytes', 'distance', 'estimate'
 		);
 
 	my $checkpoint_wbuffer_peak = 0;
@@ -7476,9 +7496,28 @@ $drawn_graphs{checkpointfiles_graph}
 };
 	delete $drawn_graphs{checkpointfiles_graph};
 
+	print $fh qq{
+	<div id="checkpoints-distance" class="analysis-item row">
+	<h2 class=""><i class="glyphicon icon-file-alt"></i> Checkpoints distance</h2>
+	<div class="col-md-3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+			</ul>
+		</div>
+	</div>
+	<div class="col-md-9">
+$drawn_graphs{checkpointdistance_graph}
+		</div>
+	</div><!-- end of Checkpoints Files -->
+};
+	delete $drawn_graphs{checkpointdistance_graph};
+
+
 	my $buffers = '';
 	my $files = '';
 	my $warnings = '';
+	my $distance = '';
 	foreach my $d (sort {$a <=> $b} keys %per_minute_info) {
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
@@ -7486,11 +7525,13 @@ $drawn_graphs{checkpointfiles_graph}
 			$buffers .= "<tr><td>$zday</td><td>$h</td>";
 			$files .= "<tr><td>$zday</td><td>$h</td>";
 			$warnings .= "<tr><td>$zday</td><td>$h</td>";
+			$distance .= "<tr><td>$zday</td><td>$h</td>";
 			$zday = '';
 			my %cinf = ();
 			my %rinf = ();
 			my %cainf = ();
 			my %rainf = ();
+			my %dinf = ();
 			foreach my $m (keys %{$per_minute_info{$d}{$h}}) {
 
 				if (exists $per_minute_info{$d}{$h}{$m}{checkpoint}) {
@@ -7509,6 +7550,11 @@ $drawn_graphs{checkpointfiles_graph}
 				if (exists $per_minute_info{$d}{$h}{$m}{checkpoint}{warning}) {
 					$cinf{warning} += $per_minute_info{$d}{$h}{$m}{checkpoint}{warning};
 					$cinf{warning_seconds} += $per_minute_info{$d}{$h}{$m}{checkpoint}{warning_seconds};
+				}
+				if (exists $per_minute_info{$d}{$h}{$m}{checkpoint}{distance} || $per_minute_info{$d}{$h}{$m}{checkpoint}{estimate}) {
+					$dinf{distance}{sum} += $per_minute_info{$d}{$h}{$m}{checkpoint}{distance};
+					$dinf{estimate}{sum} += $per_minute_info{$d}{$h}{$m}{checkpoint}{estimate};
+					$dinf{distance}{count} += $per_minute_info{$d}{$h}{$m}{checkpoint}{distance_count};
 				}
 			}
 			if (scalar keys %cinf) {
@@ -7535,12 +7581,20 @@ $drawn_graphs{checkpointfiles_graph}
 			} else {
 				$warnings .= "<td>0</td><td>0s</td></tr>";
 			}
+			if (exists $dinf{distance} || $dinf{estimate}) {
+				$distance .= "<td>" . &comma_numbers(sprintf( "%.2f", $dinf{distance}{sum}/$dinf{distance}{count})) . " kB</td><td>" .
+					&comma_numbers(sprintf( "%.2f", $dinf{estimate}{sum}/$dinf{distance}{count})) .
+					 " kB</td></tr>";
+			} else {
+				$distance .= "<td>0</td><td>0</td></tr>";
+			}
 		}
 	}
 
 	$buffers = qq{<tr><td colspan="6">$NODATA</td></tr>} if (!$buffers);
 	$files = qq{<tr><td colspan="8">$NODATA</td></tr>} if (!$files);
 	$warnings = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$warnings);
+	$distance = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$distance);
 
 	print $fh qq{
 <div class="analysis-item row" id="checkpoint-activity">
@@ -7550,6 +7604,7 @@ $drawn_graphs{checkpointfiles_graph}
 			<li class="active"><a href="#checkpoint-activity-buffers" data-toggle="tab">Checkpoints Buffers</a></li>
 			<li><a href="#checkpoint-activity-files" data-toggle="tab">Checkpoints files</a></li>
 			<li><a href="#checkpoint-activity-warnings" data-toggle="tab">Checkpoints Warnings</a></li>
+			<li><a href="#checkpoint-activity-distance" data-toggle="tab">Checkpoints distance</a></li>
 		</ul>
 		<div class="tab-content">
 			<div class="active tab-pane" id="checkpoint-activity-buffers">
@@ -7597,6 +7652,20 @@ $drawn_graphs{checkpointfiles_graph}
 						</tr>
 					</thead>
 					<tbody>$warnings
+					</tbody>
+				</table>        
+			</div>
+			<div class="tab-pane" id="checkpoint-activity-distance">
+				<table class="table table-striped table-hover table-condensed">
+					<thead>
+						<tr>
+							<th>Day</th>
+							<th>Hour</th>
+							<th>Mean distance</th>
+							<th>Mean estimate</th>
+						</tr>
+					</thead>
+					<tbody>$distance
 					</tbody>
 				</table>        
 			</div>        
@@ -12738,7 +12807,7 @@ sub parse_query
 		   )
 	   )
 	{
-		# Example: LOG:  checkpoint complete: wrote 175 buffers (5.7%); 0 transaction log file(s) added, 1 removed, 2 recycled; write=17.437 s, sync=0.722 s, total=18.259 s; sync files=2, longest=0.708 s, average=0.361 s
+		# Example: LOG:  checkpoint complete: wrote 8279 buffers (50.5%); 0 transaction log file(s) added, 0 removed, 0 recycled; write=2.277 s, sync=0.194 s, total=2.532 s; sync files=13, longest=0.175 s, average=0.014 s; distance=402024 kB, estimate=402024 kB
 		return if ($disable_checkpoint);
 
 		$checkpoint_info{wbuffer} += $1;
@@ -12773,6 +12842,23 @@ sub parse_query
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_longest} = $2
 				if ($2 > $per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_longest});
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_avg} += $3;
+		}
+
+		# 9.6: LOG: checkpoint complete: wrote 0 buffers (0.0%); 0 transaction log file(s) added, 1 removed, 0 recycled; write=0.016 s, sync=0.000 s, total=0.054 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=14744 kB
+		if ($prefix_vars{'t_query'} =~ /; distance=(\d+) kB, estimate=(\d+) kB/) {
+			$checkpoint_info{distance}    += $1;
+			$checkpoint_info{estimate}    += $2;
+			if ($1 > $overall_checkpoint{distance}) {
+				$overall_checkpoint{distance} = $1;
+			}
+			if ($2 > $overall_checkpoint{estimate}) {
+				$overall_checkpoint{estimate} = $2;
+			}
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{distance} += $1;
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{distance_count}++;
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{estimate} += $2;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{distance} += $1;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{estimate} += $2;
 		}
 		return;
 	}
@@ -12820,7 +12906,21 @@ sub parse_query
 		if ($7 > $overall_checkpoint{checkpoint_sync}) {
 			$overall_checkpoint{checkpoint_sync} = $7;
 		}
-
+		if ($prefix_vars{'t_query'} =~ /distance=(\d+) kB, estimate=(\d+) kB/) {
+			$checkpoint_info{distance}    += $1;
+			$checkpoint_info{estimate}    += $2;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{distance} += $1;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{estimate} += $2;
+			if ($1 > $overall_checkpoint{distance}) {
+				$overall_checkpoint{distance} = $1;
+			}
+			if ($2 > $overall_checkpoint{estimate}) {
+				$overall_checkpoint{estimate} = $2;
+			}
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{distance} += $1;
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{distance_count}++;
+			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{estimate} += $2;
+		}
 		return;
 	}
 
