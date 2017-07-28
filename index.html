@@ -1494,7 +1494,7 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 <li>The pgBadger logo is an original creation of <a href="http://www.damiencazeils.com/">Damien Cazeils</a>.
 <li>The pgBadger v4.x design comes from the <a href="http://a.rtisco.de/" target="_new">"Art is code"</a> company.</li>
 <li>This web site is a work of Gilles Darold.</li>
-<li>pgBadger is maintained by Gilles Darold and the good folks at <a href="http://www.dalibo.com/">Dalibo</a> and every one who wants to contribute.</li>
+<li>pgBadger is maintained by the good folks at <a href="http://www.dalibo.com/">Dalibo</a> and every one who wants to contribute.</li>
 <li>Many people have contributed to pgBadger, they are all quoted in the Changelog file.</li>
 </ul>
 
@@ -1502,7 +1502,6 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 <ul>
 <li>&lt;pgbadger AT dalibo DOT com&gt;</li>
 <li>&lt;contact AT dalibo DOT com&gt;</li>
-<li>&lt;gilles AT darold DOT net&gt;</li>
 <li><a href="http://a.rtisco.de/contact.html" target="_new">"Art is code"</a></li>
 </ul>
 
@@ -1515,6 +1514,74 @@ Michael Paquier from <a href="http://postgres-xc.sourceforge.net/">Postgres-XC</
 
 	<div id="simultaneous-connections" class="analysis-item row-fluid">
 		<h2 class=""><i class="icon-random"></i> Latest news about pgBadger</h2>
+
+		<div class="span3">
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">9.2</span> <span class="figure-label">version</span></li>
+					<li><span class="figure">2017-07-27</span> <span class="figure-label">Date</span></li>    
+				</ul>
+			</div>
+		</div>
+		<div class="span8">
+<p>
+This release of pgBadger is a maintenance release that adds some new
+features.
+</p>
+<pre>
+  * Add report of checkpoint distance and estimate.
+  * Add support of AWS Redshift keywords to SQL code beautifier.
+  * Add autodetection of log format in remote mode to allow remote
+    parsing of pgbouncer log file together with PostgreSQL log file.
+</pre>
+<p>
+There's also some bugs fixes and features enhancements.
+</p>
+<pre>
+  - Fix reports with histogram that was not showing data upper than
+    the last range.
+  - Fix parsing of journalctl without the the log line number pattern
+    ([%l-n]). Thanks to Christian Schmitt for the report.
+  - Add report of checkpoint distance and estimate. Thanks to jjsantam
+    for the feature request.
+  - Append more information on what is done by script to update CSS
+    and javascript files, tools/updt_embedded_rsc.pl.
+  - Do not warn when all log files are empty and exit with code 0.
+  - Fix build_log_line_prefix_regex() that does not include %n as a
+    lookup in %regex_map. Thanks to ghosthound for the patch.
+  - Change error level of "FATAL: cannot use CSV" to WARNING. Thanks
+    to kong1man for the report.
+  - Fix use of uninitialized value warning. Thanks to Payal for the
+    report.
+  - Add permission denied to error normalization
+  - Update pgbadger to latest commit 5bdc018 of pgFormatter.
+  - Add support for AWS Redshift keywords. Thanks to cavanaug for the
+    feature request.
+  - Fix missing query in temporary file report when the query was
+    canceled. Thanks to Fabrizio de Royes Mello for the report.
+  - Normalize query with binded parameters, replaced with a ?.
+  - Sanity check to avoid end time before start time. Thanks to
+    Christophe Courtois for the patch.
+  - Fix a lot of mystyped words and do some grammatical fixes. Use
+    'pgBadger' where it refers to the program and not the binary file.
+    Also, use "official" expressions such as PgBouncer, GitHub, and
+    CSS. POD file was synced with README. Thanks to Euler Taveira for
+    the patch.
+  - Menu is broken when --disable-type top_cancelled_info test and
+    closing list must be inside disable_type test. While in it, ident
+    disable_lock test. Thanks to Euler Taveira for the patch.
+  - Fix use of uninitialized value. Thanks to johnkrugger for the
+    report.
+  - Remove test to read log file during log format auto-detection when
+    the file is hosted remotly. Thanks to clomdd for the report.
+  - Add autodetection of log format in remote mode to allow remote
+    parsing of pgbouncer log file together with PostgreSQL log file.
+  - Fix number of sessions wrongly increased after log line validation
+    Thanks to Achilleas Mantzios for the report.
+  - Minor reformatting of the pgBadger Description.
+  - Fix repeated info in documentation. Thanks to cscatolini for the patch.
+</pre>
+		</div>
 
 		<div class="span3">
 			<div class="well key-figures">
@@ -2972,21 +3039,6 @@ or subscribe to the <a href="https://groups.google.com/forum/?hl=fr#!forum/pgbad
 </p>
 	</div>
 	</div><!-- end of Feature request & Bugs -->
-
-	<div class="analysis-item row-fluid" id="donate-table">
-		<h2><i class="icon-pencil"></i> I want to make a donation</h2>
-		<div class="span8">
-<p>Some of you ask me (Gilles Darold) a way to donate to support my all days efforts to build a better tool. You can use the link below and if you need an invoice, just drop me line I will send it back to you.</p>
-<p>
-<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
-<input type="hidden" name="cmd" value="_s-xclick">
-<input type="hidden" name="hosted_button_id" value="FANPGK5Z4ABT6">
-<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" title="Donate to the badger!">
-<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
-</form>
-</p>
-		</div>
-	</div><!-- end of How to contribute -->
 
 	<div class="analysis-item row-fluid" id="analyzes-per-table">
 		<h2><i class="icon-pencil"></i> How to contribute</h2>
