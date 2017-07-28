@@ -1,3 +1,58 @@
+2017-07-27 - v9.2
+
+This release of pgBadger is a maintenance release that adds some new
+features.
+
+  * Add report of checkpoint distance and estimate.
+  * Add support of AWS Redshift keywords to SQL code beautifier.
+  * Add autodetection of log format in remote mode to allow remote
+    parsing of pgbouncer log file together with PostgreSQL log file.
+
+There's also some bugs fixes and features enhancements.
+
+  - Fix reports with histogram that was not showing data upper than
+    the last range.
+  - Fix parsing of journalctl without the the log line number pattern
+    ([%l-n]). Thanks to Christian Schmitt for the report.
+  - Add report of checkpoint distance and estimate. Thanks to jjsantam
+    for the feature request.
+  - Append more information on what is done by script to update CSS
+    and javascript files, tools/updt_embedded_rsc.pl.
+  - Do not warn when all log files are empty and exit with code 0.
+  - Fix build_log_line_prefix_regex() that does not include %n as a
+    lookup in %regex_map. Thanks to ghosthound for the patch.
+  - Change error level of "FATAL: cannot use CSV" to WARNING. Thanks
+    to kong1man for the report.
+  - Fix use of uninitialized value warning. Thanks to Payal for the
+    report.
+  - Add permission denied to error normalization
+  - Update pgbadger to latest commit 5bdc018 of pgFormatter.
+  - Add support for AWS Redshift keywords. Thanks to cavanaug for the
+    feature request.
+  - Fix missing query in temporary file report when the query was
+    canceled. Thanks to Fabrizio de Royes Mello for the report.
+  - Normalize query with binded parameters, replaced with a ?.
+  - Sanity check to avoid end time before start time. Thanks to
+    Christophe Courtois for the patch.
+  - Fix a lot of mystyped words and do some grammatical fixes. Use
+    'pgBadger' where it refers to the program and not the binary file.
+    Also, use "official" expressions such as PgBouncer, GitHub, and
+    CSS. POD file was synced with README. Thanks to Euler Taveira for
+    the patch.
+  - Menu is broken when --disable-type top_cancelled_info test and
+    closing list must be inside disable_type test. While in it, ident
+    disable_lock test. Thanks to Euler Taveira for the patch.
+  - Fix use of uninitialized value. Thanks to johnkrugger for the
+    report.
+  - Remove test to read log file during log format auto-detection when
+    the file is hosted remotly. Thanks to clomdd for the report.
+  - Add autodetection of log format in remote mode to allow remote
+    parsing of pgbouncer log file together with PostgreSQL log file.
+  - Fix number of sessions wrongly increased after log line validation
+    Thanks to Achilleas Mantzios for the report.
+  - Minor reformatting of the pgBadger Description.
+  - Fix repeated info in documentation. Thanks to cscatolini for the patch.
+
 2017-01-24 - v9.1
 
 This release of pgBadger is a maintenance release that adds some new

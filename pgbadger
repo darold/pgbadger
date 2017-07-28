@@ -51,7 +51,7 @@ use FileHandle;
 use Socket;
 use constant EBCDIC => "\t" ne "\011";
 
-$VERSION = '9.1';
+$VERSION = '9.2';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
