@@ -14379,7 +14379,7 @@ sub build_log_line_prefix_regex
 		$self->{_new_line}	= 1;
 		$self->{ '_is_in_create' } = 0;
 
-		my $last;
+		my $last = '';
 		$self->{_tokens} = [tokenize_sql($self->query, 1)];
 
 		while (defined(my $token = $self->_token)) {
