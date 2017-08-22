@@ -122,6 +122,9 @@ Options:
     --exclude-time  regex  : any timestamp matching the given regex will be
 			     excluded from the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
+    --include-time  regex  : only timestamps matching the given regex will be
+                             included in the report. Example: "2013-04-12 .*"
+                             You can use this option multiple times.
     --exclude-appname name : exclude entries for the specified application name
 			     from report. Example: "pg_dump".
     --exclude-line regex   : pgBadger will start to exclude any log entry that
