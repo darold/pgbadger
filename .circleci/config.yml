@@ -1,0 +1,22 @@
+version: 2
+
+jobs:
+  test:
+    docker: [{image: "perl:5.26"}]
+    working_directory: /tmp/pgbadger
+    steps:
+    - run:
+        name: Install git and ssh for checkout
+        command: apt update -y && apt install -y git ssh
+    - checkout
+    - run:
+        name: Testing perl syntax
+        command: |
+          perl -c pgbadger
+          ./pgbadger --help
+
+workflows:
+  version: 2
+  pipeline:
+    jobs:
+    - test
