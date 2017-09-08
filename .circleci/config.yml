@@ -6,14 +6,12 @@ jobs:
     working_directory: /tmp/pgbadger
     steps:
     - run:
-        name: Install git and ssh for checkout
-        command: apt update -y && apt install -y git ssh
+        name: Install debian packages
+        command: apt update -y && apt install -y bats git ssh
     - checkout
     - run:
-        name: Testing perl syntax
-        command: |
-          perl -c pgbadger
-          ./pgbadger --help
+        name: Executing tests
+        command: prove
 
 workflows:
   version: 2
