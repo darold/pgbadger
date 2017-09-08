@@ -276,6 +276,7 @@ my $progress                = 1;
 my $error_only              = 0;
 my @exclude_query           = ();
 my @exclude_time            = ();
+my @include_time            = ();
 my $exclude_file            = '';
 my @include_query           = ();
 my $include_file            = '';
@@ -464,6 +465,7 @@ my $result = GetOptions(
 	"disable-autovacuum!"      => \$disable_autovacuum,
 	"charset=s"                => \$charset,
 	"csv-separator=s"          => \$csv_sep_char,
+	"include-time=s"           => \@include_time,
 	"exclude-time=s"           => \@exclude_time,
         'ssh-command=s'            => \$ssh_command,
         'ssh-program=s'            => \$ssh_bin,
@@ -886,6 +888,13 @@ if ($#exclude_query >= 0) {
 if ($#exclude_time >= 0) {
 	foreach my $r (@exclude_time) {
 		&check_regex($r, '--exclude-time');
+	}
+}
+#
+# Testing regex syntax
+if ($#include_time >= 0) {
+	foreach my $r (@include_time) {
+		&check_regex($r, '--include-time');
 	}
 }
 
@@ -1852,6 +1861,9 @@ Options:
     --csv-separator        : used to set the CSV field separator, default: ,
     --exclude-time  regex  : any timestamp matching the given regex will be
 			     excluded from the report. Example: "2013-04-12 .*"
+                             You can use this option multiple times.
+    --include-time  regex  : only timestamps matching the given regex will be
+			     included in the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
     --exclude-appname name : exclude entries for the specified application name
 			     from report. Example: "pg_dump".
@@ -15243,6 +15255,18 @@ sub skip_unwanted_line
 		}
 		return 1 if ($found);
 	}
+
+	if ($#include_time >= 0) {
+		my $found = 0;
+		foreach (@include_time) {
+			if ($prefix_vars{'t_timestamp'} !~ /$_/) {
+				$found = 1;
+				last;
+			}
+        }
+		return 1 if ($found);
+	}
+
 
 	return 1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
 
