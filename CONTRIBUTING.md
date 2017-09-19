@@ -7,3 +7,9 @@
 2. Look at the [closed issues](https://github.com/dalibo/pgbadger/issues?state=closed), we may have already answered a similar problem
 
 3. [Read the doc](http://dalibo.github.com/pgbadger/). It is short and useful.
+
+
+## Coding style
+
+pgBadger project provides a [.editorconfig](http://editorconfig.org/) file to
+setup consistent spacing in files. Please follow it!

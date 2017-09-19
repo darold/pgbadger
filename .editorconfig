@@ -1,0 +1,16 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = tab
+indent_size = 8
+# Unix-style newlines
+end_of_line = lf
+# Remove any whitespace characters preceding newline characters
+trim_trailing_whitespace = true
+# Newline ending every file
+insert_final_newline = true
+
+[*.yml]
+indent_style = space
+indent_size = 2
