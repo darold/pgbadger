@@ -12,9 +12,22 @@ jobs:
     - run:
         name: Executing tests
         command: prove
+  doc:
+    docker: [{image: "perl:5.26"}]
+    working_directory: /tmp/pgbadger
+    steps:
+    - checkout
+    - run:
+        name: Check README is up to date with pod
+        command: |
+          perl Makefile.PL
+          touch --no-create doc/pgBadger.pod
+          make README
+          git diff --exit-code
 
 workflows:
   version: 2
   pipeline:
     jobs:
     - test
+    - doc

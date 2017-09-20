@@ -35,6 +35,13 @@ if ($ExtUtils::MakeMaker::VERSION >= 6.46) {
 	);
 }
 
+sub MY::postamble {
+    return <<'EOMAKE';
+README: doc/pgBadger.pod
+	pod2text $^ > $@
+EOMAKE
+}
+
 WriteMakefile(
 	'DISTNAME'	=> 'pgbadger',
 	'NAME'		=> 'pgBadger',
@@ -52,4 +59,3 @@ WriteMakefile(
 	'clean'	       => {},
 	%merge_compat
 );
-
