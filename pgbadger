@@ -44,7 +44,7 @@ use POSIX qw(locale_h sys_wait_h _exit strftime);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
 use File::Spec qw/ tmpdir /;
-use File::Temp qw/ tempfile /;
+use File::Temp qw/ tempfile tempdir /;
 use IO::Handle;
 use IO::Pipe;
 use FileHandle;
@@ -55,7 +55,8 @@ $VERSION = '9.2';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
-my $TMP_DIR      = File::Spec->tmpdir() || '/tmp';
+my $TMP_DIR = File::Spec->tmpdir() || '/tmp';
+$TMP_DIR      = tempdir($TMP_DIR . "/pgbadger-XXXX", CLEANUP => 1);
 my %RUNNING_PIDS = ();
 my @tempfiles    = ();
 my $parent_pid   = $$;
