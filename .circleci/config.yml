@@ -2,15 +2,21 @@ version: 2
 
 jobs:
   test:
-    docker: [{image: "perl:5.26"}]
+    # Use same version as debian stretch to use packaged dependencies.
+    docker: [{image: "perl:5.24-threaded"}]
     working_directory: /tmp/pgbadger
     steps:
     - run:
         name: Install debian packages
-        command: apt update -y && apt install -y bats git openssh-client
+        command: >
+          apt update -y &&
+          apt install -y --no-install-recommends bats git jq libjson-xs-perl openssh-client
     - checkout
     - run:
         name: Executing tests
+        environment:
+          # Inject APT packaged dependencies.
+          PERL5LIB: /usr/lib/x86_64-linux-gnu/perl5/5.24:/usr/share/perl5
         command: prove --verbose
 
   doc:
