@@ -59,4 +59,3 @@ WriteMakefile(
 	'clean'	       => {},
 	%merge_compat
 );
-
