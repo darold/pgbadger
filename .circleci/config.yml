@@ -11,7 +11,8 @@ jobs:
     - checkout
     - run:
         name: Executing tests
-        command: prove
+        command: prove --verbose
+
   doc:
     docker: [{image: "perl:5.26"}]
     working_directory: /tmp/pgbadger
