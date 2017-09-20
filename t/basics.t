@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # -*- shell-script -*-
 
-@test "HELP output" {
+@test "Inline help" {
     ./pgbadger --help
 }
 
