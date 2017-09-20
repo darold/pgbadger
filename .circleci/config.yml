@@ -7,7 +7,7 @@ jobs:
     steps:
     - run:
         name: Install debian packages
-        command: apt update -y && apt install -y bats git ssh
+        command: apt update -y && apt install -y bats git openssh-client
     - checkout
     - run:
         name: Executing tests
