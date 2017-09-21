@@ -71,6 +71,7 @@ my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
 my $EXPLAIN_URL = 'http://explain.depesz.com/?is_public=0&is_anon=0&plan=';
 my $PID_DIR = $TMP_DIR;
+my $PID_FILE = undef;
 
 my @E2A = (
    0,  1,  2,  3,156,  9,134,127,151,141,142, 11, 12, 13, 14, 15,
@@ -391,8 +392,8 @@ sub wait_child
 	if ($last_parsed && -e "$last_parsed.tmp") {
 		unlink("$last_parsed.tmp");
 	}
-	if (-e "$PID_DIR/pgbadger.pid") {
-		unlink("$PID_DIR/pgbadger.pid");
+	if (-e "$PID_FILE") {
+		unlink("$PID_FILE");
 	}
 	_exit(0);
 }
@@ -480,6 +481,7 @@ my $result = GetOptions(
 	'enable-checksum!'         => \$enable_checksum,
 	'journalctl=s'             => \$journalctl_cmd,
 	'pid-dir=s'		   => \$PID_DIR,
+	'pid-file=s'		   => \$PID_FILE,
 	'rebuild!'                 => \$rebuild,
 	'pgbouncer-only!'          => \$pgbouncer_only,
 	'start-monday!'            => \$week_start_monday,
@@ -505,22 +507,26 @@ if ($enable_checksum) {
 }
 
 # Check if an other process is already running
-if (-e "$PID_DIR/pgbadger.pid") {
+unless ($PID_FILE) {
+  $PID_FILE = $PID_DIR . '/pgbadger.pid';
+}
+
+if (-e "$PID_FILE") {
 	my $is_running = 2;
 	if ($^O !~ /MSWin32|dos/i) {
 		eval { $is_running = `ps auwx | grep pgbadger | grep -v grep | wc -l`; chomp($is_running); };
 	}
 	if (!$@ && ($is_running <= 1)) {
-		unlink("$PID_DIR/pgbadger.pid");
+		unlink("$PID_FILE");
 	} else {
-		print "FATAL: an other process is already started or remove the file, see $PID_DIR/pgbadger.pid\n";
+		print "FATAL: an other process is already started or remove the file, see $PID_FILE\n";
 		exit 3;
 	}
 }
 
 # Create pid file
-unless(open(OUT, ">$PID_DIR/pgbadger.pid")) {
-	print "FATAL: can't create pid file $PID_DIR/pgbadger.pid, $!\n";
+unless(open(OUT, ">$PID_FILE")) {
+	print "FATAL: can't create pid file $PID_FILE, $!\n";
 	exit 3;
 }
 print OUT $$;
@@ -631,7 +637,7 @@ if ($logfile_list) {
 # Do not warn if all log files are empty
 if (!$rebuild && $empty_files) {
 	&logmsg('DEBUG', "All log files are empty, exiting...");
-	unlink("$PID_DIR/pgbadger.pid");
+	unlink("$PID_FILE");
 	exit 0;
 }
 
@@ -640,7 +646,7 @@ if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd) {
 	if (!$quiet) {
 		localdie("FATAL: you must give a log file at command line parameter.\n\n");
 	} else {
-		unlink("$PID_DIR/pgbadger.pid");
+		unlink("$PID_FILE");
 		exit 4;
 	}
 }
@@ -1176,7 +1182,7 @@ if ($incremental) {
 		&logmsg('DEBUG', "rebuilding reports took: " . timestr($td));
 
 		# Remove pidfile
-		unlink("$PID_DIR/pgbadger.pid");
+		unlink("$PID_FILE");
 
 		exit 0;
 	}
@@ -1654,7 +1660,7 @@ if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime}) && ($last
 }
 
 if ($terminate) {
-	unlink("$PID_DIR/pgbadger.pid");
+	unlink("$PID_FILE");
 	exit 2;
 }
 
@@ -1734,7 +1740,7 @@ $td = timediff($t2, $t0);
 &logmsg('DEBUG', "the total execution time took: " . timestr($td));
 
 # Remove pidfile and temporary file
-unlink("$PID_DIR/pgbadger.pid");
+unlink("$PID_FILE");
 unlink("$last_parsed.tmp") if (-e "$last_parsed.tmp");
 
 exit 0;
@@ -1880,9 +1886,8 @@ Options:
     --journalctl command   : command to use to replace PostgreSQL logfile by
 			     a call to journalctl. Basically it might be:
 				journalctl -u postgresql-9.5
-    --pid-dir dirpath      : set the path of the directory where the pid file
-                             will be written to be able to run two pgBadger at
-			     the same time.
+    --pid-file PATH        : set the path of the pid file to manage
+			     concurrent execution of pgBadger.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
@@ -2496,8 +2501,8 @@ sub process_file
 		&logmsg('DEBUG', "Starting to parse remote log file: $remote_host:$logfile");
 	}
 
-	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; unlink("$PID_DIR/pgbadger.pid"); $terminate = 1; };
-	local $SIG{TERM} = sub { print STDERR "Received SIGTERM abort parsing...\n"; unlink("$PID_DIR/pgbadger.pid"); $terminate = 1; };
+	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; unlink("$PID_FILE"); $terminate = 1; };
+	local $SIG{TERM} = sub { print STDERR "Received SIGTERM abort parsing...\n"; unlink("$PID_FILE"); $terminate = 1; };
 
 	my $curdate = localtime(time);
 
@@ -15236,7 +15241,7 @@ sub localdie
 	my $msg = shift;
 
 	print STDERR "$msg";
-	unlink("$PID_DIR/pgbadger.pid");
+	unlink("$PID_FILE");
 
 	exit 1;
 }
