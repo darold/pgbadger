@@ -13,3 +13,13 @@
 
 pgBadger project provides a [.editorconfig](http://editorconfig.org/) file to
 setup consistent spacing in files. Please follow it!
+
+
+## Keep Documentation Updated
+
+The first pgBadger documentation is `pgbadger --help`. `--help` is
+injected in `doc/pgBadger.pod`. `README` is the text formatting of
+`doc/pgBadger.pod`. Update `README` and `doc/pgBadger.pod` with `make
+README`.
+
+A job in CI ensure all versionned documentations are consistent.

@@ -28,9 +28,9 @@ jobs:
         name: Check README is up to date with pod
         command: |
           perl Makefile.PL
-          touch --no-create doc/pgBadger.pod
+          touch --no-create pgbadger
           make README
-          git diff --exit-code
+          git diff --exit-code README doc/pgBadger.pod
 
 workflows:
   version: 2

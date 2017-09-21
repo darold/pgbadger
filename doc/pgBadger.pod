@@ -16,9 +16,9 @@ Arguments:
 
 Options:
 
-    -a | --average N       : number of minutes to build the average graphs
-                             of queries and connections. Default 5 minutes.
-    -A | --histo-average N : number of minutes to build the histogram graphs
+    -a | --average minutes : number of minutes to build the average graphs of
+                             queries and connections. Default 5 minutes.
+    -A | --histo-average min: number of minutes to build the histogram graphs
                              of queries. Default 60 minutes.
     -b | --begin datetime  : start date/time for the data to be parsed in log.
     -c | --dbclient host   : only report on entries for the given client host.
@@ -28,7 +28,7 @@ Options:
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
-                             pgbouncer. Use this option when pgBadger is not
+			     pgbouncer. Use this option when pgBadger is not
                              able to auto-detect the log format Default: stderr.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
@@ -43,7 +43,7 @@ Options:
                              last datetime and line parsed. Useful if you want
                              to watch errors since last run or if you want one
                              report per day with a log rotated each week.
-    -L | logfile-list file : file containing a list of log file to parse.
+    -L | --logfile-list file:file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
                              the given size. Default: no truncate
     -M | --no-multiline    : do not collect multiline statement to avoid garbage
@@ -122,7 +122,7 @@ Options:
 			     excluded from the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
     --include-time  regex  : only timestamps matching the given regex will be
-                             included in the report. Example: "2013-04-12 .*"
+			     included in the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
     --exclude-appname name : exclude entries for the specified application name
 			     from report. Example: "pg_dump".
@@ -141,14 +141,13 @@ Options:
 				journalctl -u postgresql-9.5
     --pid-dir dirpath      : set the path of the directory where the pid file
                              will be written to be able to run two pgBadger at
-                             the same time.
+			     the same time.
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
-    --start-monday         : in incremental mode, weeks start on sunday. Use
-                             this option to start on monday.
+    --start-monday         : in incremental mode, calendar's weeks start on
+                             sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
-
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -174,19 +173,19 @@ Examples:
 		       /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 	# Log prefix with stderr log output
-	pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' 
+	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' 
 			/pglog/postgresql-2012-08-21*
-	pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
-	pgbadger -j 8 /pglog/postgresql-9.1-main.log
+	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
 
 
 Generate Tsung sessions XML file with select queries only:
 
-    pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
 
 Reporting errors every week by cron job:
 
@@ -229,8 +228,8 @@ or worst, call it from a remote host:
 
     pgbadger -r 192.168.1.159 --journalctl 'journalctl -u postgresql-9.5'
 
-you don't need to specify any log file at command line, but if you have others
-PostgreSQL log files to parse, you can add them as usual.
+you don't need to specify any log file at command line, but if you have other
+PostgreSQL log file to parse, you can add them as usual.
 
 To rebuild all incremental html reports after, proceed as follow:
 

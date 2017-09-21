@@ -39,6 +39,18 @@ sub MY::postamble {
     return <<'EOMAKE';
 README: doc/pgBadger.pod
 	pod2text $^ > $@
+
+.INTERMEDIATE: doc/synopsis.pod
+doc/synopsis.pod: Makefile pgbadger
+	echo "=head1 SYNOPSIS" > $@
+	./pgbadger --help >> $@
+	echo "=head1 DESCRIPTION" >> $@
+	sed -i 's/ +$$//g' $@
+
+doc/pgBadger.pod: doc/synopsis.pod Makefile
+	git checkout $@
+	sed -i '/^=head1 SYNOPSIS/,/^=head1 DESCRIPTION/d' $@
+	sed -i '4r $<' $@
 EOMAKE
 }
 
