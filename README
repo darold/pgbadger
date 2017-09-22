@@ -137,9 +137,8 @@ SYNOPSIS
         --journalctl command   : command to use to replace PostgreSQL logfile by
                                  a call to journalctl. Basically it might be:
                                     journalctl -u postgresql-9.5
-        --pid-dir dirpath      : set the path of the directory where the pid file
-                                 will be written to be able to run two pgBadger at
-                                 the same time.
+        --pid-file PATH        : set the path of the pid file to manage
+                                 concurrent execution of pgBadger.
         --rebuild              : used to rebuild all html reports in incremental
                                  output directories where there is binary data files.
         --pgbouncer-only       : only show PgBouncer related menu in the header.
