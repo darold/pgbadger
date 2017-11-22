@@ -17,9 +17,10 @@ setup consistent spacing in files. Please follow it!
 
 ## Keep Documentation Updated
 
-The first pgBadger documentation is `pgbadger --help`. `--help` is
-injected in `doc/pgBadger.pod`. `README` is the text formatting of
-`doc/pgBadger.pod`. Update `README` and `doc/pgBadger.pod` with `make
-README`.
+The first pgBadger documentation is `pgbadger --help`. `--help` fills the
+SYNOPSIS section in `doc/pgBadger.pod`. The DESCRIPTION section *must* be
+written directly in `doc/pgBadger.pod`. `README` is the text formatting of
+`doc/pgBadger.pod`. Update `README` and `doc/pgBadger.pod` with `make README`
+and commit changes when contributing.
 
 A job in CI ensure all versionned documentations are consistent.
