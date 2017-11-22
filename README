@@ -27,7 +27,7 @@ SYNOPSIS
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
                                  pgbouncer. Use this option when pgBadger is not
-                                 able to auto-detect the log format Default: stderr.
+                                 able to auto-detect the log format.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -250,10 +250,11 @@ DESCRIPTION
     embedded.
 
     pgBadger is able to autodetect your log file format (syslog, stderr or
-    csvlog). It is designed to parse huge log files as well as gzip
-    compressed files. See a complete list of features below. Supported
-    compressed format are gzip, bzip2 and xz. For the xz format you must
-    have an xz version upper than 5.05 that supports the --robot option.
+    csvlog) if the log file is long enough. It is designed to parse huge log
+    files as well as gzip compressed files. See a complete list of features
+    below. Supported compressed format are gzip, bzip2 and xz. For the xz
+    format you must have an xz version upper than 5.05 that supports the
+    --robot option.
 
     All charts are zoomable and can be saved as PNG images.
 
