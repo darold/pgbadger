@@ -47,6 +47,7 @@ doc/synopsis.pod: Makefile pgbadger
 	echo "=head1 DESCRIPTION" >> $@
 	sed -i 's/ +$$//g' $@
 
+.PHONY: doc/pgBadger.pod
 doc/pgBadger.pod: doc/synopsis.pod Makefile
 	git checkout $@
 	sed -i '/^=head1 SYNOPSIS/,/^=head1 DESCRIPTION/d' $@
