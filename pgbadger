@@ -1776,7 +1776,7 @@ Options:
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
 			     pgbouncer. Use this option when pgBadger is not
-                             able to auto-detect the log format Default: stderr.
+                             able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
