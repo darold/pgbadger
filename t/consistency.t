@@ -2,20 +2,20 @@
 # -*- shell-script -*-
 
 setup() {
-IN=t/fixtures/light.postgres.log.bz2
-BIN=$BATS_TMPDIR/out.bin
-OUT=$BATS_TMPDIR/out.json
-OUT_FROM_BIN=$BATS_TMPDIR/out_from_bin.json
-# Generate report from plain-text log
-./pgbadger $IN -o $OUT
-# Generate intermediate binary file
-./pgbadger $IN  -o $BIN
-# Generate report from binary file
-./pgbadger $BIN --format=binary -o $OUT_FROM_BIN
+    IN=t/fixtures/light.postgres.log.bz2
+    BIN=$BATS_TMPDIR/out.bin
+    OUT=$BATS_TMPDIR/out.json
+    OUT_FROM_BIN=$BATS_TMPDIR/out_from_bin.json
+    # Generate report from plain-text log
+    ./pgbadger $IN -o $OUT
+    # Generate intermediate binary file
+    ./pgbadger $IN  -o $BIN
+    # Generate report from binary file
+    ./pgbadger $BIN --format=binary -o $OUT_FROM_BIN
 }
 
 #
-# Assert that analyzing from a plain-text log and from the intermediate binary file  
+# Assert that analyzing from a plain-text log and from the intermediate binary file
 # will provide the exact same results
 #
 
