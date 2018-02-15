@@ -419,7 +419,7 @@ my $result = GetOptions(
 	"i|ident=s"                => \$ident,
 	"I|incremental!"           => \$incremental,
 	"j|jobs=i"                 => \$queue_size,
-	"J|job_per_file=i"         => \$job_per_file,
+	"J|Jobs=i"                 => \$job_per_file,
 	"l|last-parsed=s"          => \$last_parsed,
 	"L|logfile-list=s"         => \$logfile_list,
 	"m|maxlength=i"            => \$maxlength,
