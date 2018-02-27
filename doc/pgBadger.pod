@@ -176,7 +176,7 @@ Examples:
 			/pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,app=%a' 
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log

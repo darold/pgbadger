@@ -864,7 +864,7 @@ if ($error_only && $disable_error) {
 my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,\(]*)/;
-my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
+my $regex_prefix_dbappname = qr/(?:app|application|appname)=([^,]*)/;
 
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
@@ -1923,7 +1923,7 @@ Examples:
 			/pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,app=%a' \
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
