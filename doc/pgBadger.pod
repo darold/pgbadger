@@ -416,7 +416,7 @@ In order to run pgbadger in docker container, you have to build it:
 
 After you can run with:
 
-	docker run dalibo/pgbadger --help
+	docker run --volume /var/log/postgresql:/logs --volume ${PWD}/outdir:/outdir dalibo/pgbadger -O /outdir ...
 
 =head1 POSTGRESQL CONFIGURATION
 

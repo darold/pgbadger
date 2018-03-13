@@ -421,7 +421,7 @@ DOCKER USAGE
 
     After you can run with:
 
-            docker run dalibo/pgbadger --help
+            docker run --volume /var/log/postgresql:/logs --volume ${PWD}/outdir:/outdir dalibo/pgbadger -O /outdir ...
 
 POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
