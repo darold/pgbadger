@@ -414,6 +414,15 @@ INSTALLATION
 
     By default INSTALLDIRS is set to site.
 
+DOCKER USAGE
+    In order to run pgbadger in docker container, you have to build it:
+
+            docker build . -t dalibo/pgbadger
+
+    After you can run with:
+
+            docker run dalibo/pgbadger --help
+
 POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
     postgresql.conf before starting.
