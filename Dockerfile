@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # Since Alpine linux 3.3 we can install on-the-fly
-RUN apk add --no-cache perl
+RUN apk add --no-cache bzip2 gzip perl unzip xz
 
 COPY pgbadger /usr/local/bin
 
