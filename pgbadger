@@ -12817,7 +12817,7 @@ sub parse_query
 	if (
 		($prefix_vars{'t_loglevel'} eq 'LOG')
 		&& ($prefix_vars{'t_query'} =~
-/point complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) transaction log file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
+/point complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) (?:transaction log|WAL) file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
 		   )
 	   )
 	{
