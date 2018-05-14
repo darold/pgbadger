@@ -3530,9 +3530,6 @@ sub normalize_query
 	# Remove comments
 	$orig_query =~ s/\/\*(.*?)\*\///gs;
 
-	# Set the entire query lowercase
-	$orig_query = lc($orig_query);
-
 	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/\s+/ /gs;
 
