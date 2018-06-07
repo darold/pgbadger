@@ -321,6 +321,7 @@ my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
 my $timezone                = 0;
+my $log_timezone            = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
@@ -486,6 +487,7 @@ my $result = GetOptions(
 	'pgbouncer-only!'          => \$pgbouncer_only,
 	'start-monday!'            => \$week_start_monday,
 	'normalized-only!'         => \$dump_normalized_only,
+	"log-timezone=s"           => \$log_timezone,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -723,6 +725,9 @@ $top ||= 20;
 
 # Set timezone
 $timezone = ((0-$timezone)*3600);
+# Set timezone for logs
+$log_timezone = ((0-$log_timezone)*3600);
+
 
 # Set the default extension and output format
 if (!$extension) {
@@ -1894,6 +1899,8 @@ Options:
     --start-monday         : in incremental mode, calendar's weeks start on
                              sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
+    --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
+                             when parsing logs.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2478,6 +2485,31 @@ sub update_progress_bar
 	}
 }
 
+sub apply_tz_offset
+{
+	# Apply timezone offset to datetime string
+	# Parsing regex is set using $pattern
+	my ($datetime, $offset, $pattern, $format) = @_;
+	my ($y, $m, $d, $h, $mi, $s) = (0, 0, 0, 0, 0, 0, 0);
+
+	$format = "%Y-%m-%d %H:%M:%S" unless defined $format;
+	$pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/ unless defined $pattern;
+	# $datetime parsing
+	($y, $m, $d, $h, $mi, $s) = ($datetime =~ $pattern);
+
+	if ($offset == 0)
+	{
+		# If no tz offset, return input and parsed datetime
+		return ($datetime, $y, $m, $d, $h, $mi, $s);
+	}
+	my $t = timegm_nocheck($s, $mi, $h, $d, $m - 1, $y);
+	# Apply offset
+	$t += ($offset);
+	my @gmtime = CORE::gmtime($t);
+	($y, $m, $d, $h, $mi, $s) = split(/:/, strftime("%Y:%m:%d:%H:%M:%S", @gmtime));
+	return (strftime($format, @gmtime), $y, $m, $d, $h, $mi, $s);
+}
+
 
 ####
 # Main function called per each parser process
@@ -2490,6 +2522,7 @@ sub process_file
 	my $old_errors_count  = 0;
 	my $getout            = 0;
 	$start_offset       ||= 0;
+	my $time_pattern      = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
 	$0 = 'pgbadger parser';
 
@@ -2559,7 +2592,6 @@ sub process_file
 	# Parse pgbouncer logfile
 	if ($fmt eq 'pgbouncer') {
 
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $has_exclusion = 0;
@@ -2604,9 +2636,16 @@ sub process_file
 					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
 				}
 
-				# Get time detailed information
-				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+				# Apply log timezone offset
+				(
+					$prefix_vars{'t_timestamp'},
+					$prefix_vars{'t_year'},
+					$prefix_vars{'t_month'},
+					$prefix_vars{'t_day'},
+					$prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'},
+					$prefix_vars{'t_sec'}
+				) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
@@ -2699,8 +2738,17 @@ sub process_file
 					map { s/[\r\n]+/ /gs; } @$row;
 
 					my $milli = $7 || 0;
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
-					$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset("$1-$2-$3 $4:$5:$6", $log_timezone, $time_pattern);
 
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
@@ -2762,7 +2810,6 @@ sub process_file
 	}
 	else { # Format is not CSV.
 
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
@@ -2832,6 +2879,17 @@ sub process_file
 					}
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -2944,10 +3002,19 @@ sub process_file
 						my $ms = $1;
 						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
-						 $prefix_vars{'t_timestamp'} .= $ms;
+						$prefix_vars{'t_timestamp'} .= $ms;
 					}
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
