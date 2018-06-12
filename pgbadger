@@ -13597,9 +13597,6 @@ sub store_queries
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 
-		# Stores global statistics
-
-		$overall_stat{'queries_number'}++;
 		$overall_stat{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
@@ -13610,7 +13607,6 @@ sub store_queries
 		if (!$overall_stat{'last_query_ts'} || ($overall_stat{'last_query_ts'} lt $cur_last_log_timestamp)) {
 			$overall_stat{'last_query_ts'} = $cur_last_log_timestamp;
 		}
-		$overall_stat{'peak'}{$cur_last_log_timestamp}{query}++;
 
 		if ($graph) {
 			$per_minute_info{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{count}++;
@@ -13629,35 +13625,52 @@ sub store_queries
 
 		# Counter per database and application name
 		if ($cur_info{$t_pid}{dbname}) {
-			$database_info{$cur_info{$t_pid}{dbname}}{count}++;
 			$database_info{$cur_info{$t_pid}{dbname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$database_info{unknown}{count}++;
 			$database_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbappname}) {
-			$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
 			$application_info{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$application_info{unknown}{count}++;
 			$application_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbuser}) {
-			$user_info{$cur_info{$t_pid}{dbuser}}{count}++;
 			$user_info{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$user_info{unknown}{count}++;
 			$user_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 		if ($cur_info{$t_pid}{dbclient}) {
-			$host_info{$cur_info{$t_pid}{dbclient}}{count}++;
 			$host_info{$cur_info{$t_pid}{dbclient}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		} else {
-			$host_info{unknown}{count}++;
 			$host_info{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 		}
 
 		if ($cur_info{$t_pid}{query}) {
+			# Overall counters
+			$overall_stat{'queries_number'}++;
+			$overall_stat{'peak'}{$cur_last_log_timestamp}{query}++;
+
+			# Counter per database and application name
+			if ($cur_info{$t_pid}{dbname}) {
+				$database_info{$cur_info{$t_pid}{dbname}}{count}++;
+			} else {
+				$database_info{unknown}{count}++;
+			}
+			if ($cur_info{$t_pid}{dbappname}) {
+				$application_info{$cur_info{$t_pid}{dbappname}}{count}++;
+			} else {
+				$application_info{unknown}{count}++;
+			}
+			if ($cur_info{$t_pid}{dbuser}) {
+				$user_info{$cur_info{$t_pid}{dbuser}}{count}++;
+			} else {
+				$user_info{unknown}{count}++;
+			}
+			if ($cur_info{$t_pid}{dbclient}) {
+				$host_info{$cur_info{$t_pid}{dbclient}}{count}++;
+			} else {
+				$host_info{unknown}{count}++;
+			}
 
 			# Add a semi-colon at end of the query
 			$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
