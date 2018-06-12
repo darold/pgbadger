@@ -12585,6 +12585,11 @@ sub parse_query
 		$prefix_vars{'t_query'} =~ s/#011/\t/g;
 	}
 
+	# Remove current temp info if we meet an error for the same pid
+	if (($cur_info{$t_pid}{loglevel} =~ $main_error_regex) && exists $cur_temp_info{$t_pid}) {
+		delete $cur_temp_info{$t_pid};
+	}
+
 	# Save previous temporary file information with same pid to not overwrite it
 	if ($prefix_vars{'t_loglevel'} =~ $main_log_regex) {
 		if (($prefix_vars{'t_query'} !~ /temporary file: path .*, size \d+/) && exists $cur_temp_info{$t_pid}) {
