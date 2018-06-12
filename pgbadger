@@ -14295,7 +14295,7 @@ sub build_log_line_prefix_regex
 		push(@param_list, $regex_map{"$1"}->[0]);
 	}
 	# replace %% by a single %
-	$llp =~ s/\%\%/\%/;
+	$llp =~ s/\%\%/\%/g;
 
 	# t_session_id (%c) can naturaly replace pid as unique session id
 	# when it is given in log_line_prefix and pid is not present.
