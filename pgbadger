@@ -2510,6 +2510,41 @@ sub apply_tz_offset
 	return (strftime($format, @gmtime), $y, $m, $d, $h, $mi, $s);
 }
 
+sub apply_tz_offset_chronos
+{
+	# Apply timezone offset to chronos structure and returns a copy
+	my ($chronosref, $timezone) = @_;
+
+	my %new_chronos = ();
+	my %chronos = %{$chronosref};
+	if ($timezone  == 0)
+	{
+		# If no timezone offset, just return original chronos
+		return %chronos;
+	}
+	my ($nc_t, $nc_y, $nc_m, $nc_d, $nc_h, $nc_mi, $nc_s);
+	foreach my $d (sort keys %chronos) {
+		foreach my $h (sort keys %{ $chronos{$d} }) {
+			# Apply timezone offset to $d $h:00:00
+			# not going to the minute
+			(
+				$nc_t,
+				$nc_y,
+				$nc_m,
+				$nc_d,
+				$nc_h,
+				$nc_mi,
+				$nc_s
+			) = apply_tz_offset("$d $h:00:00", $timezone, qr/(\d{4})(\d{2})(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+			my $nc_date = "$nc_y$nc_m$nc_d";
+			# Copy original chronos subset into new chronos at the right time (after TZ
+			# offset application).
+			$new_chronos{$nc_date}{$nc_h} = $chronos{$d}{$h};
+		}
+	}
+	return %new_chronos
+}
+
 
 ####
 # Main function called per each parser process
@@ -9822,22 +9857,22 @@ sub print_time_consuming
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / ($chronos{$d}{$h}{count} || 1);
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
@@ -10052,23 +10087,23 @@ sub print_most_frequent
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-                my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my $details = '';
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
@@ -10275,36 +10310,36 @@ sub print_slowest_queries
 		next if (!$k || !$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
 		last if ($rank > $top);
 		$found++;
-                $normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
-                my $duration = &convert_time($normalyzed_info{$k}{duration});
-                my $count = &comma_numbers($normalyzed_info{$k}{count});
-                my $min = &convert_time($normalyzed_info{$k}{min});
-                my $max = &convert_time($normalyzed_info{$k}{max});
-                my $avg = &convert_time($normalyzed_info{$k}{average});
-                my $query = &highlight_code($k);
+		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
+		my $duration = &convert_time($normalyzed_info{$k}{duration});
+		my $count = &comma_numbers($normalyzed_info{$k}{count});
+		my $min = &convert_time($normalyzed_info{$k}{min});
+		my $max = &convert_time($normalyzed_info{$k}{max});
+		my $avg = &convert_time($normalyzed_info{$k}{average});
+		my $query = &highlight_code($k);
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
 		my $details = '';
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
