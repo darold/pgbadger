@@ -489,6 +489,10 @@ Enabling log_min_duration_statement will add reports about slowest queries and
 queries that took up the most time. Take care that if you have log_statement
 set to 'all' nothing will be logged with log_line_prefix.
 
+Warning: Do not enable both log_min_duration_statement and log_duration+
+log_statement, this will result in wrong counter values. Note that this
+will also increase drastically the size of your log.
+log_min_duration_statement should always be preferred.
 
 =head1 PARALLEL PROCESSING
 
