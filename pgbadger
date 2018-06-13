@@ -12260,8 +12260,42 @@ sub dump_error_as_json
 	print $fh $json;
 }
 
+sub get_top_n_queries
+{
+	# Sorts and returns top normalized queries
+	my ($sort) = @_;
+	my @sorts = ('duration', 'count', 'average');
+	my @top_n_queries = ();
+	if (!(grep {$_ eq $sort} @sorts))
+	{
+		return @top_n_queries;
+	}
+	my $rank = 1;
+	foreach my $k (sort {$normalyzed_info{$b}{$sort} <=> $normalyzed_info{$a}{$sort}} keys %normalyzed_info) {
+		next if (!$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
+		last if ($rank > $top);
+		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
+		push @top_n_queries, {
+			rank => $rank,
+			total_duration => $normalyzed_info{$k}{duration},
+			times_executed => $normalyzed_info{$k}{count},
+			min_duration => $normalyzed_info{$k}{min},
+			max_duration => $normalyzed_info{$k}{max},
+			avg_duration => $normalyzed_info{$k}{average},
+			query => $k
+		};
+		$rank++;
+	}
+	return @top_n_queries;
+}
+
 sub dump_as_json
 {
+	# Get top normalized queries
+	my @time_consuming_queries = get_top_n_queries('duration');
+	my @most_frequent_queries = get_top_n_queries('count');
+	my @normalized_slowest_queries = get_top_n_queries('average');
+
 	my $json = encode_json({
 		'overall_stat' => \%overall_stat,
 		'pgb_overall_stat' => \%pgb_overall_stat,
@@ -12291,6 +12325,9 @@ sub dump_as_json
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
+		'time_consuming_queries' => \@time_consuming_queries,
+		'most_frequent_queries' => \@most_frequent_queries,
+		'normalized_slowest_queries' => \@normalized_slowest_queries,
 	}) || localdie ("Encode object to JSON failed!\n");
 
 	print $fh $json;
