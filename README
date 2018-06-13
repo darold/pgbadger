@@ -499,6 +499,11 @@ log_min_duration_statement, log_duration and log_statement
     have log_statement set to 'all' nothing will be logged with
     log_line_prefix.
 
+    Warning: Do not enable both log_min_duration_statement and log_duration+
+    log_statement, this will result in wrong counter values. Note that this
+    will also increase drastically the size of your log.
+    log_min_duration_statement should always be preferred.
+
 PARALLEL PROCESSING
     To enable parallel processing you just have to use the -j N option where
     N is the number of cores you want to use.
