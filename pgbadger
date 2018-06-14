@@ -321,6 +321,7 @@ my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
 my $timezone                = 0;
+my $log_timezone            = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
@@ -486,6 +487,7 @@ my $result = GetOptions(
 	'pgbouncer-only!'          => \$pgbouncer_only,
 	'start-monday!'            => \$week_start_monday,
 	'normalized-only!'         => \$dump_normalized_only,
+	"log-timezone=s"           => \$log_timezone,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -723,6 +725,9 @@ $top ||= 20;
 
 # Set timezone
 $timezone = ((0-$timezone)*3600);
+# Set timezone for logs
+$log_timezone = ((0-$log_timezone)*3600);
+
 
 # Set the default extension and output format
 if (!$extension) {
@@ -1894,6 +1899,8 @@ Options:
     --start-monday         : in incremental mode, calendar's weeks start on
                              sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
+    --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
+                             when parsing logs.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2478,6 +2485,66 @@ sub update_progress_bar
 	}
 }
 
+sub apply_tz_offset
+{
+	# Apply timezone offset to datetime string
+	# Parsing regex is set using $pattern
+	my ($datetime, $offset, $pattern, $format) = @_;
+	my ($y, $m, $d, $h, $mi, $s) = (0, 0, 0, 0, 0, 0, 0);
+
+	$format = "%Y-%m-%d %H:%M:%S" unless defined $format;
+	$pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/ unless defined $pattern;
+	# $datetime parsing
+	($y, $m, $d, $h, $mi, $s) = ($datetime =~ $pattern);
+
+	if ($offset == 0)
+	{
+		# If no tz offset, return input and parsed datetime
+		return ($datetime, $y, $m, $d, $h, $mi, $s);
+	}
+	my $t = timegm_nocheck($s, $mi, $h, $d, $m - 1, $y);
+	# Apply offset
+	$t += ($offset);
+	my @gmtime = CORE::gmtime($t);
+	($y, $m, $d, $h, $mi, $s) = split(/:/, strftime("%Y:%m:%d:%H:%M:%S", @gmtime));
+	return (strftime($format, @gmtime), $y, $m, $d, $h, $mi, $s);
+}
+
+sub apply_tz_offset_chronos
+{
+	# Apply timezone offset to chronos structure and returns a copy
+	my ($chronosref, $timezone) = @_;
+
+	my %new_chronos = ();
+	my %chronos = %{$chronosref};
+	if ($timezone  == 0)
+	{
+		# If no timezone offset, just return original chronos
+		return %chronos;
+	}
+	my ($nc_t, $nc_y, $nc_m, $nc_d, $nc_h, $nc_mi, $nc_s);
+	foreach my $d (sort keys %chronos) {
+		foreach my $h (sort keys %{ $chronos{$d} }) {
+			# Apply timezone offset to $d $h:00:00
+			# not going to the minute
+			(
+				$nc_t,
+				$nc_y,
+				$nc_m,
+				$nc_d,
+				$nc_h,
+				$nc_mi,
+				$nc_s
+			) = apply_tz_offset("$d $h:00:00", $timezone, qr/(\d{4})(\d{2})(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+			my $nc_date = "$nc_y$nc_m$nc_d";
+			# Copy original chronos subset into new chronos at the right time (after TZ
+			# offset application).
+			$new_chronos{$nc_date}{$nc_h} = $chronos{$d}{$h};
+		}
+	}
+	return %new_chronos
+}
+
 
 ####
 # Main function called per each parser process
@@ -2490,6 +2557,7 @@ sub process_file
 	my $old_errors_count  = 0;
 	my $getout            = 0;
 	$start_offset       ||= 0;
+	my $time_pattern      = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
 	$0 = 'pgbadger parser';
 
@@ -2559,7 +2627,6 @@ sub process_file
 	# Parse pgbouncer logfile
 	if ($fmt eq 'pgbouncer') {
 
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $has_exclusion = 0;
@@ -2604,9 +2671,16 @@ sub process_file
 					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
 				}
 
-				# Get time detailed information
-				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+				# Apply log timezone offset
+				(
+					$prefix_vars{'t_timestamp'},
+					$prefix_vars{'t_year'},
+					$prefix_vars{'t_month'},
+					$prefix_vars{'t_day'},
+					$prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'},
+					$prefix_vars{'t_sec'}
+				) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
@@ -2699,8 +2773,17 @@ sub process_file
 					map { s/[\r\n]+/ /gs; } @$row;
 
 					my $milli = $7 || 0;
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($1, $2, $3, $4, $5, $6);
-					$prefix_vars{'t_timestamp'} = "$1-$2-$3 $4:$5:$6";
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset("$1-$2-$3 $4:$5:$6", $log_timezone, $time_pattern);
 
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
@@ -2762,7 +2845,6 @@ sub process_file
 	}
 	else { # Format is not CSV.
 
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
@@ -2832,6 +2914,17 @@ sub process_file
 					}
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -2944,10 +3037,19 @@ sub process_file
 						my $ms = $1;
 						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
-						 $prefix_vars{'t_timestamp'} .= $ms;
+						$prefix_vars{'t_timestamp'} .= $ms;
 					}
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+
+					# Apply log timezone offset
+					(
+						$prefix_vars{'t_timestamp'},
+						$prefix_vars{'t_year'},
+						$prefix_vars{'t_month'},
+						$prefix_vars{'t_day'},
+						$prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'},
+						$prefix_vars{'t_sec'}
+					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -9752,22 +9854,22 @@ sub print_time_consuming
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / ($chronos{$d}{$h}{count} || 1);
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
@@ -9982,23 +10084,23 @@ sub print_most_frequent
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-                my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my $details = '';
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
@@ -10205,36 +10307,36 @@ sub print_slowest_queries
 		next if (!$k || !$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
 		last if ($rank > $top);
 		$found++;
-                $normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
-                my $duration = &convert_time($normalyzed_info{$k}{duration});
-                my $count = &comma_numbers($normalyzed_info{$k}{count});
-                my $min = &convert_time($normalyzed_info{$k}{min});
-                my $max = &convert_time($normalyzed_info{$k}{max});
-                my $avg = &convert_time($normalyzed_info{$k}{average});
-                my $query = &highlight_code($k);
+		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
+		my $duration = &convert_time($normalyzed_info{$k}{duration});
+		my $count = &comma_numbers($normalyzed_info{$k}{count});
+		my $min = &convert_time($normalyzed_info{$k}{min});
+		my $max = &convert_time($normalyzed_info{$k}{max});
+		my $avg = &convert_time($normalyzed_info{$k}{average});
+		my $query = &highlight_code($k);
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
 		my $details = '';
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
+		foreach my $d (sort keys %chronos) {
 			my $c = 1;
 			$d =~ /^\d{4}(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
-				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
-					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+			foreach my $h (sort keys %{$chronos{$d}}) {
+				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
 				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
+					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
@@ -12515,6 +12617,11 @@ sub parse_query
 		$prefix_vars{'t_query'} =~ s/#011/\t/g;
 	}
 
+	# Remove current temp info if we meet an error for the same pid
+	if (($cur_info{$t_pid}{loglevel} =~ $main_error_regex) && exists $cur_temp_info{$t_pid}) {
+		delete $cur_temp_info{$t_pid};
+	}
+
 	# Save previous temporary file information with same pid to not overwrite it
 	if ($prefix_vars{'t_loglevel'} =~ $main_log_regex) {
 		if (($prefix_vars{'t_query'} !~ /temporary file: path .*, size \d+/) && exists $cur_temp_info{$t_pid}) {
@@ -14185,7 +14292,7 @@ sub build_log_line_prefix_regex
 		push(@param_list, $regex_map{"$1"}->[0]);
 	}
 	# replace %% by a single %
-	$llp =~ s/\%\%/\%/;
+	$llp =~ s/\%\%/\%/g;
 
 	# t_session_id (%c) can naturaly replace pid as unique session id
 	# when it is given in log_line_prefix and pid is not present.
