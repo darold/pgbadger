@@ -7928,7 +7928,7 @@ $drawn_graphs{temporaryfile_graph}
 							"</td><td>" . &pretty_print_size($tinf{size}) . "</td>" .
 							"</td><td>$temp_average</td>";
 			} else {
-				$tempfiles_activity .= "<td>0</td><td>0</td>";
+				$tempfiles_activity .= "<td>0</td><td>0</td><td>0</td>";
 			}
 		}
 	}
