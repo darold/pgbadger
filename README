@@ -416,12 +416,6 @@ INSTALLATION
 
     By default INSTALLDIRS is set to site.
 
-DOCKER USAGE
-    pgBadger is available as Docker image. Remember to mount logs and
-    outdir.
-
-            docker run -v /var/log/postgresql:/logs -v ${PWD}:/outdir dalibo/pgbadger -O /outdir /logs/postgresql.log
-
 POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
     postgresql.conf before starting.
