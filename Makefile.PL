@@ -24,11 +24,11 @@ if ($ExtUtils::MakeMaker::VERSION >= 6.46) {
 	%merge_compat = (
 		'META_MERGE'   => {
 			resources  => {
-				homepage => 'http://projects.dalibo.org/pgbadger',
+				homepage => 'http://pgbadger.darold.net/',
 				repository  => {
 					type => 'git',
-					git => 'git@github.com:dalibo/pgbadger.git',
-					web => 'https://github.com/dalibo/pgbadger',
+					git => 'git@github.com:darold/pgbadger.git',
+					web => 'https://github.com/darold/pgbadger',
 				},
 			},
 		}

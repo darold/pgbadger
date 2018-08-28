@@ -623,7 +623,7 @@ The pgBadger v4.x design comes from the "Art is code" company.
 
 This web site is a work of Gilles Darold.
 
-pgBadger is maintained by Gilles Darold, the good folks at Dalibo, and every one who wants to contribute.
+pgBadger is maintained by Gilles Darold and every one who wants to contribute.
 
 Many people have contributed to pgBadger, they are all quoted in the Changelog file.
 
@@ -631,7 +631,7 @@ Many people have contributed to pgBadger, they are all quoted in the Changelog f
 
 pgBadger is free software distributed under the PostgreSQL Licence.
 
-Copyright (c) 2012-2017, Dalibo
+Copyright (c) 2012-2018, Gilles Darold
 
 A modified version of the SQL::Beautify Perl Module is embedded in pgBadger
 with copyright (C) 2009 by Jonas Kramer and is published under the terms of
