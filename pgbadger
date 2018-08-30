@@ -2995,7 +2995,6 @@ sub process_file
 				}
 
 			} elsif ($fmt eq 'stderr') {
-
 				@matches = ($line =~ $compiled_prefix);
 				if ($#matches >= 0) {
 
@@ -3003,13 +3002,37 @@ sub process_file
 					foreach my $p (keys %cur_plan_info) {
 						if (exists $cur_plan_info{$p}{plan}) {
 							# Extract the query part from the plan
-							my $key = 'query';
 							my @plan = split("\n", $cur_plan_info{$p}{plan});
-							foreach my $l (@plan) {
-								$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
-								$cur_info{$p}{$key} .= "$l\n";
+							if ($cur_plan_info{$p}{plan} =~ /^.*{.*/m) { # if is JSON plan
+								my $query = "";
+								my $plan = "";
+								my $queryStarted = 0;
+								foreach my $l (@plan) {
+									$plan = $plan . "$l\n";
+									if ($queryStarted == 1) {
+										if ($l =~ m/\"Plan\":/) {
+											$queryStarted = 0;
+										}
+									} elsif ($l =~ m/\"Query Text\":/) {
+										$queryStarted = 1;
+									}
+									if ($queryStarted == 1) {
+										$query = $query . "$l\n";
+									}
+								}
+								$query =~ s/^.*\"Query Text\": \"//s;
+								$query =~ s/;\",\n$//s;
+								$query =~ s/\",\n$//s;
+								$cur_info{$p}{query} = $query;
+								$cur_info{$p}{plan} = $plan;
+							} else {
+								my $key = 'query';
+								foreach my $l (@plan) {
+									$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
+									$cur_info{$p}{$key} .= "$l\n";
+								}
+								$cur_info{$p}{query} =~ s/^\s*Query Text:\s+//s;
 							}
-							$cur_info{$p}{query} =~ s/^\s*Query Text:\s+//s;
 							delete $cur_plan_info{$p};
 							&store_queries($p);
 							delete $cur_info{$p};
@@ -3631,9 +3654,6 @@ sub normalize_query
 
 	# Remove comments
 	$orig_query =~ s/\/\*(.*?)\*\///gs;
-
-	# Set the entire query lowercase
-	$orig_query = lc($orig_query);
 
 	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/\s+/ /gs;
@@ -13385,12 +13405,37 @@ sub set_current_infos
 	if (exists $cur_plan_info{$t_pid} && exists $cur_plan_info{$t_pid}{plan} && $cur_plan_info{$t_pid}{plan} ne '') {
 		my $key = 'query';
 		my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
-		$plan[0] =~ s/^\s*Query Text:\s+//;
-		foreach my $l (@plan) {
-			$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
-			$cur_info{$t_pid}{$key} .= "$l\n";
+		if ($cur_plan_info{$t_pid}{plan} =~ /^.*{.*/m) { # if is JSON plan
+			my $query = "";
+			my $plan = "";
+			my $queryStarted = 0;
+			foreach my $l (@plan) {
+				$plan = $plan . "$l\n";
+				if ($queryStarted == 1) {
+					if ($l =~ m/\"Plan\":/) {
+						$queryStarted = 0;
+					}
+				} elsif ($l =~ m/\"Query Text\":/) {
+					$queryStarted = 1;
+				}
+				if ($queryStarted == 1) {
+					$query = $query . "$l\n";
+				}
+			}
+			$query =~ s/^.*\"Query Text\": \"//s;
+			$query =~ s/;\",\n$//s;
+			$query =~ s/\",\n$//s;
+			$cur_info{$t_pid}{query} = $query;
+			$cur_info{$t_pid}{plan} = $plan;
 		}
-		$cur_info{$t_pid}{query} =~ s/^\s*Query Text:\s+//s;
+		else {
+			$plan[0] =~ s/^\s*Query Text:\s+//;
+			foreach my $l (@plan) {
+				$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
+				$cur_info{$t_pid}{$key} .= "$l\n";
+			}
+			$cur_info{$t_pid}{query} =~ s/^\s*Query Text:\s+//s;
+		}
 		delete $cur_plan_info{$t_pid};
 	}
 }
