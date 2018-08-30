@@ -11,14 +11,14 @@
 #
 # You should enable SQL query logging with log_min_duration_statement >= 0
 # With stderr output
-#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] '
-#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d '
-#  Log line prefix should be: log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: user=%u,db=%d '
+#  Log line prefix should be: log_line_prefix = '%t [%p]: db=%d,user=%u '
 # If you need report per client Ip adresses you can add client=%h or remote=%h
 # pgbadger will also recognized the following form:
-#     log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u,client=%h '
+#     log_line_prefix = '%t [%p]: db=%d,user=%u,client=%h '
 # or
-#     log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,remote=%h '
+#     log_line_prefix = '%t [%p]: user=%u,db=%d,remote=%h '
 # With syslog output
 #  Log line prefix should be: log_line_prefix = 'db=%d,user=%u '
 #
@@ -39,7 +39,7 @@ use IO::File;
 use Benchmark;
 use File::Basename;
 use Storable qw(store_fd fd_retrieve);
-use Time::Local 'timegm_nocheck';
+use Time::Local qw(timegm_nocheck timelocal_nocheck);
 use POSIX qw(locale_h sys_wait_h _exit strftime);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
@@ -297,7 +297,7 @@ my $last_parsed             = '';
 my $report_title            = '';
 my $log_line_prefix         = '';
 my $compiled_prefix         = '';
-my $project_url             = 'http://darold.github.com/pgbadger/';
+my $project_url             = 'http://pgbadger.darold.net/';
 my $t_min                   = 0;
 my $t_max                   = 0;
 my $remove_comment          = 0;
@@ -321,12 +321,13 @@ my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
 my $timezone                = 0;
-my $log_timezone            = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
 my $use_sessionid_as_pid    = 0;
 my $dump_normalized_only    = 0;
+my $log_timezone            = 0;
+my $json_prettify           = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -334,6 +335,8 @@ my $RESRC_URL   = '';
 my $img_format  = 'png';
 my @log_files   = ();
 my %prefix_vars = ();
+my $q_prefix    = '';
+my @prefix_q_params = ();
 
 my $remote_host = '';
 my $ssh_command = '';
@@ -487,7 +490,8 @@ my $result = GetOptions(
 	'pgbouncer-only!'          => \$pgbouncer_only,
 	'start-monday!'            => \$week_start_monday,
 	'normalized-only!'         => \$dump_normalized_only,
-	"log-timezone=s"           => \$log_timezone,
+	'log-timezone=i'           => \$log_timezone,
+	'prettify-json!'           => \$json_prettify,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -527,12 +531,13 @@ if (-e "$PID_FILE") {
 }
 
 # Create pid file
-unless(open(OUT, ">$PID_FILE")) {
+if (open(my $out, '>', $PID_FILE)) {
+	print $out $$;
+	close($out);
+} else {
 	print "FATAL: can't create pid file $PID_FILE, $!\n";
 	exit 3;
 }
-print OUT $$;
-close(OUT);
 
 # Rewrite some command line arguments as lists
 &compute_arg_list();
@@ -602,11 +607,12 @@ if ($logfile_list) {
 	if (!-e $logfile_list) {
 		localdie("FATAL: logfile list $logfile_list must exist!\n");
 	}
-	if (not open(IN, $logfile_list)) {
+	my $in = undef;
+	if (not open($in, "<", $logfile_list)) {
 		localdie("FATAL: can not read logfile list $logfile_list, $!.\n");
 	}
-	my @files = <IN>;
-	close(IN);
+	my @files = <$in>;
+	close($in);
 	foreach my $file (@files) {
 		chomp($file);
 		$file =~ s/\r//;
@@ -725,9 +731,7 @@ $top ||= 20;
 
 # Set timezone
 $timezone = ((0-$timezone)*3600);
-# Set timezone for logs
 $log_timezone = ((0-$log_timezone)*3600);
-
 
 # Set the default extension and output format
 if (!$extension) {
@@ -869,7 +873,7 @@ if ($error_only && $disable_error) {
 my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,\(]*)/;
-my $regex_prefix_dbappname = qr/(?:app|application|appname)=([^,]*)/;
+my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
 
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
@@ -877,12 +881,12 @@ my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP
 
 # Loading excluded query from file if any
 if ($exclude_file) {
-	open(IN, "$exclude_file") or localdie("FATAL: can't read file $exclude_file: $!\n");
-	my @exclq = <IN>;
-	close(IN);
+	open(my $in, '<', $exclude_file) or localdie("FATAL: can't read file $exclude_file: $!\n");
+	my @exclq = <$in>;
+	close($in);
 	chomp(@exclq);
-	map {s/\r//;} @exclq;
 	foreach my $r (@exclq) {
+		$r =~ s/\r//;
 		&check_regex($r, '--exclude-file');
 	}
 	push(@exclude_query, @exclq);
@@ -911,12 +915,12 @@ if ($#include_time >= 0) {
 
 # Loading included query from file if any
 if ($include_file) {
-	open(IN, "$include_file") or localdie("FATAL: can't read file $include_file: $!\n");
-	my @exclq = <IN>;
-	close(IN);
+	open(my $in, '<', $include_file) or localdie("FATAL: can't read file $include_file: $!\n");
+	my @exclq = <$in>;
+	close($in);
 	chomp(@exclq);
-	map {s/\r//;} @exclq;
 	foreach my $r (@exclq) {
+		$r =~ s/\r//;
 		&check_regex($r, '--include-file');
 	}
 	push(@include_query, @exclq);
@@ -970,8 +974,8 @@ my %abbr_month = (
 
 # Keywords variable
 my @pg_keywords = qw(
-        ALL ANALYSE ANALYZE AND ANY ARRAY AS ASC ASYMMETRIC AUTHORIZATION BERNOULLI BINARY BOTH CASE
-        CAST CHECK COLLATE COLLATION COLUMN CONCURRENTLY CONSTRAINT CREATE CROSS CUBE
+        ALL ANALYSE ANALYZE AND ANY ARRAY AS ASC ASYMMETRIC AUTHORIZATION BERNOULLI BINARY BOTH BUFFERS
+	CASE CAST CHECK COLLATE COLLATION COLUMN CONCURRENTLY CONSTRAINT CREATE CROSS CUBE
         CURRENT_DATE CURRENT_ROLE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER
         DEFAULT DEFERRABLE DESC DISTINCT DO ELSE END EXCEPT FALSE FETCH FOR FOREIGN FREEZE FROM
         FULL GRANT GROUP GROUPING HAVING ILIKE IN INITIALLY INNER INTERSECT INTO IS ISNULL JOIN LEADING
@@ -1011,7 +1015,7 @@ my @KEYWORDS1 = qw(
         DEFERRED DEFINER DELIMITER DELIMITERS DICTIONARY DISABLE DISCARD DOCUMENT DOMAIN DOUBLE EACH
         ENABLE ENCODING ENCRYPTED ENUM ESCAPE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXTENSION EXTERNAL
         FIRST FLOAT FOLLOWING FORCE FORWARD FUNCTIONS GLOBAL GRANTED HANDLER HEADER HOLD
-        HOUR IDENTITY IMMEDIATE IMMUTABLE IMPLICIT INCLUDING INCREMENT INDEXES INHERITS INLINE INOUT INPUT
+        HOUR IDENTITY IMMEDIATE IMMUTABLE IMPLICIT INCLUDING INCREMENT INHERITS INLINE INOUT INPUT
         INSENSITIVE INSTEAD INT INTEGER INVOKER ISOLATION LABEL LARGE LAST LC_COLLATE LC_CTYPE
         LEAKPROOF LEVEL LISTEN LOCATION LOOP MAPPING MATCH MAXVALUE MINUTE MINVALUE MODE MONTH MOVE NAMES
         NATIONAL NCHAR NEXT NO NONE NOTHING NOTIFY NOWAIT NULLS OBJECT OF OFF OIDS OPERATOR OPTIONS
@@ -1060,7 +1064,6 @@ my %SYMBOLS = (
 	'\/' => '/', '!=' => '!='
 );
 my @BRACKETS = ('(', ')');
-map {$_ = quotemeta($_)} @BRACKETS;
 
 # Inbounds of query times histogram
 my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
@@ -1201,9 +1204,9 @@ if ($incremental) {
 
 # Reading last line parsed
 if ($last_parsed && -e $last_parsed) {
-	if (open(IN, "$last_parsed")) {
-		my @content = <IN>;
-		close(IN);
+	if (open(my $in, '<', $last_parsed)) {
+		my @content = <$in>;
+		close($in);
 		foreach my $line (@content) {
 			chomp($line);
 			next if (!$line);
@@ -1614,8 +1617,8 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 # Get last line parsed from all process
 if ($last_parsed) {
-	if (open(IN, "$tmp_last_parsed") ) {
-		while (my $line = <IN>) {
+	if (open(my $in, '<', $tmp_last_parsed) ) {
+		while (my $line = <$in>) {
 			chomp($line);
 			$line =~ s/\r//;
 			my ($d, $p, $l, @o) = split(/\t/, $line);
@@ -1636,29 +1639,29 @@ if ($last_parsed) {
 				}
 			}
 		}
-		close(IN);
+		close($in);
 	}
 	unlink("$tmp_last_parsed");
 }
 
 # Save last line parsed
 if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime}) && ($last_line{orig} || $pgb_last_line{orig}) ) {
-	if (open(OUT, ">$last_parsed")) {
+	if (open(my $out, '>', $last_parsed)) {
 		if ($last_line{datetime}) {
 			$last_line{current_pos} ||= 0;
-			print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+			print $out "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 		} elsif ($saved_last_line{datetime}) {
 			$saved_last_line{current_pos} ||= 0;
-			print OUT "$saved_last_line{datetime}\t$saved_last_line{current_pos}\t$saved_last_line{orig}\n";
+			print $out "$saved_last_line{datetime}\t$saved_last_line{current_pos}\t$saved_last_line{orig}\n";
 		}
 		if ($pgb_last_line{datetime}) {
 			$pgb_last_line{current_pos} ||= 0;
-			print OUT "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
+			print $out "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
 		} elsif ($pgb_saved_last_line{datetime}) {
 			$pgb_saved_last_line{current_pos} ||= 0;
-			print OUT "pgbouncer\t$pgb_saved_last_line{datetime}\t$pgb_saved_last_line{current_pos}\t$pgb_saved_last_line{orig}\n";
+			print $out "pgbouncer\t$pgb_saved_last_line{datetime}\t$pgb_saved_last_line{current_pos}\t$pgb_saved_last_line{orig}\n";
 		}
-		close(OUT);
+		close($out);
 	} else {
 		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
 	}
@@ -1676,6 +1679,10 @@ my $td = timediff($t1, $t0);
 if (!$incremental && ($#given_log_files >= 0) ) {
 
 	&logmsg('LOG', "Ok, generating $extension report...");
+
+	# Some message have been temporary stored as ERROR but
+	# they are LOGestore them to the right log level.
+	&restore_log_type_count();
 
 	if ($extension ne 'tsung') {
 		$fh = new IO::File ">$outfile";
@@ -1720,13 +1727,13 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	# Look for directory where report must be generated
 	my @build_directories = ();
 	if (-e "$last_parsed.tmp") {
-		if (open(IN, "$last_parsed.tmp")) {
-			while (my $l = <IN>) {
+		if (open(my $in, '<', "$last_parsed.tmp")) {
+			while (my $l = <$in>) {
 				chomp($l);
 				$l =~ s/\r//;
 				push(@build_directories, $l) if (!grep(/^$l$/, @build_directories));
 			}
-			close(IN);
+			close($in);
 			unlink("$last_parsed.tmp");
 		} else {
 			&logmsg('ERROR', "can't read file $last_parsed.tmp, $!");
@@ -1779,9 +1786,9 @@ Options:
     -D | --dns-resolv      : client ip addresses are replaced by their DNS name.
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
-			     pgbouncer. Use this option when pgBadger is not
-                             able to auto-detect the log format.
+    -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
+			     cvs and pgbouncer. Use this option when pgBadger is
+                             not able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -1891,16 +1898,22 @@ Options:
     --journalctl command   : command to use to replace PostgreSQL logfile by
 			     a call to journalctl. Basically it might be:
 				journalctl -u postgresql-9.5
-    --pid-file PATH        : set the path of the pid file to manage
-			     concurrent execution of pgBadger.
+    --pid-dir path         : set the path where the pid file must be stored.
+                             Default /tmp
+    --pid-file file        : set the name of the pid file to manage concurrent
+                             execution of pgBadger. Default: pgbadger.pid
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
     --start-monday         : in incremental mode, calendar's weeks start on
                              sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
-    --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
-                             when parsing logs.
+    --log-timezone  +/-XX  : Set the number of hours from GMT of the timezone
+                             that must be used to adjust date/time read from
+                             log file before beeing parsed. Using this option
+                             make more difficult log search with a date/time.
+    --prettify-json        : use it if you want json output to be prettified.
+
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -1930,7 +1943,7 @@ Examples:
 			/pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,app=%a' \
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' \
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
@@ -2015,6 +2028,7 @@ sub set_parser_regex
 	my $fmt = shift;
 
 	@prefix_params = ();
+	@prefix_q_params = ();
 
 	if ($fmt eq 'pgbouncer') {
 
@@ -2029,8 +2043,11 @@ sub set_parser_regex
 	} elsif ($log_line_prefix) {
 
 		# Build parameters name that will be extracted from the prefix regexp
-		my $llp = '';
-		($llp, @prefix_params) = &build_log_line_prefix_regex($log_line_prefix);
+		my %res = &build_log_line_prefix_regex($log_line_prefix);
+		my $llp = $res{'llp'};
+		@prefix_params = @{ $res{'param_list'} };
+		$q_prefix = $res{'q_prefix'};
+		@prefix_q_params = @{ $res{'q_param_list'} };
 
 		if ($fmt eq 'syslog') {
 			$llp =
@@ -2055,7 +2072,6 @@ sub set_parser_regex
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
 			push(@prefix_params, 't_loglevel', 't_query');
-
 		}
 
 	} elsif ($fmt eq 'syslog') {
@@ -2078,14 +2094,14 @@ sub set_parser_regex
 	} elsif ($fmt eq 'stderr') {
 
 		$compiled_prefix =
-	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
 
 	} elsif ($fmt eq 'default') {
 
 		$fmt = 'stderr';
 		$compiled_prefix =
-	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[(\d+)\]\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_logprefix', 't_loglevel', 't_query');
 	}
 
@@ -2108,16 +2124,16 @@ sub build_incremental_reports
 	my @build_directories = @_;
 
 	my %weeks_directories = ();
-	foreach $incr_date (sort @build_directories) {
+	foreach my $bpath (sort @build_directories) {
 
-		$last_incr_date = $incr_date;
+		$incr_date = $bpath;
+		$last_incr_date = $bpath;
 
 		# Set the path to binary files
-		my $bpath = $incr_date;
 		$bpath =~ s/\-/\//g;
-		$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
 
 		# Get the week number following the date
+		$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
 		my $wn = &get_week_number($1, $2, $3);
 		$weeks_directories{$wn} = "$1-$2" if ($rebuild || !exists $weeks_directories{$wn});
 
@@ -2160,8 +2176,8 @@ sub build_incremental_reports
 		my $wdir = '';
 
 		# Load data per day
-		foreach $incr_date (@wdays) {
-			my $bpath = $incr_date;
+		foreach my $bpath (@wdays) {
+			$incr_date = $bpath;
 			$bpath =~ s/\-/\//g;
 			$incr_date =~ /^(\d+)\-(\d+)\-(\d+)$/;
 			$wdir = "$1/week-$wn";
@@ -2207,7 +2223,9 @@ sub build_incremental_reports
 	}
 	my $date = localtime(time);
 	my @tmpjscode = @jscode;
-	map { s/EDIT_URI/\./; } @tmpjscode;
+	for (my $i = 0; $i <= $#tmpjscode; $i++) {
+		$tmpjscode[$i] =~ s/EDIT_URI/\./;
+	}
 	my $local_title = 'Global Index on incremental reports';
 	if ($report_title) {
 		$local_title = 'Global Index - ' . $report_title;
@@ -2485,66 +2503,6 @@ sub update_progress_bar
 	}
 }
 
-sub apply_tz_offset
-{
-	# Apply timezone offset to datetime string
-	# Parsing regex is set using $pattern
-	my ($datetime, $offset, $pattern, $format) = @_;
-	my ($y, $m, $d, $h, $mi, $s) = (0, 0, 0, 0, 0, 0, 0);
-
-	$format = "%Y-%m-%d %H:%M:%S" unless defined $format;
-	$pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/ unless defined $pattern;
-	# $datetime parsing
-	($y, $m, $d, $h, $mi, $s) = ($datetime =~ $pattern);
-
-	if ($offset == 0)
-	{
-		# If no tz offset, return input and parsed datetime
-		return ($datetime, $y, $m, $d, $h, $mi, $s);
-	}
-	my $t = timegm_nocheck($s, $mi, $h, $d, $m - 1, $y);
-	# Apply offset
-	$t += ($offset);
-	my @gmtime = CORE::gmtime($t);
-	($y, $m, $d, $h, $mi, $s) = split(/:/, strftime("%Y:%m:%d:%H:%M:%S", @gmtime));
-	return (strftime($format, @gmtime), $y, $m, $d, $h, $mi, $s);
-}
-
-sub apply_tz_offset_chronos
-{
-	# Apply timezone offset to chronos structure and returns a copy
-	my ($chronosref, $timezone) = @_;
-
-	my %new_chronos = ();
-	my %chronos = %{$chronosref};
-	if ($timezone  == 0)
-	{
-		# If no timezone offset, just return original chronos
-		return %chronos;
-	}
-	my ($nc_t, $nc_y, $nc_m, $nc_d, $nc_h, $nc_mi, $nc_s);
-	foreach my $d (sort keys %chronos) {
-		foreach my $h (sort keys %{ $chronos{$d} }) {
-			# Apply timezone offset to $d $h:00:00
-			# not going to the minute
-			(
-				$nc_t,
-				$nc_y,
-				$nc_m,
-				$nc_d,
-				$nc_h,
-				$nc_mi,
-				$nc_s
-			) = apply_tz_offset("$d $h:00:00", $timezone, qr/(\d{4})(\d{2})(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-			my $nc_date = "$nc_y$nc_m$nc_d";
-			# Copy original chronos subset into new chronos at the right time (after TZ
-			# offset application).
-			$new_chronos{$nc_date}{$nc_h} = $chronos{$d}{$h};
-		}
-	}
-	return %new_chronos
-}
-
 
 ####
 # Main function called per each parser process
@@ -2557,7 +2515,6 @@ sub process_file
 	my $old_errors_count  = 0;
 	my $getout            = 0;
 	$start_offset       ||= 0;
-	my $time_pattern      = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
 	$0 = 'pgbadger parser';
 
@@ -2627,6 +2584,7 @@ sub process_file
 	# Parse pgbouncer logfile
 	if ($fmt eq 'pgbouncer') {
 
+		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $has_exclusion = 0;
@@ -2671,16 +2629,9 @@ sub process_file
 					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
 				}
 
-				# Apply log timezone offset
-				(
-					$prefix_vars{'t_timestamp'},
-					$prefix_vars{'t_year'},
-					$prefix_vars{'t_month'},
-					$prefix_vars{'t_day'},
-					$prefix_vars{'t_hour'},
-					$prefix_vars{'t_min'},
-					$prefix_vars{'t_sec'}
-				) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
+				# Get time detailed information
+				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
 
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
@@ -2693,6 +2644,15 @@ sub process_file
 
 				# Jump to the last line parsed if required
 				next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+
+				# Store the current timestamp of the log line
+				&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+				# Override timestamp when we have to adjust datetime to the log timezone
+				if ($log_timezone) {
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				}
 
 				# Extract other information from the line
 				@matches = ($line =~ $pgbouncer_log_parse2);
@@ -2711,9 +2671,6 @@ sub process_file
 						$prefix_vars{'t_avgduration'} = $4;
 					}
 				}
-
-				# Store the current timestamp of the log line
-				&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 				# Check if the log line should be excluded from the report
 				if (&validate_log_line($prefix_vars{'t_pid'})) {
@@ -2769,21 +2726,19 @@ sub process_file
 				# Extract the date
 				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
 
-					# Remove newline characters from queries
-					map { s/[\r\n]+/ /gs; } @$row;
-
+					$prefix_vars{'t_year'} = $1;
+					$prefix_vars{'t_month'} = $2;
+					$prefix_vars{'t_day'} = $3;
+					$prefix_vars{'t_hour'} = $4;
+					$prefix_vars{'t_min'} = $5;
+					$prefix_vars{'t_sec'} = $6;
 					my $milli = $7 || 0;
+					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
-					# Apply log timezone offset
-					(
-						$prefix_vars{'t_timestamp'},
-						$prefix_vars{'t_year'},
-						$prefix_vars{'t_month'},
-						$prefix_vars{'t_day'},
-						$prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'},
-						$prefix_vars{'t_sec'}
-					) = apply_tz_offset("$1-$2-$3 $4:$5:$6", $log_timezone, $time_pattern);
+					# Remove newline characters from queries
+					for (my $i = 0; $i <= $#$row; $i++) {
+						$row->[$i] =~ s/[\r\n]+/ /gs;
+					}
 
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
@@ -2799,6 +2754,12 @@ sub process_file
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+					# Update current timestamp with the timezone wanted
+					if ($log_timezone) {
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+					}
 
 					# Set query parameters as global variables
 					$prefix_vars{'t_dbuser'}  = $row->[1] || '';
@@ -2840,11 +2801,14 @@ sub process_file
 		}
 
 	}
+
 	elsif ($fmt eq 'binary') {
+
 		&load_stats($lfile);
 	}
 	else { # Format is not CSV.
 
+		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = 0;
@@ -2884,15 +2848,59 @@ sub process_file
 
 			%prefix_vars = ();
 
+			# Parse jsonlog lines
+			if ($fmt =~ /jsonlog/) {
+
+				%prefix_vars = parse_jsonlog_input($line);
+
+				# Skip unwanted lines
+				my $res = &skip_unwanted_line();
+				next if ($res == 1);
+
+				# Jump to the last line parsed if required
+				next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+
+				# Store the current timestamp of the log line
+				&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+				# Update current timestamp with the timezone wanted
+				if ($log_timezone) {
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				}
+
+				# Check if the log line should be excluded from the report
+				if (&validate_log_line($prefix_vars{'t_pid'})) {
+
+					# Parse the query now
+					&parse_query($fmt);
+
+					# The information can be saved immediately with csvlog
+					&store_queries($prefix_vars{'t_pid'});
+					delete $cur_info{$prefix_vars{'t_pid'}};
+				}
+
 			# Parse syslog lines
-			if ($fmt =~ /syslog/) {
+			} elsif ($fmt =~ /syslog/) {
 
 				@matches = ($line =~ $compiled_prefix);
 
+				my $q_match = 0;
+				if ($#matches < 0 && $q_prefix) {
+					@matches = ($line =~ $q_prefix);
+					$q_match = 1;
+				}
+
 				if ($#matches >= 0) {
 
-					for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
-						$prefix_vars{$prefix_params[$i]} = $matches[$i];
+					if (!$q_match) {
+						for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+							$prefix_vars{$prefix_params[$i]} = $matches[$i];
+						}
+					} else {
+						for (my $i = 0 ; $i <= $#prefix_q_params ; $i++) {
+							$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
+						}
 					}
 
 					# skip non postgresql lines
@@ -2914,18 +2922,6 @@ sub process_file
 					}
 					$prefix_vars{'t_timestamp'} =
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-
-					# Apply log timezone offset
-					(
-						$prefix_vars{'t_timestamp'},
-						$prefix_vars{'t_year'},
-						$prefix_vars{'t_month'},
-						$prefix_vars{'t_day'},
-						$prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'},
-						$prefix_vars{'t_sec'}
-					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
-
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
 						# Remove the port part
@@ -2948,6 +2944,12 @@ sub process_file
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+					# Update current timestamp with the timezone wanted
+					if ($log_timezone) {
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+					}
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -2997,27 +2999,23 @@ sub process_file
 			} elsif ($fmt eq 'stderr') {
 
 				@matches = ($line =~ $compiled_prefix);
+
+				my $q_match = 0;
+				if ($#matches < 0 && $q_prefix) {
+					@matches = ($line =~ $q_prefix);
+					$q_match = 1;
+				}
+
 				if ($#matches >= 0) {
 
-					# Store auto explain plan when switching to an other log entry
-					foreach my $p (keys %cur_plan_info) {
-						if (exists $cur_plan_info{$p}{plan}) {
-							# Extract the query part from the plan
-							my $key = 'query';
-							my @plan = split("\n", $cur_plan_info{$p}{plan});
-							foreach my $l (@plan) {
-								$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
-								$cur_info{$p}{$key} .= "$l\n";
-							}
-							$cur_info{$p}{query} =~ s/^\s*Query Text:\s+//s;
-							delete $cur_plan_info{$p};
-							&store_queries($p);
-							delete $cur_info{$p};
+					if (!$q_match) {
+						for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+							$prefix_vars{$prefix_params[$i]} = $matches[$i];
 						}
-					}
-
-					for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
-						$prefix_vars{$prefix_params[$i]} = $matches[$i];
+					} else {
+						for (my $i = 0 ; $i <= $#prefix_q_params ; $i++) {
+							$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
+						}
 					}
 					$prefix_vars{'t_pid'} = $prefix_vars{'t_session_id'} if ($use_sessionid_as_pid);
 
@@ -3037,19 +3035,10 @@ sub process_file
 						my $ms = $1;
 						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
-						$prefix_vars{'t_timestamp'} .= $ms;
+						 $prefix_vars{'t_timestamp'} .= $ms;
 					}
-
-					# Apply log timezone offset
-					(
-						$prefix_vars{'t_timestamp'},
-						$prefix_vars{'t_year'},
-						$prefix_vars{'t_month'},
-						$prefix_vars{'t_day'},
-						$prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'},
-						$prefix_vars{'t_sec'}
-					) = apply_tz_offset($prefix_vars{'t_timestamp'}, $log_timezone, $time_pattern);
+					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -3072,6 +3061,12 @@ sub process_file
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
+
+					# Update current timestamp with the timezone wanted
+					if ($log_timezone) {
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+					}
 
 					# Extract information from log line prefix
 					if (!$log_line_prefix) {
@@ -3101,7 +3096,7 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					# Parse orphan lines to append inforamtion to the right place
+					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $line);
 
 				} else {
@@ -3112,6 +3107,7 @@ sub process_file
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
+
 		if ($last_parsed) {
 			$last_line{current_pos} = $current_offset;
 		}
@@ -3180,10 +3176,10 @@ sub process_file
 		$bpath =~ s/\-/\//g;
 
 		# Mark the directory as needing index update
-		if (open(OUT, ">>$last_parsed.tmp")) {
-			flock(OUT, 2) || return $getout;
-			print OUT "$incr_date\n";
-			close(OUT);
+		if (open(my $out, '>>', "$last_parsed.tmp")) {
+			flock($out, 2) || return $getout;
+			print $out "$incr_date\n";
+			close($out);
 		} else {
 			&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
 		}
@@ -3208,18 +3204,18 @@ sub process_file
 
 	# Save last line into temporary file
 	if ($last_parsed && (scalar keys %last_line || scalar keys %pgb_last_line)) {
-		if (open(OUT, ">>$tmp_last_parsed")) {
-			flock(OUT, 2) || return $getout;
+		if (open(my $out, '>>', "$tmp_last_parsed")) {
+			flock($out, 2) || return $getout;
 			if ($fmt eq 'pgbouncer') {
 				$pgb_last_line{current_pos} ||= 0;
 				&logmsg('DEBUG', "Saving pgbouncer last parsed line into $tmp_last_parsed ($pgb_last_line{datetime}\t$pgb_last_line{current_pos})");
-				print OUT "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
+				print $out "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
 			} else {
 				$last_line{current_pos} ||= 0;
 				&logmsg('DEBUG', "Saving last parsed line into $tmp_last_parsed ($last_line{datetime}\t$last_line{current_pos})");
-				print OUT "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
+				print $out "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
 			}
-			close(OUT);
+			close($out);
 		} else {
 			&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
 		}
@@ -3234,6 +3230,87 @@ sub process_file
 	return $getout;
 }
 
+sub unescape_jsonlog
+{
+	my $str = shift;
+
+	while ($str =~ s/([^\\])\\"/$1"/g) {};
+	while ($str =~ s/([^\\])\\t/$1\t/g) {};
+	while ($str =~ s/\\r\\n/\n/gs) {};
+	while ($str =~ s/([^\\])\\r/$1\n/gs) {};
+	while ($str =~ s/([^\\])\\n/$1\n/gs) {};
+	
+	return $str;
+}
+
+sub parse_jsonlog_input
+{
+	my $str = shift;
+
+	my %infos = ();
+
+	# Extract the date
+	if ($str =~ m/\{"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
+
+		$infos{'t_year'} = $1;
+		$infos{'t_month'} = $2;
+		$infos{'t_day'} = $3;
+		$infos{'t_hour'} = $4;
+		$infos{'t_min'} = $5;
+		$infos{'t_sec'} = $6;
+		my $milli = $7 || 0;
+		$infos{'t_timestamp'} = "$infos{'t_year'}-$infos{'t_month'}-$infos{'t_day'} $infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+	}
+
+	# Set query parameters as global variables
+	if ($str =~ m/"user":"(.*?)"(?:,"|\})/) {
+		$infos{'t_dbuser'}  = $1;
+	}
+	if ($str =~ m/"dbname":"(.*?)"(?:,"|\})/) {
+		$infos{'t_dbname'}  = $1;
+	}
+	if ($str =~ m/"application_name":"(.*?)"(?:,"|\})/) {
+		$infos{'t_appname'} = $1;
+	}
+	if ($str =~ m/"remote_host":"(.*?)"(?:,"|\})/) {
+		$infos{'t_client'}  = $1;
+		$infos{'t_client'}  =~ s/:.*//;
+		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv);
+	}
+	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
+	if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
+		$infos{'t_pid'} = $1;
+	}
+	if ($str =~ m/"error_severity":"(.*?)"(?:,"|\})/) {
+		$infos{'t_loglevel'} = $1;
+	}
+	if ($str =~ m/"state_code":"(.*?)"(?:,"|\})/) {
+		$infos{'t_sqlstate'} = $1;
+	}
+	if ($str =~ m/"message":"(.*?)"(?:,"|\})/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
+	} elsif ($str =~ m/"statement":"(.*?)"(?:,"|\})/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
+	}
+
+	# Set ERROR additional information
+	if ($str =~ m/"(?:detail_log|detail)":"(.*?)"(?:,"|\})/) {
+		$infos{'t_detail'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"hint":"(.*?)"(?:,"|\})/) {
+		$infos{'t_hint'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"context":"(.*?)"(?:,"|\})/) {
+		$infos{'t_context'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"(?:statement|internal_query)":"(.*?)"(?:,"|\})/) {
+		$infos{'t_statement'} = unescape_jsonlog($1);
+	}
+
+	return %infos;
+}
+
+
 sub parse_orphan_line
 {
 	my ($cur_pid, $line) = @_;
@@ -3243,7 +3320,7 @@ sub parse_orphan_line
 		if ($line =~ /^\t?(pages|tuples): (\d+) removed, (\d+) remain/) {
 			$autovacuum_info{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 		}
-		if ($line =~ m#^\t?system usage: CPU .* sec elapsed (.*) sec#) {
+		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
 			if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
 				$autovacuum_info{peak}{system_usage}{elapsed} = $1;
 				$autovacuum_info{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
@@ -3572,10 +3649,10 @@ sub check_incremental_position
 			$bpath =~ s/\-/\//g;
 
 			# Mark this directory as needing a reindex	
-			if (open(OUT, ">>$last_parsed.tmp")) {
-				flock(OUT, 2) || return 1;
-				print OUT "$incr_date\n";
-				close(OUT);
+			if (open(my $out, '>>' , "$last_parsed.tmp")) {
+				flock($out, 2) || return 1;
+				print $out "$incr_date\n";
+				close($out);
 			} else {
 				&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
 			}
@@ -3632,8 +3709,19 @@ sub normalize_query
 	# Remove comments
 	$orig_query =~ s/\/\*(.*?)\*\///gs;
 
+	# Keep case on object name between doublequote
+	my %objnames = ();
+	my $i = 0;
+	while ($orig_query =~ s/("[^"]+")/%%OBJNAME$i%%/) {
+		$objnames{$i} = $1;
+		$i++;
+	}
 	# Set the entire query lowercase
 	$orig_query = lc($orig_query);
+
+	# Restore object name
+	while ($orig_query =~ s/\%\%objname(\d+)\%\%/$objnames{$1}/gs) {};
+	%objnames = ();
 
 	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/\s+/ /gs;
@@ -3648,17 +3736,17 @@ sub normalize_query
 
 	# Remove string content
 	$orig_query =~ s/\\'//gs;
-	$orig_query =~ s/'[^']*'/''/gs;
-	$orig_query =~ s/''('')+/''/gs;
+	$orig_query =~ s/'[^']*'/\?/gs;
+	$orig_query =~ s/\?(\?)+/\?/gs;
 
 	# Remove NULL parameters
-	$orig_query =~ s/=\s*NULL/=''/gs;
+	$orig_query =~ s/=\s*NULL/= \?/gs;
 
 	# Remove numbers
-	$orig_query =~ s/([^a-z0-9_\$\-])-?\d+/${1}0/gs;
+	$orig_query =~ s/([^a-z0-9_\$\-])-?\d+/$1\?/gs;
 
 	# Remove hexadecimal numbers
-	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/${1}0x/gs;
+	$orig_query =~ s/([^a-z_\$-])0x[0-9a-f]{1,10}/$1\?/gs;
 
 	# Remove bind parameters
 	$orig_query =~ s/\$\d+/\?/gs;
@@ -3667,7 +3755,12 @@ sub normalize_query
 	$orig_query =~ s/\bin\s*\([\'0x,\s\?]*\)/in (...)/gs;
 
 	# Remove curor names in CURSOR and IN clauses
-	$orig_query =~ s/\b(declare|in)\s+"[^"]+"/$1 "..."/gs;
+	$orig_query =~ s/\b(declare|in|deallocate|close)\s+"[^"]+"/$1 "..."/gs;
+
+	# Normalise cursor name
+	$orig_query =~ s/\bdeclare\s+[^"\s]+\s+cursor/declare "..." cursor/gs;
+	$orig_query =~ s/\b(fetch\s+next\s+from)\s+[^\s]+/$1 "..."/gs;
+	$orig_query =~ s/\b(deallocate|close)\s+[^"\s]+/$1 "..."/gs;
 
 	return $orig_query;
 }
@@ -3933,6 +4026,27 @@ sub pgb_set_top_error_sample
 	}
 }
 
+sub get_log_limit
+{
+	$overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+	my ($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s);
+	if (!$log_timezone) {
+		($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
+	} else {
+		($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = change_timezone($1, $2, $3, $4, $5, $6);
+	}
+	my $t_log_min = "$t_y-$t_mo-$t_d $t_h:$t_mi:$t_s";
+	$overall_stat{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
+	if (!$log_timezone) {
+		($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
+	} else {
+		($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = change_timezone($1, $2, $3, $4, $5, $6);
+	}
+	my $t_log_max = "$t_y-$t_mo-$t_d $t_h:$t_mi:$t_s";
+
+	return ($t_log_min, $t_log_max);
+}
+
 sub dump_as_text
 {
 
@@ -3946,6 +4060,8 @@ sub dump_as_text
 	if ($#log_files > 0) {
 		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
+	# Set logs limits
+	my ($t_log_min, $t_log_max) = get_log_limit();
 	print $fh qq{
 pgBadger :: $report_title
 
@@ -3954,7 +4070,7 @@ pgBadger :: $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+Log start from $t_log_min to $t_log_max
 
 };
 
@@ -4243,7 +4359,8 @@ Report not supported by text format
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				last if ($j > $sample);
 				my $ttl = $top_locked_info[$i]->[1] || '';
-				my $db = " - $normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				my $db = '';
+				$db .= " - $normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4262,7 +4379,8 @@ Report not supported by text format
 		print $fh "Rank   Wait time (s)    Query\n";
 		for (my $i = 0 ; $i <= $#top_locked_info ; $i++) {
 			my $ttl = $top_locked_info[$i]->[1] || '';
-			my $db = " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
+			my $db = '';
+			$db .= " - database: $top_locked_info[$i]->[3]" if ($top_locked_info[$i]->[3]);
 			$db .= ", user: $top_locked_info[$i]->[4]" if ($top_locked_info[$i]->[4]);
 			$db .= ", remote: $top_locked_info[$i]->[5]" if ($top_locked_info[$i]->[5]);
 			$db .= ", app: $top_locked_info[$i]->[6]" if ($top_locked_info[$i]->[6]);
@@ -4304,7 +4422,8 @@ Report not supported by text format
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					last if ($j > $sample);
-					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					my $db = '';
+					$db .= "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4325,7 +4444,8 @@ Report not supported by text format
 		print $fh "Rank   Size    Query\n";
 		for (my $i = 0 ; $i <= $#top_tempfile_info ; $i++) {
 			my $ttl = $top_tempfile_info[$i]->[1] || '';
-			my $db = " - database: $top_tempfile_info[$i]->[3]" if ($top_tempfile_info[$i]->[3]);
+			my $db = '';
+			$db .= " - database: $top_tempfile_info[$i]->[3]" if ($top_tempfile_info[$i]->[3]);
 			$db .= ", user: $top_tempfile_info[$i]->[4]" if ($top_tempfile_info[$i]->[4]);
 			$db .= ", remote: $top_tempfile_info[$i]->[5]" if ($top_tempfile_info[$i]->[5]);
 			$db .= ", app: $top_tempfile_info[$i]->[6]" if ($top_tempfile_info[$i]->[6]);
@@ -4361,7 +4481,8 @@ Report not supported by text format
 				my $j = 1;
 				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 					last if ($j > $sample);
-					my $db = "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+					my $db = '';
+					$db .= "$normalyzed_info{$k}{samples}{$d}{date} - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 					$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 					$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4382,7 +4503,8 @@ Report not supported by text format
 		print $fh "Rank   Times cancelled    Query\n";
 		for (my $i = 0 ; $i <= $#top_cancelled_info ; $i++) {
 			my $ttl = $top_cancelled_info[$i]->[1] || '';
-			my $db = " - database: $top_cancelled_info[$i]->[3]" if ($top_cancelled_info[$i]->[3]);
+			my $db = '';
+			$db .= " - database: $top_cancelled_info[$i]->[3]" if ($top_cancelled_info[$i]->[3]);
 			$db .= ", user: $top_cancelled_info[$i]->[4]" if ($top_cancelled_info[$i]->[4]);
 			$db .= ", remote: $top_cancelled_info[$i]->[5]" if ($top_cancelled_info[$i]->[5]);
 			$db .= ", app: $top_cancelled_info[$i]->[6]" if ($top_cancelled_info[$i]->[6]);
@@ -4398,7 +4520,8 @@ Report not supported by text format
 		print $fh "\n- Slowest queries ------------------------------------------------------\n\n";
 		print $fh "Rank     Duration (s)     Query\n";
 		for (my $i = 0 ; $i <= $#top_slowest ; $i++) {
-			my $db = " database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
+			my $db = '';
+			$db .= " database: $top_slowest[$i]->[3]" if ($top_slowest[$i]->[3]);
 			$db .= ", user: $top_slowest[$i]->[4]" if ($top_slowest[$i]->[4]);
 			$db .= ", remote: $top_slowest[$i]->[5]" if ($top_slowest[$i]->[5]);
 			$db .= ", app: $top_slowest[$i]->[6]" if ($top_slowest[$i]->[6]);
@@ -4433,7 +4556,8 @@ Report not supported by text format
 			my $j = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				last if ($j > $sample);
-				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				my $db = '';
+				$db .= " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4471,7 +4595,8 @@ Report not supported by text format
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				last if ($i > $sample);
-				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				my $db = '';
+				$db .= " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4509,7 +4634,8 @@ Report not supported by text format
 			my $i = 1;
 			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$k}{samples}}) {
 				last if ($i > $sample);
-				my $db = " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
+				my $db = '';
+				$db .= " - database: $normalyzed_info{$k}{samples}{$d}{db}" if ($normalyzed_info{$k}{samples}{$d}{db});
 				$db .= ", user: $normalyzed_info{$k}{samples}{$d}{user}" if ($normalyzed_info{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$k}{samples}{$d}{remote}" if ($normalyzed_info{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$k}{samples}{$d}{app}" if ($normalyzed_info{$k}{samples}{$d}{app});
@@ -4625,6 +4751,8 @@ sub dump_error_as_text
 	}
 	$report_title ||= 'PostgreSQL Log Analyzer';
 
+	# Set logs limits
+	my ($t_log_min, $t_log_max) = get_log_limit();
 	print $fh qq{
 pgBadger :: $report_title
 
@@ -4633,7 +4761,7 @@ pgBadger :: $report_title
 Generated on $curdate
 Log file: $logfile_str
 Parsed $fmt_nlines log entries in $total_time
-Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}
+Log start from $t_log_min to $t_log_max
 };
 
 	&show_error_as_text();
@@ -4815,7 +4943,9 @@ sub html_header
 	my $global_info = &print_global_information();
 
 	my @tmpjscode = @jscode;
-	map { s/EDIT_URI/$uri/; } @tmpjscode;
+	for (my $i = 0; $i <= $#tmpjscode; $i++) {
+		$tmpjscode[$i] =~ s/EDIT_URI/\./;
+	}
 
 	my $local_title = 'PostgreSQL Log Analyzer';
 	if ($report_title) {
@@ -5000,7 +5130,8 @@ sub html_header
 		}
 	}
 	if (!$disable_error && !$pgbouncer_only) {
-		my $sqlstate_report = '<li><a href="#error-code">Error class distribution</a></li>' if (scalar keys %errors_code > 0);
+		my $sqlstate_report = '';
+		$sqlstate_report = '<li><a href="#error-code">Error class distribution</a></li>' if (scalar keys %errors_code > 0);
 		print $fh qq{
      		<li id="menu-events" class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Events <span class="caret"></span></a>
      			<ul class="dropdown-menu">
@@ -5142,12 +5273,15 @@ sub print_global_information
 	if ($#log_files > 0) {
 		$logfile_str .= ', ..., ' . $log_files[-1];
 	}
+
+	# Set logs limits
+	my ($t_log_min, $t_log_max) = get_log_limit();
 	return qq{
 <ul>
 <li>Generated on $curdate</li>
 <li>Log file: $logfile_str</li>
 <li>Parsed $fmt_nlines log entries in $total_time</li>
-<li>Log start from $overall_stat{'first_log_ts'} to $overall_stat{'last_log_ts'}</li>
+<li>Log start from $t_log_min to $t_log_max</li>
 </ul>
 };
 
@@ -7816,9 +7950,9 @@ sub print_temporary_file
 					if ($tempfile_info{count}) {
 						$t_dataavg{size}{"$rd"} = 0 if (!exists $t_dataavg{size}{"$rd"});
 						$t_dataavg{count}{"$rd"} = 0 if (!exists $t_dataavg{count}{"$rd"});
-						if (exists $per_minute_info{$tm}{$h}{$m}{tempfile}) {
-							$t_dataavg{size}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{size} || 0);
-							$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{tempfile}{count} || 0);
+						if (exists $per_minute_info{$tm}{$h}{$m}{'tempfile'}) {
+							$t_dataavg{size}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{'tempfile'}{size} || 0);
+							$t_dataavg{count}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{'tempfile'}{count} || 0);
 						}
 					}
 				}
@@ -7917,9 +8051,9 @@ $drawn_graphs{temporaryfile_graph}
 			$zday = "";
 			my %tinf = ();
 			foreach my $m (keys %{$per_minute_info{$d}{$h}}) {
-				if (exists $per_minute_info{$d}{$h}{$m}{tempfile}) {
-					$tinf{size} += $per_minute_info{$d}{$h}{$m}{tempfile}{size};
-					$tinf{count} += $per_minute_info{$d}{$h}{$m}{tempfile}{count};
+				if (exists $per_minute_info{$d}{$h}{$m}{'tempfile'}) {
+					$tinf{size} += $per_minute_info{$d}{$h}{$m}{'tempfile'}{size};
+					$tinf{count} += $per_minute_info{$d}{$h}{$m}{'tempfile'}{count};
 				}
 			}
 			if (scalar keys %tinf) {
@@ -9209,6 +9343,14 @@ sub print_query_per_host
 
 }
 
+sub display_plan
+{
+	my ($id, $plan) = @_;
+
+	my $url = $EXPLAIN_URL . url_escape($plan);
+
+	return "<div id=\"$id\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre>" . $plan . "</pre>\n</div>\n";
+}
 
 sub print_lock_queries_report
 {
@@ -9285,8 +9427,7 @@ sub print_lock_queries_report
 				$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 				my $explain = '';
 				if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-					my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
-					$explain = "<div id=\"query-a-explain-$rank\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
+					$explain = &display_plan("query-a-explain-$rank", $normalyzed_info{$k}{samples}{$d}{plan});
 				}
 				print $fh qq{
 					<dt>
@@ -9786,8 +9927,7 @@ sub print_slowest_individual_queries
 		$details .= " ]";
 		my $explain = '';
 		if ($top_slowest[$i]->[8]) {
-			my $url = $EXPLAIN_URL . url_escape($top_slowest[$i]->[8]);
-			$explain = "<div id=\"query-d-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $top_slowest[$i]->[8] . "</pre>\n";
+			$explain = &display_plan("query-d-explain-$rank-$idx", $top_slowest[$i]->[8]);
 		}
 		my $query = &highlight_code($top_slowest[$i]->[2]);
 		my $md5 = '';
@@ -9857,30 +9997,36 @@ sub print_time_consuming
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
-		foreach my $d (sort keys %chronos) {
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
-			foreach my $h (sort keys %{$chronos{$d}}) {
-				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / ($chronos{$d}{$h}{count} || 1);
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
+			my $dd = $3;
+			my $mo = $2 -1 ;
+			my $y = $1 - 1900;
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / ($normalyzed_info{$k}{chronos}{$d}{$h}{count} || 1);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$ht:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}/($hourly_count{"$ht:$rd"}||1)) .  "</td></tr>";
 					}
 				}
 			}
@@ -10014,8 +10160,7 @@ sub print_time_consuming
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
-				$explain = "<div id=\"query-e-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
+				$explain = &display_plan("query-e-explain-$rank-$idx", $normalyzed_info{$k}{samples}{$d}{plan});
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -10087,31 +10232,37 @@ sub print_most_frequent
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		my $details = '';
-		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
-		foreach my $d (sort keys %chronos) {
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+                my $details = '';
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$chronos{$d}}) {
-				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
+			my $zday = "$abbr_month{$2} $3";
+			my $dd = $3;
+			my $mo = $2 - 1;
+			my $y = $1 - 1900;
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$ht:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}/($hourly_count{"$ht:$rd"}||1)) .  "</td></tr>";
 					}
 				}
 			}
@@ -10246,8 +10397,7 @@ sub print_most_frequent
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
-				$explain = "<div id=\"query-f-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>";
+				$explain = &display_plan("query-f-explain-$rank-$idx", $normalyzed_info{$k}{samples}{$d}{plan});
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -10283,7 +10433,6 @@ sub print_most_frequent
 
 }
 
-
 sub print_slowest_queries
 {
 	print $fh qq{
@@ -10310,44 +10459,50 @@ sub print_slowest_queries
 		next if (!$k || !$normalyzed_info{$k}{count} || !exists $normalyzed_info{$k}{duration});
 		last if ($rank > $top);
 		$found++;
-		$normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
-		my $duration = &convert_time($normalyzed_info{$k}{duration});
-		my $count = &comma_numbers($normalyzed_info{$k}{count});
-		my $min = &convert_time($normalyzed_info{$k}{min});
-		my $max = &convert_time($normalyzed_info{$k}{max});
-		my $avg = &convert_time($normalyzed_info{$k}{average});
-		my $query = &highlight_code($k);
+                $normalyzed_info{$k}{average} = $normalyzed_info{$k}{duration} / $normalyzed_info{$k}{count};
+                my $duration = &convert_time($normalyzed_info{$k}{duration});
+                my $count = &comma_numbers($normalyzed_info{$k}{count});
+                my $min = &convert_time($normalyzed_info{$k}{min});
+                my $max = &convert_time($normalyzed_info{$k}{max});
+                my $avg = &convert_time($normalyzed_info{$k}{average});
+                my $query = &highlight_code($k);
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
 		my $details = '';
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		my %chronos = apply_tz_offset_chronos(\%{$normalyzed_info{$k}{chronos}}, $timezone);
-		foreach my $d (sort keys %chronos) {
+		foreach my $d (sort keys %{$normalyzed_info{$k}{chronos}}) {
 			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
-			my $zday = "$abbr_month{$1} $2";
-			foreach my $h (sort keys %{$chronos{$d}}) {
-				$chronos{$d}{$h}{average} = $chronos{$d}{$h}{duration} / $chronos{$d}{$h}{count};
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
-					&comma_numbers($chronos{$d}{$h}{count}) .   "</td><td>" .
-					&convert_time($chronos{$d}{$h}{duration}) . "</td><td>" .
-					&convert_time($chronos{$d}{$h}{average}) .  "</td></tr>";
+			my $zday = "$abbr_month{$2} $3";
+			my $dd = $3;
+			my $mo = $2 - 1;
+			my $y = $1 - 1900;
+			foreach my $h (sort keys %{$normalyzed_info{$k}{chronos}{$d}}) {
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$normalyzed_info{$k}{chronos}{$d}{$h}{average} =
+					$normalyzed_info{$k}{chronos}{$d}{$h}{duration} / $normalyzed_info{$k}{chronos}{$d}{$h}{count};
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
+					&comma_numbers($normalyzed_info{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($normalyzed_info{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$chronos{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $chronos{$d}{$h}{min}{$m};
-					$hourly_duration{"$h:$rd"} += ($chronos{$d}{$h}{min_duration}{$m} || 0);
+					$hourly_count{"$ht:$rd"} += $normalyzed_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) .   "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}) . "</td><td>" .
-							&convert_time($hourly_duration{"$h:$rd"}/($hourly_count{"$h:$rd"}||1)) .  "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}/($hourly_count{"$ht:$rd"}||1)) .  "</td></tr>";
 					}
 				}
 			}
@@ -10482,8 +10637,7 @@ sub print_slowest_queries
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$k}{samples}{$d}{plan}) {
-				my $url = $EXPLAIN_URL . url_escape($normalyzed_info{$k}{samples}{$d}{plan});
-				$explain = "<div id=\"query-g-explain-$rank-$idx\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<pre>" . $normalyzed_info{$k}{samples}{$d}{plan} . "</pre>\n";
+				$explain = &display_plan("query-g-explain-$rank-$idx", $normalyzed_info{$k}{samples}{$d}{plan});
 			}
 			$query = &highlight_code($normalyzed_info{$k}{samples}{$d}{query});
 			my $md5 = '';
@@ -10527,6 +10681,30 @@ sub dump_as_html
 	# Dump the html header
 	&html_header($uri);
 
+	# Set graphs limits
+	if ($overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/) {
+		my ($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s);
+		if (!$log_timezone) {
+			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
+		} else {
+			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = change_timezone($1, $2, $3, $4, $5, $6);
+		}
+		$t_min = timegm_nocheck(0, $t_mi, $t_h, $t_d, $t_mo - 1, $t_y) * 1000;
+		$t_min += ($timezone*1000);
+		$t_min -= ($avg_minutes * 60000);
+	}
+	if ($overall_stat{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/) {
+		my ($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s);
+		if (!$log_timezone) {
+			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
+		} else {
+			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = change_timezone($1, $2, $3, $4, $5, $6);
+		}
+		$t_max = timegm_nocheck(59, $t_mi, $t_h, $t_d, $t_mo - 1, $t_y) * 1000;
+		$t_max += ($timezone*1000);
+		$t_max += ($avg_minutes * 60000);
+	}
+
 	if (!$error_only) {
 
 		if (!$pgbouncer_only) {
@@ -10535,18 +10713,7 @@ sub dump_as_html
 	<li class="slide active-slide" id="overview-slide">
 };
 			&print_overall_statistics();
-
 		}
-		# Set graphs limits
-		$overall_stat{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
-		$t_min = timegm_nocheck(0, $5, $4, $3, $2 - 1, $1) * 1000;
-		$t_min += ($timezone*1000);
-		$t_min -= ($avg_minutes * 60000);
-
-		$overall_stat{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
-		$t_max = timegm_nocheck(59, $5, $4, $3, $2 - 1, $1) * 1000;
-		$t_max += ($timezone*1000);
-		$t_max += ($avg_minutes * 60000);
 
 		if (!$disable_hourly && !$pgbouncer_only) {
 
@@ -10794,9 +10961,8 @@ sub escape_html
 	return $_[0];
 }
 
-sub print_log_level
+sub restore_log_type_count
 {
-	my %infos = ();
 	my $ret = 0;
 
 	# Some messages have seen their log level change during log parsing.
@@ -10819,6 +10985,11 @@ sub print_log_level
 			}
 		}
 	}
+}
+
+sub print_log_level
+{
+	my %infos = ();
 
 	# Show log types
 	my $total_logs = 0;
@@ -10852,45 +11023,48 @@ sub print_log_level
 		foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
 			$max_events{$l} = 0;
 		}
+		my %e_dataavg = ();
 		foreach my $tm (sort {$a <=> $b} keys %per_minute_info) {
-			$tm =~ /(\d{4})(\d{2})(\d{2})/;
-			my $y  = $1 - 1900;
-			my $mo = $2 - 1;
-			my $d  = $3;
 			foreach my $h ("00" .. "23") {
 				next if (!exists $per_minute_info{$tm}{$h});
-				my %e_dataavg = ();
 				foreach my $m ("00" .. "59") {
 					next if (!exists $per_minute_info{$tm}{$h}{$m});
 
-					my $rd = &average_per_minutes($m, $avg_minutes);
-
 					if (exists $per_minute_info{$tm}{$h}{$m}{log_level}) {
+
+						my $rd = &average_per_minutes($m, $avg_minutes);
 
 						# Average per minute
 						foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
-							$e_dataavg{$l}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{log_level}{$l} || 0);
+							$e_dataavg{$l}{$tm}{$h}{"$rd"} += ($per_minute_info{$tm}{$h}{$m}{log_level}{$l} || 0);
 							$max_events{$l} += ($per_minute_info{$tm}{$h}{$m}{log_level}{$l} || 0);
 						}
 						delete $per_minute_info{$tm}{$h}{$m}{log_level};
 					}
 				}
+			}
+		}
 
-				foreach my $rd (@avgs) {
-					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
-					$t += ($timezone*1000);
+		foreach my $l (qw(FATAL ERROR PANIC WARNING)) {
+			foreach my $tm (sort {$a <=> $b} keys %{$e_dataavg{$l}}) {
+				$tm =~ /(\d{4})(\d{2})(\d{2})/;
+				my $y  = $1 - 1900;
+				my $mo = $2 - 1;
+				my $d  = $3;
+				foreach my $h ("00" .. "23") {
+					foreach my $rd (@avgs) {
+						my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
+						$t += ($timezone*1000);
 
-					next if ($t < $t_min);
-					last if ($t > $t_max);
+						next if ($t < $t_min);
+						last if ($t > $t_max);
 
-					if (scalar keys %e_dataavg> 0) {
-						foreach my $l (qw(FATAL ERROR PANIC WARNING)) {
-							$graph_data{$l} .= "[$t, " . ($e_dataavg{$l}{"$rd"} || 0) . "],";
-						}
+						$graph_data{$l} .= "[$t, " . ($e_dataavg{$l}{$tm}{$h}{"$rd"} || 0) . "],";
 					}
 				}
 			}
 		}
+
 		foreach (keys %graph_data) {
 			$graph_data{$_} =~ s/,$//;
 		}
@@ -11125,22 +11299,28 @@ sub show_error_as_html
                 my $days = 0;
 		foreach my $d (sort keys %{$error_info{$k}{chronos}}) {
 			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
-			my $zday = "$abbr_month{$1} $2";
+			my $zday = "$abbr_month{$2} $3";
+			my $y = $1 - 1900;
+			my $mo = $2 - 1;
+			my $dd = $3;
 			foreach my $h (sort keys %{$error_info{$k}{chronos}{$d}}) {
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
 					&comma_numbers($error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
 				$zday = "";
 				foreach my $m (sort keys %{$error_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $error_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_count{"$ht:$rd"} += $error_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
 					}
 				}
 			}
@@ -11307,22 +11487,28 @@ sub show_pgb_error_as_html
                 my $days = 0;
 		foreach my $d (sort keys %{$pgb_error_info{$k}{chronos}}) {
 			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
-			my $zday = "$abbr_month{$1} $2";
+			my $zday = "$abbr_month{$2} $3";
+			my $y = $1 - 1900;
+			my $mo = $2 - 1;
+			my $dd = $3;
 			foreach my $h (sort keys %{$pgb_error_info{$k}{chronos}{$d}}) {
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
 					&comma_numbers($pgb_error_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
 				$zday = "";
 				foreach my $m (sort keys %{$pgb_error_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $pgb_error_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_count{"$ht:$rd"} += $pgb_error_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
 					}
 				}
 			}
@@ -11462,22 +11648,28 @@ sub show_pgb_reserved_pool
                 my $days = 0;
 		foreach my $d (sort keys %{$pgb_pool_info{$k}{chronos}}) {
 			my $c = 1;
-			$d =~ /^\d{4}(\d{2})(\d{2})$/;
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
-			my $zday = "$abbr_month{$1} $2";
+			my $zday = "$abbr_month{$2} $3";
+			my $y = $1 - 1900;
+			my $mo = $2 - 1;
+			my $dd = $3;
 			foreach my $h (sort keys %{$pgb_pool_info{$k}{chronos}{$d}}) {
-				$details .= "<tr><td>$zday</td><td>$h</td><td>" .
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
 					&comma_numbers($pgb_pool_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
 				$zday = "";
 				foreach my $m (sort keys %{$pgb_pool_info{$k}{chronos}{$d}{$h}{min}}) {
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
-					$hourly_count{"$h:$rd"} += $pgb_pool_info{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_count{"$ht:$rd"} += $pgb_pool_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
 				if ($#histo_avgs > 0) {
 					foreach my $rd (@histo_avgs) {
-						next if (!exists $hourly_count{"$h:$rd"});
-						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$h:$rd</td><td>" .
-							&comma_numbers($hourly_count{"$h:$rd"}) . "</td></tr>";
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
 					}
 				}
 			}
@@ -11736,7 +11928,7 @@ sub load_stats
 	foreach my $day (keys %{ $_connection_info{chronos} }) {
 		foreach my $hour (keys %{ $_connection_info{chronos}{$day} }) {
 
-			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count}
+			$connection_info{chronos}{$day}{$hour}{count} += $_connection_info{chronos}{$day}{$hour}{count};
 
 ###############################################################################
 # May be used in the future to display more detailed information on connection
@@ -11913,10 +12105,10 @@ sub load_stats
 
 				$per_minute_info{$day}{$hour}{$min}{cancelled}{count} += $_per_minute_info{$day}{$hour}{$min}{cancelled}{count}
 						if defined $_per_minute_info{$day}{$hour}{$min}{cancelled}{count};
-				$per_minute_info{$day}{$hour}{$min}{tempfile}{count} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{count}
-						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{count};
-				$per_minute_info{$day}{$hour}{$min}{tempfile}{size} += $_per_minute_info{$day}{$hour}{$min}{tempfile}{size}
-						if defined $_per_minute_info{$day}{$hour}{$min}{tempfile}{size};
+				$per_minute_info{$day}{$hour}{$min}{'tempfile'}{count} += $_per_minute_info{$day}{$hour}{$min}{'tempfile'}{count}
+						if defined $_per_minute_info{$day}{$hour}{$min}{'tempfile'}{count};
+				$per_minute_info{$day}{$hour}{$min}{'tempfile'}{size} += $_per_minute_info{$day}{$hour}{$min}{'tempfile'}{size}
+						if defined $_per_minute_info{$day}{$hour}{$min}{'tempfile'}{size};
 
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{file_removed} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{file_removed};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync};
@@ -12253,16 +12445,22 @@ sub dump_as_binary
 
 sub dump_error_as_json
 {
-	my $json = encode_json({
-		'error_info' => \%error_info,
-	}) || localdie ("Encode object to JSON failed!\n");
+	my $perl_hash = { 'error_info' => \%error_info };
+
+	my $json = undef;
+	if (!$json_prettify) {
+		$json = encode_json($perl_hash) || localdie ("Encode events objects to JSON failed!\n");
+	} else {
+		my $coder = JSON::XS->new->ascii->pretty->allow_nonref(0);
+		$json = $coder->encode($perl_hash) || localdie ("Encode events objects to prettified JSON failed!\n");
+	}
 
 	print $fh $json;
 }
 
 sub dump_as_json
 {
-	my $json = encode_json({
+	my $perl_hash = {
 		'overall_stat' => \%overall_stat,
 		'pgb_overall_stat' => \%pgb_overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
@@ -12290,8 +12488,15 @@ sub dump_as_json
 		'autovacuum_info' => \%autovacuum_info,
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \@top_tempfile_info,
-		'top_locked_info' => \@top_locked_info,
-	}) || localdie ("Encode object to JSON failed!\n");
+		'top_locked_info' => \@top_locked_info
+	};
+	my $json = undef;
+	if (!$json_prettify) {
+		$json = encode_json($perl_hash) || localdie ("Encode stats objects to JSON failed!\n");
+	} else {
+		my $coder = JSON::XS->new->ascii->pretty->allow_nonref(0);
+		$json = $coder->encode($perl_hash) || localdie ("Encode stats objects to prettified JSON failed!\n");
+	}
 
 	print $fh $json;
 }
@@ -12344,7 +12549,7 @@ sub highlight_code
 		$code =~ s/\b$KEYWORDS3[$x]\b/<span class="kw3">$KEYWORDS3[$x]<\/span>/igs;
 	}
 	for (my $x = 0 ; $x <= $#BRACKETS ; $x++) {
-		$code =~ s/($BRACKETS[$x])/<span class="br0">$1<\/span>/igs;
+		$code =~ s/(\Q$BRACKETS[$x]\E)/<span class="br0">$1<\/span>/igs;
 	}
 
 	$code =~ s/\$\$PGBGYA\$\$([^\$]+)\$\$PGBGYB\$\$/<span class="sy0">$1<\/span>/gs;
@@ -12537,7 +12742,6 @@ sub parse_log_prefix
 		if ($t_logprefix =~ $regex_prefix_dbappname) {
 			$prefix_vars{'t_appname'} = $1;
 		}
-
 	}
 }
 
@@ -12618,11 +12822,6 @@ sub parse_query
 	# Replace syslog tabulation rewrite
 	if ($fmt =~ /syslog/) {
 		$prefix_vars{'t_query'} =~ s/#011/\t/g;
-	}
-
-	# Remove current temp info if we meet an error for the same pid
-	if (($cur_info{$t_pid}{loglevel} =~ $main_error_regex) && exists $cur_temp_info{$t_pid}) {
-		delete $cur_temp_info{$t_pid};
 	}
 
 	# Save previous temporary file information with same pid to not overwrite it
@@ -12719,8 +12918,8 @@ sub parse_query
 		my $size = $2;
 		$tempfile_info{count}++;
 		$tempfile_info{size} += $size;
-		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{count}++;
-		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{tempfile}{size} += $size;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{'tempfile'}{count}++;
+		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{'tempfile'}{size} += $size;
 
 		# Store current temporary file information that will be used later
 		# when we will parse the query responsible for the tempfile
@@ -12878,7 +13077,7 @@ sub parse_query
 			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
 				$autovacuum_info{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $1;
 			}
-			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* sec elapsed (.*) sec#) {
+			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
 				if ($1 > $autovacuum_info{peak}{system_usage}{elapsed}) {
 					$autovacuum_info{peak}{system_usage}{elapsed} = $1;
 					$autovacuum_info{peak}{system_usage}{table} = $cur_info{$t_pid}{vacuum};
@@ -12911,7 +13110,7 @@ sub parse_query
 		$autoanalyze_info{tables}{$table}{analyzes} += 1;
 		$autoanalyze_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autoanalyze}{count}++;
-		if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* sec elapsed (.*) sec#) {
+		if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
 			if ($1 > $autoanalyze_info{peak}{system_usage}{elapsed}) {
 				$autoanalyze_info{peak}{system_usage}{elapsed} = $1;
 				$autoanalyze_info{peak}{system_usage}{table} = $table;
@@ -12929,6 +13128,7 @@ sub parse_query
 	   )
 	{
 		# Example: LOG:  checkpoint complete: wrote 8279 buffers (50.5%); 0 transaction log file(s) added, 0 removed, 0 recycled; write=2.277 s, sync=0.194 s, total=2.532 s; sync files=13, longest=0.175 s, average=0.014 s; distance=402024 kB, estimate=402024 kB
+		# checkpoint complete: wrote 38 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.160 s, sync=0.096 s, total=4.338 s; sync files=29, longest=0.018 s, average=0.003 s; distance=79 kB, estimate=79 kB
 		return if ($disable_checkpoint);
 
 		$checkpoint_info{wbuffer} += $1;
@@ -13106,7 +13306,7 @@ sub parse_query
 
 	my $t_action = '';
 	# Store query duration generated by log_min_duration >= 0 in postgresql.conf
-	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(query|statement): //is) {
+	if ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(query|statement): //s) {
 		$prefix_vars{'t_duration'} = $1;
 		$t_action   = $2;
 		my $k = &get_hist_inbound($1, @histogram_query_time);
@@ -13119,7 +13319,7 @@ sub parse_query
 			return if (lc($1) eq 'prepare');
 		}
 	# Log line with duration and statement from prepared queries
-	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//is)
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//s)
 	{
 		$prefix_vars{'t_duration'} = $1;
 		$t_action = $2;
@@ -13134,12 +13334,9 @@ sub parse_query
 		$overall_stat{histogram}{query_total}++;
 		$prefix_vars{'t_bind'} = 1;
 	# Activate storage of the explain plan generated by auto_explain
-	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+plan://is) {
-		$prefix_vars{'t_duration'} = $1;
-		$cur_plan_info{$prefix_vars{'t_pid'}}{duration} = $prefix_vars{'t_duration'};
-		my $k = &get_hist_inbound($prefix_vars{'t_duration'}, @histogram_query_time);
-		$overall_stat{histogram}{query_time}{$k}++;
-		$overall_stat{histogram}{query_total}++;
+	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+plan://s) {
+		$cur_plan_info{$prefix_vars{'t_pid'}}{duration} = $1;
+		$prefix_vars{'t_duration'} = $1; # needed to be saved later
 	# Log line without duration at all
 	} elsif ($prefix_vars{'t_query'} =~ s/(query|statement): //is) {
 		$t_action = $1;
@@ -13148,7 +13345,7 @@ sub parse_query
 			$per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
 		}
 	# Log line without duration at all from prepared queries
-	} elsif ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//is)
+	} elsif ($prefix_vars{'t_query'} =~ s/(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//s)
 	{
 		$t_action = $1;
 		$t_action =~ s/ from fetch//;
@@ -13169,7 +13366,7 @@ sub parse_query
 		return;
 	}
 
-	if ( ($fmt eq 'csv') && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
+	if ( ($fmt =~ /csv|jsonlog/) && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
 		$cur_info{$t_pid}{detail} = $prefix_vars{'t_detail'};
 		$cur_info{$t_pid}{hint} = $prefix_vars{'t_hint'};
 		$cur_info{$t_pid}{context} = $prefix_vars{'t_context'};
@@ -13380,19 +13577,6 @@ sub set_current_infos
 	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if (!$cur_info{$t_pid}{date});
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
-
-	# Extract the query part from the plan
-	if (exists $cur_plan_info{$t_pid} && exists $cur_plan_info{$t_pid}{plan} && $cur_plan_info{$t_pid}{plan} ne '') {
-		my $key = 'query';
-		my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
-		$plan[0] =~ s/^\s*Query Text:\s+//;
-		foreach my $l (@plan) {
-			$key = 'plan' if ($l =~ /\(cost=\d+.*rows=\d+/);
-			$cur_info{$t_pid}{$key} .= "$l\n";
-		}
-		$cur_info{$t_pid}{query} =~ s/^\s*Query Text:\s+//s;
-		delete $cur_plan_info{$t_pid};
-	}
 }
 
 sub store_tsung_session
@@ -13466,13 +13650,11 @@ sub store_queries
 	}
 
 	return 0 if (!exists $cur_info{$t_pid});
-	return 1 if (!$cur_info{$t_pid}{year});
-
+	return 1 if (!exists $cur_info{$t_pid}{year});
 
 	# Cleanup and pre-normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^\s+//s;
 	$cur_info{$t_pid}{query} =~ s/[\s;]+$//s;
-
 
 	# Just store normalized query when --normalized-only is used
 	if ($dump_normalized_only && $cur_info{$t_pid}{query}) {
@@ -13596,6 +13778,30 @@ sub store_queries
 		}
 
 	} elsif ($cur_info{$t_pid}{loglevel} eq 'LOG') {
+
+		# Store auto explain plan when switching to an other log entry
+		if (exists $cur_plan_info{$t_pid}{plan}) {
+			$cur_plan_info{$t_pid}{plan} =~ s/^\s+//s;
+			$cur_plan_info{$t_pid}{plan} =~ s/\s+$//s;
+			# Extract the query part from the plan then the plan itself
+			if ($cur_plan_info{$t_pid}{plan}) {
+				my $key = 'query';
+				my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
+				foreach my $l (@plan) {
+					if ($l =~ /\(cost=\d+.*rows=\d+/) {
+						$key = 'plan' ;
+					} elsif ($l =~ /"Plan": \{/) {
+						$key = 'plan' ;
+					}
+					$cur_info{$t_pid}{$key} .= "$l\n";
+				}
+				$cur_info{$t_pid}{query} =~ s/Query Text: //s;
+				$cur_info{$t_pid}{query} =~ s/.*"Query Text": "//;
+				$cur_info{$t_pid}{query} =~ s/"$//;
+				$cur_info{$t_pid}{plan} = "  [\n    {\n" . $cur_info{$t_pid}{plan} . "  ]\n";
+			}
+			delete $cur_plan_info{$t_pid};
+		}
 
 		# Stores global statistics
 
@@ -13873,7 +14079,8 @@ sub normalize_error
 	$orig_query =~ s/(byte sequence for encoding).*/$1/;
 
 	# Replace changing parameter by ...
-	$orig_query =~ s/"[^"]*"/"..."/g;
+	$orig_query =~ s/"[^"]+"/"..."/g;
+	$orig_query =~ s/""...""/"..."/g;
 	$orig_query =~ s/\(.*\)/\(...\)/g;
 	$orig_query =~ s/column .* does not exist/column "..." does not exist/;
 	$orig_query =~ s/(database system was.* at (?:log time )?).*/$1 .../;
@@ -13952,16 +14159,19 @@ sub autodetect_format
 	my $fltf;
 
 	if (!$remote_host) {
-		localdie("FATAL: when looking for log file format, can't open file $file, $!\n") unless(open(TESTFILE, $file));
-		$fltf = <TESTFILE>;
-		close(TESTFILE);
+		if (open(my $in, '<', $file)) {
+			$fltf = <$in>;
+			close($in);
+		} else {
+			localdie("FATAL: when looking for log file format, can't open file $file, $!\n");
+		}
 	}
 
 	# is file in binary format ?
 	if ( $fltf =~ /^pst\d/ ) {
 		$fmt = 'binary';
 	}
-	else { # try to detect syslogs, stderr, csv or pgbouncer format
+	else { # try to detect syslogs, stderr, csv jsonlog or pgbouncer format
 		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
 		while (my $line = <$tfile>) {
 			chomp($line);
@@ -14040,31 +14250,34 @@ sub search_log_format
 	{
 		$fmt = 'csv';
 
-	# Are default stderr lines since 10.0 ?
-	} elsif ($line =~
-/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
-		)
-	{
-		$fmt = 'default';
-
 	# Are stderr lines ?
 	} elsif ($line =~
-/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})?(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\]: \[\d+-\d+\] (.*?)\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 		)
 	{
 		$fmt = 'stderr';
 
+	# Are default stderr lines since 10.0 or minimal prefix for pgbadger?
+	} elsif ($line =~
+/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\][:]*\s+(.*?)\s+(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+		)
+	{
+		$fmt = 'default';
 
 	# Are pgbouncer lines ?
 	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]*|Stats):/) {
 		$fmt = 'pgbouncer';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
+
+	# jsonlog lines
+	} elsif ($line =~ /\{"timestamp":"/) {
+		$fmt = 'jsonlog';
 	}
 
 	return ($fmt, $ident_name);
 }
-
+	
 sub progress_bar
 {
 	my ($got, $total, $width, $char, $queries, $errors) = @_;
@@ -14287,24 +14500,38 @@ sub build_log_line_prefix_regex
 		'%i' => [('t_command',           '([0-9a-zA-Z\.\-\_\s]*)')],                                        # command tag
 		'%e' => [('t_sqlstate',          '([0-9a-zA-Z]+)')],                                              # SQL state
 	);
-	my @param_list = ();
+	my $param_list = [];
 	$llp =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
 	$llp =~ s/\%l([^\d])\d+/\%l$1\\d\+/;
-	$llp =~ s/\%q//;
-	while ($llp =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
-		push(@param_list, $regex_map{"$1"}->[0]);
+	my $q_prefix = '';
+	if ($llp =~ s/(.*)\%q(.*)/$1$2/) {
+		$q_prefix =  $1;
 	}
+	while ($llp =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
+		push(@$param_list, $regex_map{"$1"}->[0]);
+	}
+	my $q_prefix_param = [];
+	while ($q_prefix =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
+		push(@$q_prefix_param, $regex_map{"$1"}->[0]);
+	}
+	push(@$q_prefix_param, 't_loglevel', 't_query');
+
 	# replace %% by a single %
 	$llp =~ s/\%\%/\%/g;
+	$q_prefix =~ s/\%\%/\%/g;
+	$q_prefix = qr/$q_prefix\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 
 	# t_session_id (%c) can naturaly replace pid as unique session id
 	# when it is given in log_line_prefix and pid is not present.
-	$use_sessionid_as_pid = 1 if ( grep(/t_session_id/, @param_list) && !grep(/t_pid/, @param_list) );
+	$use_sessionid_as_pid = 1 if ( grep(/t_session_id/, @$param_list) && !grep(/t_pid/, @$param_list) );
 
 	# Check regex in log line prefix from command line
 	&check_regex($llp, '--prefix');
 
-	return ($llp, @param_list);
+	return (
+		'llp' => $llp, 'param_list' => $param_list,
+		'q_prefix' => $q_prefix, 'q_param_list' => $q_prefix_param
+	);
 }
 
 # Inclusion of Perl package SQL::Beautify
@@ -14447,7 +14674,7 @@ sub build_log_line_prefix_regex
 		my $self = bless {%options}, $class;
 
 		# Set some defaults.
-		$self->{query}       = ''   unless defined($self->{query});
+		$self->{'query'}       = ''   unless defined($self->{'query'});
 		$self->{spaces}      = 4    unless defined($self->{spaces});
 		$self->{space}       = ' '  unless defined($self->{space});
 		$self->{break}       = "\n" unless defined($self->{break});
@@ -14477,7 +14704,7 @@ sub build_log_line_prefix_regex
 
 		$addendum =~ s/^\s*/ /;
 
-		$self->{query} .= $addendum;
+		$self->{'query'} .= $addendum;
 	}
 
 	# Set SQL to beautify.
@@ -14485,9 +14712,9 @@ sub build_log_line_prefix_regex
 	{
 		my ($self, $query) = @_;
 
-		$self->{query} = $query if (defined($query));
+		$self->{'query'} = $query if (defined($query));
 
-		return $self->{query};
+		return $self->{'query'};
 	}
 
 	# Beautify SQL.
@@ -14981,30 +15208,30 @@ sub get_log_file
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
 		# For journalctl command we need to use a pipe as file handle
 		if (!$remote_host) {
-			open($lfile, "$logf |") || localdie("FATAL: cannot read output of commanf: $logf. $!\n");
+			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of commanf: $logf. $!\n");
 		} else {
 			if (!$sample_only) {
 				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
 				# Open a pipe to remote journalctl program
-				open($lfile,"$ssh_command \"$logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
+				open($lfile, '-|', "$ssh_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
 			} else {
 				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf -n 100\" |");
 				# Open a pipe to remote journalctl program
-				open($lfile,"$ssh_command \"$logf -n 100\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf -n 100\". $!\n");
+				open($lfile, '-|', "$ssh_command \"$logf -n 100\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf -n 100\". $!\n");
 			}
 		}
 		$iscompressed = 0;
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
-			open($lfile, $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
+			open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 		} else {
 			if (!$sample_only) {
 				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
 				# Open a pipe to cat program
-				open($lfile,"$ssh_command \"cat $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
+				open($lfile, '-|', "$ssh_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
 			} else {
 				# Open a pipe to cat program
-				open($lfile,"$ssh_command \"tail -n 100 $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
+				open($lfile, '-|', "$ssh_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
 			}
 		}
 		$totalsize = 0 if ($logf eq '-');
@@ -15025,16 +15252,16 @@ sub get_log_file
 		if (!$remote_host) {
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
-			open($lfile,"$uncompress \"$logf\" |") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
+			open($lfile, '-|', "$uncompress \"$logf\"") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
 		} else {
 			if (!$sample_only) {
 				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
 				# Open a pipe to zcat program for compressed log
-				open($lfile,"$ssh_command \"$uncompress $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
+				open($lfile, '-|', "$ssh_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
 			} else {
 				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
 				# Open a pipe to zcat program for compressed log
-				open($lfile,"$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\" |") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+				open($lfile, '-|', "$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
 			}
 		}
 
@@ -15258,11 +15485,10 @@ sub get_calendar
 	map { $str .= '<th>' . $day_lbl{$_} . '</th>'; } @wday;
 	$str .= "</tr></thead>\n<tbody>\n";
 	my @currow = ('','','','','','','');
-	my $d = '';
 	my $wd = 0;
 	my $wn = 0;
 	my $week = '';
-	for $d ("01" .. "31") {
+	for my $d ("01" .. "31") {
 		last if (($d == 31) && grep(/^$month$/, '04','06','09','11'));
 		last if (($d == 30) && ($month eq '02'));
 		last if (($d == 29) && ($month eq '02') && !&IsLeapYear($year));
@@ -15281,7 +15507,9 @@ sub get_calendar
 			} else {
 				$week = "<th>$week</th>";
 			}
-			map { $_ = "<td>&nbsp;</td>" if ($_ eq ''); } @currow;
+			for (my $i = 0; $i <= $#currow; $i++) {
+				$currow[$i] = "<td>&nbsp;</td>" if ($currow[$i] eq '');
+			}
 			$str .= "<tr>$week" . join('', @currow) . "</tr>\n";
 			@currow = ('','','','','','','');
 		}
@@ -15293,7 +15521,9 @@ sub get_calendar
 		} else {
 			$week = "<th>$week</th>";
 		}
-		map { $_ = "<td>&nbsp;</td>" if ($_ eq ''); } @currow;
+		for (my $i = 0; $i <= $#currow; $i++) {
+			$currow[$i] = "<td>&nbsp;</td>" if ($currow[$i] eq '');
+		}
 		$str .= "<tr>$week" . join('', @currow) . "</tr>\n";
 		@currow = ('','','','','','','');
 	}
@@ -15387,6 +15617,17 @@ sub skip_unwanted_line
 	}
 
 	return 0;
+}
+
+sub change_timezone
+{
+	my ($y, $mo, $d, $h, $mi, $s) = @_;
+
+	my $t = timegm_nocheck($s, $mi, $h, $d, $mo-1, $y-1900);
+	$t += $log_timezone;
+	($s, $mi, $h, $d, $mo, $y) = localtime($t);
+
+	return ($y+1900, sprintf("%02d", ++$mo), sprintf("%02d", $d), sprintf("%02d", $h), sprintf("%02d", $mi), sprintf("%02d", $s));
 }
 
 __DATA__
