@@ -49,7 +49,6 @@ doc/synopsis.pod: Makefile pgbadger
 
 .PHONY: doc/pgBadger.pod
 doc/pgBadger.pod: doc/synopsis.pod Makefile
-	git checkout $@
 	sed -i '/^=head1 SYNOPSIS/,/^=head1 DESCRIPTION/d' $@
 	sed -i '4r $<' $@
 EOMAKE
