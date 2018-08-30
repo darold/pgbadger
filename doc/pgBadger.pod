@@ -27,9 +27,9 @@ Options:
     -D | --dns-resolv      : client ip addresses are replaced by their DNS name.
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
-    -f | --format logtype  : possible values: syslog, syslog2, stderr, csv and
-			     pgbouncer. Use this option when pgBadger is not
-                             able to auto-detect the log format.
+    -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
+			     cvs and pgbouncer. Use this option when pgBadger
+                             is not able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -139,8 +139,10 @@ Options:
     --journalctl command   : command to use to replace PostgreSQL logfile by
 			     a call to journalctl. Basically it might be:
 				journalctl -u postgresql-9.5
-    --pid-file PATH        : set the path of the pid file to manage
-			     concurrent execution of pgBadger.
+    --pid-dir path         : set the path where the pid file must be stored.
+                              Default /tmp
+    --pid-file file        : set the name of the pid file to manage concurrent
+			     execution of pgBadger. Default: pgbadger.pid
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
@@ -148,7 +150,10 @@ Options:
                              sunday. Use this option to start on monday.
     --normalized-only      : only dump all normalized query to out.txt
     --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
-                             when parsing logs.
+                             that must be used to adjust date/time read from
+                             log file before beeing parsed. Using this option
+                             make more difficult log search with a date/time.
+    --prettify-json        : use it if you want json output to be prettified.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -174,11 +179,11 @@ Examples:
 		       /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 	# Log prefix with stderr log output
-	perl pgbadger --prefix '%t [%p]: [%l-1] user=%u,db=%d,client=%h' 
+	perl pgbadger --prefix '%t [%p]: user=%u,database=%d,client=%h' 
 			/pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,app=%a' 
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
 			/pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
@@ -186,7 +191,7 @@ Examples:
 
 Generate Tsung sessions XML file with select queries only:
 
-    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: [%l-1] user=%u,db=%d ' /pglog/postgresql-9.1.log
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-9.1.log
 
 Reporting errors every week by cron job:
 
@@ -252,12 +257,11 @@ other packages. Furthermore, this library gives us more features such
 as zooming. pgBadger also uses the Bootstrap JavaScript library and
 the FontAwesome webfont for better design. Everything is embedded.
 
-pgBadger is able to autodetect your log file format (syslog, stderr or csvlog)
-if the log file is long enough.
-It is designed to parse huge log files as well as gzip compressed files. See a
-complete list of features below. Supported compressed format are gzip, bzip2
-and xz. For the xz format you must have an xz version upper than 5.05 that
-supports the --robot option.
+pgBadger is able to autodetect your log file format (syslog, stderr, csvlog
+or jsonlog) if the file is long enough. It is designed to parse huge log
+files as well as compressed files. Supported compressed format are gzip,
+bzip2 and xz.  For the xz format you must have an xz version upper than 5.05
+that supports the --robot option. For the complete list of features see below.
 
 All charts are zoomable and can be saved as PNG images.
 
@@ -424,22 +428,26 @@ this value to only log queries with a longer duration. Note that if you have
 log_statement set to 'all' nothing will be logged through the log_min_duration_statement
 directive. See the next chapter for more information.
 
-With 'stderr' log format, log_line_prefix must be at least:
+pgBadger supports any custom format set into the log_line_prefix directive of
+your postgresql.conf file as long as it at least specify a time escape sequence
+(%t, %m or %n) and the process related escape sequence (%p or %c).
 
-        log_line_prefix = '%t [%p]: [%l-1] '
+For example, with 'stderr' log format, log_line_prefix must be at least:
+
+	log_line_prefix = '%t [%p]: '
 
 Log line prefix could add user, database name, application name and client ip
 address as follows:
 
-        log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+        log_line_prefix = '%t [%p]: user=%u,db=%d,app=%a,client=%h '
 
 or for syslog log file format:
 
-        log_line_prefix = 'user=%u,db=%d,app=%aclient=%h '
+        log_line_prefix = 'user=%u,db=%d,app=%a,client=%h '
 
 Log line prefix for stderr output could also be:
 
-        log_line_prefix = '%t [%p]: [%l-1] db=%d,user=%u,app=%a,client=%h '
+        log_line_prefix = '%t [%p]: db=%d,user=%u,app=%a,client=%h '
 
 or for syslog output:
 
@@ -463,11 +471,6 @@ Of course your log messages should be in English without locale support:
 
 but this is not only recommended by pgBadger.
 
-Note: the session line [%l-1] is just used to match the default prefix for "stderr".
-The -1 has no real purpose and basically is not used in pgBadger statistics / graphs.
-You can safely remove them from the log_line_prefix but you will need to set the
---prefix command line option accordingly.
-
 =head1 log_min_duration_statement, log_duration and log_statement
 
 If you want the query statistics to include the actual query strings,
@@ -483,10 +486,10 @@ Enabling log_min_duration_statement will add reports about slowest queries and
 queries that took up the most time. Take care that if you have log_statement
 set to 'all' nothing will be logged with log_line_prefix.
 
-Warning: Do not enable both log_min_duration_statement and log_duration+
-log_statement, this will result in wrong counter values. Note that this
-will also increase drastically the size of your log.
-log_min_duration_statement should always be preferred.
+Warning: Do not enable both log_min_duration_statement, log_duration and
+log_statement, this will result in wrong counter values. Note that this will
+also increase drastically the size of your log. log_min_duration_statement
+should always be preferred.
 
 =head1 PARALLEL PROCESSING
 
@@ -611,7 +614,7 @@ or Graphite.
 
 pgBadger is an original work from Gilles Darold.
 
-The pgBadger logo is an original creation of Damien Clochard.
+The pgBadger logo is an original creation of Damien Cazeils.
 
 The pgBadger v4.x design comes from the "Art is code" company.
 
