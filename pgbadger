@@ -2068,7 +2068,8 @@ sub set_parser_regex
 			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*)/;
-		} elsif ($fmt eq 'stderr') {
+		} elsif ($fmt eq 'stderr' || $fmt eq 'default') {
+			$fmt = 'stderr';
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
 			push(@prefix_params, 't_loglevel', 't_query');
