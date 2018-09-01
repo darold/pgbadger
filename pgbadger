@@ -2543,6 +2543,27 @@ sub process_file
 
 	# Get file handle and size of the file
 	my ($lfile, $totalsize) = &get_log_file($logfile);
+	if (!defined $lfile) {
+
+		if ($progress && ($getout != 1)) {
+			if (!$tmpoutfile) {
+				if ($totalsize) {
+					print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
+					print STDERR "\n";
+				}
+			} else {
+				$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
+			}
+		}
+		if ($tmpoutfile) {
+
+			&dump_as_binary($tmpoutfile);
+			$tmpoutfile->close();
+
+		}
+
+	}
+
 	# Reset the start position if file is smaller that the current start offset
 	if ($start_offset > $totalsize) {
 		&logmsg('DEBUG', "Starting offset $start_offset is greater than total size $totalsize for file $logfile");
@@ -2572,9 +2593,6 @@ sub process_file
 	}
 
 	my $current_offset = $start_offset || 0;
-
-	# Forward the progress bar to the starting point in MP mode
-	#$cursize = $start_offset if ($chunk_pos == 0);
 
 	if (!$remote_host) {
 		&logmsg('DEBUG', "Starting reading file $logfile...");
@@ -3392,79 +3410,6 @@ sub store_current_timestamp
 	}
 }
 
-# Method used to check if the log file is produced by pgbouncer
-sub detect_pgbouncer_log
-{
-	my ($file, $saved_date, $look_at_beginning) = @_;
-
-	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
-
-	# Compressed files do not allow seeking
-	if ($iscompressed) {
-		$look_at_beginning = 1;	
-	}
-
-	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
-	$gyear += 1900;
-	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
-
-	%prefix_vars = ();
-	my $startoffset = 0;
-	# If seeking is not explicitely disabled
-	if (!$look_at_beginning) {
-		# do not seek if filesize is smaller than the seek position
-		if ($saved_last_line{current_pos} < $totalsize) {
-			$lfile->seek($saved_last_line{current_pos} || 0, 0);
-			$startoffset = $saved_last_line{current_pos} || 0;
-		}
-	}
-
-	my $more_lines = 0;
-	my $ispgbouncerlog = 0;
-	while (my $line = <$lfile>) {
-
-		$more_lines++;
-
-		$line =~ s/\r//;
-
-		my @matches = ($line =~ $pgbouncer_log_format);
-		if ($#matches >= 0) {
-			$ispgbouncerlog++;
-			for (my $i = 0 ; $i <= $#pgb_prefix_params ; $i++) {
-				$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
-			}
-		} else {
-			@matches = ($line =~ $pgbouncer_log_parse1);
-			if (($#matches >= 0) && ($matches[-1] =~ /^Stats:/) ) {
-				$ispgbouncerlog++;
-				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
-					$prefix_vars{$pgb_prefix_params[$i]} = $matches[$i];
-				}
-			}
-		}
-		next if (!$prefix_vars{'t_timestamp'});
-		if ($iscompressed) {
-			close($lfile);
-			return ($ispgbouncerlog, 0, "log file is compressed start at offset 0");
-		# This file has already been parsed
-		} elsif ($saved_date gt $prefix_vars{'t_timestamp'}) {
-			close($lfile);
-			return ($ispgbouncerlog, 0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
-		} else {
-			last;
-		}
-	}
-	close($lfile);
-
-	if (!$more_lines) {
-		close($lfile);
-		return ($ispgbouncerlog, 0, "there no new lines in this file");
-	}
-
-	return ($ispgbouncerlog, 1, "reach the end of detect_pgbouncer_log() with start date: $saved_date and file size: $totalsize") ;
-}
-
-
 # Method used to check if the file stores logs after the last incremental position or not
 # This position should have been saved in the incremental file and read in the $last_parsed at
 # start up. Here we just verify that the first date in file is before the last incremental date.
@@ -3473,6 +3418,7 @@ sub check_file_changed
 	my ($file, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
 
 	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
+	return if (!defined $lfile);
 
 	# Compressed files do not allow seeking
 	if ($iscompressed) {
@@ -14200,19 +14146,24 @@ sub autodetect_format
 	}
 	else { # try to detect syslogs, stderr, csv jsonlog or pgbouncer format
 		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
-		while (my $line = <$tfile>) {
-			chomp($line);
-			$line =~ s/\r//;
-			next if (!$line);
-			$nline++;
+		if (defined $tfile) {
+			while (my $line = <$tfile>) {
+				chomp($line);
+				$line =~ s/\r//;
+				next if (!$line);
+				$nline++;
 
-			my ($f, $i) = search_log_format($line);
-			$nfound++ if ($f);
-			$fmt = $f;
-			$ident_name{$i}++ if ($i);
-			last if (($nfound > 10) || ($nline > 5000));
+				my ($f, $i) = search_log_format($line);
+				$nfound++ if ($f);
+				$fmt = $f;
+				$ident_name{$i}++ if ($i);
+				last if (($nfound > 10) || ($nline > 5000));
+			}
+			$tfile->close();
+		} else {
+			&logmsg('DEBUG', "Can not autodetected log format from $file, using default");
+			return 'default';
 		}
-		$tfile->close();
 	}
 
 	# When --pgbouncer-only is used force the format
@@ -15208,6 +15159,7 @@ sub get_log_file
 	my $sample_only = shift;
 
 	my $lfile = undef;
+	my $iscompressed = 1;
 
 	chomp($logf);
 
@@ -15226,16 +15178,20 @@ sub get_log_file
 		}
 		&logmsg('DEBUG', "Remote file size: $totalsize");
 		if (!$totalsize) {
-			return $totalsize;
+			# In list context returns the filehandle and the size of the file
+			if (wantarray()) {
+				return ($lfile, $totalsize, $iscompressed);
+			} else {
+				return $totalsize;
+			}
 		}
 	}
-	my $iscompressed = 1;
 
 	# Open a file handle
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
 		# For journalctl command we need to use a pipe as file handle
 		if (!$remote_host) {
-			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of commanf: $logf. $!\n");
+			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of command: $logf. $!\n");
 		} else {
 			if (!$sample_only) {
 				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
@@ -15371,18 +15327,20 @@ sub split_logfile
 	}
 	my $i = 1;
 	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
-	while ($i < $queue_size) {
-		my $pos = int(($totalsize/$queue_size) * $i);
-		if ($pos > $chunks[0]) {
-			$lfile->seek($pos, 0);
-			#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
-			$pos= $pos + length(<$lfile>) - 1;
-			push(@chunks, $pos) if ($pos < $totalsize);
+	if (defined) {
+		while ($i < $queue_size) {
+			my $pos = int(($totalsize/$queue_size) * $i);
+			if ($pos > $chunks[0]) {
+				$lfile->seek($pos, 0);
+				#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
+				$pos= $pos + length(<$lfile>) - 1;
+				push(@chunks, $pos) if ($pos < $totalsize);
+			}
+			last if ($pos >= $totalsize);
+			$i++;
 		}
-		last if ($pos >= $totalsize);
-		$i++;
+		$lfile->close();
 	}
-	$lfile->close();
 	push(@chunks, $totalsize);
 
 	return @chunks;
