@@ -9350,7 +9350,12 @@ sub display_plan
 
 	my $url = $EXPLAIN_URL . url_escape($plan);
 
-	return "<div id=\"$id\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre>" . $plan . "</pre>\n</div>\n";
+	# Only TEXT format plan can be sent to Depesz site.
+	if ($plan !~ /Node Type:|"Node Type":|Node-Type/s) {
+		return "<div id=\"$id\" class=\"sql sql-largesize\"><a href=\"$url\" target=\"explain\" title=\"Click to beautify Explain Plan\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre>" . $plan . "</pre>\n</div>\n";
+	} else {
+		return "<div id=\"$id\" class=\"sql sql-largesize\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></div>\n<div style=\"width:900px;overflow:auto\">\n<pre>" . $plan . "</pre>\n</div>\n";
+	}
 }
 
 sub print_lock_queries_report
@@ -13790,17 +13795,37 @@ sub store_queries
 				my $key = 'query';
 				my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
 				foreach my $l (@plan) {
+					# In TEXT format
 					if ($l =~ /\(cost=\d+.*rows=\d+/) {
 						$key = 'plan' ;
-					} elsif ($l =~ /"Plan": \{/) {
+					# In JSON or YAML format
+					} elsif ($l =~ /"Plan": \{|Plan:/) {
+						$key = 'plan' ;
+					# In XML format
+					} elsif ($l =~ /<Plan>/) {
 						$key = 'plan' ;
 					}
 					$cur_info{$t_pid}{$key} .= "$l\n";
 				}
-				$cur_info{$t_pid}{query} =~ s/Query Text: //s;
-				$cur_info{$t_pid}{query} =~ s/.*"Query Text": "//;
-				$cur_info{$t_pid}{query} =~ s/"$//;
-				$cur_info{$t_pid}{plan} = "  [\n    {\n" . $cur_info{$t_pid}{plan} . "  ]\n";
+				# YAML format
+				if ($cur_info{$t_pid}{query} =~ s/Query Text: "//s) {
+					$cur_info{$t_pid}{query} =~ s/"$//s;
+					$cur_info{$t_pid}{plan} .= "\n";
+				# TEXT format
+				} elsif ($cur_info{$t_pid}{query} =~ s/Query Text: ([^"])/$1/s) {
+					$cur_info{$t_pid}{plan} .= "\n";
+				# JSON format
+				} elsif ($cur_info{$t_pid}{query} =~ s/.*"Query Text": "//s) {
+					$cur_info{$t_pid}{query} =~ s/"$//s;
+					$cur_info{$t_pid}{plan} = "  [\n    {\n" . $cur_info{$t_pid}{plan} . "  ]\n";
+				} elsif ($cur_info{$t_pid}{query} =~ s/.*<Query-Text>//s) {
+					$cur_info{$t_pid}{query} =~ s/<\/Query-Text>//s;
+					$cur_info{$t_pid}{plan} .= "\n";
+					if ($extension eq 'html') {
+						$cur_info{$t_pid}{plan} =~ s/</&lt;/gs;
+						$cur_info{$t_pid}{plan} =~ s/>/&gt;/gs;
+					}
+				}
 			}
 			delete $cur_plan_info{$t_pid};
 		}
