@@ -16,6 +16,10 @@
     ! test -f out.html
 }
 
+@test "Light log to binary" {
+    ./pgbadger -o t/fixtures/light.postgres.bin t/fixtures/light.postgres.log.bz2
+}
+
 @test "From binary to JSON" {
     ./pgbadger --outdir $BATS_TMPDIR -o test-out.json \
                --format binary t/fixtures/light.postgres.bin
