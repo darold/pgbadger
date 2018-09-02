@@ -6119,7 +6119,7 @@ sub compute_query_graphs
 	);
 
 	$drawn_graphs{'sessionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'sessionspersecond_graph', $graph_data{sess_max},
-		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions (' . $avg_minutes . ' minutes average)',
+		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions/second (' . $avg_minutes . ' minutes average)',
 		'Sessions', 'Maximum', 'Average', 'Minimum'
 	);
 
@@ -6260,7 +6260,7 @@ sub compute_pgbouncer_graphs
 	);
 
 	$drawn_graphs{'pgb_sessionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_sessionspersecond_graph', $graph_data{sess_max},
-		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions (' . $avg_minutes . ' minutes average)',
+		$graph_data{sess_avg}, $graph_data{sess_min}, 'Number of sessions/second (' . $avg_minutes . ' minutes average)',
 		'Sessions', 'Maximum', 'Average', 'Minimum'
 	);
 
