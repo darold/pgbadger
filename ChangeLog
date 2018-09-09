@@ -8,6 +8,7 @@ features and fix all issues reported by users since last release.
   * Add support to %q placeholder in log_line_prefix.
   * Add jsonlog format of Michael Paquier extension, with -f jsonlog
     pgbadger will be able to parse the log.
+  * Replace the SQL formatter/beautify with v3.0 of pgFormatter.
 
 There is some new command line option:
 
@@ -32,17 +33,24 @@ I want to thanks the great guys at Dalibo for all their investments
 into pgBadger during these years and especially Damien Clochard and
 Jean-paul argudo for their help to promote pgBadger.
 
-Here is the complete list of changes and acknowledgement in this
-release.
 
-  - Fix title of pgbouncer simultaneous session report. Thansks yo Jehan Guillaume De Rorthais for the report.
-  - Add support of pgbouncer syslog log file format. Thanks to djester for the feature request.
-  - Fix error when a remote log is empty. Thanks to Parasit Hendersson for the report.
-  - Fix test with binary format. Binary file must be generated as it is dependent of the plateform. Thanks to Michal Nowak for the report.
+  - Fix checkpoint distance and estimate not reported in incremental
+    mode. Thanks to aleszeleny for the report.
+  - Fix title of pgbouncer simultaneous session report. Thansks to
+    Jehan Guillaume De Rorthais for the report.
+  - Add support of pgbouncer syslog log file format. Thanks to djester
+    for the feature request.
+  - Fix error when a remote log is empty. Thanks to Parasit Hendersson
+    for the report.
+  - Fix test with binary format. Binary file must be generated as it
+    is dependent of the plateform. Thanks to Michal Nowak for the
+    report.
   - Fix case where an empty explain plan is generated.
-  - Fix parsing of autodetected default format with a prefix in command line.
+  - Fix parsing of autodetected default format with a prefix in
+    command line.
   - Remove dependency of git command in Makefile.PL.
-  - Update documentation about options changes and remove of the [%l-1] part of the mandatory prefix.
+  - Update documentation about options changes and remove of the
+    [%l-1] part of the mandatory prefix.
   - Fix parsing of vacuum / analyze system usage for PostgreSQL 10.
     Thanks to Achilleas Mantzios for the patch.
   - Fix Temporary File Activity table.
@@ -67,7 +75,7 @@ release.
     Normalisation of values are now tranformed into a single ? and no
     more 0 for numbers, two single quote for string. Thanks to vadv
     for the report.
-  - Fix log level count. Thanks to Jean-Christophe Arnu for the report.
+  - Fix log level count. Thanks to Jean-Christophe Arnu for the report
   - Make pgbadger more compliant with B::Lint bare sub name.
   - Made perlcritic happy.
   - Add --prettify-json command line option to prettify JSON output.
@@ -84,11 +92,11 @@ release.
     the same timezone. Thanks to xdexter for the feature request.
   - Remove INDEXES from the keyword list and add BUFFERS to this list.
   - Fix normalization of query using cursors.
-  - Remove Dockerfile and documentation about docker run. pgBadger comes as
-    a single Perl script without any dependence and it can be used on any
-    plateform. It is a non sens to use docker to run pgbadger, if you don't
-    want to install anything, just copy the file pgbadger where you want and
-    execute it.
+  - Remove Dockerfile and documentation about docker run. pgBadger
+    comes as a single Perl script without any dependence and it can
+    be used on any plateform. It is a non sens to use docker to run
+    pgbadger, if you don't want to install anything, just copy the
+    file pgbadger where you want and execute it.
   - Fix broken grid when no temp files activity. Thanks to Pierre
     Giraud for the patch
   - Add doc warning about log_in_duration_statement vs log_duration +
