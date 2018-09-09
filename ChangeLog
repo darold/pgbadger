@@ -1,3 +1,139 @@
+2018-09-09 - v10.0
+
+This release of pgBadger is a major release that adds some new
+features and fix all issues reported by users since last release.
+
+  * Add support of pgbouncer syslog log file format.
+  * Add support to all auto_explain format (text, xml, json and yaml).
+  * Add support to %q placeholder in log_line_prefix.
+  * Add jsonlog format of Michael Paquier extension, with -f jsonlog
+    pgbadger will be able to parse the log.
+
+There is some new command line option:
+
+  - Add --prettify-json command line option to prettify JSON output.
+  - Add --log-timezone  +/-XX  command line option to set the number
+    of hours from GMT of the timezone that must be used to adjust
+    date/time read from log file before beeing parsed. Note that you
+    might still need to adjust the graph timezone using -Z when the
+    client has not the same timezone.
+  - Add --include-time option to add the ability to choose times that
+    you want to see, instead of excluding all the times you do not
+    want to see (--exclude-time).
+
+The pgBadger project and copyrights has been transfered from Dalibo
+to the author and official maintainer of the project. Please update
+your links:
+
+  - Web site: http://pgbadger.darold.net/
+  - Source code: https://github.com/darold/pgbadger
+
+I want to thanks the great guys at Dalibo for all their investments
+into pgBadger during these years and especially Damien Clochard and
+Jean-paul argudo for their help to promote pgBadger.
+
+Here is the complete list of changes and acknowledgement in this
+release.
+
+  - Fix title of pgbouncer simultaneous session report. Thansks yo Jehan Guillaume De Rorthais for the report.
+  - Add support of pgbouncer syslog log file format. Thanks to djester for the feature request.
+  - Fix error when a remote log is empty. Thanks to Parasit Hendersson for the report.
+  - Fix test with binary format. Binary file must be generated as it is dependent of the plateform. Thanks to Michal Nowak for the report.
+  - Fix case where an empty explain plan is generated.
+  - Fix parsing of autodetected default format with a prefix in command line.
+  - Remove dependency of git command in Makefile.PL.
+  - Update documentation about options changes and remove of the [%l-1] part of the mandatory prefix.
+  - Fix parsing of vacuum / analyze system usage for PostgreSQL 10.
+    Thanks to Achilleas Mantzios for the patch.
+  - Fix Temporary File Activity table.
+  - Remove dependency to git during install.
+  - Add --log-timezone  +/-XX  command line option to set the number
+    of hours from GMT of the timezone that must be used to adjust
+    date/time read from log file before beeing parsed. Using this
+    option make more difficult log search with a date/time because the
+    time will not be the same in the log. Note that you might still
+    need to adjust the graph timezone using -Z when the client has not
+    the same timezone. Thanks to xdexter for the feature request and
+    Julien Tachoire for the patch.
+  - Add support to auto_explain json output format. Thanks to dmius
+    for the report.
+  - Fix auto_explain parser and queries that was counted twice.
+    Thanks to zam6ak for the report.
+  - Fix checkpoint regex to match PostgreSQL 10 log messages. Thanks
+    to Edmund Horner for the patch.
+  - Update description of -f | --format option by adding information
+    about jsonlog format.
+  - Fix query normalisation to not duplicate with bind queries.
+    Normalisation of values are now tranformed into a single ? and no
+    more 0 for numbers, two single quote for string. Thanks to vadv
+    for the report.
+  - Fix log level count. Thanks to Jean-Christophe Arnu for the report.
+  - Make pgbadger more compliant with B::Lint bare sub name.
+  - Made perlcritic happy.
+  - Add --prettify-json command line option to prettify JSON output.
+    Default output is all in single line.
+  - Fix Events distribution report.
+  - Fix bug with --prefix when log_line_prefix contain multiple %%.
+    Thanks to svb007 for the report.
+  - Add --log-timezone  +/-XX  command line option to set the number
+    of hours from GMT of the timezone that must be used to adjust
+    date/time read from log file before beeing parsed. Using this
+    option make more difficult log search with a date/time because the
+    time will not be the same in the log. Note that you might still
+    need to adjust the graph timezone using -Z when the client has not
+    the same timezone. Thanks to xdexter for the feature request.
+  - Remove INDEXES from the keyword list and add BUFFERS to this list.
+  - Fix normalization of query using cursors.
+  - Remove Dockerfile and documentation about docker run. pgBadger comes as
+    a single Perl script without any dependence and it can be used on any
+    plateform. It is a non sens to use docker to run pgbadger, if you don't
+    want to install anything, just copy the file pgbadger where you want and
+    execute it.
+  - Fix broken grid when no temp files activity. Thanks to Pierre
+    Giraud for the patch
+  - Add doc warning about log_in_duration_statement vs log_duration +
+    log_statement. Thanks to Julien Tachoire for the patch.
+  - Apply timezone offset to bar charts. Thanks to Julien Tachoire
+    for the patch.
+  - Delete current temp file info if we meet an error for the same PID
+    Thanks to Julien Tachoire for the patch.
+  - Consistently use app= in examples, and support appname=
+    Some of the usage examples used appname= in the prefix, but the
+    code didn't recognize that token. Use app= in all examples, and
+    add appname= to the prefix parser. Thanks to Christoph Berg for
+    the patch
+  - Fix wrong long name for option -J that should be --Jobs intead
+    of --job_per_file. Thanks to Chad Trabant for the report and
+    Etienne Bersac for the patch.
+  - Ignore blib files. Thanks to Etienne Bersac for the patch.
+  - Add consistency tests. Thanks to damien clochard for the patch.
+  - doc update : stderr is not a default for -f. Thanks to Christophe
+    Courtois for the patch.
+  - Always update pod and README. Thanks to Etienne Bersac for
+    the patch.
+  - Add some regression tests. Thanks to Etienne Bersac for the patch.
+  - Add editorconfig configuration. Thanks to Etienne Bersac for the
+    patch.
+  - Drop vi temp files from gitignore. Thanks to Etienne Bersac for
+    the patch.
+  - Add --include-time option to add the ability to choose times that
+    you want to see, instead of excluding all the times you do not
+    want to see. This is handy when wanting to view only one or two
+    days from a week's worth of logs (simplifies down from multiple
+    --exlucde-time options to one --include-time). Thanks to Wesley
+    Bowman for the patch.
+  - Check pod syntax. Thanks to Etienne Bersac for the patch.
+  - Add HACKING to document tests. Thanks to Etienne Bersac for the
+    patch.
+  - Drop obsolete --bar-graph option. Thanks to Etienne Bersac for
+    the patch.
+  - Drop misleading .perltidyrc. This file date from 2012 and
+    pgbadger code is far from compliant. perltidy unified diff is
+    10k lines. Let's drop this. Thanks to Etienne Bersac for the
+    patch.
+  - Fix use of uninitialized value in SQL formatting. Thanks to John
+    Krugger for the report and Jean-paul Argudo for the report.
+
 2017-07-27 - v9.2
 
 This release of pgBadger is a maintenance release that adds some new
