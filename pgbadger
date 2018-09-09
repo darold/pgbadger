@@ -12115,6 +12115,11 @@ sub load_stats
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg} += $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_avg};
 				$per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest}
 					if ($_per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest} > $per_minute_info{$day}{$hour}{$min}{checkpoint}{sync_longest});
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{distance} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{distance};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{distance_count} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{distance_count};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{estimate} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{estimate};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{warnning} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{warning};
+				$per_minute_info{$day}{$hour}{$min}{checkpoint}{warning_seconds} = $_per_minute_info{$day}{$hour}{$min}{checkpoint}{warning_seconds};
 			}
 		}
 	}
@@ -12355,6 +12360,10 @@ sub load_stats
 	$checkpoint_info{total} += $_checkpoint_info{total};
 	$checkpoint_info{file_added} += $_checkpoint_info{file_added};
 	$checkpoint_info{write} += $_checkpoint_info{write};
+	$checkpoint_info{distance} += $_checkpoint_info{distance};
+	$checkpoint_info{estimate} += $_checkpoint_info{estimate};
+	$checkpoint_info{warning} += $_checkpoint_info{warning};
+	$checkpoint_info{warning_seconds} += $_checkpoint_info{warning_seconds};
 
 	#### Autovacuum info ####
 
