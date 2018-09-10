@@ -7725,8 +7725,8 @@ $drawn_graphs{checkpointdistance_graph}
 				$warnings .= "<td>0</td><td>0s</td></tr>";
 			}
 			if (exists $dinf{distance} || $dinf{estimate}) {
-				$distance .= "<td>" . &comma_numbers(sprintf( "%.2f", $dinf{distance}{sum}/$dinf{distance}{count})) . " kB</td><td>" .
-					&comma_numbers(sprintf( "%.2f", $dinf{estimate}{sum}/$dinf{distance}{count})) .
+				$distance .= "<td>" . &comma_numbers(sprintf( "%.2f", $dinf{distance}{sum}/($dinf{distance}{count}||1))) . " kB</td><td>" .
+					&comma_numbers(sprintf( "%.2f", $dinf{estimate}{sum}/($dinf{distance}{count}||1))) .
 					 " kB</td></tr>";
 			} else {
 				$distance .= "<td>0</td><td>0</td></tr>";
