@@ -371,7 +371,13 @@ If you want to export statistics as JSON file you need an additional Perl module
 	JSON::XS - JSON serialising/deserialising, done correctly and fast
 
 This module is optional, if you don't select the json output format you don't
-need to install it.
+need to install it. You can install it on a Debian like system using:
+
+    sudo apt-get install libjson-xs-perl
+
+and in RPM like system using:
+
+    sudo yum install perl-JSON-XS
 
 Compressed log file format is autodetected from the file extension. If pgBadger find
 a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat
