@@ -2323,7 +2323,6 @@ sub write_resources
 	}
 
 	return @contents;
-
 }
 
 sub sort_by_week
@@ -4839,7 +4838,7 @@ sub html_header
 
 	my @tmpjscode = @jscode;
 	for (my $i = 0; $i <= $#tmpjscode; $i++) {
-		$tmpjscode[$i] =~ s/EDIT_URI/\./;
+		$tmpjscode[$i] =~ s/EDIT_URI/$uri/;
 	}
 
 	my $local_title = 'PostgreSQL Log Analyzer';
