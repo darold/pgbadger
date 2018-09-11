@@ -28,8 +28,8 @@ Options:
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-			     cvs and pgbouncer. Use this option when pgBadger
-                             is not able to auto-detect the log format.
+                             cvs and pgbouncer. Use this option when pgBadger is
+                             not able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -140,9 +140,9 @@ Options:
 			     a call to journalctl. Basically it might be:
 				journalctl -u postgresql-9.5
     --pid-dir path         : set the path where the pid file must be stored.
-                              Default /tmp
+                             Default /tmp
     --pid-file file        : set the name of the pid file to manage concurrent
-			     execution of pgBadger. Default: pgbadger.pid
+                             execution of pgBadger. Default: pgbadger.pid
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there is binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
@@ -154,6 +154,7 @@ Options:
                              log file before beeing parsed. Using this option
                              make more difficult log search with a date/time.
     --prettify-json        : use it if you want json output to be prettified.
+
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -171,20 +172,16 @@ some additional options to fully control the ssh connection.
 Examples:
 
 	pgbadger /var/log/postgresql.log
-	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz 
-		       /var/log/postgres.log
+	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
 	pgbadger /var/log/postgresql/postgresql-2012-05-*
 	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
-	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" 
-		       /var/log/postgresql.log
+	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
 	cat /var/log/postgres.log | pgbadger -
 	# Log prefix with stderr log output
-	perl pgbadger --prefix '%t [%p]: user=%u,database=%d,client=%h' 
-			/pglog/postgresql-2012-08-21*
+	perl pgbadger --prefix '%t [%p]: user=%u,db=%d,client=%h' /pglog/postgresql-2012-08-21*
 	perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
 	# Log line prefix with syslog log output
-	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' 
-			/pglog/postgresql-2012-08-21*
+	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
 
@@ -199,23 +196,20 @@ Reporting errors every week by cron job:
 
 Generate report every week using incremental behavior:
 
-    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` 
-	-o /var/reports/pg_errors-`date +%F`.html -l /var/reports/pgbadger_incremental_file.dat
+    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` -o /var/reports/pg_errors-`date +\%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
 This supposes that your log file and HTML report are also rotated every week.
 
 Or better, use the auto-generated incremental reports:
 
-    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 
-	-O /var/www/pg_reports/
+    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 -O /var/www/pg_reports/
 
 will generate a report per day and per week.
 
 In incremental mode, you can also specify the number of week to keep in the
 reports:
 
-    /usr/bin/pgbadger --retention 2 -I -q /var/log/postgresql/postgresql.log.1 
-	-O /var/www/pg_reports/
+    /usr/bin/pgbadger --retention 2 -I -q /var/log/postgresql/postgresql.log.1 -O /var/www/pg_reports/
 
 If you have a pg_dump at 23:00 and 13:00 each day during half an hour, you can
 use pgBadger as follow to exclude these period from the report:
@@ -564,8 +558,7 @@ week report and links to daily reports of each week.
 
 For example, if you run pgBadger as follows based on a daily rotated file:
 
-    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 \
-        -O /var/www/pg_reports/
+    0 4 * * * /usr/bin/pgbadger -I -q /var/log/postgresql/postgresql.log.1 -O /var/www/pg_reports/
 
 you will have all daily and weekly reports for the full running period.
 
