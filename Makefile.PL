@@ -45,12 +45,14 @@ doc/synopsis.pod: Makefile pgbadger
 	echo "=head1 SYNOPSIS" > $@
 	./pgbadger --help >> $@
 	echo "=head1 DESCRIPTION" >> $@
-	sed -i 's/ +$$//g' $@
+	sed -i.bak 's/ +$$//g' $@
+	rm $@.bak
 
 .PHONY: doc/pgBadger.pod
 doc/pgBadger.pod: doc/synopsis.pod Makefile
-	sed -i '/^=head1 SYNOPSIS/,/^=head1 DESCRIPTION/d' $@
-	sed -i '4r $<' $@
+	sed -i.bak '/^=head1 SYNOPSIS/,/^=head1 DESCRIPTION/d' $@
+	sed -i.bak '4r $<' $@
+	rm $@.bak
 EOMAKE
 }
 
