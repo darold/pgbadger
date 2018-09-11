@@ -10,7 +10,7 @@ jobs:
         name: Install debian packages
         command: >
           apt update -y &&
-          apt install -y --no-install-recommends bats git jq libjson-xs-perl openssh-client
+          apt install -y --no-install-recommends git libjson-xs-perl openssh-client
     - checkout
     - run:
         name: Executing tests
