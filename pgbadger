@@ -711,12 +711,16 @@ if (!$rebuild) {
 		} else {
 			$frmt = &autodetect_format($log_files[0]);
 		}
-	} elsif (!$format) {
+	} elsif (!$format && ($ARGV[0] ne '-')) {
 		if ($journalctl_cmd) {
 			$frmt = 'syslog2';
 		} else {
 			$frmt = &autodetect_format($log_files[0]);
 		}
+	} elsif (!$format && ($ARGV[0] eq '-')) {
+		&logmsg('LOG', "unknown log format with stdin input, assuming stderr. Use -f if to change it.");
+		# Assume default log format is stderr with input from stdin
+		$frmt = 'stderr';
 	}
 } else {
 	if (!$incremental) {
@@ -1457,7 +1461,6 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 			} 
 
 		} else {
-
 			# Start parsing one file per parallel process
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 			spawn sub {
@@ -1507,7 +1510,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 
 		# Get log format of the current file
 		my $fmt = $format || 'stderr';
-		if (!$journalctl_cmd) {
+		if (!$journalctl_cmd && $logfile ne '-') {
 			$fmt = &autodetect_format($logfile);
 			$fmt ||= $format;
 			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
@@ -2472,7 +2475,7 @@ sub process_file
 
 	# Get file handle and size of the file
 	my ($lfile, $totalsize) = &get_log_file($logfile);
-	if (!defined $lfile) {
+	if ($logfile ne '-') {
 
 		if ($progress && ($getout != 1)) {
 			if (!$tmpoutfile) {
@@ -2490,7 +2493,6 @@ sub process_file
 			$tmpoutfile->close();
 
 		}
-
 	}
 
 	# Reset the start position if file is smaller that the current start offset
@@ -2500,7 +2502,7 @@ sub process_file
 		$start_offset = 0 ;
 	}
 	# Check if the first date in the log are after the last date saved
-	if (($fmt ne 'binary') && ($fmt ne 'csv')) {
+	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv')) {
 		if ($start_offset && !$chunk_pos) {
 			my ($retcode, $msg) = check_file_changed($logfile, $fmt, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
 			if ($retcode) {
@@ -14527,7 +14529,11 @@ sub get_log_file
 		$iscompressed = 0;
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
 		if (!$remote_host) {
-			open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
+			if ($logf ne '-') {
+				open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
+			} else {
+				 $lfile = *STDIN;
+			}
 		} else {
 			if (!$sample_only) {
 				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
@@ -14648,7 +14654,7 @@ sub split_logfile
 	}
 	my $i = 1;
 	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
-	if (defined) {
+	if (defined $lfile) {
 		while ($i < $queue_size) {
 			my $pos = int(($totalsize/$queue_size) * $i);
 			if ($pos > $chunks[0]) {
