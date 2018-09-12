@@ -2478,7 +2478,7 @@ sub process_file
 				$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 			}
 		}
-		if ($tmpoutfile) {
+		if (!$totalsize && $tmpoutfile) {
 
 			&dump_as_binary($tmpoutfile);
 			$tmpoutfile->close();
