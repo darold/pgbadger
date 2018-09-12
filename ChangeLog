@@ -1,3 +1,33 @@
+2018-09-12 - v10.1
+
+This release of pgBadger is a maintenance release that fixes reports
+in incremental mode and multiprocess with -j option. Log parsing from
+standard input was also broken. If you are using v10.0 please upgrade
+now.
+
+  - Add test on pgbouncer log parser.
+  - Some little performances improvment.
+  - Fix not a valid file descriptor at pgbadger line 12314.
+  - Fix unwanted newline in progressbar at startup.
+  - Remove circleci files from the project.
+  - Remove dependency of bats and jq for the test suite, they are
+    replaced with Test::Simple and JSON::XS.
+  - Add more tests especially for incremental mode and input from
+    stdin that was broken in release 10.0.
+  - Sync pgbadger, pod, and README, and fix some syntax errors.
+    Thanks to Christoph Berg for the patch.
+  - Add documentation on how to install Perl module JSON::XS from
+    apt and yum repositories.
+  - Fix URI for CSS in incremental mode. Thanks to Floris van Nee
+    for the report.
+  - Fix fatal error when looking for log from STDIN. Thanks to
+    Jacek Szpot for the report.
+  - Fixes SED use for OSX builds. Thanks to Steve Newson for the
+    patch.
+  - Fix illegal division by zero in incrental mode. Thanks to
+    aleszeleny for the report.
+  - Replace SQL::Beautify with v3.1 of pgFormatter::Beautify.
+
 2018-09-09 - v10.0
 
 This release of pgBadger is a major release that adds some new
