@@ -2473,7 +2473,6 @@ sub process_file
 			if (!$tmpoutfile) {
 				if ($totalsize) {
 					print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
-					print STDERR "\n";
 				}
 			} else {
 				$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
