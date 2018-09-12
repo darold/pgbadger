@@ -4,6 +4,7 @@ version_from: pgbadger
 installdirs:  site
 recommends:
     Text::CSV_XS:                     0
+    JSON::XS:                         0
 
 distribution_type: script
 generated_by: ExtUtils::MakeMaker version 6.17

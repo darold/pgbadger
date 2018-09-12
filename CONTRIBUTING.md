@@ -23,4 +23,3 @@ written directly in `doc/pgBadger.pod`. `README` is the text formatting of
 `doc/pgBadger.pod`. Update `README` and `doc/pgBadger.pod` with `make README`
 and commit changes when contributing.
 
-A job in CI ensure all versionned documentations are consistent.
