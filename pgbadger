@@ -328,6 +328,7 @@ my $use_sessionid_as_pid    = 0;
 my $dump_normalized_only    = 0;
 my $log_timezone            = 0;
 my $json_prettify           = 0;
+my $is_tsung_output         = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -763,6 +764,10 @@ if (!$extension) {
 	} else {
 		JSON::XS->import();
 	}
+}
+
+if ($extension eq 'tsung') {
+	$is_tsung_output = 1;
 }
 
 # Force text output with normalized query list only
@@ -2492,6 +2497,7 @@ sub process_file
 		&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
 		$start_offset = 0 ;
 	}
+
 	# Check if the first date in the log are after the last date saved
 	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv')) {
 		if ($start_offset && !$chunk_pos) {
@@ -2509,6 +2515,12 @@ sub process_file
 		$start_offset = 0;
 		$stop_offset = 0;
 	}
+
+	# Set some boolean to gain speed
+	my $is_json_log = 0;
+	$is_json_log = 1 if ($fmt =~ /jsonlog/);
+	my $is_syslog = 0;
+	$is_syslog = 1 if ($fmt =~ /syslog/);
 
 	if ($stop_offset > 0) {
 		$totalsize = $stop_offset - $start_offset;
@@ -2807,7 +2819,7 @@ sub process_file
 			%prefix_vars = ();
 
 			# Parse jsonlog lines
-			if ($fmt =~ /jsonlog/) {
+			if ($is_json_log) {
 
 				%prefix_vars = parse_jsonlog_input($line);
 
@@ -2839,7 +2851,7 @@ sub process_file
 				}
 
 			# Parse syslog lines
-			} elsif ($fmt =~ /syslog/) {
+			} elsif ($is_syslog) {
 
 				@matches = ($line =~ $compiled_prefix);
 
@@ -3338,8 +3350,10 @@ sub store_current_timestamp
 {
 	my $t_timestamp = shift;
 
-	$prefix_vars{'t_date'} = $t_timestamp;
-	$prefix_vars{'t_date'} =~ s/\D+//g;
+	if ($is_tsung_output) {
+		$prefix_vars{'t_date'} = $t_timestamp;
+		$prefix_vars{'t_date'} =~ s/\D+//g;
+	}
 
 	if (!$overall_stat{'first_log_ts'} || ($overall_stat{'first_log_ts'} gt $t_timestamp)) {
 		$overall_stat{'first_log_ts'} = $t_timestamp;
@@ -12649,6 +12663,8 @@ sub parse_query
 {
 	my $fmt = shift;
 
+	my $is_log_level = 0;
+	
 	my $t_pid = $prefix_vars{'t_pid'};
 
 	my $date_part = "$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}";
@@ -12658,8 +12674,11 @@ sub parse_query
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
- 
-		$prefix_vars{'t_loglevel'} = 'ERROR' if (&change_log_level($prefix_vars{'t_query'}));
+		if (&change_log_level($prefix_vars{'t_query'})) {
+			$prefix_vars{'t_loglevel'} = 'ERROR';
+		} else {
+			$is_log_level = 1;
+		}
 
 	} elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only) {
 
@@ -12689,13 +12708,13 @@ sub parse_query
 	# Remove session failure from current workload because there is no disconnection entry
 	if (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'FATAL')) {
 		delete $current_sessions{$prefix_vars{'t_pid'}};
-		if ($extension eq 'tsung') {
+		if ($is_tsung_output) {
 			delete $tsung_session{$prefix_vars{'t_pid'}}
 		}
 	} elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING')) {
 		if ($prefix_vars{'t_query'} =~ /terminating connection/) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
-			if ($extension eq 'tsung') {
+			if ($is_tsung_output) {
 				delete $tsung_session{$prefix_vars{'t_pid'}}
 			}
 		}
@@ -12788,7 +12807,7 @@ sub parse_query
 	}
 
 	# Stores lock activity
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/))
+	if ($is_log_level && ($prefix_vars{'t_query'} =~ /acquired ([^\s]+) on ([^\s]+) .* after ([0-9\.]+) ms/))
 	{
 		return if ($disable_lock);
 		$lock_info{$1}{count}++;
@@ -12812,7 +12831,7 @@ sub parse_query
 	}
 
 	# Stores temporary files activity
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /temporary file: path (.*), size (\d+)/)) {
+	if ($is_log_level && ($prefix_vars{'t_query'} =~ /temporary file: path (.*), size (\d+)/)) {
 		return if ($disable_temporary);
 		my $filepath = $1;
 		my $size = $2;
@@ -12843,7 +12862,7 @@ sub parse_query
 	}
 
 	# Stores pre-connection activity
-	if (($prefix_vars{'t_loglevel'} eq 'LOG') && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/)) {
+	if ($is_log_level && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/)) {
 		$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
@@ -12852,7 +12871,7 @@ sub parse_query
 	}
 
 	# Stores connection activity
-	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
+	if (   $is_log_level
 		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+)(?: database=([^\s]+))?/))
 	{
 		$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
@@ -12875,7 +12894,7 @@ sub parse_query
 			$host = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$host = _gethostbyaddr($host) if ($dns_resolv);
 		}
-		if ($extension eq 'tsung') {
+		if ($is_tsung_output) {
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $db;
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $usr;
 			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
@@ -12910,13 +12929,13 @@ sub parse_query
 	}
 
 	# Store session duration
-	if (($prefix_vars{'t_loglevel'} eq 'LOG')
+	if (    $is_log_level
 		&& ($prefix_vars{'t_query'} =~
 			/disconnection: session time: ([^\s]+) user=([^\s]+) database=([^\s]+) host=([^\s]+)/))
 	{
 		return if ($disable_session);
 		delete $current_sessions{$prefix_vars{'t_pid'}};
-		if ($extension eq 'tsung') {
+		if ($is_tsung_output) {
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
 		}
 		my $time = $1;
@@ -12925,7 +12944,7 @@ sub parse_query
 		my $host = $4;
 		$host = _gethostbyaddr($host) if ($dns_resolv);
 
-		if ($extension eq 'tsung') {
+		if ($is_tsung_output) {
 			&store_tsung_session($prefix_vars{'t_pid'});
 			return;
 		}
@@ -12955,7 +12974,7 @@ sub parse_query
 
 	# Store autovacuum information
 	if (
-		($prefix_vars{'t_loglevel'} eq 'LOG')
+		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
 /automatic vacuum of table "([^\s]+)": index scans: (\d+)/
 		   )
@@ -12998,7 +13017,7 @@ sub parse_query
 
 	# Store autoanalyze information
 	if (
-		($prefix_vars{'t_loglevel'} eq 'LOG')
+		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
 /automatic analyze of table "([^\s]+)"/
 		   )
@@ -13021,7 +13040,7 @@ sub parse_query
 
 	# Store checkpoint or restartpoint information
 	if (
-		($prefix_vars{'t_loglevel'} eq 'LOG')
+		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
 /point complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) (?:transaction log|WAL) file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
 		   )
@@ -13085,7 +13104,7 @@ sub parse_query
 	}
 
 	# Store checkpoint warning information
-	if (   ($prefix_vars{'t_loglevel'} eq 'LOG')
+	if (   $is_log_level
 		&& ($prefix_vars{'t_query'} =~ /checkpoints are occurring too frequently \((\d+) seconds apart\)/))
 	{
 		return if ($disable_checkpoint);
@@ -13099,7 +13118,7 @@ sub parse_query
 
 	# Store old restartpoint information
 	if (
-		($prefix_vars{'t_loglevel'} eq 'LOG')
+		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
 /restartpoint complete: wrote (\d+) buffers \(([^\)]+)\); write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
 		   )
@@ -13152,7 +13171,7 @@ sub parse_query
 		delete $conn_received{$cur_info{$t_pid}{pid}};
 
 		# The query is complete but we are missing some debug/info/bind parameter logs
-		if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
+		if ($is_log_level) {
 
 			# Apply bind parameters if any
 			if (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ /parameters: (.*)/)) {
@@ -13198,7 +13217,7 @@ sub parse_query
 	}
 
 	# Store info as tsung session following the output file extension
-	if (($extension eq 'tsung') && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'}) {
+	if ($is_tsung_output && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'}) {
 		$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
 		$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $prefix_vars{'t_dbuser'};
 		$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
@@ -13257,7 +13276,7 @@ sub parse_query
 		return if ($t_action !~ /query|statement|execute/);
 		$prefix_vars{'t_bind'} = 1;
 	# Log line that could not be parsed
-	} elsif ($prefix_vars{'t_loglevel'} eq 'LOG') {
+	} elsif ($is_log_level) {
 		if ($prefix_vars{'t_query'} !~
 /incomplete startup packet|connection|receive|unexpected EOF|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
@@ -13475,7 +13494,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} if (!$cur_info{$t_pid}{dbuser});
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'} if (!$cur_info{$t_pid}{dbclient});
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} if (!$cur_info{$t_pid}{dbappname});
-	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if (!$cur_info{$t_pid}{date});
+	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if ($is_tsung_output && !$cur_info{$t_pid}{date});
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
 }
@@ -13616,7 +13635,7 @@ sub store_queries
 		}
 
 		# Dump queries as tsung request and return
-		if ($extension eq 'tsung') {
+		if ($is_tsung_output) {
 			if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
 				push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
 				push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
@@ -14220,7 +14239,7 @@ sub progress_bar
 	my $num_width = length $total;
 	my $nchars = (($width - 1) * $got / $total);
 	$nchars = ($width - 1) if ($nchars >= $width);
-	if ($extension eq 'tsung') {
+	if ($is_tsung_output) {
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
 			$char x $nchars . '>',
