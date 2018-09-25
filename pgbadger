@@ -259,6 +259,7 @@ my @dbclient                = ();
 my @dbappname               = ();
 my @exclude_user            = ();
 my @exclude_appname         = ();
+my @exclude_db              = ();
 my @exclude_line            = ();
 my $ident                   = '';
 my $top                     = 0;
@@ -455,6 +456,7 @@ my $result = GetOptions(
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
 	"exclude-file=s"           => \$exclude_file,
+	"exclude-db=s"             => \@exclude_db,
 	"exclude-appname=s"        => \@exclude_appname,
 	"include-query=s"          => \@include_query,
 	"exclude-line=s"           => \@exclude_line,
@@ -1798,8 +1800,12 @@ Options:
     --include-time  regex  : only timestamps matching the given regex will be
 			     included in the report. Example: "2013-04-12 .*"
                              You can use this option multiple times.
+    --exclude-db name      : exclude entries for the specified database from
+			     report. Example: "pg_dump". Can be used multiple
+			     time.
     --exclude-appname name : exclude entries for the specified application name
-			     from report. Example: "pg_dump".
+			     from report. Example: "pg_dump". Can be used multiple
+			     time.
     --exclude-line regex   : pgBadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple
 			     time.
@@ -12535,6 +12541,13 @@ sub compute_arg_list
 	push(@exclude_appname, @tmp);
 
 	@tmp = ();
+	foreach my $v (@exclude_db) {
+		push(@tmp, split(/,/, $v));
+	}
+	@exclude_db = ();
+	push(@exclude_db, @tmp);
+
+	@tmp = ();
 	foreach my $v (@exclude_line) {
 		push(@tmp, split(/,/, $v));
 	}
@@ -12605,6 +12618,14 @@ sub validate_log_line
 
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
+			return 0;
+		}
+	}
+	if ($#exclude_db >= 0) {
+
+		# Log line matches the excluded db
+		if ($prefix_vars{'t_dbname'} && grep(/^\Q$prefix_vars{'t_dbname'}\E$/i, @exclude_db)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			return 0;
 		}
