@@ -13192,23 +13192,28 @@ sub parse_query
 		delete $conn_received{$cur_info{$t_pid}{pid}};
 
 		# The query is complete but we are missing some debug/info/bind parameter logs
-		if ($is_log_level) {
+		if ($cur_info{$t_pid}{loglevel} eq 'LOG' && $prefix_vars{'t_loglevel'} eq 'DETAIL') {
 
 			# Apply bind parameters if any
-			if (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ /parameters: (.*)/)) {
+			if ($prefix_vars{'t_query'} =~ /parameters: (.*)/) {
 				$cur_info{$t_pid}{parameters} = "$1";
 				# go look at other params
 				return;
 			# replace the execute statements with the prepared query and set the parameters
-			} elsif (($prefix_vars{'t_loglevel'} eq 'DETAIL') && ($prefix_vars{'t_query'} =~ s/prepare: PREPARE\s+([^\s]+)\s+AS\s+(.*)//is)) {
+			} elsif ($prefix_vars{'t_query'} =~ s/prepare: PREPARE\s+([^\s]+)(\s*\([^\)]*\))?\s+AS\s*(.*)/[ EXECUTE $1 (PARAM) ]/is) {
 				my $q_name = $1;
-				my $real_query = $2;
+				my $real_query = $3;
 				if ($cur_info{$t_pid}{query} =~ /\b$q_name\b/) {
-					$cur_info{$t_pid}{query} =~ s/EXECUTE\s+$q_name(\s+)\(//is;
-					$cur_info{$t_pid}{parameters} = $cur_info{$t_pid}{query};
-					$cur_info{$t_pid}{parameters} =~ s/\)$//;
-					$cur_info{$t_pid}{query} = $real_query;
+					$cur_info{$t_pid}{query} =~ s/EXECUTE\s+$q_name\s*\((.*)\)[;]*$//is;
+					$cur_info{$t_pid}{parameters} = $1;
+					$prefix_vars{'t_query'} =~ s/\(PARAM\)/($cur_info{$t_pid}{parameters})/;
+					$cur_info{$t_pid}{query} = $prefix_vars{'t_query'} . ' - ' . $real_query;
 					$cur_info{$t_pid}{'bind'} = 1;
+					my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
+					for (my $i = 0 ; $i <= $#t_res ; $i++) {
+						my $num = $i + 1;
+						$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
+					}
 				}
 				# go look at other params
 				return;
