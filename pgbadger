@@ -348,6 +348,8 @@ my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
 
+my $curl_command = 'curl -s ';
+
 # OBSOLETE, to be removed
 # List of regex that match fatal error message that do not
 # generate disconnection line in log. This is to prevent
@@ -576,7 +578,7 @@ if ($#ARGV >= 0) {
 			push(@log_files, $file);
 			$empty_files = 0;
 		} elsif ($file ne '-') {
-			if (!$remote_host) {
+			if (!$remote_host && $file !~ /^http[s]*:|ftp:/i) {
 				localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
 				if (-z $file) {
 					print "WARNING: file $file is empty\n" if (!$quiet);
@@ -584,13 +586,16 @@ if ($#ARGV >= 0) {
 				}
 				push(@log_files, $file);
 				$empty_files = 0;
-			} else {
+			} elsif ($file !~ /^http[s]*:|ftp:/i) {
 				# Get files from remote host
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
 				my @rfiles = `$ssh_command "ls $file"`;
 				foreach my $f (@rfiles) {
 					push(@log_files, $f);
 				}
+				$empty_files = 0;
+			} else {
+				push(@log_files, $file);
 				$empty_files = 0;
 			}
 		} else {
@@ -2450,6 +2455,8 @@ sub process_file
 	my $old_queries_count = 0;
 	my $old_errors_count  = 0;
 	my $getout            = 0;
+	my $http_download     = ($logfile =~ /^http[s]*:|ftp:/i) ? 1 : 0;
+
 	$start_offset       ||= 0;
 
 	$0 = 'pgbadger parser';
@@ -2505,7 +2512,7 @@ sub process_file
 	}
 
 	# Check if the first date in the log are after the last date saved
-	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv')) {
+	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv') && !$http_download) {
 		if ($start_offset && !$chunk_pos) {
 			my ($retcode, $msg) = check_file_changed($logfile, $fmt, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
 			if ($retcode) {
@@ -3375,6 +3382,9 @@ sub store_current_timestamp
 sub check_file_changed
 {
 	my ($file, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
+
+	# Incremental mode is not possible for the moment with http download
+	return 1 if ($file =~ /^http[s]*:|ftp:/);
 
 	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
 	return if (!defined $lfile);
@@ -14123,8 +14133,9 @@ sub autodetect_format
 	my $fmt    = '';
 	my %ident_name = ();
 	my $fltf;
+	my $http_download  = ($file =~ /^http[s]*:|ftp:/i) ? 1 : 0;
 
-	if (!$remote_host) {
+	if (!$remote_host && !$http_download) {
 		if (open(my $in, '<', $file)) {
 			$fltf = <$in>;
 			close($in);
@@ -14137,7 +14148,8 @@ sub autodetect_format
 	if ( $fltf =~ /^pst\d/ ) {
 		$fmt = 'binary';
 	}
-	else { # try to detect syslogs, stderr, csv jsonlog or pgbouncer format
+	elsif (!$http_download) {
+		# try to detect syslogs, stderr, csv jsonlog or pgbouncer format
 		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
 		if (defined $tfile) {
 			while (my $line = <$tfile>) {
@@ -14157,6 +14169,9 @@ sub autodetect_format
 			&logmsg('DEBUG', "Can not autodetected log format from $file, using default");
 			return 'default';
 		}
+
+	} elsif (!$format) {
+		localdie("FATAL: with http files you need to specify the log format, please use -f option.\n");
 	}
 
 	# When --pgbouncer-only is used force the format
@@ -14519,6 +14534,7 @@ sub get_log_file
 
 	my $lfile = undef;
 	my $iscompressed = 1;
+	my $http_download  = ($logf =~ /^http[s]*:|ftp:/i) ? 1 : 0;
 
 	chomp($logf);
 
@@ -14526,14 +14542,21 @@ sub get_log_file
 	my $totalsize = 0;
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
 		$totalsize = 0;
-	} elsif (!$remote_host) {
+	} elsif (!$remote_host && !$http_download) {
 		$totalsize = (stat("$logf"))[7] || 0 if ($logf ne '-');
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
-		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
-		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
-		chomp($totalsize);
-		if ($totalsize eq '') {
+		if ($http_download) {
+			&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
+			$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
+		} elsif ($remote_host) {
+			&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
+			$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
+		}
+                chomp($totalsize);
+		if ($totalsize eq '' && $remote_host) {
 			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'\n");
+		} elsif ($totalsize eq '' && $http_download) {
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'\n");
 		}
 		&logmsg('DEBUG', "Remote file size: $totalsize");
 		if (!$totalsize) {
@@ -14564,21 +14587,32 @@ sub get_log_file
 		}
 		$iscompressed = 0;
 	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
-		if (!$remote_host) {
+		if (!$remote_host && !$http_download) {
 			if ($logf ne '-') {
 				open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 			} else {
 				 $lfile = *STDIN;
 			}
 		} else {
-			if (!$sample_only) {
-				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
-				# Open a pipe to cat program
-				open($lfile, '-|', "$ssh_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
-			} else {
-				# Open a pipe to cat program
-				open($lfile, '-|', "$ssh_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
-			}
+                        if (!$sample_only) {
+                                if (!$http_download) {
+                                        &logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
+                                        # Open a pipe to cat program
+                                        open($lfile, '-|', "$ssh_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
+                                } else {
+                                        &logmsg('DEBUG', "Retrieving log entries using command: $curl_command --data-binary \"$logf\" |");
+                                        # Open a pipe to GET program
+                                        open($lfile, '-|', "$curl_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary \"$logf\". $!\n");
+                                }
+                        } elsif (!$http_download) {
+				&logmsg('DEBUG', "Retrieving log sample using command: $ssh_command \"tail -n 100 $logf\" |");
+                                # Open a pipe to cat program
+                                open($lfile, '-|', "$ssh_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
+                        } else {
+				&logmsg('DEBUG', "Retrieving log sample using command: $curl_command --data-binary --max-filesize 102400 \"$logf\" |");
+                                # Open a pipe to GET program
+                                open($lfile, '-|', "$curl_command --data-binary --max-filesize 102400 \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary --max-filesize 102400 \"$logf\". $!\n");
+                        }
 		}
 		$totalsize = 0 if ($logf eq '-');
 		$iscompressed = 0;
@@ -14595,27 +14629,36 @@ sub get_log_file
 			$uncompress = $xzcat;
 			$sample_cmd = 'xzgrep';
 		}
-		if (!$remote_host) {
+
+		if (!$remote_host && !$http_download) {
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
 			open($lfile, '-|', "$uncompress \"$logf\"") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
 		} else {
 			if (!$sample_only) {
-				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
-				# Open a pipe to zcat program for compressed log
-				open($lfile, '-|', "$ssh_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
-			} else {
-				&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
-				# Open a pipe to zcat program for compressed log
-				open($lfile, '-|', "$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+				if (!$http_download) {
+					&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
+					# Open a pipe to zcat program for compressed log
+					open($lfile, '-|', "$ssh_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
+				} else {
+					&logmsg('DEBUG', "Retrieving log entries using command: $curl_command \"$logf\" | $uncompress |");
+					# Open a pipe to GET program
+					open($lfile, '-|', "$curl_command \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command \"$logf\". $!\n");
+				}
+                        } elsif (!$http_download) {
+                                &logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
+                                # Open a pipe to zcat program for compressed log
+                                open($lfile, '-|', "$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+                        } else {
+                                # Open a pipe to GET program
+                                open($lfile, '-|', "$curl_command --max-filesize 102400 \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command --max-filesize 102400 \"$logf\" | $uncompress . $!\n");
 			}
 		}
-
 
 		# Real size of the file is unknown, try to find it
 		# bz2 does not report real size
 		$totalsize = 0;
-		if ($logf =~ /\.(gz|zip|xz)$/i) {
+		if ($logf =~ /\.(gz|zip|xz)$/i && !$http_download) {
 			my $cmd_file_size = $gzip_uncompress_size;
 			if ($logf =~ /\.zip$/i) {
 				$cmd_file_size = $zip_uncompress_size;
@@ -14623,14 +14666,16 @@ sub get_log_file
 				$cmd_file_size = $xz_uncompress_size;
 			}			
 			$cmd_file_size =~ s/\%f/$logf/g;
-			if (!$remote_host) {
+			if (!$remote_host && !$http_download) {
 				&logmsg('DEBUG', "Looking for file size using command: $cmd_file_size");
 				$totalsize = `$cmd_file_size`;
-			} else {
-				&logmsg('DEBUG', "Looking for remote file size using command: $ssh_command $cmd_file_size");
-				$totalsize = `$ssh_command $cmd_file_size`;
+                        } else {
+                                &logmsg('DEBUG', "Looking for remote file size using command: $ssh_command $cmd_file_size");
+                                $totalsize = `$ssh_command $cmd_file_size`;
 			}
 			chomp($totalsize);
+		} elsif ($http_download) {
+			&logmsg('DEBUG', "With http access size real size of a compressed file is unknown.");
 		}
 		$queue_size = 0;
 	}
