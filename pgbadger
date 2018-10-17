@@ -744,6 +744,14 @@ $top ||= 20;
 # Set timezone
 $timezone = ((0-$timezone)*3600);
 $log_timezone = ((0-$log_timezone)*3600);
+if (!$timezone) {
+	my @lt = localtime();
+	my @gt = gmtime();
+	my $hour_diff = $gt[2] - $lt[2];
+	my $min_diff  = $gt[1] - $lt[1];
+	$hour_diff += $lt[8];
+	$timezone = ($hour_diff * 3600) + ($min_diff * 60);
+}
 
 # Set the default extension and output format
 if (!$extension) {
