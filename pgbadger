@@ -348,7 +348,7 @@ my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
 
-my $curl_command = 'curl -s ';
+my $curl_command = 'curl -k -s ';
 
 # OBSOLETE, to be removed
 # List of regex that match fatal error message that do not
