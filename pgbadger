@@ -2685,7 +2685,12 @@ sub process_file
 	# Parse PostgreSQL log file with CSV format
 	} elsif ($fmt eq 'csv') {
 
+		if ($queue_size > 1 || $job_per_file > 1) {
+			&logmsg('WARNING', "parallel processing is disabled with csvlog format.");
+		}
+
 		require Text::CSV_XS;
+
 		my $csv = Text::CSV_XS->new(
 			{
 				binary => 1,
@@ -2698,7 +2703,6 @@ sub process_file
 		# Parse csvlog lines
 		CSVLOOP: while (!$csv->eof()) {
 			while (my $row = $csv->getline($lfile)) {
-
 				$row =~ s/\r//;
 
 				# We received a signal
