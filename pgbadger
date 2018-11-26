@@ -548,18 +548,10 @@ if (open(my $out, '>', $PID_FILE)) {
 &compute_arg_list();
 
 # If pgBadger must parse remote files set the ssh command
-if ($remote_host) {
-	# If no user defined ssh command
-	if (!$ssh_command) {
-		$ssh_command = $ssh_bin || 'ssh';
-		$ssh_command .= " -i $ssh_identity" if ($ssh_identity);
-		$ssh_command .= " $ssh_options" if ($ssh_options);
-		if ($ssh_user) {
-			$ssh_command .= " $ssh_user\@$remote_host";
-		} else {
-			$ssh_command .= " $remote_host";
-		}
-	}
+# If no user defined ssh command have been set
+my $remote_command = '';
+if ($remote_host && !$ssh_command) {
+	$remote_command = &set_ssh_command($ssh_command, $remote_host);
 }
 
 # Add journalctl command to the file list if not already found
@@ -573,40 +565,10 @@ if ($journalctl_cmd) {
 # Log files to be parsed are passed as command line arguments
 my $empty_files = 1;
 if ($#ARGV >= 0) {
-	foreach my $file (@ARGV) {
-		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
-			push(@log_files, $file);
-			$empty_files = 0;
-		} elsif ($file ne '-') {
-			if (!$remote_host && $file !~ /^http[s]*:|ftp:/i) {
-				localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
-				if (-z $file) {
-					print "WARNING: file $file is empty\n" if (!$quiet);
-					next;
-				}
-				push(@log_files, $file);
-				$empty_files = 0;
-			} elsif ($file !~ /^http[s]*:|ftp:/i) {
-				# Get files from remote host
-				&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
-				my @rfiles = `$ssh_command "ls $file"`;
-				foreach my $f (@rfiles) {
-					push(@log_files, $f);
-				}
-				$empty_files = 0;
-			} else {
-				push(@log_files, $file);
-				$empty_files = 0;
-			}
-		} else {
-			if ($logfile_list) {
-				localdie("FATAL: stdin input - can not be used with logfile list (-L).\n");
-			}
-			push(@log_files, $file);
-			$empty_files = 0;
-		}
+	foreach my $file (@ARGV)
+	{
+		push(@log_files, &set_file_list($file));
 	}
-
 }
 
 # Read list of log file to parse from a file
@@ -627,26 +589,7 @@ if ($logfile_list) {
 		if ($file eq '-') {
 			localdie("FATAL: stdin input - can not be used with logfile list.\n");
 		}
-		if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
-			push(@log_files, $file);
-			$empty_files = 0;
-		} elsif (!$remote_host) {
-			localdie("FATAL: logfile $file must exist!\n") if (not -f $file);
-			if (-z $file) {
-				print "WARNING: file $file is empty\n" if (!$quiet);
-				next;
-			}
-			$empty_files = 0;
-			push(@log_files, $file);
-		} else {
-			# Get files from remote host
-			&logmsg('DEBUG', "Looking for remote filename using command: $ssh_command \"ls $file\"");
-			my @rfiles = `$ssh_command "ls $file"`;
-			foreach my $f (@rfiles) {
-				push(@log_files, $f);
-			}
-			$empty_files = 0;
-		}
+		push(@log_files, &set_file_list($file));
 	}
 }
 
@@ -709,34 +652,11 @@ my @pgb_prefix_params = ();
 my @pgb_prefix_parse1 = ();
 my @pgb_prefix_parse2 = ();
 
-# Set default format, with multiple files format will be autodetected each time.i
-# This default format will be used when the autodetection fail.
-my $frmt = '';
-if (!$rebuild) {
-	if (!$remote_host && ($ARGV[0] ne '-')) {
-		if ($journalctl_cmd) {
-			$frmt = 'syslog2';
-		} else {
-			$frmt = &autodetect_format($log_files[0]);
-		}
-	} elsif (!$format && ($ARGV[0] ne '-')) {
-		if ($journalctl_cmd) {
-			$frmt = 'syslog2';
-		} else {
-			$frmt = &autodetect_format($log_files[0]);
-		}
-	} elsif (!$format && ($ARGV[0] eq '-')) {
-		&logmsg('LOG', "unknown log format with stdin input, assuming stderr. Use -f if to change it.");
-		# Assume default log format is stderr with input from stdin
-		$frmt = 'stderr';
-	}
-} else {
-	if (!$incremental) {
-		print STDERR "WARNING: --rebuild require incremental mode, activating it.\n"
-	}
+# Force incremental mode when rebuild mode is used
+if ($rebuild && !$incremental) {
+	print STDERR "WARNING: --rebuild require incremental mode, activating it.\n";
 	$incremental = 1;
 }
-$format ||= $frmt;
 
 # Set default top query
 $top ||= 20;
@@ -1320,7 +1240,6 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 			}
 		}
 	}
-
 }
 
 # Main loop reading log files
@@ -1330,8 +1249,16 @@ chomp(@given_log_files);
 # Append journalctl command at top of log file list
 unshift(@given_log_files, $journalctl_cmd) if ($journalctl_cmd);
 
+# Store globaly total size for each log files
+my %file_size = ();
+foreach my $logfile ( @given_log_files ) {
+	$file_size{$logfile} = &get_file_size($logfile);
+	$global_totalsize += $file_size{$logfile} if ($file_size{$logfile} > 0);
+}
+
 # Verify that the file has not changed for incremental move
-if (!$remote_host) {
+if ($incremental && !$remote_host)
+{
 	my @tmpfilelist = ();
 	# Removed files that have already been parsed during previous runs
 	foreach my $f (@given_log_files) {
@@ -1346,6 +1273,7 @@ if (!$remote_host) {
 			}
 			&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
 			push(@tmpfilelist, "$f $since");
+
 		} else {
 
 			# Auto detect log format for proper parsing
@@ -1355,14 +1283,14 @@ if (!$remote_host) {
 			$fmt = set_parser_regex($fmt);
 
 			if (($fmt ne 'pgbouncer') && ($saved_last_line{current_pos} > 0)) {
-				my ($retcode, $msg) = &check_file_changed($f, $fmt, $saved_last_line{datetime}, $saved_last_line{current_pos});
+				my ($retcode, $msg) = &check_file_changed($f, $file_size{$f}, $fmt, $saved_last_line{datetime}, $saved_last_line{current_pos});
 				if (!$retcode) {
 					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
 				} else {
 					push(@tmpfilelist, $f);
 				}
 			} elsif (($fmt eq 'pgbouncer') && ($pgb_saved_last_line{current_pos} > 0)) {
-				my ($retcode, $msg) = &check_file_changed($f, $fmt, $pgb_saved_last_line{datetime}, $pgb_saved_last_line{current_pos});
+				my ($retcode, $msg) = &check_file_changed($f, $file_size{$f}, $fmt, $pgb_saved_last_line{datetime}, $pgb_saved_last_line{current_pos});
 				if (!$retcode) {
 					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
 				} else {
@@ -1375,23 +1303,36 @@ if (!$remote_host) {
 	}
 	@given_log_files = ();
 	push(@given_log_files, @tmpfilelist);
-
-} else {
-
-	# Disable multi process when using ssh to parse remote log
-	if ($queue_size > 1) {
-		&logmsg('DEBUG', "parallel processing through ssh is not supported with remote file.");
-	}
-	$queue_size = 1;
 }
 
-# Disable parallel processing in binary mode
-if ($format eq 'binary') {
-	if (($queue_size > 1) || ($job_per_file > 1)) {
-		&logmsg('DEBUG', "parallel processing is not supported with binary format.") if (!$quiet);
+####
+# Function used to validate the possibility to use process on the given
+# file. Returns 1 when all multiprocess can be used, 0 when we can not
+# use multiprocess on a single file (remore file) and -1 when parallel
+# process can not be used too (binary mode).
+####
+sub confirm_multiprocess
+{
+	my $file = shift;
+
+	if ($remote_host || $file =~ /^(http[s]*|ftp[s]*|ssh):/) {
+
+		# Disable multi process when using ssh to parse remote log
+		if ($queue_size > 1) {
+			&logmsg('DEBUG', "parallel processing is not supported with remote files.");
+		}
+		return 0;
 	}
-	$queue_size = 1;
-	$job_per_file = 1;
+
+	# Disable parallel processing in binary mode
+	if ($format eq 'binary') {
+		if (($queue_size > 1) || ($job_per_file > 1)) {
+			&logmsg('DEBUG', "parallel processing is not supported with binary format.") if (!$quiet);
+		}
+		return -1;
+	}
+
+	return 1;
 }
 
 # Pipe used for progress bar in multiprocess
@@ -1403,150 +1344,145 @@ if (!$last_parsed) {
 	$pgb_saved_last_line{current_pos} = 0;
 }
 
-# Start parsing all given files using multiprocess
-if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
+####
+# Start parsing all log files
+####
 
-	# Number of running process
-	my $child_count = 0;
-	# Set max number of parallel process
-	my $parallel_process = $queue_size;
-	if ($job_per_file > 1) {
-		$parallel_process = $job_per_file;
-	}
-	# Store total size of the log files
-	foreach my $logfile ( @given_log_files ) {
-		$global_totalsize += &get_log_file($logfile);
-	}
+# Number of running process
+my $child_count = 0;
+# Set max number of parallel process
+my $parallel_process = 0;
 
-	# Open a pipe for interprocess communication
-	my $reader = new IO::Handle;
-	my $writer = new IO::Handle;
-	$pipe = IO::Pipe->new($reader, $writer);
-	$writer->autoflush(1);
+# Open a pipe for interprocess communication
+my $reader = new IO::Handle;
+my $writer = new IO::Handle;
+$pipe = IO::Pipe->new($reader, $writer);
+$writer->autoflush(1);
 
-	# Fork the logger process
-	if ($progress) {
-		spawn sub {
-			&multiprocess_progressbar($global_totalsize);
-		};
-	}
+# Fork the logger process
+if ($progress) {
+	spawn sub {
+		&multiprocess_progressbar($global_totalsize);
+	};
+}
 
-	# Parse each log file following the multiprocess mode chosen (-j or -J)
-	foreach my $logfile ( @given_log_files ) {
-
-		while ($child_count >= $parallel_process) {
-			my $kid = waitpid(-1, WNOHANG);
-			if ($kid > 0) {
-				$child_count--;
-				delete $RUNNING_PIDS{$kid};
-			}
-			sleep(1);
-		}
-
-		# Get log format of the current file
-		my $fmt = $format || 'stderr';
-		if ($logfile ne '-' && !$journalctl_cmd) {
-			$fmt = &autodetect_format($logfile);
-			$fmt ||= $format;
-			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
+# Parse each log file following the multiprocess mode chosen (-j or -J)
+foreach my $logfile ( @given_log_files )
+{
+	# Confirm if we can use multiprocess for this file
+	my $pstatus = confirm_multiprocess($logfile);
+	if ($pstatus >= 0) {
+		if ($pstatus = 1 && $job_per_file > 1) {
+			$parallel_process = $job_per_file;
 		} else {
-			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
+			$parallel_process = $queue_size;
 		}
-
-		# Set regex to parse the log file
-		$fmt = set_parser_regex($fmt);
-
-		# Do not use split method with compressed files and stdin
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile ne '-') &&
-						 (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) ) {
-			# Create multiple processes to parse one log file by chunks of data
-			my @chunks = split_logfile($logfile, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
-			&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
-			for (my $i = 0; $i < $#chunks; $i++) {
-				while ($child_count >= $parallel_process) {
-					my $kid = waitpid(-1, WNOHANG);
-					if ($kid > 0) {
-						$child_count--;
-						delete $RUNNING_PIDS{$kid};
-					}
-					sleep(1);
-				}
-				localdie("FATAL: Abort signal received when processing to next chunk\n") if ($interrupt == 2);
-				last if ($interrupt);
-				push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
-				spawn sub {
-					&process_file($logfile, $fmt, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
-				};
-				$child_count++;
-			} 
-
-		} else {
-			# Start parsing one file per parallel process
-			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
-			spawn sub {
-				&process_file($logfile, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
-			};
-			$child_count++;
-
-		}
-
-		localdie("FATAL: Abort signal received when processing next file\n") if ($interrupt == 2);
-		last if ($interrupt);
+	} else {
+		$parallel_process = 1;
 	}
 
-	my $minproc = 1;
-	$minproc = 0 if (!$progress);
-	# Wait for all child processes to localdie except for the logger
-	while (scalar keys %RUNNING_PIDS > $minproc) {
+	# Wait until a child dies if max parallel processes is reach
+	while ($child_count >= $parallel_process) {
 		my $kid = waitpid(-1, WNOHANG);
 		if ($kid > 0) {
+			$child_count--;
 			delete $RUNNING_PIDS{$kid};
 		}
 		sleep(1);
 	}
 
-	# Terminate the process logger
-	foreach my $k (keys %RUNNING_PIDS) {
-		kill('USR1', $k);
-		%RUNNING_PIDS = ();
+	# Get log format of the current file
+	my $fmt = $format || 'stderr';
+	my $logfile_orig = $logfile;
+	if ($logfile ne '-' && !$journalctl_cmd) {
+		$fmt = &autodetect_format($logfile, $file_size{$logfile});
+		$fmt ||= $format;
+		# Remove log format from filename if any
+		$logfile =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
+		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
+	} else {
+		&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
 	}
 
-	# Clear previous statistics
-	&init_stats_vars();
+	# Set the regex to parse the log file following the format
+	$fmt = set_parser_regex($fmt);
 
-	# Load all data gathered by all the different processes
-	foreach my $f (@tempfiles) {
-		next if (!-e "$f->[1]" || -z "$f->[1]");
-		my $fht = new IO::File;
-		$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
-		&load_stats($fht);
-		$fht->close();
-	}
+	# Do not use split method with remote and compressed files, stdin or journalctl command
+	if ( ($parallel_process > 1) && ($queue_size > 1) &&
+			($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile ne '-') &&
+			($logfile !~ /^(http[s]*|ftp[s]*|ssh):/i) &&
+			 (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/))
+		) {
 
-} else {
-
-	# Multiprocessing disabled, parse log files one by one
-	foreach my $logfile ( @given_log_files ) {
-
-		# Get log format of the current file
-		my $fmt = $format || 'stderr';
-		if (!$journalctl_cmd && $logfile ne '-') {
-			$fmt = &autodetect_format($logfile);
-			$fmt ||= $format;
-			&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
-		} else {
-			&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
+		# Create multiple processes to parse one log file by chunks of data
+		my @chunks = split_logfile($logfile, $file_size{$logfile_orig}, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
+		&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
+		for (my $i = 0; $i < $#chunks; $i++) {
+			while ($child_count >= $parallel_process) {
+				my $kid = waitpid(-1, WNOHANG);
+				if ($kid > 0) {
+					$child_count--;
+					delete $RUNNING_PIDS{$kid};
+				}
+				sleep(1);
+			}
+			localdie("FATAL: Abort signal received when processing to next chunk\n") if ($interrupt == 2);
+			last if ($interrupt);
+			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
+			spawn sub {
+				&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
+			};
+			$child_count++;
 		}
 
-		# Set regex to parse the log file 
-		$fmt = set_parser_regex($fmt);
-
-		last if (&process_file($logfile, $fmt, '', ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos}));
+	} else {
+		# Start parsing one file per parallel process
+		push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
+		spawn sub {
+			&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
+		};
+		$child_count++;
 	}
+
+	localdie("FATAL: Abort signal received when processing next file\n") if ($interrupt == 2);
+	last if ($interrupt);
+}
+
+my $minproc = 1;
+$minproc = 0 if (!$progress);
+# Wait for all child processes to localdie except for the logger
+while (scalar keys %RUNNING_PIDS > $minproc)
+{
+	my $kid = waitpid(-1, WNOHANG);
+	if ($kid > 0) {
+		delete $RUNNING_PIDS{$kid};
+	}
+	sleep(1);
+}
+
+# Terminate the process logger
+foreach my $k (keys %RUNNING_PIDS)
+{
+	kill('USR1', $k);
+	%RUNNING_PIDS = ();
+}
+
+# Clear previous statistics
+&init_stats_vars();
+
+# Load all data gathered by all the different processes
+foreach my $f (@tempfiles)
+{
+	next if (!-e "$f->[1]" || -z "$f->[1]");
+	my $fht = new IO::File;
+	$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
+	&load_stats($fht);
+	$fht->close();
 }
 
 # Get last line parsed from all process
-if ($last_parsed) {
+if ($last_parsed)
+{
 	if (open(my $in, '<', $tmp_last_parsed) ) {
 		while (my $line = <$in>) {
 			chomp($line);
@@ -1935,6 +1871,100 @@ it will also update all resource files (JS and CSS).
 };
 
 	exit 0;
+}
+
+sub set_ssh_command
+{
+	my ($ssh_cmd, $rhost) = @_;
+
+	#http://www.domain.com:8080/file.log:format
+	#ftp://www.domain.com/file.log:format
+	#ssh:root@domain.com:file.log:format
+
+	# Extract format part
+	my $fmt = '';
+	if ($rhost =~ s/\|([a-z2]+)$//) {
+		$fmt = $1;
+	}
+
+	$ssh_cmd = $ssh_bin || 'ssh';
+	$ssh_cmd .= " -i $ssh_identity" if ($ssh_identity);
+	$ssh_cmd .= " $ssh_options" if ($ssh_options);
+	if ($ssh_user && $rhost !~ /\@/) {
+		$ssh_cmd .= " $ssh_user\@$rhost";
+	} else {
+		$ssh_cmd .= " $rhost";
+	}
+
+	if (wantarray()) {
+		return ($ssh_cmd, $fmt);
+	} else {
+		return $ssh_cmd;
+	}
+}
+
+sub set_file_list
+{
+	my $file = shift;
+
+	my @lfiles = ();
+
+	my $file_orig = $file;
+	my $fmt = '';
+	# Remove log format from log file if any
+	if ($file =~ s/(:(?:stderr|csvlog|syslog|pgbouncer)\d*)$//i) {
+		$fmt = $1;
+	}
+
+	# Store the journalctl command as is we will create a pipe from this command
+	if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
+		push(@lfiles, $file_orig);
+		$empty_files = 0;
+	# Input from stdin
+	} elsif ($file eq '-') {
+		if ($logfile_list) {
+			localdie("FATAL: stdin input - can not be used with logfile list (-L).\n");
+		}
+		push(@lfiles, $file_orig);
+		$empty_files = 0;
+	# For input from other sources than stdin
+	} else {
+		# if it is not a remote file store the file if it is not an empty file
+		if (!$remote_host && $file !~ /^(http[s]*:|[s]*ftp:|ssh:)/i) {
+			localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
+			if (-z $file) {
+				print "WARNING: file $file is empty\n" if (!$quiet);
+				next;
+			}
+			push(@lfiles, $file_orig);
+			$empty_files = 0;
+		# if this is a remote file extract the list of files using a ssh command
+		} elsif ($file !~ /^(http[s]*:|[s]*ftp:)/i) {
+			# Get files from remote host
+			if ($file !~ /^ssh:/) {
+				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls $file\"");
+				my @rfiles = `$remote_command "ls $file"`;
+				foreach my $f (@rfiles) {
+					push(@lfiles, "$f$fmt");
+				}
+			} elsif ($file =~ m#^ssh://([^\/]+)/(.*)#) {
+				my $host_info = $1;
+				my $file = $2;
+				my $ssh = $ssh_command || 'ssh';
+				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls $file\"");
+				my @rfiles = `$ssh $host_info "ls $file"`;
+				foreach my $f (@rfiles) {
+					push(@lfiles, "ssh://$host_info/$f$fmt");
+				}
+			}
+			$empty_files = 0;
+		# this is remote file extracted using http/ftp protocol, store the uri
+		} else {
+			push(@lfiles, $file_orig);
+			$empty_files = 0;
+		}
+	}
+	return @lfiles;
 }
 
 # Get inbounds of query times histogram
@@ -2458,12 +2488,12 @@ sub update_progress_bar
 ####
 sub process_file
 {
-	my ($logfile, $fmt, $tmpoutfile, $start_offset, $stop_offset, $chunk_pos) = @_;
+	my ($logfile, $totalsize, $fmt, $tmpoutfile, $start_offset, $stop_offset, $chunk_pos) = @_;
 
 	my $old_queries_count = 0;
 	my $old_errors_count  = 0;
 	my $getout            = 0;
-	my $http_download     = ($logfile =~ /^http[s]*:|ftp:/i) ? 1 : 0;
+	my $http_download     = ($logfile =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 
 	$start_offset       ||= 0;
 
@@ -2472,9 +2502,9 @@ sub process_file
 	&init_stats_vars() if ($tmpoutfile);
 
 	if (!$remote_host) {
-		&logmsg('DEBUG', "Starting to parse log file: $logfile");
+		&logmsg('DEBUG', "Processing log file: $logfile");
 	} else {
-		&logmsg('DEBUG', "Starting to parse remote log file: $remote_host:$logfile");
+		&logmsg('DEBUG', "Processing remote log file: $remote_host:$logfile");
 	}
 
 	local $SIG{INT} = sub { print STDERR "Received SIGINT abort parsing...\n"; unlink("$PID_FILE"); $terminate = 1; };
@@ -2491,11 +2521,12 @@ sub process_file
 
 	my $cursize = 0;
 
-	# Get file handle and size of the file
-	my ($lfile, $totalsize) = &get_log_file($logfile);
-	if ($logfile ne '-') {
-
-		if ($progress && ($getout != 1)) {
+	# Get a filehandle to the log file
+	my $lfile = &get_log_file($logfile, $totalsize);
+	if ($logfile ne '-')
+	{
+		if ($progress && ($getout != 1))
+		{
 			if (!$tmpoutfile) {
 				if ($totalsize) {
 					print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
@@ -2513,7 +2544,7 @@ sub process_file
 	}
 
 	# Reset the start position if file is smaller that the current start offset
-	if ($start_offset > $totalsize) {
+	if ($totalsize > -1 && $start_offset > $totalsize) {
 		&logmsg('DEBUG', "Starting offset $start_offset is greater than total size $totalsize for file $logfile");
 		&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
 		$start_offset = 0 ;
@@ -2522,7 +2553,7 @@ sub process_file
 	# Check if the first date in the log are after the last date saved
 	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv') && !$http_download) {
 		if ($start_offset && !$chunk_pos) {
-			my ($retcode, $msg) = check_file_changed($logfile, $fmt, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
+			my ($retcode, $msg) = check_file_changed($logfile, $file_size{$logfile}, $fmt, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
 			if ($retcode) {
 				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile, $msg");
 				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
@@ -2570,8 +2601,8 @@ sub process_file
 			# Move to the starting offset position in file
 			$lfile->seek($start_offset, 0);
 		}
-		while (my $line = <$lfile>) {
-
+		while (my $line = <$lfile>)
+		{
 			# We received a signal
 			last if ($terminate);
 
@@ -2824,6 +2855,8 @@ sub process_file
 		if ($start_offset) {
 			# Move to the starting offset position in file
 			$lfile->seek($start_offset, 0);
+		} else {
+			$lfile->seek(0, 0);
 		}
 		while (my $line = <$lfile>) {
 
@@ -3411,15 +3444,16 @@ sub store_current_timestamp
 # start up. Here we just verify that the first date in file is before the last incremental date.
 sub check_file_changed
 {
-	my ($file, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
+	my ($file, $totalsize, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
 
 	# Incremental mode is not possible for the moment with http download
-	return 1 if ($file =~ /^http[s]*:|ftp:/);
+	return 1 if ($file =~ /^(http[s]*:|[s]*ftp:)/);
 
-	my ($lfile, $totalsize, $iscompressed) = &get_log_file($file);
+	my $lfile = &get_log_file($file, $totalsize);
 	return if (!defined $lfile);
 
 	# Compressed files do not allow seeking
+	my $iscompressed   = ($file =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
 	if ($iscompressed) {
 		close($lfile);
 		return (1, "log file is compressed");
@@ -13355,7 +13389,7 @@ sub parse_query
 /incomplete startup packet|connection|receive|unexpected EOF|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
-			&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
+			#&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
 		}
 		return;
 	}
@@ -14161,6 +14195,7 @@ sub average_per_minutes
 sub autodetect_format
 {
 	my $file = shift;
+	my $totalsize = shift;
 
 	# a file must be passed
 	return if (!$file);
@@ -14171,9 +14206,17 @@ sub autodetect_format
 	my $fmt    = '';
 	my %ident_name = ();
 	my $fltf;
-	my $http_download  = ($file =~ /^http[s]*:|ftp:/i) ? 1 : 0;
+	my $http_download  = ($file =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
+	my $ssh_download   = ($file =~ /^ssh:/i) ? 1 : 0;
 
-	if (!$remote_host && !$http_download) {
+	# If log format is given at end of the filename, remove it and return the format
+	# Ex: ssh://remotehost/postgresql-10.log:csvlog
+	if ($file =~ s#:(syslog|csvlog|stderr|pgbouncer)\d*$##) {
+		&logmsg('DEBUG', "Autodetected log format '$1' from URI '$file'");
+		return $1;
+	}
+
+	if (!$remote_host && !$http_download && !$ssh_download) {
 		if (open(my $in, '<', $file)) {
 			$fltf = <$in>;
 			close($in);
@@ -14188,7 +14231,7 @@ sub autodetect_format
 	}
 	elsif (!$http_download) {
 		# try to detect syslogs, stderr, csv jsonlog or pgbouncer format
-		my ($tfile, $totalsize) = &get_log_file($file, $remote_host);
+		my $tfile = &get_log_file($file, $totalsize, $remote_host);
 		if (defined $tfile) {
 			while (my $line = <$tfile>) {
 				chomp($line);
@@ -14209,7 +14252,11 @@ sub autodetect_format
 		}
 
 	} elsif (!$format) {
-		localdie("FATAL: with http files you need to specify the log format, please use -f option.\n");
+		if (!$http_download) {
+			localdie("FATAL: with http files you need to specify the log format, please use -f option.\n");
+		} else {
+			localdie("FATAL: with http files you need to specify the log format, append it to the uri.\n");
+		}
 	}
 
 	# When --pgbouncer-only is used force the format
@@ -14316,7 +14363,7 @@ sub progress_bar
 	$width ||= 25;
 	$char  ||= '=';
 	my $num_width = length $total;
-	my $nchars = (($width - 1) * $got / $total);
+	my $nchars = (($width - 1) * $got / ($total||1));
 	$nchars = ($width - 1) if ($nchars >= $width);
 	if ($is_tsung_output) {
 		sprintf(
@@ -14334,7 +14381,7 @@ sub progress_bar
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
 			$char x $nchars . '>',
-			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
+			$got, $total, 100 * $got / (+$total||1), ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
 		);
 	}
 }
@@ -14565,67 +14612,146 @@ sub build_log_line_prefix_regex
 	);
 }
 
-sub get_log_file
+####
+# get_file_size: in scalar context returns the size of the file,
+#       in list context returns the size of the file and a boolean
+#       to indicate if the file is compressed.
+#       The total size returnied is set to -1 when pgbadger can not
+#       determine the file size (remote file, bzip2 conmpressed file
+#       and privilege issue). Outside these cases if we can't get size
+#       of a remote file pgbadger exit with a fatal error.
+####
+sub get_file_size
 {
 	my $logf = shift;
-	my $sample_only = shift;
 
-	my $lfile = undef;
-	my $iscompressed = 1;
-	my $http_download  = ($logf =~ /^http[s]*:|ftp:/i) ? 1 : 0;
+	# Remove log format from log file if any
+	$logf =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
 
-	chomp($logf);
+	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
+	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
+	my $iscompressed   = ($logf =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
 
-	# get file size
+	# Get file size
 	my $totalsize = 0;
+
+	# Log entries extracted from journalctl command are of indetermined size
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
-		$totalsize = 0;
-	} elsif (!$remote_host && !$http_download) {
-		$totalsize = (stat("$logf"))[7] || 0 if ($logf ne '-');
-	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
+		$totalsize = -1;
+	# Same from stdin
+	} elsif ($logf eq '-') {
+		$totalsize = -1;
+	# Regular local files can be "stated"
+	} elsif (!$remote_host && !$http_download && !$ssh_download) {
+		eval {
+			$totalsize = (stat("$logf"))[7];
+		};
+		$totalsize = -1 if ($@);
+	# For uncompressed files try to get the size following the protocol
+	} elsif (!$iscompressed) {
+		# Use curl to try to get remote file size if it is not compressed
 		if ($http_download) {
 			&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
 			$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
+			chomp($totalsize);
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\"\n") if ($totalsize eq '');
+		} elsif ($ssh_download && $logf =~ m#^ssh:\/\/([^\/]+)/(.*)#i) {
+			my $host_info = $1;
+			my $file = $2;
+			my $ssh = $ssh_command || 'ssh';
+			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l $file\" | awk '{print \$5}'");
+			$totalsize = `$ssh $host_info "ls -l $file" | awk '{print \$5}'`;
+			chomp($totalsize);
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh $host_info \"ls -l $file\"\n") if ($totalsize eq '');
 		} elsif ($remote_host) {
-			&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
-			$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
+			&logmsg('DEBUG', "Looking for file size using command: $remote_command \"ls -l $logf\" | awk '{print \$5}'");
+			$totalsize = `$remote_command "ls -l $logf" | awk '{print \$5}'`;
+			chomp($totalsize);
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\"\n") if ($totalsize eq '');
 		}
                 chomp($totalsize);
-		if ($totalsize eq '' && $remote_host) {
-			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'\n");
-		} elsif ($totalsize eq '' && $http_download) {
-			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'\n");
-		}
+
 		&logmsg('DEBUG', "Remote file size: $totalsize");
-		if (!$totalsize) {
-			# In list context returns the filehandle and the size of the file
-			if (wantarray()) {
-				return ($lfile, $totalsize, $iscompressed);
-			} else {
-				return $totalsize;
-			}
+
+	# Real size of the file is unknown with compressed file, try to find
+	# size using uncompress command (bz2 does not report real size)
+	} elsif (!$http_download && $logf =~ /\.(gz|zip|xz)$/i) {
+
+		my $cmd_file_size = $gzip_uncompress_size;
+		if ($logf =~ /\.zip$/i) {
+			$cmd_file_size = $zip_uncompress_size;
+		} elsif ($logf =~ /\.xz$/i) {
+			$cmd_file_size = $xz_uncompress_size;
 		}
+		if (!$remote_host && !$http_download && !$ssh_download) {
+			$cmd_file_size =~ s/\%f/$logf/g;
+			&logmsg('DEBUG', "Looking for file size using command: $cmd_file_size");
+			$totalsize = `$cmd_file_size`;
+		} elsif ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+			my $host_info = $1;
+			my $file = $2;
+			my $ssh = $ssh_command || 'ssh';
+			$cmd_file_size =~ s/\%f/$file/g;
+			$cmd_file_size =~ s/\$/\\\$/g;
+			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"$cmd_file_size\"");
+			$totalsize = `$ssh $host_info \"$cmd_file_size\"`;
+		} else {
+			$cmd_file_size =~ s/\%f/$logf/g;
+			$cmd_file_size =~ s/\$/\\\$/g;
+			&logmsg('DEBUG', "Looking for remote file size using command: $remote_command \"$cmd_file_size\"");
+			$totalsize = `$remote_command \"$cmd_file_size\"`;
+		}
+		chomp($totalsize);
+
+	} elsif ($http_download) {
+		&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
+		$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
+		chomp($totalsize);
+		localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\"\n") if ($totalsize eq '');
+		&logmsg('DEBUG', "With http access size real size of a compressed file is unknown but use Content-Length wirth compressed side.");
 	}
 
-	# Open a file handle
+	return $totalsize;
+}
+
+sub get_log_file
+{
+	my $logf = shift;
+	my $totalsize = shift;
+	my $sample_only = shift;
+
+	my $lfile = undef;
+
+	return $lfile if ($totalsize == 0);
+
+	$logf =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
+
+	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
+	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
+	my $iscompressed   = ($logf =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
+
+	chomp($logf);
+
+	# Open and return a file handle to parse the log
 	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
 		# For journalctl command we need to use a pipe as file handle
 		if (!$remote_host) {
 			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of command: $logf. $!\n");
 		} else {
 			if (!$sample_only) {
-				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf\" |");
+				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"$logf\" |");
 				# Open a pipe to remote journalctl program
-				open($lfile, '-|', "$ssh_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf\". $!\n");
+				open($lfile, '-|', "$remote_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$logf\". $!\n");
 			} else {
-				&logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \"$logf -n 100\" |");
+				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"$logf -n 100\" |");
 				# Open a pipe to remote journalctl program
-				open($lfile, '-|', "$ssh_command \"$logf -n 100\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$logf -n 100\". $!\n");
+				open($lfile, '-|', "$remote_command \"$logf -n 100\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$logf -n 100\". $!\n");
 			}
 		}
-		$iscompressed = 0;
-	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
-		if (!$remote_host && !$http_download) {
+
+	} elsif (!$iscompressed) {
+
+		if (!$remote_host && !$http_download && !$ssh_download) {
 			if ($logf ne '-') {
 				open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 			} else {
@@ -14634,27 +14760,50 @@ sub get_log_file
 		} else {
                         if (!$sample_only) {
                                 if (!$http_download) {
-                                        &logmsg('DEBUG', "Retrieving log entries using command: $ssh_command \" cat $logf\" |");
-                                        # Open a pipe to cat program
-                                        open($lfile, '-|', "$ssh_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"cat $logf\". $!\n");
+					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+						my $host_info = $1;
+						my $file = $2;
+						my $ssh = $ssh_command || 'ssh';
+						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat $file\" |");
+						# Open a pipe to cat program
+						open($lfile, '-|', "$ssh $host_info \"cat $file\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat $file\". $!\n");
+					} else {
+						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \" cat $logf\" |");
+						# Open a pipe to cat program
+						open($lfile, '-|', "$remote_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"cat $logf\". $!\n");
+					}
                                 } else {
                                         &logmsg('DEBUG', "Retrieving log entries using command: $curl_command --data-binary \"$logf\" |");
                                         # Open a pipe to GET program
                                         open($lfile, '-|', "$curl_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary \"$logf\". $!\n");
                                 }
+
                         } elsif (!$http_download) {
-				&logmsg('DEBUG', "Retrieving log sample using command: $ssh_command \"tail -n 100 $logf\" |");
-                                # Open a pipe to cat program
-                                open($lfile, '-|', "$ssh_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"tail -n 100 $logf\". $!\n");
+
+				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+					my $host_info = $1;
+					my $file = $2;
+					my $ssh = $ssh_command || 'ssh';
+					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 $file\" |");
+					# Open a pipe to cat program
+					open($lfile, '-|', "$ssh $host_info \"tail -n 100 $file\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 $logf\". $!\n");
+				} else {
+					&logmsg('DEBUG', "Retrieving log sample using command: $remote_command \"tail -n 100 $logf\" |");
+					# Open a pipe to cat program
+					open($lfile, '-|', "$remote_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 $logf\". $!\n");
+				}
+
                         } else {
+
 				&logmsg('DEBUG', "Retrieving log sample using command: $curl_command --data-binary --max-filesize 102400 \"$logf\" |");
                                 # Open a pipe to GET program
                                 open($lfile, '-|', "$curl_command --data-binary --max-filesize 102400 \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary --max-filesize 102400 \"$logf\". $!\n");
+
                         }
 		}
-		$totalsize = 0 if ($logf eq '-');
-		$iscompressed = 0;
+
 	} else {
+
 		my $uncompress = $zcat;
 		my $sample_cmd = 'zgrep';
 		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
@@ -14668,97 +14817,68 @@ sub get_log_file
 			$sample_cmd = 'xzgrep';
 		}
 
-		if (!$remote_host && !$http_download) {
+		if (!$remote_host && !$http_download && !$ssh_download) {
+
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
 			open($lfile, '-|', "$uncompress \"$logf\"") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
+
 		} else {
 			if (!$sample_only) {
 				if (!$http_download) {
-					&logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
-					# Open a pipe to zcat program for compressed log
-					open($lfile, '-|', "$ssh_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$uncompress $logf\". $!\n");
+					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+						my $host_info = $1;
+						my $file = $2;
+						my $ssh = $ssh_command || 'ssh';
+						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress $file\"");
+						# Open a pipe to zcat program for compressed log
+						open($lfile, '-|', "$ssh $host_info \"$uncompress $file\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress $logf\". $!\n");
+					} else {
+						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress $logf\"");
+						# Open a pipe to zcat program for compressed log
+						open($lfile, '-|', "$remote_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress $logf\". $!\n");
+					}
 				} else {
 					&logmsg('DEBUG', "Retrieving log entries using command: $curl_command \"$logf\" | $uncompress |");
 					# Open a pipe to GET program
 					open($lfile, '-|', "$curl_command \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command \"$logf\". $!\n");
 				}
+
                         } elsif (!$http_download) {
-                                &logmsg('DEBUG', "Compressed log file, will use command: $ssh_command \"$uncompress $logf\"");
-                                # Open a pipe to zcat program for compressed log
-                                open($lfile, '-|', "$ssh_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $ssh_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+
+				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+					my $host_info = $1;
+					my $file = $2;
+					my $ssh = $ssh_command || 'ssh';
+					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress $file\"");
+					# Open a pipe to zcat program for compressed log
+					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' $file\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' $file\". $!\n");
+				} else {
+					&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress $logf\"");
+					# Open a pipe to zcat program for compressed log
+					open($lfile, '-|', "$remote_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+				}
                         } else {
                                 # Open a pipe to GET program
                                 open($lfile, '-|', "$curl_command --max-filesize 102400 \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command --max-filesize 102400 \"$logf\" | $uncompress . $!\n");
 			}
 		}
-
-		# Real size of the file is unknown, try to find it
-		# bz2 does not report real size
-		$totalsize = 0;
-		if ($logf =~ /\.(gz|zip|xz)$/i && !$http_download) {
-			my $cmd_file_size = $gzip_uncompress_size;
-			if ($logf =~ /\.zip$/i) {
-				$cmd_file_size = $zip_uncompress_size;
-			} elsif ($logf =~ /\.xz$/i) {
-				$cmd_file_size = $xz_uncompress_size;
-			}			
-			$cmd_file_size =~ s/\%f/$logf/g;
-			if (!$remote_host && !$http_download) {
-				&logmsg('DEBUG', "Looking for file size using command: $cmd_file_size");
-				$totalsize = `$cmd_file_size`;
-                        } else {
-                                &logmsg('DEBUG', "Looking for remote file size using command: $ssh_command $cmd_file_size");
-                                $totalsize = `$ssh_command $cmd_file_size`;
-			}
-			chomp($totalsize);
-		} elsif ($http_download) {
-			&logmsg('DEBUG', "With http access size real size of a compressed file is unknown.");
-		}
-		$queue_size = 0;
 	}
 
-	# In list context returns the filehandle and the size of the file
-	if (wantarray()) {
-		return ($lfile, $totalsize, $iscompressed);
-	}
-	# In scalar context return size only
-	close($lfile);
-
-	return $totalsize;
+	return $lfile;
 }
 
 sub split_logfile
 {
 	my $logf = shift;
+	my $totalsize = shift;
 	my $saved_pos = shift;
 
 	# CSV file can't be parsed using multiprocessing
 	return (0, -1) if ( $format eq 'csv' );
 
-	# get file size
-	my $totalsize = (stat("$logf"))[7] || 0;
-
-	# Real size of a compressed file is unknown, try to find it
-	# bz2 does not report real size
-	if ($logf =~ /\.(gz|zip|xz)$/i) {
-		$totalsize = 0;
-		my $cmd_file_size = $gzip_uncompress_size;
-		if ($logf =~ /\.zip$/i) {
-			$cmd_file_size = $zip_uncompress_size;
-		} elsif ($logf =~ /\.xz$/i) {
-			$cmd_file_size = $xz_uncompress_size;
-		}
-		$cmd_file_size =~ s/\%f/$logf/g;
-		$totalsize = `$cmd_file_size`;
-		chomp($totalsize);
-		return (0, $totalsize) if ($totalsize);
-	} elsif ($logf =~ /\.bz2$/i) {
-		$totalsize = 0;
-	}
-
-	# Only uncompressed file can be splitted
-	return (0, -1) if (!$totalsize);
+	# Do not split the file if we don't know his size
+	return (0, -1) if ($totalsize <= 0);
 
 	my @chunks = (0);
 	# Seek to the last saved position
@@ -14767,18 +14887,19 @@ sub split_logfile
 			$chunks[0] = $saved_pos;
 		}
 	}
-	# With small files splitting is inefficient
+	# With small files splitting is inefficient 
 	if ($totalsize <= 16777216) {
 		return ($chunks[0], $totalsize);
 	}
 	my $i = 1;
-	my ($lfile, $null) = &get_log_file($logf); # Get file handle to the file
+	my $lfile = &get_log_file($logf, $totalsize); # Get file handle to the file
 	if (defined $lfile) {
 		while ($i < $queue_size) {
 			my $pos = int(($totalsize/$queue_size) * $i);
 			if ($pos > $chunks[0]) {
 				$lfile->seek($pos, 0);
-				#Move the offset to the BEGINNING of each line, because the logic in process_file requires so
+				# Move the offset to the BEGINNING of each line, because
+				# the logic in process_file requires so
 				$pos= $pos + length(<$lfile>) - 1;
 				push(@chunks, $pos) if ($pos < $totalsize);
 			}
