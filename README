@@ -153,7 +153,7 @@ SYNOPSIS
         --normalized-only      : only dump all normalized query to out.txt
         --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
                                  that must be used to adjust date/time read from
-                                 log file before being parsed. Using this option
+                                 log file before beeing parsed. Using this option
                                  make more difficult log search with a date/time.
         --prettify-json        : use it if you want json output to be prettified.
 
