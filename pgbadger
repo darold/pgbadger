@@ -1398,7 +1398,7 @@ foreach my $logfile ( @given_log_files )
 		$fmt = &autodetect_format($logfile, $file_size{$logfile});
 		$fmt ||= $format;
 		# Remove log format from filename if any
-		$logfile =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
+		$logfile =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
 		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 	} else {
 		&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
@@ -1912,7 +1912,7 @@ sub set_file_list
 	my $file_orig = $file;
 	my $fmt = '';
 	# Remove log format from log file if any
-	if ($file =~ s/(:(?:stderr|csvlog|syslog|pgbouncer)\d*)$//i) {
+	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer)\d*)$//i) {
 		$fmt = $1;
 	}
 
@@ -2725,7 +2725,7 @@ sub process_file
 	} elsif ($fmt eq 'csv') {
 
 		if ($queue_size > 1 || $job_per_file > 1) {
-			&logmsg('WARNING', "parallel processing is disabled with csvlog format.");
+			&logmsg('WARNING', "parallel processing is disabled with csv format.");
 		}
 
 		require Text::CSV_XS;
@@ -14210,8 +14210,8 @@ sub autodetect_format
 	my $ssh_download   = ($file =~ /^ssh:/i) ? 1 : 0;
 
 	# If log format is given at end of the filename, remove it and return the format
-	# Ex: ssh://remotehost/postgresql-10.log:csvlog
-	if ($file =~ s#:(syslog|csvlog|stderr|pgbouncer)\d*$##) {
+	# Ex: ssh://remotehost/postgresql-10.log:csv
+	if ($file =~ s#:(syslog|csv|stderr|pgbouncer)\d*$##) {
 		&logmsg('DEBUG', "Autodetected log format '$1' from URI '$file'");
 		return $1;
 	}
@@ -14230,7 +14230,7 @@ sub autodetect_format
 		$fmt = 'binary';
 	}
 	elsif (!$http_download) {
-		# try to detect syslogs, stderr, csv jsonlog or pgbouncer format
+		# try to detect syslogs, stderr, csv, jsonlog or pgbouncer format
 		my $tfile = &get_log_file($file, $totalsize, $remote_host);
 		if (defined $tfile) {
 			while (my $line = <$tfile>) {
@@ -14626,7 +14626,7 @@ sub get_file_size
 	my $logf = shift;
 
 	# Remove log format from log file if any
-	$logf =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
@@ -14724,7 +14724,7 @@ sub get_log_file
 
 	return $lfile if ($totalsize == 0);
 
-	$logf =~ s/:(stderr|csvlog|syslog|pgbouncer)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
