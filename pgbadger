@@ -7692,6 +7692,13 @@ sub print_checkpoint
 		$walfile_usage_peak_date = $_;
 		last;
 	}
+	my $checkpoint_distance_peak = 0;
+	my $checkpoint_distance_peak_date = '';
+	foreach (sort {$overall_checkpoint{'peak'}{$b}{distance} <=> $overall_checkpoint{'peak'}{$a}{distance}} keys %{$overall_checkpoint{'peak'}}) {
+		$checkpoint_distance_peak = &comma_numbers(sprintf("%.2f", $overall_checkpoint{'peak'}{$_}{distance}/1024));
+		$checkpoint_distance_peak_date = $_;
+		last;
+	}
 
 	print $fh qq{
 	<h1 class="page-header"><i class="glyphicon icon-pencil"></i> Checkpoints / Restartpoints</h1>
@@ -7742,6 +7749,8 @@ $drawn_graphs{checkpointfiles_graph}
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
 			<ul>
+			<li><span class="figure">$checkpoint_distance_peak Mo</span> <span class="figure-label">Distance Peak</span></li>
+			<li><span class="figure">$checkpoint_distance_peak_date</span> <span class="figure-label">Date</span></li>    
 			</ul>
 		</div>
 	</div>
@@ -11833,6 +11842,8 @@ sub load_stats
 	foreach my $k (keys %{$_overall_checkpoint{peak}}) {
 		$overall_checkpoint{peak}{$k}{checkpoint_wbuffer} += $_overall_checkpoint{peak}{$k}{checkpoint_wbuffer};
 		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
+		$overall_checkpoint{peak}{$k}{distance} += $_overall_checkpoint{peak}{$k}{distance};
+		$overall_checkpoint{peak}{$k}{estimate} += $_overall_checkpoint{peak}{$k}{estimate};
 	}
 
 	### pgbouncer related overall stats ###
@@ -13192,6 +13203,8 @@ sub parse_query
 		if ($prefix_vars{'t_query'} =~ /; distance=(\d+) kB, estimate=(\d+) kB/) {
 			$checkpoint_info{distance}    += $1;
 			$checkpoint_info{estimate}    += $2;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{distance} += $1;
+			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{estimate} += $1;
 			if ($1 > $overall_checkpoint{distance}) {
 				$overall_checkpoint{distance} = $1;
 			}
