@@ -50,6 +50,7 @@ use IO::Pipe;
 use FileHandle;
 use Socket;
 use constant EBCDIC => "\t" ne "\011";
+use Encode qw(encode decode);
 
 $VERSION = '10.1';
 
@@ -11406,6 +11407,7 @@ sub show_error_as_html
 				$details .= "<b>Code:</b> $error_info{$k}{sqlstate}[$i]\n";
 			}
 			$details =~ s/<br\/>$//s;
+			$info = encode('UTF-8', $info);
 			print $fh qq{
 								<dt><span class="$error_level_class">$message</span></dt>
 								<p>$info</p>
@@ -12582,7 +12584,7 @@ sub highlight_code
 
 	$code =~ s/\$\$PGBGY(A|B)\$\$//gs;
 
-	return $code;
+	return encode('UTF-8', $code);
 }
 
 sub compute_arg_list
