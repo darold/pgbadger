@@ -74,6 +74,12 @@ my $EXPLAIN_URL = 'http://explain.depesz.com/?is_public=0&is_anon=0&plan=';
 my $PID_DIR = $TMP_DIR;
 my $PID_FILE = undef;
 
+# Factor used to estimate the total size of compressed file
+# when real size can not be obtained (bz2 or remote files)
+my $BZ_FACTOR = 25;
+my $GZ_FACTOR = 15;
+my $XZ_FACTOR = 18;
+
 my @E2A = (
    0,  1,  2,  3,156,  9,134,127,151,141,142, 11, 12, 13, 14, 15,
   16, 17, 18, 19,157, 10,  8,135, 24, 25,146,143, 28, 29, 30, 31,
@@ -575,19 +581,23 @@ if ($#ARGV >= 0) {
 # Read list of log file to parse from a file
 if ($logfile_list) {
 
-	if (!-e $logfile_list) {
+	if (!-e $logfile_list)
+	{
 		localdie("FATAL: logfile list $logfile_list must exist!\n");
 	}
 	my $in = undef;
-	if (not open($in, "<", $logfile_list)) {
+	if (not open($in, "<", $logfile_list))
+	{
 		localdie("FATAL: can not read logfile list $logfile_list, $!.\n");
 	}
 	my @files = <$in>;
 	close($in);
-	foreach my $file (@files) {
+	foreach my $file (@files)
+	{
 		chomp($file);
 		$file =~ s/\r//;
-		if ($file eq '-') {
+		if ($file eq '-')
+		{
 			localdie("FATAL: stdin input - can not be used with logfile list.\n");
 		}
 		push(@log_files, &set_file_list($file));
@@ -1262,42 +1272,65 @@ if ($incremental && !$remote_host)
 {
 	my @tmpfilelist = ();
 	# Removed files that have already been parsed during previous runs
-	foreach my $f (@given_log_files) {
-		if ($f eq '-') {
+	foreach my $f (@given_log_files)
+	{
+		if ($f eq '-')
+		{
 			&logmsg('DEBUG', "waiting for log entries from stdin.");
 			$saved_last_line{current_pos} = 0;
 			push(@tmpfilelist, $f);
-		} elsif ( $journalctl_cmd && ($f eq $journalctl_cmd) ) {
+		}
+		elsif ($f =~ /\.bin$/)
+		{
+			&logmsg('DEBUG', "binary file as input, there is no log to parse.");
+			$saved_last_line{current_pos} = 0;
+			push(@tmpfilelist, $f);
+		}
+		elsif ( $journalctl_cmd && ($f eq $journalctl_cmd) )
+		{
 			my $since = '';
-			if ( ($journalctl_cmd !~ /--since|-S/) && ($saved_last_line{datetime} =~ /^(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/) ) {
+			if ( ($journalctl_cmd !~ /--since|-S/) &&
+				($saved_last_line{datetime} =~ /^(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/) )
+			{
 				$since = " --since='$1-$2-$3 $4:$5:$6'";
 			}
 			&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
 			push(@tmpfilelist, "$f $since");
-
-		} else {
-
+		}
+		else
+		{
 			# Auto detect log format for proper parsing
 			my $fmt = autodetect_format($f);
 
 			# Set regex to parse the log file 
 			$fmt = set_parser_regex($fmt);
 
-			if (($fmt ne 'pgbouncer') && ($saved_last_line{current_pos} > 0)) {
+			if (($fmt ne 'pgbouncer') && ($saved_last_line{current_pos} > 0))
+			{
 				my ($retcode, $msg) = &check_file_changed($f, $file_size{$f}, $fmt, $saved_last_line{datetime}, $saved_last_line{current_pos});
-				if (!$retcode) {
+				if (!$retcode)
+				{
 					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
-				} else {
+				}
+				else
+				{
 					push(@tmpfilelist, $f);
 				}
-			} elsif (($fmt eq 'pgbouncer') && ($pgb_saved_last_line{current_pos} > 0)) {
+			}
+			elsif (($fmt eq 'pgbouncer') && ($pgb_saved_last_line{current_pos} > 0))
+			{
 				my ($retcode, $msg) = &check_file_changed($f, $file_size{$f}, $fmt, $pgb_saved_last_line{datetime}, $pgb_saved_last_line{current_pos});
-				if (!$retcode) {
+				if (!$retcode)
+				{
 					&logmsg('DEBUG', "this file has already been parsed: $f, $msg");
-				} else {
+				}
+				else
+				{
 					push(@tmpfilelist, $f);
 				}
-			} else {
+			}
+			else
+			{
 				push(@tmpfilelist, $f);
 			}
 		}
@@ -1361,8 +1394,10 @@ $pipe = IO::Pipe->new($reader, $writer);
 $writer->autoflush(1);
 
 # Fork the logger process
-if ($progress) {
-	spawn sub {
+if ($progress)
+{
+	spawn sub
+	{
 		&multiprocess_progressbar($global_totalsize);
 	};
 }
@@ -1372,20 +1407,28 @@ foreach my $logfile ( @given_log_files )
 {
 	# Confirm if we can use multiprocess for this file
 	my $pstatus = confirm_multiprocess($logfile);
-	if ($pstatus >= 0) {
-		if ($pstatus = 1 && $job_per_file > 1) {
+	if ($pstatus >= 0)
+	{
+		if ($pstatus = 1 && $job_per_file > 1)
+		{
 			$parallel_process = $job_per_file;
-		} else {
+		}
+		else
+		{
 			$parallel_process = $queue_size;
 		}
-	} else {
+	}
+	else
+	{
 		$parallel_process = 1;
 	}
 
 	# Wait until a child dies if max parallel processes is reach
-	while ($child_count >= $parallel_process) {
+	while ($child_count >= $parallel_process)
+	{
 		my $kid = waitpid(-1, WNOHANG);
-		if ($kid > 0) {
+		if ($kid > 0)
+		{
 			$child_count--;
 			delete $RUNNING_PIDS{$kid};
 		}
@@ -1395,13 +1438,16 @@ foreach my $logfile ( @given_log_files )
 	# Get log format of the current file
 	my $fmt = $format || 'stderr';
 	my $logfile_orig = $logfile;
-	if ($logfile ne '-' && !$journalctl_cmd) {
+	if ($logfile ne '-' && !$journalctl_cmd)
+	{
 		$fmt = &autodetect_format($logfile, $file_size{$logfile});
 		$fmt ||= $format;
 		# Remove log format from filename if any
 		$logfile =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
 		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
-	} else {
+	}
+	else
+	{
 		&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
 	}
 
@@ -1410,18 +1456,22 @@ foreach my $logfile ( @given_log_files )
 
 	# Do not use split method with remote and compressed files, stdin or journalctl command
 	if ( ($parallel_process > 1) && ($queue_size > 1) &&
-			($logfile !~ /\.(gz|bz2|zip|xz)$/i) && ($logfile ne '-') &&
+			($logfile !~ /\.(gz|bz2|zip|xz|bin)$/i) && ($logfile ne '-') &&
 			($logfile !~ /^(http[s]*|ftp[s]*|ssh):/i) &&
 			 (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/))
-		) {
+		)
+	{
 
 		# Create multiple processes to parse one log file by chunks of data
 		my @chunks = split_logfile($logfile, $file_size{$logfile_orig}, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
 		&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
-		for (my $i = 0; $i < $#chunks; $i++) {
-			while ($child_count >= $parallel_process) {
+		for (my $i = 0; $i < $#chunks; $i++)
+		{
+			while ($child_count >= $parallel_process)
+			{
 				my $kid = waitpid(-1, WNOHANG);
-				if ($kid > 0) {
+				if ($kid > 0)
+				{
 					$child_count--;
 					delete $RUNNING_PIDS{$kid};
 				}
@@ -1430,16 +1480,20 @@ foreach my $logfile ( @given_log_files )
 			localdie("FATAL: Abort signal received when processing to next chunk\n") if ($interrupt == 2);
 			last if ($interrupt);
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
-			spawn sub {
+			spawn sub
+			{
 				&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
 			};
 			$child_count++;
 		}
 
-	} else {
+	}
+	else
+	{
 		# Start parsing one file per parallel process
 		push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
-		spawn sub {
+		spawn sub
+		{
 			&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
 		};
 		$child_count++;
@@ -1913,58 +1967,77 @@ sub set_file_list
 	my $file_orig = $file;
 	my $fmt = '';
 	# Remove log format from log file if any
-	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer)\d*)$//i) {
+	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog)\d*)$//i)
+	{
 		$fmt = $1;
 	}
 
 	# Store the journalctl command as is we will create a pipe from this command
-	if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) ) {
+	if ( $journalctl_cmd && ($file =~ m/\Q$journalctl_cmd\E/) )
+	{
 		push(@lfiles, $file_orig);
 		$empty_files = 0;
+	}
 	# Input from stdin
-	} elsif ($file eq '-') {
-		if ($logfile_list) {
+	elsif ($file eq '-')
+	{
+		if ($logfile_list)
+		{
 			localdie("FATAL: stdin input - can not be used with logfile list (-L).\n");
 		}
 		push(@lfiles, $file_orig);
 		$empty_files = 0;
+	}
 	# For input from other sources than stdin
-	} else {
+	else
+	{
 		# if it is not a remote file store the file if it is not an empty file
-		if (!$remote_host && $file !~ /^(http[s]*:|[s]*ftp:|ssh:)/i) {
+		if (!$remote_host && $file !~ /^(http[s]*:|[s]*ftp:|ssh:)/i)
+		{
 			localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
-			if (-z $file) {
+			if (-z $file)
+			{
 				print "WARNING: file $file is empty\n" if (!$quiet);
 				next;
 			}
 			push(@lfiles, $file_orig);
 			$empty_files = 0;
+		}
 		# if this is a remote file extract the list of files using a ssh command
-		} elsif ($file !~ /^(http[s]*:|[s]*ftp:)/i) {
+		elsif ($file !~ /^(http[s]*:|[s]*ftp:)/i)
+		{
 			# Get files from remote host
-			if ($file !~ /^ssh:/) {
+			if ($file !~ /^ssh:/)
+			{
 				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls $file\"");
 				my @rfiles = `$remote_command "ls $file"`;
-				foreach my $f (@rfiles) {
+				foreach my $f (@rfiles)
+				{
 					push(@lfiles, "$f$fmt");
 				}
-			} elsif ($file =~ m#^ssh://([^\/]+)/(.*)#) {
+			}
+			elsif ($file =~ m#^ssh://([^\/]+)/(.*)#)
+			{
 				my $host_info = $1;
 				my $file = $2;
 				my $ssh = $ssh_command || 'ssh';
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls $file\"");
 				my @rfiles = `$ssh $host_info "ls $file"`;
-				foreach my $f (@rfiles) {
+				foreach my $f (@rfiles)
+				{
 					push(@lfiles, "ssh://$host_info/$f$fmt");
 				}
 			}
 			$empty_files = 0;
+		}
 		# this is remote file extracted using http/ftp protocol, store the uri
-		} else {
+		else
+		{
 			push(@lfiles, $file_orig);
 			$empty_files = 0;
 		}
 	}
+
 	return @lfiles;
 }
 
@@ -2524,15 +2597,20 @@ sub process_file
 	{
 		if ($progress && ($getout != 1))
 		{
-			if (!$tmpoutfile) {
-				if ($totalsize) {
+			if (!$tmpoutfile)
+			{
+				if ($totalsize)
+				{
 					print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
 				}
-			} else {
+			}
+			else
+			{
 				$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 			}
 		}
-		if (!$totalsize && $tmpoutfile) {
+		if (!$totalsize && $tmpoutfile)
+		{
 
 			&dump_as_binary($tmpoutfile);
 			$tmpoutfile->close();
@@ -2541,14 +2619,16 @@ sub process_file
 	}
 
 	# Reset the start position if file is smaller that the current start offset
-	if ($totalsize > -1 && $start_offset > $totalsize) {
+	if ($totalsize > -1 && $start_offset > $totalsize)
+	{
 		&logmsg('DEBUG', "Starting offset $start_offset is greater than total size $totalsize for file $logfile");
 		&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
 		$start_offset = 0 ;
 	}
 
 	# Check if the first date in the log are after the last date saved
-	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv') && !$http_download) {
+	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv') && !$http_download)
+	{
 		if ($start_offset && !$chunk_pos) {
 			my ($retcode, $msg) = check_file_changed($logfile, $file_size{$logfile}, $fmt, ($fmt =~ /pgbouncer/) ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
 			if ($retcode) {
@@ -2560,7 +2640,9 @@ sub process_file
 			}
 			$cursize = $start_offset;
 		}
-	} else {
+	}
+	else
+	{
 		$start_offset = 0;
 		$stop_offset = 0;
 	}
@@ -2571,30 +2653,36 @@ sub process_file
 	my $is_syslog = 0;
 	$is_syslog = 1 if ($fmt =~ /syslog/);
 
-	if ($stop_offset > 0) {
+	if ($stop_offset > 0)
+	{
 		$totalsize = $stop_offset - $start_offset;
 	}
 
 	my $current_offset = $start_offset || 0;
 
-	if (!$remote_host) {
+	if (!$remote_host)
+	{
 		&logmsg('DEBUG', "Starting reading file $logfile...");
-	} else {
+	}
+	else
+	{
 		&logmsg('DEBUG', "Starting reading file $remote_host:$logfile...");
 	}
 
 	# Parse pgbouncer logfile
-	if ($fmt =~ /pgbouncer/) {
-
+	if ($fmt =~ /pgbouncer/)
+	{
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $has_exclusion = 0;
-		if ($#exclude_line >= 0) {
+		if ($#exclude_line >= 0)
+		{
 			$has_exclusion = 1;
 		}
 		&logmsg('DEBUG', "Start parsing pgbouncer log at offset $start_offset of file $logfile to " . ($stop_offset || $totalsize));
-		if ($start_offset) {
+		if ($start_offset)
+		{
 			# Move to the starting offset position in file
 			$lfile->seek($start_offset, 0);
 		}
@@ -2611,8 +2699,8 @@ sub process_file
 			$line =~ s/\r//;
 
 			# Start to exclude from parsing any desired lines
-			if ($has_exclusion >= 0) {
-
+			if ($has_exclusion >= 0)
+			{
 				# Log line matches the excluded regex
 				map { next if ($line =~ /$_/is); } @exclude_line;
 			}
@@ -2626,19 +2714,24 @@ sub process_file
 			%prefix_vars = ();
 
 			@matches = ($line =~ $pgbouncer_log_parse1);
-			if ($#matches >= 0) {
-				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+			if ($#matches >= 0)
+			{
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++)
+				{
 					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
 				}
 				# Get detailled information from timestamp
-				if (!$prefix_vars{'t_month'}) {
+				if (!$prefix_vars{'t_month'})
+				{
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
-				} else {
-
+				}
+				else
+				{
 					# Standard syslog format does not have year information, months are
 					# three letters and days are not always with 2 digits.
-					if ($prefix_vars{'t_month'} !~ /\d/) {
+					if ($prefix_vars{'t_month'} !~ /\d/)
+					{
 						$prefix_vars{'t_year'}  = $gyear;
 						$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
 						$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
@@ -2651,7 +2744,8 @@ sub process_file
 "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 				}
 				$prefix_vars{'t_loglevel'} = 'LOG';
-				if ($prefix_vars{'t_session_id'} eq 'Stats') {
+				if ($prefix_vars{'t_session_id'} eq 'Stats')
+				{
 					$prefix_vars{'t_loglevel'} = 'STATS';
 					$prefix_vars{'t_session_id'} = '';
 					$prefix_vars{'t_query'} = 'Stats: ' . $prefix_vars{'t_query'};
@@ -2660,7 +2754,8 @@ sub process_file
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
 				next if ($res == 1);
-				if ($res == -1) {
+				if ($res == -1)
+				{
 					&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count);
 					$getout = 2;
 					last;
@@ -2673,27 +2768,35 @@ sub process_file
 				&store_current_timestamp($prefix_vars{'t_timestamp'});
 
 				# Override timestamp when we have to adjust datetime to the log timezone
-				if ($log_timezone) {
+				if ($log_timezone)
+				{
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
 					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 				}
 
 				# Extract other information from the line
 				@matches = ($line =~ $pgbouncer_log_parse2);
-				if ($#matches >= 0) {
-					for (my $i = 0 ; $i <= $#pgb_prefix_parse2 ; $i++) {
+				if ($#matches >= 0)
+				{
+					for (my $i = 0 ; $i <= $#pgb_prefix_parse2 ; $i++)
+					{
 						$prefix_vars{$pgb_prefix_parse2[$i]} = $matches[$i];
 					}
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv && $prefix_vars{'t_client'});
-				} else {
+				}
+				else
+				{
 					# pgBouncer Statistics appears each minutes in the log
-					if ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/) {
+					if ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/)
+					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_req/s'} = $1;
 						$prefix_vars{'t_inbytes/s'} = $2;
 						$prefix_vars{'t_outbytes/s'} = $3;
 						$prefix_vars{'t_avgduration'} = $4;
-					} elsif ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us/) {
+					}
+					elsif ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us/)
+					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_xact/s'} = $1;
 						$prefix_vars{'t_req/s'} = $2;
@@ -2705,14 +2808,17 @@ sub process_file
 				}
 
 				# Check if the log line should be excluded from the report
-				if (&validate_log_line($prefix_vars{'t_pid'})) {
+				if (&validate_log_line($prefix_vars{'t_pid'}))
+				{
 					$prefix_vars{'t_host'} = 'stderr'; # this unused variable is used to store format information when log format is not syslog
 
 					# Process the log line
 					&parse_pgbouncer($fmt);
 				}
 
-			} else {
+			}
+			else
+			{
 				# unknown format
 				&logmsg('DEBUG', "Unknown pgbouncer line format: $line");
 			}
@@ -2837,13 +2943,14 @@ sub process_file
 		}
 
 	}
-
-	elsif ($fmt eq 'binary') {
-
+	elsif ($fmt eq 'binary')
+	{
 		&load_stats($lfile);
+		$pipe->print("$totalsize 0 0\n");
 	}
 	# Format is not CSV and in incremental mode we are not at end of the file
-	else {
+	else
+	{
 
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
@@ -14227,29 +14334,39 @@ sub autodetect_format
 
 	# If log format is given at end of the filename, remove it and return the format
 	# Ex: ssh://remotehost/postgresql-10.log:csv
-	if ($file =~ s#:(syslog|csv|stderr|pgbouncer)\d*$##) {
+	if ($file =~ s#:(syslog|csv|stderr|pgbouncer)\d*$##)
+	{
 		&logmsg('DEBUG', "Autodetected log format '$1' from URI '$file'");
 		return $1;
 	}
 
-	if (!$remote_host && !$http_download && !$ssh_download) {
-		if (open(my $in, '<', $file)) {
+	if (!$remote_host && !$http_download && !$ssh_download)
+	{
+		if (open(my $in, '<', $file))
+		{
 			$fltf = <$in>;
 			close($in);
-		} else {
+		}
+		else
+		{
 			localdie("FATAL: when looking for log file format, can't open file $file, $!\n");
 		}
 	}
 
 	# is file in binary format ?
-	if ( $fltf =~ /^pst\d/ ) {
+	if ( $fltf =~ /^pst\d/ )
+	{
+		&logmsg('DEBUG', "found binary file with $file");
 		$fmt = 'binary';
 	}
-	elsif (!$http_download) {
+	elsif (!$http_download)
+	{
 		# try to detect syslogs, stderr, csv, jsonlog or pgbouncer format
 		my $tfile = &get_log_file($file, $totalsize, $remote_host);
-		if (defined $tfile) {
-			while (my $line = <$tfile>) {
+		if (defined $tfile)
+		{
+			while (my $line = <$tfile>)
+			{
 				chomp($line);
 				$line =~ s/\r//;
 				next if (!$line);
@@ -14262,30 +14379,42 @@ sub autodetect_format
 				last if (($nfound > 10) || ($nline > 5000));
 			}
 			$tfile->close();
-		} else {
+		}
+		else
+		{
 			&logmsg('DEBUG', "Can not autodetected log format from $file, using default");
 			return 'default';
 		}
 
-	} elsif (!$format) {
-		if (!$http_download) {
+	}
+	elsif (!$format)
+	{
+		if (!$http_download)
+		{
 			localdie("FATAL: with http files you need to specify the log format, please use -f option.\n");
-		} else {
+		}
+		else
+		{
 			localdie("FATAL: with http files you need to specify the log format, append it to the uri.\n");
 		}
 	}
 
 	# When --pgbouncer-only is used force the format
-	if (!$format && !$fmt && $pgbouncer_only) {
+	if (!$format && !$fmt && $pgbouncer_only)
+	{
 		$pgbouncer_only = 1;
 		$fmt = 'pgbouncer';
-	} elsif (!$format) {
-		if (!$fmt || ($nfound < 10)) {
+	}
+	elsif (!$format)
+	{
+		if (!$fmt || ($nfound < 10 && $fmt ne 'binary'))
+		{
 			localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
 		}
 	}
 
-	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1)) {
+	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1))
+	{
 		$ident = (keys %ident_name)[0];
 	}
 
@@ -14652,19 +14781,29 @@ sub get_file_size
 	my $totalsize = 0;
 
 	# Log entries extracted from journalctl command are of indetermined size
-	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
+	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) )
+	{
 		$totalsize = -1;
+	}
+
 	# Same from stdin
-	} elsif ($logf eq '-') {
+	elsif ($logf eq '-')
+	{
 		$totalsize = -1;
-	# Regular local files can be "stated"
-	} elsif (!$remote_host && !$http_download && !$ssh_download) {
+	}
+
+	# Regular local files can be "stated" if they are not compressed
+	elsif (!$remote_host && !$http_download && !$ssh_download && !$iscompressed)
+	{
 		eval {
 			$totalsize = (stat("$logf"))[7];
 		};
 		$totalsize = -1 if ($@);
-	# For uncompressed files try to get the size following the protocol
-	} elsif (!$iscompressed) {
+	}
+
+	# For uncompressed files try to get the size following the remote access protocol
+	elsif (!$iscompressed)
+	{
 		# Use curl to try to get remote file size if it is not compressed
 		if ($http_download) {
 			&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
@@ -14688,16 +14827,20 @@ sub get_file_size
                 chomp($totalsize);
 
 		&logmsg('DEBUG', "Remote file size: $totalsize");
+	}
 
 	# Real size of the file is unknown with compressed file, try to find
 	# size using uncompress command (bz2 does not report real size)
-	} elsif (!$http_download && $logf =~ /\.(gz|zip|xz)$/i) {
+	elsif (!$http_download && $logf =~ /\.(gz|zip|xz|bz2)$/i)
+	{
 
 		my $cmd_file_size = $gzip_uncompress_size;
 		if ($logf =~ /\.zip$/i) {
 			$cmd_file_size = $zip_uncompress_size;
 		} elsif ($logf =~ /\.xz$/i) {
 			$cmd_file_size = $xz_uncompress_size;
+		} elsif ($logf =~ /\.bz2$/i) {
+			$cmd_file_size = "ls -l %f | awk '{print \$5}'";
 		}
 		if (!$remote_host && !$http_download && !$ssh_download) {
 			$cmd_file_size =~ s/\%f/$logf/g;
@@ -14718,13 +14861,38 @@ sub get_file_size
 			$totalsize = `$remote_command \"$cmd_file_size\"`;
 		}
 		chomp($totalsize);
+		# For bz2 compressed file we don't know the real size
+		if ($logf =~ /\.bz2$/i) {
+			# apply deflate estimation factor
+			$totalsize *= $BZ_FACTOR;
+		}
 
-	} elsif ($http_download) {
+	}
+
+	# Bzip2 and remote download compressed files can't report real size, get compressed
+	# file size and estimate the real size by using bzip2, gzip and xz factors.
+	elsif ($http_download)
+	{
 		&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
 		$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
 		chomp($totalsize);
 		localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\"\n") if ($totalsize eq '');
 		&logmsg('DEBUG', "With http access size real size of a compressed file is unknown but use Content-Length wirth compressed side.");
+		# For all compressed file we don't know the
+		# real size apply deflate estimation factor
+		if ($logf =~ /\.bz2$/i)
+		{
+			# apply deflate estimation factor
+			$totalsize *= $BZ_FACTOR;
+		}
+		elsif ($logf =~ /\.(zip|gz)$/i)
+		{
+			$totalsize *= $GZ_FACTOR;
+		}
+		elsif ($logf =~ /\.xz$/i)
+		{
+			$totalsize *= $XZ_FACTOR;
+		}
 	}
 
 	return $totalsize;
