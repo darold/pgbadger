@@ -2828,10 +2828,11 @@ sub process_file
 		if ($last_parsed) {
 			$pgb_last_line{current_pos} = $current_offset;
 		}
+	}
 
 	# Parse PostgreSQL log file with CSV format
-	} elsif ($fmt eq 'csv') {
-
+	elsif ($fmt eq 'csv')
+	{
 		if ($queue_size > 1 || $job_per_file > 1) {
 			&logmsg('WARNING', "parallel processing is disabled with csv format.");
 		}
@@ -2848,8 +2849,10 @@ sub process_file
 		);
 
 		# Parse csvlog lines
-		CSVLOOP: while (!$csv->eof()) {
-			while (my $row = $csv->getline($lfile)) {
+		CSVLOOP: while (!$csv->eof())
+		{
+			while (my $row = $csv->getline($lfile))
+			{
 				$row =~ s/\r//;
 
 				# We received a signal
@@ -2939,9 +2942,10 @@ sub process_file
 				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
 				print STDERR "reset CSV parser\n";
 				$csv->SetDiag(0);
+			} else {
+				$cursize = $totalsize; 
 			}
 		}
-
 	}
 	elsif ($fmt eq 'binary')
 	{
@@ -3303,13 +3307,18 @@ sub process_file
 		}
 	}
 
-	if ($progress && ($getout != 1)) {
-		if (!$tmpoutfile) {
-			if ($totalsize) {
+	if ($progress && ($getout != 1))
+	{
+		if (!$tmpoutfile)
+		{
+			if ($totalsize)
+			{
 				print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
 				print STDERR "\n";
 			}
-		} else {
+		}
+		else
+		{
 			$pipe->print("$cursize " . ($overall_stat{'queries_number'} - $old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $old_errors_count) . "\n");
 		}
 	}
