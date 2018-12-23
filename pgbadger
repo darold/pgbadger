@@ -76,7 +76,7 @@ my $PID_FILE = undef;
 
 # Factor used to estimate the total size of compressed file
 # when real size can not be obtained (bz2 or remote files)
-my $BZ_FACTOR = 25;
+my $BZ_FACTOR = 30;
 my $GZ_FACTOR = 15;
 my $XZ_FACTOR = 18;
 
@@ -1992,7 +1992,7 @@ sub set_file_list
 	else
 	{
 		# if it is not a remote file store the file if it is not an empty file
-		if (!$remote_host && $file !~ /^(http[s]*:|[s]*ftp:|ssh:)/i)
+		if (!$remote_host && $file !~ /^(http[s]*|[s]*ftp|ssh):/i)
 		{
 			localdie("FATAL: logfile \"$file\" must exist!\n") if (not -f $file);
 			if (-z $file)
@@ -2004,7 +2004,7 @@ sub set_file_list
 			$empty_files = 0;
 		}
 		# if this is a remote file extract the list of files using a ssh command
-		elsif ($file !~ /^(http[s]*:|[s]*ftp:)/i)
+		elsif ($file !~ /^(http[s]*|[s]*ftp):/i)
 		{
 			# Get files from remote host
 			if ($file !~ /^ssh:/)
@@ -3270,7 +3270,6 @@ sub process_file
 		if ($goon && $last_parsed) {
 			$last_line{current_pos} = $current_offset;
 		}
-
 	}
 	close $lfile;
 
@@ -3309,6 +3308,15 @@ sub process_file
 
 	if ($progress && ($getout != 1))
 	{
+
+		# Bzip2 and remote download compressed files has an
+		# estimated size. Force 100% at end of log parsing
+		if (($http_download && $logfile =~ /\.(zip|gz|xz|bz2)$/i )
+			|| $logfile =~ /\.bz2$/i)
+		{
+				$cursize = $totalsize;
+		}
+
 		if (!$tmpoutfile)
 		{
 			if ($totalsize)
