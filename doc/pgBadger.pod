@@ -173,6 +173,11 @@ some additional options to fully control the ssh connection.
                                  -o ConnectTimeout=$ssh_timeout
                                  -o PreferredAuthentications=hostbased,publickey
 
+Log file to parse can also be specified using an URI, supported protocol are http[s]
+[s]ftp. The curl command will be used to download the file and the file will be parsed
+during download. The ssh protocol is also supported and will use the ssh command like
+with the remote host use. See examples bellow.
+
 Examples:
 
 	pgbadger /var/log/postgresql.log
@@ -189,6 +194,15 @@ Examples:
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
 	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
 
+Use URI notation for remote log file:
+
+	perl pgbadger http://172.12.19.1//var/log/postgresql/postgresql-9.1-main.log
+	perl pgbadger ftp://username.12.19.14/postgresql-9.1-main.log
+	perl pgbadger ssh://username.12.19.14//var/log/postgresql/postgresql-9.1-main.log.2.gz
+
+You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
+
+	perl pgbadger /var/log/postgresql/postgresql-9.1-main.log ssh://username.12.19.14/pgbouncer.log
 
 Generate Tsung sessions XML file with select queries only:
 
@@ -242,6 +256,7 @@ To rebuild all incremental html reports after, proceed as follow:
     pgbadger -X -I -O /path/to/reports/ --rebuild
 
 it will also update all resource files (JS and CSS).
+
 
 =head1 DESCRIPTION
 
@@ -371,11 +386,11 @@ If you want to export statistics as JSON file you need an additional Perl module
 This module is optional, if you don't select the json output format you don't
 need to install it. You can install it on a Debian like system using:
 
-    sudo apt-get install libjson-xs-perl
+	sudo apt-get install libjson-xs-perl
 
 and in RPM like system using:
 
-    sudo yum install perl-JSON-XS
+	sudo yum install perl-JSON-XS
 
 Compressed log file format is autodetected from the file extension. If pgBadger find
 a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat
