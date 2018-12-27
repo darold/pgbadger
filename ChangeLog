@@ -1,3 +1,82 @@
+2018-12-27 - v10.2
+
+This release of pgBadger is a maintenance release that fixes issues
+reported by users during last three months. There is also some new
+features:
+
+  * Add support to pgbouncer 1.8 Stats log format.
+  * Auto adjust javascript graph timezone.
+
+There is a new command line option:
+
+  * Add --exclude-db option to compute report about everything except
+    the specified database.
+  * Add support to http or ftp remote PostgreSQL log file download.
+    The log file is parsed during the download using curl command
+    and never saved to disk. With ssh remote log parsing you can use
+    uri as command line argument to specify the PostgreSQL log file.
+    
+            ssh://localhost/postgresql-10-main.log
+            http://localhost/postgresql-10-main.log.gz
+            ftp://localhost/postgresql-10-main.log
+    
+    with http and ftp protocol you need to specify the log file format
+    at end of the uri:
+    
+            http://localhost/postgresql-10-main.log:stderr
+    
+    You can specify multiple uri for log files to be parsed. This is
+    useful when you have pgbouncer log file on a remote host and
+    PostgreSQL logs in the local host.
+
+    With ssh protocol you can use wild card too like with remote
+    mode, ex: ssh://localhost/postgresql-10-main.log*
+    
+    Old syntax to parse remote log file using -r option is still
+    working but is obsolete and might be removed in future versions.
+
+
+There's also some bugs fixes and features enhancements.
+
+  - Adjust end of progress bar with files with estimate size (bz2
+    compressed files and remote compressed files.
+  - Update year in copyright.
+  - Add information about URI notation to parse remote log files.
+  - Force progress to reach 100% at end of parsing of compressed
+    remote file.
+  - Extract information about PL/pgSQL function call in queries of
+    temporary file reports. The information is append to the details
+    display block.
+  - Fix progress bar with csv files.
+  - Fix reading binary file as input file instead of log file.
+  - Encode html output of queries into UTF8 to avoid message "Wide
+    character in print". Thanks to Colin 't Hart for the report.
+  - Add Checkpoints distance key/value for distance peak.
+  - Fix pgbouncer parsing and request throughput reports. Thanks
+    to Levente Birta for the report.
+  - Fix use of csvlog instead of csv for input format.
+  - Add support to pgbouncer 1.8 Stats log format. Thanks to Levente
+    Birta for the report.
+  - Add warning about parallel processing disabled with csvlog. Thanks
+    to cstdenis for the report.
+  - Add information in usage output about single process forcing with
+    csvlog format in -j and -J options. Thanks to cstdenis for the
+    report.
+  - Fix unknown line format error for multi line log while incremental
+    analysis over ssh. Thanks to Wooyoung Cho for the report.
+  - Add -k (--insecure) option to curl command to be able to download
+    logs from server using a self signed certificate.
+  - Auto adjust javascript graph timezone. Thanks to Massimino Sala
+    for the feature request.
+  - Add support to HTTP logfile download by pgBadger, for example:
+        /usr/bin/pgbadger http://www.mydom.com/postgresql-10.log
+  - Will parse the file during download using curl command.
+  - Fix documentation. Thanks to 0xflotus for the patch.
+  - Reapply fix on missing replacement of bind parameters after some
+    extra code cleaning. Thanks to Bernhard J. M. Grun for the report.
+  - Add --exclude-db option to compute report about everything except
+    the specified database. The option can be used multiple time.
+
 2018-09-12 - v10.1
 
 This release of pgBadger is a maintenance release that fixes reports
