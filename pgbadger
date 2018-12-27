@@ -3328,7 +3328,7 @@ sub process_file
 		if (($http_download && $logfile =~ /\.(zip|gz|xz|bz2)$/i )
 			|| $logfile =~ /\.bz2$/i)
 		{
-				$cursize = $totalsize;
+			$cursize = $totalsize;
 		}
 
 		if (!$tmpoutfile)
