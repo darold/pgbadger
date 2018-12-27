@@ -192,21 +192,21 @@ Examples:
 	# Log line prefix with syslog log output
 	perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
 	# Use my 8 CPUs to parse my 10GB file faster, much faster
-	perl pgbadger -j 8 /pglog/postgresql-9.1-main.log
+	perl pgbadger -j 8 /pglog/postgresql-10.1-main.log
 
 Use URI notation for remote log file:
 
-	perl pgbadger http://172.12.19.1//var/log/postgresql/postgresql-9.1-main.log
-	perl pgbadger ftp://username.12.19.14/postgresql-9.1-main.log
-	perl pgbadger ssh://username.12.19.14//var/log/postgresql/postgresql-9.1-main.log.2.gz
+	perl pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
+	perl pgbadger ftp://username.12.110.14/postgresql-10.1-main.log
+	perl pgbadger ssh://username.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
 
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
-	perl pgbadger /var/log/postgresql/postgresql-9.1-main.log ssh://username.12.19.14/pgbouncer.log
+	perl pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username.12.110.14/pgbouncer.log
 
 Generate Tsung sessions XML file with select queries only:
 
-    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-9.1.log
+    perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-10.1.log
 
 Reporting errors every week by cron job:
 
