@@ -257,7 +257,6 @@ To rebuild all incremental html reports after, proceed as follow:
 
 it will also update all resource files (JS and CSS).
 
-
 =head1 DESCRIPTION
 
 pgBadger is a PostgreSQL log analyzer built for speed with fully reports
