@@ -2078,7 +2078,7 @@ sub set_parser_regex
 	if ($fmt eq 'pgbouncer') {
 		$pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)(?:\(\d+\))??[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
-		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]+|Stats): (.*)/;
+		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
 		@pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_query');
 		$pgbouncer_log_parse2 = qr/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+(?: [A-Z\+\-\d]{3,6})? \d+ [^\s]+ .\-0x[0-9a-f\.]*: ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
@@ -2088,7 +2088,7 @@ sub set_parser_regex
 		$pgbouncer_log_format = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 
-		$pgbouncer_log_parse1 = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]+|Stats): (.*)/;
+		$pgbouncer_log_parse1 = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
 		@pgb_prefix_parse1 = ('t_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_query');
 		$pgbouncer_log_parse2 = qr/^...\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s[^\s\[]+\[\d+\]: .\-0x[0-9a-f\.]*: ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
@@ -2098,7 +2098,7 @@ sub set_parser_regex
 		$pgbouncer_log_format = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 
-		$pgbouncer_log_parse1 = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]+|Stats): (.*)/;
+		$pgbouncer_log_parse1 = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
 		@pgb_prefix_parse1 = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_query');
 		$pgbouncer_log_parse2 = qr/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?[^\s\[]+\[\d+\]: .\-0x[0-9a-f\.]*: ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
@@ -2801,7 +2801,7 @@ sub process_file
 				else
 				{
 					# pgBouncer Statistics appears each minutes in the log
-					if ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/)
+					if ($prefix_vars{'t_query'} =~ /(\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_req/s'} = $1;
@@ -2809,7 +2809,7 @@ sub process_file
 						$prefix_vars{'t_outbytes/s'} = $3;
 						$prefix_vars{'t_avgduration'} = $4;
 					}
-					elsif ($prefix_vars{'t_query'} =~ /[Ss]tats: (\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us/)
+					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_xact/s'} = $1;
@@ -14462,6 +14462,10 @@ sub autodetect_format
 		{
 			localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
 		}
+	}
+	else
+	{
+		$fmt = $format;
 	}
 
 	if (($fmt =~ /syslog/) && !$ident && (scalar keys %ident_name == 1))
