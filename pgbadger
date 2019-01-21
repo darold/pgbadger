@@ -684,49 +684,10 @@ if (!$timezone) {
 	$timezone = ($hour_diff * 3600) + ($min_diff * 60);
 }
 
-# Set the default extension and output format
-if (!$extension) {
-	if ($outfile =~ /\.bin/i) {
-		$extension = 'binary';
-	} elsif ($outfile =~ /\.json/i) {
-		if (eval {require JSON::XS;1;} ne 1) {
-			localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
-		} else {
-			JSON::XS->import();
-		}
-		$extension = 'json';
-	} elsif ($outfile =~ /\.tsung/i) {
-		$extension = 'tsung';
-	} elsif ($outfile =~ /\.htm[l]*/i) {
-		$extension = 'html';
-	} elsif ($outfile) {
-		$extension = 'txt';
-	} else {
-		$extension = 'html';
-	}
-} elsif (lc($extension) eq 'json') {
-	if (eval {require JSON::XS;1;} ne 1) {
-		localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
-	} else {
-		JSON::XS->import();
-	}
-}
-
-if ($extension eq 'tsung') {
-	$is_tsung_output = 1;
-}
-
-# Force text output with normalized query list only
-# and disable incremental report
-if ($dump_normalized_only) {
-	$extension = 'txt';
-	$incremental = 0;
-	$report_title = 'Normalized query report' if (!$report_title);
-}
-
+# Set the default extension and output format, load JSON Perl module if required
+# Force text output with normalized query list only and disable incremental report
 # Set default filename of the output file
-$outfile ||= 'out.' . $extension;
-&logmsg('DEBUG', "Output '$extension' reports will be written to $outfile");
+my ($current_out_file, $extens) = &set_output_extension($outfile, $extension);
 
 # Set default syslog ident name
 $ident ||= 'postgres';
@@ -743,25 +704,25 @@ $img_format = 'png' if ($img_format ne 'jpeg');
 
 # Extract the output directory from outfile so that graphs will
 # be created in the same directory
-if ($outfile ne '-') {
+if ($current_out_file ne '-') {
 	if (!$outdir) {
-		my @infs = fileparse($outfile);
+		my @infs = fileparse($current_out_file);
 		if ($infs[0] ne '') {
 			$outdir = $infs[1];
 		} else {
 			# maybe a confusion between -O and -o
-			localdie("FATAL: output file $outfile is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n");
+			localdie("FATAL: output file $current_out_file is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n");
 		}
 	} elsif (!-d "$outdir") {
 		# An output directory has been passed as command line parameter
 		localdie("FATAL: $outdir is not a directory or doesn't exist.\n");
 	}
-	$outfile = basename($outfile);
-	$outfile = $outdir . '/' . $outfile;
+	$current_out_file = basename($current_out_file);
+	$current_out_file = $outdir . '/' . $current_out_file;
 }
 
 # Remove graph support if output is not html
-$graph = 0 unless ($extension eq 'html' or $extension eq 'binary' or $extension eq 'json');
+$graph = 0 unless ($extens eq 'html' or $extens eq 'binary' or $extens eq 'json');
 $graph = 0 if ($nograph);
 
 # Set some default values
@@ -777,12 +738,12 @@ if ($^O =~ /MSWin32|dos/i) {
 	}
 }
 
-if ($extension eq 'tsung') {
+if ($extens eq 'tsung') {
 
 	# Open filehandle
-	my $fh = new IO::File ">$outfile";
+	my $fh = new IO::File ">$current_out_file";
 	if (not defined $fh) {
-		localdie("FATAL: can't write to $outfile, $!\n");
+		localdie("FATAL: can't write to $current_out_file, $!\n");
 	}
 	print $fh qq{<?xml version="1.0"?>
 <!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
@@ -811,12 +772,12 @@ if ($extension eq 'tsung') {
 } else {
 
 	# Test file creation before going to parse log
-	my $tmpfh = new IO::File ">$outfile";
+	my $tmpfh = new IO::File ">$current_out_file";
 	if (not defined $tmpfh) {
-		localdie("FATAL: can't write to $outfile, $!\n");
+		localdie("FATAL: can't write to $current_out_file, $!\n");
 	}
 	$tmpfh->close();
-	unlink($outfile) if (-e $outfile);
+	unlink($current_out_file) if (-e $current_out_file);
 }
 
 # -w and --disable-error can't go together
@@ -1007,9 +968,9 @@ if ($incremental) {
 	if (!$last_parsed) {
 		$last_parsed = $outdir . '/LAST_PARSED';
 	}
-	$outfile = 'index.html';
+	$current_out_file = 'index.html';
 	# Set default output format
-	$extension = 'binary';
+	$extens = 'binary';
 
 	if ($rebuild) {
 
@@ -1599,30 +1560,30 @@ my $td = timediff($t1, $t0);
 
 if (!$incremental && ($#given_log_files >= 0) ) {
 
-	&logmsg('LOG', "Ok, generating $extension report...");
+	&logmsg('LOG', "Ok, generating $extens report...");
 
 	# Some message have been temporary stored as ERROR but
 	# they are LOGestore them to the right log level.
 	&restore_log_type_count();
 
-	if ($extension ne 'tsung') {
-		$fh = new IO::File ">$outfile";
+	if ($extens ne 'tsung') {
+		$fh = new IO::File ">$current_out_file";
 		if (not defined $fh) {
-			localdie("FATAL: can't write to $outfile, $!\n");
+			localdie("FATAL: can't write to $current_out_file, $!\n");
 		}
-		if (($extension eq 'text') || ($extension eq 'txt')) {
+		if (($extens eq 'text') || ($extens eq 'txt')) {
 			if ($error_only) {
 				&dump_error_as_text();
 			} else {
 				&dump_as_text();
 			}
-		} elsif ($extension eq 'json') {
+		} elsif ($extens eq 'json') {
 			if ($error_only) {
 				&dump_error_as_json();
 			} else {
 				&dump_as_json();
 			}
-		} elsif ($extension eq 'binary') {
+		} elsif ($extens eq 'binary') {
 			&dump_as_binary($fh);
 		} else {
 			# Create instance to prettify SQL query
@@ -1635,9 +1596,9 @@ if (!$incremental && ($#given_log_files >= 0) ) {
 	} else {
 
 		# Open filehandle
-		$fh = new IO::File ">>$outfile";
+		$fh = new IO::File ">>$current_out_file";
 		if (not defined $fh) {
-			localdie("FATAL: can't write to $outfile, $!\n");
+			localdie("FATAL: can't write to $current_out_file, $!\n");
 		}
 		print $fh "</sessions>\n</tsung>\n";
 		$fh->close();
@@ -2219,9 +2180,9 @@ sub build_incremental_reports
 
 		&logmsg('LOG', "Ok, generating HTML daily report into $outdir/$bpath/...");
 
-		$fh = new IO::File ">$outdir/$bpath/$outfile";
+		$fh = new IO::File ">$outdir/$bpath/$current_out_file";
 		if (not defined $fh) {
-			localdie("FATAL: can't write to $outdir/$bpath/$outfile, $!\n");
+			localdie("FATAL: can't write to $outdir/$bpath/$current_out_file, $!\n");
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
@@ -2266,9 +2227,9 @@ sub build_incremental_reports
 		if (!-d "$outdir/$wdir") {
 			mkdir("$outdir/$wdir");
 		}
-		$fh = new IO::File ">$outdir/$wdir/$outfile";
+		$fh = new IO::File ">$outdir/$wdir/$current_out_file";
 		if (not defined $fh) {
-			localdie("FATAL: can't write to $outdir/$wdir/$outfile, $!\n");
+			localdie("FATAL: can't write to $outdir/$wdir/$current_out_file, $!\n");
 		}
 		# Create instance to prettify SQL query
 		if (!$noprettify) {
@@ -3314,7 +3275,7 @@ sub process_file
 		&store_temporary_and_lock_infos($pid);
 	}
 
-	if ($extension eq 'tsung') {
+	if ($extens eq 'tsung') {
 		foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
 			&store_tsung_session($pid);
 		}
@@ -3759,7 +3720,7 @@ sub check_incremental_position
 				&store_temporary_and_lock_infos($pid);
 			}
 			# Stores tsung sessions
-			if ($extension eq 'tsung') {
+			if ($extens eq 'tsung') {
 				foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
 					&store_tsung_session($pid);
 				}
@@ -12595,7 +12556,7 @@ sub dump_as_binary
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \@top_tempfile_info,
 		'top_locked_info' => \@top_locked_info,
-	}, $lfh) || localdie ("Couldn't save binary data to «$outfile»!\n");
+	}, $lfh) || localdie ("Couldn't save binary data to «$current_out_file»!\n");
 }
 
 sub dump_error_as_json
@@ -13776,9 +13737,9 @@ sub store_tsung_session
 	return if ($#{$tsung_session{$pid}{dates}} < 0);
 
 	# Open filehandle
-	my $fh = new IO::File ">>$outfile";
+	my $fh = new IO::File ">>$current_out_file";
 	if (not defined $fh) {
-		localdie("FATAL: can't write to $outfile, $!\n");
+		localdie("FATAL: can't write to $current_out_file, $!\n");
 	}
 	if ($pid) {
 		print $fh "  <session weight=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
@@ -14004,7 +13965,7 @@ sub store_queries
 				} elsif ($cur_info{$t_pid}{query} =~ s/.*<Query-Text>//s) {
 					$cur_info{$t_pid}{query} =~ s/<\/Query-Text>//s;
 					$cur_info{$t_pid}{plan} .= "\n";
-					if ($extension eq 'html') {
+					if ($extens eq 'html') {
 						$cur_info{$t_pid}{plan} =~ s/</&lt;/gs;
 						$cur_info{$t_pid}{plan} =~ s/>/&gt;/gs;
 					}
@@ -15419,6 +15380,76 @@ sub change_timezone
 	($s, $mi, $h, $d, $mo, $y) = localtime($t);
 
 	return ($y+1900, sprintf("%02d", ++$mo), sprintf("%02d", $d), sprintf("%02d", $h), sprintf("%02d", $mi), sprintf("%02d", $s));
+}
+
+# Set the default extension and output format, load JSON Perl podule if required
+# Force text output with normalized query list only and disable incremental report
+# Set default filename of the output file
+sub set_output_extension
+{
+	my ($of, $ext) = @_;
+
+	$is_tsung_output = 0;
+
+	if (!$ext)
+	{
+		if ($of =~ /\.bin/i)
+		{
+			$ext = 'binary';
+		}
+		elsif ($of =~ /\.json/i)
+		{
+			if (eval {require JSON::XS;1;} ne 1)
+			{
+				localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
+			}
+			else
+			{
+				JSON::XS->import();
+			}
+			$ext = 'json';
+		}
+		elsif ($of =~ /\.tsung/i)
+		{
+			$ext = 'tsung';
+		}
+		elsif ($of =~ /\.htm[l]*/i)
+		{
+			$ext = 'html';
+		}
+		elsif ($of)
+		{
+			$ext = 'txt';
+		}
+		else
+		{
+			$ext = 'html';
+		}
+	}
+	elsif (lc($ext) eq 'json')
+	{
+		if (eval {require JSON::XS;1;} ne 1)
+		{
+			localdie("Can not save output in json format, please install Perl module JSON::XS first.\n");
+		}
+		else
+		{
+			JSON::XS->import();
+		}
+	}
+
+	$is_tsung_output = 1 if ($ext eq 'tsung');
+
+	if ($dump_normalized_only) {
+		$ext = 'txt';
+		$incremental = 0;
+		$report_title = 'Normalized query report' if (!$report_title);
+	}
+
+	$of ||= 'out.' . $ext;
+	&logmsg('DEBUG', "Output '$ext' reports will be written to $of");
+
+	return ($of, $ext);
 }
 
 # Inclusion of Perl package pgFormatter::Beautify.
