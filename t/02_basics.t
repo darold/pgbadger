@@ -1,8 +1,9 @@
-use Test::Simple tests => 8;
+use Test::Simple tests => 9;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
 my $BIN = 't/fixtures/light.postgres.bin';
 my $JSON = 't/out.json';
+my $TEXT = 't/out.txt';
 
 my $ret = `perl pgbadger --help`;
 ok( $? == 0, "Inline help");
@@ -34,9 +35,16 @@ $ret = `bunzip2 -c $LOG | perl pgbadger -q -o $JSON -`;
 $ret = `cat $JSON | perl -pe 's/.*"SELECT":(\\d+),.*/\$1/'`;
 ok( $? == 0 && $ret > 0, "Light log from STDIN");
 
+$ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > ret.json`;
+$ret = `stat --printf='%s' ret.json out.json out.txt`;
+chomp($ret);
+ok( $? == 0 && $ret eq '13453413453415984', "Multiple output format");
+
 # Remove files generated during the tests
 `rm -f out.html`;
 `rm -r $JSON`;
+`rm -r $TEXT`;
 `rm -f $BIN`;
 `rm -rf t/test_incr/`;
+`rm ret.json`
 
