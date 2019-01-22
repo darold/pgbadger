@@ -254,7 +254,7 @@ my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{prin
 my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
 my $xz_uncompress_size      = "xz --robot -l %f | grep totals | awk '{print \$5}'";
 my $format                  = '';
-my $outfile                 = '';
+my @outfiles                = ();
 my $outdir                  = '';
 my $incremental             = '';
 my $extra_files             = 0;
@@ -441,7 +441,7 @@ my $result = GetOptions(
 	"M|no-multiline!"          => \$nomultiline,
 	"N|appname=s"              => \@dbappname,
 	"n|nohighlight!"           => \$nohighlight,
-	"o|outfile=s"              => \$outfile,
+	"o|outfile=s"              => \@outfiles,
 	"O|outdir=s"               => \$outdir,
 	"p|prefix=s"               => \$log_line_prefix,
 	"P|no-prettify!"           => \$noprettify,
@@ -684,6 +684,34 @@ if (!$timezone) {
 	$timezone = ($hour_diff * 3600) + ($min_diff * 60);
 }
 
+# Set output file
+my $outfile = $outfiles[0];
+
+# With multiple output format we must use a temporary binary file
+my $dft_extens = '';
+if ($#outfiles >= 1)
+{
+	# We can not have multiple output in incremental mode
+	if ($incremental)
+	{
+		localdie("FATAL: you can not use multiple output format with incremental mode.\n\n");
+	}
+
+	# Set temporary binary file.
+	$outfile = $TMP_DIR . "/pgbadger_tmp_$$.bin";
+
+	# Remove the default output format for the moment
+	# otherwise all dump will have the same output
+	$dft_extens = $extension;
+	$extension = '';
+}
+elsif ($#outfiles == -1)
+{
+	($extension) ? push(@outfiles, 'out.' . $extension) : push(@outfiles, 'out.html');
+	map { s/\.text/.txt/; } @outfiles;
+	
+}
+
 # Set the default extension and output format, load JSON Perl module if required
 # Force text output with normalized query list only and disable incremental report
 # Set default filename of the output file
@@ -704,16 +732,23 @@ $img_format = 'png' if ($img_format ne 'jpeg');
 
 # Extract the output directory from outfile so that graphs will
 # be created in the same directory
-if ($current_out_file ne '-') {
-	if (!$outdir) {
+if ($current_out_file ne '-')
+{
+	if (!$outdir)
+	{
 		my @infs = fileparse($current_out_file);
-		if ($infs[0] ne '') {
+		if ($infs[0] ne '')
+		{
 			$outdir = $infs[1];
-		} else {
+		}
+		else
+		{
 			# maybe a confusion between -O and -o
 			localdie("FATAL: output file $current_out_file is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n");
 		}
-	} elsif (!-d "$outdir") {
+	}
+	elsif (!-d "$outdir")
+	{
 		# An output directory has been passed as command line parameter
 		localdie("FATAL: $outdir is not a directory or doesn't exist.\n");
 	}
@@ -950,53 +985,65 @@ my $t0 = Benchmark->new;
 my @jscode = &write_resources();
 
 # Automatically set parameters with incremental mode
-if ($incremental) {
-
+if ($incremental)
+{
 	# In incremental mode an output directory must be set
-	if (!$outdir) {
+	if (!$outdir)
+	{
 		localdie("FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n")
 	}
 	# Ensure this is not a relative path
-	if (dirname($outdir) eq '.') {
+	if (dirname($outdir) eq '.')
+	{
 		localdie("FATAL: output directory ($outdir) is not an absolute path.\n");
 	}
 	# Ensure that the directory already exists
-	if (!-d $outdir) {
+	if (!-d $outdir)
+	{
 		localdie("FATAL: output directory $outdir does not exists\n");
 	}
 	# Set default last parsed file in incremental mode
-	if (!$last_parsed) {
+	if (!$last_parsed)
+	{
 		$last_parsed = $outdir . '/LAST_PARSED';
 	}
 	$current_out_file = 'index.html';
+
 	# Set default output format
 	$extens = 'binary';
 
-	if ($rebuild) {
-
+	if ($rebuild)
+	{
 		# Look for directory where report must be generated again
 		my @build_directories = ();
 
 		# Find directories that shoud be rebuilt
-		unless(opendir(DIR, "$outdir")) {
+		unless(opendir(DIR, "$outdir"))
+		{
 			localdie("Error: can't opendir $outdir: $!");
 		}
 		my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
-		foreach my $y (sort { $a <=> $b } @dyears) {
-			unless(opendir(DIR, "$outdir/$y")) {
+		foreach my $y (sort { $a <=> $b } @dyears)
+		{
+			unless(opendir(DIR, "$outdir/$y"))
+			{
 				localdie("Error: can't opendir $outdir/$y: $!");
 			}
 			my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
-			foreach my $m (sort { $a <=> $b } @dmonths) {
-				unless(opendir(DIR, "$outdir/$y/$m")) {
+			foreach my $m (sort { $a <=> $b } @dmonths)
+			{
+				unless(opendir(DIR, "$outdir/$y/$m"))
+				{
 					localdie("Error: can't opendir $outdir/$y/$m: $!");
 				}
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 				closedir DIR;
-				foreach my $d (sort { $a <=> $b } @ddays) {
-					unless(opendir(DIR, "$outdir/$y/$m/$d")) {
+				foreach my $d (sort { $a <=> $b } @ddays)
+				{
+					unless(opendir(DIR, "$outdir/$y/$m/$d"))
+					{
 						localdie("Error: can't opendir $outdir/$y/$m/$d: $!");
 					}
 					my @binfiles = grep { $_ =~ /\.bin$/ } readdir(DIR);
@@ -1017,41 +1064,49 @@ if ($incremental) {
 
 		exit 0;
 	}
-
-} else {
-
+}
+else
+{
 	# Extra files for resources are not allowed without incremental mode
 	$extra_files = 0;
-
 }
 
 # Reading last line parsed
-if ($last_parsed && -e $last_parsed) {
-	if (open(my $in, '<', $last_parsed)) {
+if ($last_parsed && -e $last_parsed)
+{
+	if (open(my $in, '<', $last_parsed))
+	{
 		my @content = <$in>;
 		close($in);
-		foreach my $line (@content) {
+		foreach my $line (@content)
+		{
 			chomp($line);
 			next if (!$line);
 			my ($datetime, $current_pos, $orig, @others) = split(/\t/, $line);
 			# Last parsed line with pgbouncer log starts with this keyword
-			if ($datetime eq 'pgbouncer') {
+			if ($datetime eq 'pgbouncer')
+			{
 				$pgb_saved_last_line{datetime} = $current_pos;
 				$pgb_saved_last_line{current_pos} = $orig;
 				$pgb_saved_last_line{orig} = join("\t", @others);
-			} else {
+			}
+			else
+			{
 				$saved_last_line{datetime} = $datetime;
 				$saved_last_line{current_pos} = $current_pos;
 				$saved_last_line{orig} = $orig;
 			}
 		}
 		# Those two log format must be read from start of the file
-		if ( ($format eq 'binary') || ($format eq 'csv') ) {
+		if ( ($format eq 'binary') || ($format eq 'csv') )
+		{
 			$saved_last_line{current_pos} = 0;
 			$pgb_saved_last_line{current_pos} = 0 if ($format eq 'binary');
 		}
 
-	} else {
+	}
+	else
+	{
 		localdie("FATAL: can't read last parsed line from $last_parsed, $!\n");
 	}
 }
@@ -1059,7 +1114,9 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 
 # Clean the incremental directory if the feature is not disabled
-if (!$noclean && $outdir && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime})) {
+if (!$noclean && $outdir &&
+	($saved_last_line{datetime} || $pgb_saved_last_line{datetime}))
+{
 
 	my $last_year  = '';
 	my $last_month = '';
@@ -1300,36 +1357,6 @@ if ($incremental && !$remote_host)
 	push(@given_log_files, @tmpfilelist);
 }
 
-####
-# Function used to validate the possibility to use process on the given
-# file. Returns 1 when all multiprocess can be used, 0 when we can not
-# use multiprocess on a single file (remore file) and -1 when parallel
-# process can not be used too (binary mode).
-####
-sub confirm_multiprocess
-{
-	my $file = shift;
-
-	if ($remote_host || $file =~ /^(http[s]*|ftp[s]*|ssh):/) {
-
-		# Disable multi process when using ssh to parse remote log
-		if ($queue_size > 1) {
-			&logmsg('DEBUG', "parallel processing is not supported with remote files.");
-		}
-		return 0;
-	}
-
-	# Disable parallel processing in binary mode
-	if ($format eq 'binary') {
-		if (($queue_size > 1) || ($job_per_file > 1)) {
-			&logmsg('DEBUG', "parallel processing is not supported with binary format.") if (!$quiet);
-		}
-		return -1;
-	}
-
-	return 1;
-}
-
 # Pipe used for progress bar in multiprocess
 my $pipe;
 
@@ -1527,85 +1554,126 @@ if ($last_parsed)
 }
 
 # Save last line parsed
-if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime}) && ($last_line{orig} || $pgb_last_line{orig}) ) {
-	if (open(my $out, '>', $last_parsed)) {
-		if ($last_line{datetime}) {
+if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime})
+	&& ($last_line{orig} || $pgb_last_line{orig}) )
+{
+	if (open(my $out, '>', $last_parsed))
+	{
+		if ($last_line{datetime})
+		{
 			$last_line{current_pos} ||= 0;
 			print $out "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
-		} elsif ($saved_last_line{datetime}) {
+		}
+		elsif ($saved_last_line{datetime})
+		{
 			$saved_last_line{current_pos} ||= 0;
 			print $out "$saved_last_line{datetime}\t$saved_last_line{current_pos}\t$saved_last_line{orig}\n";
 		}
-		if ($pgb_last_line{datetime}) {
+		if ($pgb_last_line{datetime})
+		{
 			$pgb_last_line{current_pos} ||= 0;
 			print $out "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
-		} elsif ($pgb_saved_last_line{datetime}) {
+		}
+		elsif ($pgb_saved_last_line{datetime})
+		{
 			$pgb_saved_last_line{current_pos} ||= 0;
 			print $out "pgbouncer\t$pgb_saved_last_line{datetime}\t$pgb_saved_last_line{current_pos}\t$pgb_saved_last_line{orig}\n";
 		}
 		close($out);
-	} else {
+	}
+	else
+	{
 		&logmsg('ERROR', "can't save last parsed line into $last_parsed, $!");
 	}
 }
 
-if ($terminate) {
+if ($terminate)
+{
 	unlink("$PID_FILE");
 	exit 2;
 }
 
+####
+# Generates statistics output
+####
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
 
-if (!$incremental && ($#given_log_files >= 0) ) {
-
-	&logmsg('LOG', "Ok, generating $extens report...");
-
+if ( !$incremental && ($#given_log_files >= 0) )
+{
 	# Some message have been temporary stored as ERROR but
-	# they are LOGestore them to the right log level.
+	# they are LOG, restore them to the right log level.
 	&restore_log_type_count();
 
-	if ($extens ne 'tsung') {
-		$fh = new IO::File ">$current_out_file";
-		if (not defined $fh) {
-			localdie("FATAL: can't write to $current_out_file, $!\n");
-		}
-		if (($extens eq 'text') || ($extens eq 'txt')) {
-			if ($error_only) {
-				&dump_error_as_text();
-			} else {
-				&dump_as_text();
-			}
-		} elsif ($extens eq 'json') {
-			if ($error_only) {
-				&dump_error_as_json();
-			} else {
-				&dump_as_json();
-			}
-		} elsif ($extens eq 'binary') {
-			&dump_as_binary($fh);
-		} else {
-			# Create instance to prettify SQL query
-			if (!$noprettify) {
-				$sql_prettified = pgFormatter::Beautify->new();
-			}
-			&dump_as_html('.');
-		}
-		$fh->close;
-	} else {
+	foreach $outfile (@outfiles)
+	{	
+		($current_out_file, $extens) = &set_output_extension($outfile, $extension);
 
-		# Open filehandle
-		$fh = new IO::File ">>$current_out_file";
-		if (not defined $fh) {
-			localdie("FATAL: can't write to $current_out_file, $!\n");
+		$extens = $dft_extens if ($current_out_file eq '-' && $dft_extens);
+
+		&logmsg('LOG', "Ok, generating $extens report...");
+
+		if ($extens ne 'tsung')
+		{
+			$fh = new IO::File ">$current_out_file";
+			if (not defined $fh)
+			{
+				localdie("FATAL: can't write to $current_out_file, $!\n");
+			}
+			if (($extens eq 'text') || ($extens eq 'txt'))
+			{
+				if ($error_only)
+				{
+					&dump_error_as_text();
+				}
+				else
+				{
+					&dump_as_text();
+				}
+			}
+			elsif ($extens eq 'json')
+			{
+				if ($error_only)
+				{
+					&dump_error_as_json();
+				}
+				else
+				{
+					&dump_as_json();
+				}
+			}
+			elsif ($extens eq 'binary')
+			{
+				&dump_as_binary($fh);
+			}
+			else
+			{
+				# Create instance to prettify SQL query
+				if (!$noprettify)
+				{
+					$sql_prettified = pgFormatter::Beautify->new();
+				}
+				&dump_as_html('.');
+			}
+			$fh->close;
 		}
-		print $fh "</sessions>\n</tsung>\n";
-		$fh->close();
+		else
+		{
+
+			# Open filehandle
+			$fh = new IO::File ">>$current_out_file";
+			if (not defined $fh)
+			{
+				localdie("FATAL: can't write to $current_out_file, $!\n");
+			}
+			print $fh "</sessions>\n</tsung>\n";
+			$fh->close();
+		}
 	}
-
-} elsif (!$incremental || !$noreport) {
-
+}
+elsif (!$incremental || !$noreport)
+{
 	# Look for directory where report must be generated
 	my @build_directories = ();
 	if (-e "$last_parsed.tmp") {
@@ -1636,6 +1704,7 @@ $td = timediff($t2, $t0);
 # Remove pidfile and temporary file
 unlink("$PID_FILE");
 unlink("$last_parsed.tmp") if (-e "$last_parsed.tmp");
+unlink($TMP_DIR . "/pgbadger_tmp_$$.bin") if ($#outfiles >= 1);
 
 exit 0;
 
@@ -1693,9 +1762,9 @@ Options:
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html, out.txt, out.bin,
-                             out.json or out.tsung.
-                             With module JSON::XS installed, you can output file
-                             in JSON format either.
+                             out.json or out.tsung. This option can be used
+			     multiple time to output several format. To use json
+			     output the Perl module JSON::XS must be installed,
                              To dump output to stdout use - as filename.
     -O | --outdir path     : directory where out file must be saved.
     -p | --prefix string   : the value of your custom log_line_prefix as
@@ -1902,6 +1971,37 @@ it will also update all resource files (JS and CSS).
 
 	exit 0;
 }
+
+####
+# Function used to validate the possibility to use process on the given
+# file. Returns 1 when all multiprocess can be used, 0 when we can not
+# use multiprocess on a single file (remore file) and -1 when parallel
+# process can not be used too (binary mode).
+####
+sub confirm_multiprocess
+{
+	my $file = shift;
+
+	if ($remote_host || $file =~ /^(http[s]*|ftp[s]*|ssh):/) {
+
+		# Disable multi process when using ssh to parse remote log
+		if ($queue_size > 1) {
+			&logmsg('DEBUG', "parallel processing is not supported with remote files.");
+		}
+		return 0;
+	}
+
+	# Disable parallel processing in binary mode
+	if ($format eq 'binary') {
+		if (($queue_size > 1) || ($job_per_file > 1)) {
+			&logmsg('DEBUG', "parallel processing is not supported with binary format.") if (!$quiet);
+		}
+		return -1;
+	}
+
+	return 1;
+}
+
 
 sub set_ssh_command
 {

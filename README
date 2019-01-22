@@ -50,9 +50,9 @@ SYNOPSIS
         -N | --appname name    : only report on entries for given application name
         -o | --outfile filename: define the filename for the output. Default depends
                                  on the output format: out.html, out.txt, out.bin,
-                                 out.json or out.tsung.
-                                 With module JSON::XS installed, you can output file
-                                 in JSON format either.
+                                 out.json or out.tsung. This option can be used
+                                 multiple time to output several format. To use json
+                                 output the Perl module JSON::XS must be installed,
                                  To dump output to stdout use - as filename.
         -O | --outdir path     : directory where out file must be saved.
         -p | --prefix string   : the value of your custom log_line_prefix as
