@@ -13989,6 +13989,13 @@ sub store_queries
 
 	}
 
+	# We only process stored object with query here
+	if ($cur_info{$t_pid}{statement}) {
+		# Truncate the statement if requested by the user
+		$cur_info{$t_pid}{statement} = substr($cur_info{$t_pid}{statement}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_info{$t_pid}{statement}) > $maxlength));
+	}
+
 	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
 	my $cur_hour_str = "$cur_info{$t_pid}{hour}";
 
