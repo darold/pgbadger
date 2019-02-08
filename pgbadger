@@ -14605,7 +14605,7 @@ sub search_log_format
 
 	# Are default stderr lines since 10.0 or minimal prefix for pgbadger?
 	} elsif ($line =~
-/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\][:]*\s+(.*?)\s+(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\][:]*\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 		)
 	{
 		$fmt = 'default';
