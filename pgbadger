@@ -14528,7 +14528,16 @@ sub autodetect_format
 	{
 		if (!$fmt || ($nfound < 10 && $fmt ne 'binary'))
 		{
-			localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
+			if ($log_line_prefix =~ /\%(t|m|n).*\%(c|p)/)
+			{
+				# when log line prefix is set and have mandatory
+				# placeholders we considere format is stderr
+				$fmt = 'stderr';
+			}
+			else
+			{
+				localdie("FATAL: unable to detect log file format from $file, please use -f option.\n");
+			}
 		}
 	}
 	else
