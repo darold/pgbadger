@@ -3190,15 +3190,16 @@ sub process_file
 					if (&validate_log_line($prefix_vars{'t_pid'})) {
 
 						# The information can be saved when we are switching to a new main message
-						if ($cur_pid && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)) {
+						if ($cur_pid && exists $cur_info{$cur_pid} && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)) {
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid} if (!$log_duration || (($cur_info{$cur_pid}{duration} ne '') && ($cur_info{$cur_pid}{query} ne '')));
 						}
 
 						# Process the log line
 						&parse_query($fmt);
+
+						$cur_pid = $prefix_vars{'t_pid'};
 					}
-					$cur_pid = $prefix_vars{'t_pid'};
 
 				} elsif ($goon && ($line =~ $other_syslog_line)) {
 
@@ -3314,15 +3315,16 @@ sub process_file
 						$prefix_vars{'t_host'} = 'stderr';
 
 						# The information can be saved when we are switching to a new main message
-						if ($cur_pid && $prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/) {
+						if ($cur_pid && exists $cur_info{$cur_pid} && $prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/) {
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid} if (!$log_duration || (($cur_info{$cur_pid}{duration} ne '') && ($cur_info{$cur_pid}{query} ne '')));
 						}
 
 						# Process the log line
 						&parse_query($fmt);
+
+						$cur_pid = $prefix_vars{'t_pid'};
 					}
-					$cur_pid = $prefix_vars{'t_pid'};
 
 				# Collect additional query information
 				} elsif ($goon && $cur_pid) {
@@ -13078,7 +13080,7 @@ sub parse_query
 	}
 
 	# Stores the error's detail if previous line was an error
-	if (($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
+	if (exists $cur_info{$t_pid} && ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
 		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
 			# Store error details only if this is not a parameter list (never present with errors)
 			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
@@ -13491,7 +13493,7 @@ sub parse_query
 	}
 
 	# Look at bind/execute parameters if any
-	if ($cur_info{$t_pid}{query}) {
+	if (exists $cur_info{$t_pid} && $cur_info{$t_pid}{query}) {
 
 		# Remove obsolete connection storage
 		delete $conn_received{$cur_info{$t_pid}{pid}};
@@ -13886,6 +13888,9 @@ sub store_queries
 	my $t_pid  = shift;
 	my $end  = shift;
 
+	# We must have something to save
+	return 0 if (!exists $cur_info{$t_pid} || scalar keys %{$cur_info{$t_pid}} == 0);
+
 	# With separate log_duration and log_statement wait duration before storing the entry
 	return 0 if (!$end && $log_duration && ($cur_info{$t_pid}{duration} eq '')
 					&& ($cur_info{$t_pid}{query} ne ''));
@@ -13899,9 +13904,6 @@ sub store_queries
 	if ($anonymize && exists $cur_info{$t_pid}{query}) {
 		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
 	}
-
-	return 0 if (!exists $cur_info{$t_pid});
-	return 1 if (!exists $cur_info{$t_pid}{year});
 
 	# Cleanup and pre-normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^\s+//s;
