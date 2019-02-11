@@ -1,6 +1,7 @@
-use Test::Simple tests => 9;
+use Test::Simple tests => 10;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
+my $SYSLOG = 't/fixtures/pg-syslog.1.bz2';
 my $BIN = 't/fixtures/light.postgres.bin';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
@@ -35,16 +36,20 @@ $ret = `bunzip2 -c $LOG | perl pgbadger -q -o $JSON -`;
 $ret = `cat $JSON | perl -pe 's/.*"SELECT":(\\d+),.*/\$1/'`;
 ok( $? == 0 && $ret > 0, "Light log from STDIN");
 
-$ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > ret.json`;
-$ret = `stat --printf='%s' ret.json out.json out.txt`;
+$ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > t/ret.json`;
+$ret = `stat --printf='%s' t/ret.json $TEXT $JSON`;
 chomp($ret);
-ok( $? == 0 && $ret eq '13453413453415984', "Multiple output format");
+ok( $? == 0 && $ret eq '13453415984134534', "Multiple output format");
 
+$ret = `perl pgbadger -q -o - $SYSLOG`;
+ok( $? == 0 && length($ret) == 24281, "syslog report to stdout");
+
+`rm -f out.html`;
 # Remove files generated during the tests
 `rm -f out.html`;
 `rm -r $JSON`;
 `rm -r $TEXT`;
 `rm -f $BIN`;
 `rm -rf t/test_incr/`;
-`rm ret.json`
+`rm t/ret.json`
 
