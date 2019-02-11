@@ -1318,7 +1318,7 @@ if ($incremental && !$remote_host)
 		else
 		{
 			# Auto detect log format for proper parsing
-			my $fmt = autodetect_format($f);
+			my $fmt = autodetect_format($f, $file_size{$f});
 
 			# Set regex to parse the log file
 			$fmt = set_parser_regex($fmt);
@@ -14438,8 +14438,7 @@ sub average_per_minutes
 
 sub autodetect_format
 {
-	my $file = shift;
-	my $totalsize = shift;
+	my ($file, $totalsize) = @_;
 
 	# a file must be passed
 	return if (!$file);
@@ -14503,7 +14502,7 @@ sub autodetect_format
 		}
 		else
 		{
-			&logmsg('DEBUG', "Can not autodetected log format from $file, using default");
+			&logmsg('DEBUG', "Can not autodetect log format from $file, using default");
 			return 'default';
 		}
 
@@ -15034,9 +15033,7 @@ sub get_file_size
 
 sub get_log_file
 {
-	my $logf = shift;
-	my $totalsize = shift;
-	my $sample_only = shift;
+	my ($logf, $totalsize, $sample_only) = @_;
 
 	my $lfile = undef;
 
