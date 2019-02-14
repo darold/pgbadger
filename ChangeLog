@@ -1,3 +1,42 @@
+2019-02-14 - v10.3
+
+This release of pgBadger is a maintenance release that fixes some
+log format autodetection issues another pgBouncer log parsing issue
+reported by users. There is also a new feature:
+
+    The -o | --outfile option can now be used multiple time to dump
+    output in several format in a single command. For example:
+        pgbadger -o out.html -o out.json /log/pgsql-11.log
+    will create two reports in html and json format saved in the
+    two corresponding files.
+
+There's also some bugs fixes and features enhancements.
+
+  - Fix statistics reports when there a filter on database, user,
+    client or application is requested. Some queries was not
+    reported.
+  - Fix autodetection of pg>=10 defauilt log line prefix.
+  - Fix autodetection of log file with "non standard" log line prefix.
+    If --prefix specify %t, %m, %n and %p or %c, set format to stderr.
+    Thanks to Alex Danvy for the report.
+  - Remove extra space at end of line.
+  - Add minimal test to syslog parser.
+  - Fix a call to autodetect_format().
+  - Truncate statement when maxlength is used. Thanks to Thibaud
+    Madelaine for the patch.
+  - Add test for multiple output format.
+  - The -o | --outfile option can now be used multiple time to dump
+    output in several format in a single command. For example:
+      pgbadger -o out.txt -o out.html -o - -x json /log/pgsql-11.log
+    Here pgbadger will create two reports in text and html format
+    saved in the two corresponding file. It will also output a json
+    report on standard output. Thanks to Nikolay for the feature
+    request.
+  - Move detection of output format and setting of out filename into
+    a dedicated function set_output_extension().
+  - Fix another pgBouncer log parsing issue. Thanks to Douglas J.
+    Hunley for the report.
+
 2018-12-27 - v10.2
 
 This release of pgBadger is a maintenance release that fixes issues

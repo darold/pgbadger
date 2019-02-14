@@ -52,7 +52,7 @@ use Socket;
 use constant EBCDIC => "\t" ne "\011";
 use Encode qw(encode decode);
 
-$VERSION = '10.2';
+$VERSION = '10.3';
 
 $SIG{'CHLD'} = 'DEFAULT';
 

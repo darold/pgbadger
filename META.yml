@@ -1,5 +1,5 @@
 name:         pgBadger
-version:      10.2
+version:      10.3
 version_from: pgbadger
 installdirs:  site
 recommends:
