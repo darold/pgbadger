@@ -42,7 +42,7 @@ chomp($ret);
 ok( $? == 0 && $ret eq '13453415984134534', "Multiple output format");
 
 $ret = `perl pgbadger -q -o - $SYSLOG`;
-ok( $? == 0 && length($ret) == 24281, "syslog report to stdout");
+ok( $? == 0 && (length($ret) == 24281 || length($ret) == 24282), "syslog report to stdout");
 
 `rm -f out.html`;
 # Remove files generated during the tests
