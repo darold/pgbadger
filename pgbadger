@@ -2084,8 +2084,8 @@ sub set_file_list
 			# Get files from remote host
 			if ($file !~ /^ssh:/)
 			{
-				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls $file\"");
-				my @rfiles = `$remote_command "ls $file"`;
+				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls '$file'\"");
+				my @rfiles = `$remote_command "ls '$file'"`;
 				foreach my $f (@rfiles)
 				{
 					push(@lfiles, "$f$fmt");
@@ -2096,8 +2096,8 @@ sub set_file_list
 				my $host_info = $1;
 				my $file = $2;
 				my $ssh = $ssh_command || 'ssh';
-				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls $file\"");
-				my @rfiles = `$ssh $host_info "ls $file"`;
+				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$file'\"");
+				my @rfiles = `$ssh $host_info "ls '$file'"`;
 				foreach my $f (@rfiles)
 				{
 					push(@lfiles, "ssh://$host_info/$f$fmt");
@@ -14929,7 +14929,7 @@ sub get_file_size
 	elsif (!$remote_host && !$http_download && !$ssh_download && !$iscompressed)
 	{
 		eval {
-			$totalsize = (stat("$logf"))[7];
+			$totalsize = (stat($logf))[7];
 		};
 		$totalsize = -1 if ($@);
 	}
@@ -14939,21 +14939,21 @@ sub get_file_size
 	{
 		# Use curl to try to get remote file size if it is not compressed
 		if ($http_download) {
-			&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
-			$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
+			&logmsg('DEBUG', "Looking for file size using command: $curl_command --head \"$logf\" | grep \"Content-Length:\" | awk '{print \$2}'");
+			$totalsize = `$curl_command --head \"$logf\" | grep "Content-Length:" | awk '{print \$2}'`;
 			chomp($totalsize);
-			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\"\n") if ($totalsize eq '');
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head \"$logf\" | grep \"Content-Length:\"\n") if ($totalsize eq '');
 		} elsif ($ssh_download && $logf =~ m#^ssh:\/\/([^\/]+)/(.*)#i) {
 			my $host_info = $1;
 			my $file = $2;
 			my $ssh = $ssh_command || 'ssh';
-			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l $file\" | awk '{print \$5}'");
-			$totalsize = `$ssh $host_info "ls -l $file" | awk '{print \$5}'`;
+			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l '$file'\" | awk '{print \$5}'");
+			$totalsize = `$ssh $host_info "ls -l '$file'" | awk '{print \$5}'`;
 			chomp($totalsize);
-			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh $host_info \"ls -l $file\"\n") if ($totalsize eq '');
+			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh $host_info \"ls -l '$file'\"\n") if ($totalsize eq '');
 		} elsif ($remote_host) {
-			&logmsg('DEBUG', "Looking for file size using command: $remote_command \"ls -l $logf\" | awk '{print \$5}'");
-			$totalsize = `$remote_command "ls -l $logf" | awk '{print \$5}'`;
+			&logmsg('DEBUG', "Looking for file size using command: $remote_command \"ls -l '$logf'\" | awk '{print \$5}'");
+			$totalsize = `$remote_command "ls -l '$logf'" | awk '{print \$5}'`;
 			chomp($totalsize);
 			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l $logf\"\n") if ($totalsize eq '');
 		}
@@ -14973,7 +14973,7 @@ sub get_file_size
 		} elsif ($logf =~ /\.xz$/i) {
 			$cmd_file_size = $xz_uncompress_size;
 		} elsif ($logf =~ /\.bz2$/i) {
-			$cmd_file_size = "ls -l %f | awk '{print \$5}'";
+			$cmd_file_size = "ls -l '%f' | awk '{print \$5}'";
 		}
 		if (!$remote_host && !$http_download && !$ssh_download) {
 			$cmd_file_size =~ s/\%f/$logf/g;
@@ -15006,10 +15006,10 @@ sub get_file_size
 	# file size and estimate the real size by using bzip2, gzip and xz factors.
 	elsif ($http_download)
 	{
-		&logmsg('DEBUG', "Looking for file size using command: $curl_command --head $logf | grep \"Content-Length:\" | awk '{print \$2}'");
-		$totalsize = `$curl_command --head $logf | grep "Content-Length:" | awk '{print \$2}'`;
+		&logmsg('DEBUG', "Looking for file size using command: $curl_command --head \"$logf\" | grep \"Content-Length:\" | awk '{print \$2}'");
+		$totalsize = `$curl_command --head \"$logf\" | grep "Content-Length:" | awk '{print \$2}'`;
 		chomp($totalsize);
-		localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head $logf | grep \"Content-Length:\"\n") if ($totalsize eq '');
+		localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $curl_command --head \"$logf\" | grep \"Content-Length:\"\n") if ($totalsize eq '');
 		&logmsg('DEBUG', "With http access size real size of a compressed file is unknown but use Content-Length wirth compressed side.");
 		# For all compressed file we don't know the
 		# real size apply deflate estimation factor
@@ -15079,13 +15079,13 @@ sub get_log_file
 						my $host_info = $1;
 						my $file = $2;
 						my $ssh = $ssh_command || 'ssh';
-						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat $file\" |");
+						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat '$file'\" |");
 						# Open a pipe to cat program
-						open($lfile, '-|', "$ssh $host_info \"cat $file\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat $file\". $!\n");
+						open($lfile, '-|', "$ssh $host_info \"cat '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat '$file'\". $!\n");
 					} else {
-						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \" cat $logf\" |");
+						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \" cat '$logf'\" |");
 						# Open a pipe to cat program
-						open($lfile, '-|', "$remote_command \"cat $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"cat $logf\". $!\n");
+						open($lfile, '-|', "$remote_command \"cat '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"cat '$logf'\". $!\n");
 					}
                                 } else {
                                         &logmsg('DEBUG', "Retrieving log entries using command: $curl_command --data-binary \"$logf\" |");
@@ -15099,13 +15099,13 @@ sub get_log_file
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
-					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 $file\" |");
+					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 '$file'\" |");
 					# Open a pipe to cat program
-					open($lfile, '-|', "$ssh $host_info \"tail -n 100 $file\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 $logf\". $!\n");
+					open($lfile, '-|', "$ssh $host_info \"tail -n 100 $file\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
 				} else {
-					&logmsg('DEBUG', "Retrieving log sample using command: $remote_command \"tail -n 100 $logf\" |");
+					&logmsg('DEBUG', "Retrieving log sample using command: $remote_command \"tail -n 100 '$logf'\" |");
 					# Open a pipe to cat program
-					open($lfile, '-|', "$remote_command \"tail -n 100 $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 $logf\". $!\n");
+					open($lfile, '-|', "$remote_command \"tail -n 100 '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
 				}
 
                         } else {
@@ -15145,13 +15145,13 @@ sub get_log_file
 						my $host_info = $1;
 						my $file = $2;
 						my $ssh = $ssh_command || 'ssh';
-						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress $file\"");
+						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 						# Open a pipe to zcat program for compressed log
-						open($lfile, '-|', "$ssh $host_info \"$uncompress $file\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress $logf\". $!\n");
+						open($lfile, '-|', "$ssh $host_info \"$uncompress '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
 					} else {
-						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress $logf\"");
+						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress '$logf'\"");
 						# Open a pipe to zcat program for compressed log
-						open($lfile, '-|', "$remote_command \"$uncompress $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress $logf\". $!\n");
+						open($lfile, '-|', "$remote_command \"$uncompress '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
 					}
 				} else {
 					&logmsg('DEBUG', "Retrieving log entries using command: $curl_command \"$logf\" | $uncompress |");
@@ -15165,13 +15165,13 @@ sub get_log_file
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
-					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress $file\"");
+					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 					# Open a pipe to zcat program for compressed log
-					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' $file\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' $file\". $!\n");
+					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' '$file'\". $!\n");
 				} else {
-					&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress $logf\"");
+					&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress '$logf'\"");
 					# Open a pipe to zcat program for compressed log
-					open($lfile, '-|', "$remote_command \"$sample_cmd -m 100 '[1234567890]' $logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$sample_cmd -m 100 '' $logf\". $!\n");
+					open($lfile, '-|', "$remote_command \"$sample_cmd -m 100 '[1234567890]' '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$sample_cmd -m 100 '' '$logf'\". $!\n");
 				}
                         } else {
                                 # Open a pipe to GET program
