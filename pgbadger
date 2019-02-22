@@ -1907,8 +1907,8 @@ Examples:
 Use URI notation for remote log file:
 
 	perl pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
-	perl pgbadger ftp://username@172.12.110.14/postgresql-10.1-main.log
-	perl pgbadger ssh://username@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+	perl pgbadger ftp://username\@172.12.110.14/postgresql-10.1-main.log
+	perl pgbadger ssh://username\@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
 
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
