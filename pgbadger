@@ -2084,8 +2084,9 @@ sub set_file_list
 			# Get files from remote host
 			if ($file !~ /^ssh:/)
 			{
-				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls '$file'\"");
-				my @rfiles = `$remote_command "ls '$file'"`;
+				my($filename, $dirs, $suffix) = fileparse($file);
+				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls '$dirs'$filename\"");
+				my @rfiles = `$remote_command "ls '$dirs'$filename"`;
 				foreach my $f (@rfiles)
 				{
 					push(@lfiles, "$f$fmt");
@@ -2096,8 +2097,9 @@ sub set_file_list
 				my $host_info = $1;
 				my $file = $2;
 				my $ssh = $ssh_command || 'ssh';
-				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$file'\"");
-				my @rfiles = `$ssh $host_info "ls '$file'"`;
+				my($filename, $dirs, $suffix) = fileparse($file);
+				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
+				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
 				foreach my $f (@rfiles)
 				{
 					push(@lfiles, "ssh://$host_info/$f$fmt");
