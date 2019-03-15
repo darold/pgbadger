@@ -823,8 +823,9 @@ if ($error_only && $disable_error) {
 # Set default search pattern for database, user name, application name and host in log_line_prefix
 my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
-my $regex_prefix_dbclient = qr/(?:client|remote|ip|host)=([^,\(]*)/;
+my $regex_prefix_dbclient = qr/(?:client|remote|ip|host|connection_source)=([^,\(]*)/;
 my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
+my $regex_prefix_sqlstate = qr/(?:error_code|state|state_code)=([^,]*)/;
 
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
@@ -1431,7 +1432,7 @@ foreach my $logfile ( @given_log_files )
 		$fmt = &autodetect_format($logfile, $file_size{$logfile});
 		$fmt ||= $format;
 		# Remove log format from filename if any
-		$logfile =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
+		$logfile =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
 		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 	}
 	else
@@ -1738,8 +1739,8 @@ Options:
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                             cvs and pgbouncer. Use this option when pgBadger is
-                             not able to auto-detect the log format.
+                             cvs, pgbouncer and logplex. Use this option when
+                             pgBadger is not able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -1967,6 +1968,11 @@ To rebuild all incremental html reports after, proceed as follow:
 
 it will also update all resource files (JS and CSS).
 
+pgBadger also support Heroku PostgreSQL logs using logplex format:
+
+    heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
+
+this will stream Heroku PostgreSQL log to pgbadger through stdin. 
 };
 
 	exit 0;
@@ -2042,7 +2048,7 @@ sub set_file_list
 	my $file_orig = $file;
 	my $fmt = '';
 	# Remove log format from log file if any
-	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog)\d*)$//i)
+	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*)$//i)
 	{
 		$fmt = $1;
 	}
@@ -2175,7 +2181,8 @@ sub set_parser_regex
 		$q_prefix = $res{'q_prefix'};
 		@prefix_q_params = @{ $res{'q_param_list'} };
 
-		if ($fmt eq 'syslog') {
+		if ($fmt eq 'syslog')
+		{
 			$llp =
 				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*'
 				. $llp
@@ -2184,7 +2191,9 @@ sub set_parser_regex
 			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)\-\d+\]\s*(.*)/;
-		} elsif ($fmt eq 'syslog2') {
+		}
+		elsif ($fmt eq 'syslog2')
+		{
 			$fmt = 'syslog';
 			$llp =
 				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*'
@@ -2194,7 +2203,22 @@ sub set_parser_regex
 			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*)/;
-		} elsif ($fmt eq 'stderr' || $fmt eq 'default') {
+		}
+		elsif ($fmt eq 'logplex')
+		{
+			# The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
+
+			$llp =
+				  '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+'
+				. $llp
+				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
+			$compiled_prefix = qr/$llp/;
+			unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid');
+			push(@prefix_params, 't_loglevel', 't_query');
+			$other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*)/;
+		}
+		elsif ($fmt eq 'stderr' || $fmt eq 'default')
+		{
 			$fmt = 'stderr';
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
@@ -2217,6 +2241,16 @@ sub set_parser_regex
 		push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)\-\d+\])?\s*(.*)/;
+
+	} elsif ($fmt eq 'logplex') {
+
+		# The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
+
+		$compiled_prefix =
+			  qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+		unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid');
+		push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
+		$other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*)/;
 
 	} elsif ($fmt eq 'stderr') {
 
@@ -2728,7 +2762,7 @@ sub process_file
 	my $is_json_log = 0;
 	$is_json_log = 1 if ($fmt =~ /jsonlog/);
 	my $is_syslog = 0;
-	$is_syslog = 1 if ($fmt =~ /syslog/);
+	$is_syslog = 1 if ($fmt =~ /syslog|logplex/);
 
 	if ($stop_offset > 0)
 	{
@@ -2839,7 +2873,7 @@ sub process_file
 				}
 
 				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+				next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 				# Store the current timestamp of the log line
 				&store_current_timestamp($prefix_vars{'t_timestamp'});
@@ -2972,7 +3006,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, join(',', @$row)));
+					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, join(',', @$row)));
 
 					# Store the current timestamp of the log line
 					&store_current_timestamp($prefix_vars{'t_timestamp'});
@@ -3036,7 +3070,7 @@ sub process_file
 		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
-		my $goon = 0;
+		my $goon = ($incremental) ? 1 : 0;
 		my $has_exclusion = 0;
 		if ($#exclude_line >= 0) {
 			$has_exclusion = 1;
@@ -3085,7 +3119,7 @@ sub process_file
 				next if ($res == 1);
 
 				# Jump to the last line parsed if required
-				next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+				next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 				# We have reach previous incremental position (or we not in increment mode)
 				$goon = 1;
@@ -3134,7 +3168,7 @@ sub process_file
 					}
 
 					# skip non postgresql lines
-					next if ($prefix_vars{'t_ident'} ne $ident);
+					next if (exists $prefix_vars{'t_ident'} && $prefix_vars{'t_ident'} ne $ident);
 
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
@@ -3168,7 +3202,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 					# We have reach previous incremental position (or we not in increment mode)
 					$goon = 1;
 
@@ -3226,7 +3260,7 @@ sub process_file
 					&parse_orphan_line($cur_pid, $line);
 
 				} else {
-					&logmsg('DEBUG', "Unknown syslog line format: $line");
+					&logmsg('DEBUG', "Unknown $fmt line format: $line");
 				}
 
 			} elsif ($fmt eq 'stderr') {
@@ -3289,7 +3323,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if (!&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 					# We have reach previous incremental position (or we not in increment mode)
 					$goon = 1;
@@ -3340,7 +3374,7 @@ sub process_file
 				} elsif ($goon) {
 
 					# unknown format
-					&logmsg('DEBUG', "Unknown $fmt line format: $line");
+					&logmsg('DEBUG', "Unknown stderr line format: $line");
 				}
 			}
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
@@ -3694,7 +3728,7 @@ sub check_file_changed
 
 		$line =~ s/\r//;
 
-		if ($fmt =~ /syslog/) {
+		if ($fmt =~ /syslog|logplex/) {
 
 			my @matches = ($line =~ $compiled_prefix);
 			if ($#matches >= 0) {
@@ -12977,6 +13011,11 @@ sub parse_log_prefix
 		if ($t_logprefix =~ $regex_prefix_dbappname) {
 			$prefix_vars{'t_appname'} = $1;
 		}
+
+		# Search for sql state code
+		if ($t_logprefix =~ $regex_prefix_sqlstate) {
+			$prefix_vars{'t_sqlstate'} = $1;
+		}
 	}
 }
 
@@ -13062,7 +13101,7 @@ sub parse_query
 	}
 
 	# Replace syslog tabulation rewrite
-	if ($fmt =~ /syslog/) {
+	if ($fmt =~ /syslog|logplex/) {
 		$prefix_vars{'t_query'} =~ s/#011/\t/g;
 	}
 
@@ -14456,7 +14495,7 @@ sub autodetect_format
 
 	# If log format is given at end of the filename, remove it and return the format
 	# Ex: ssh://remotehost/postgresql-10.log:csv
-	if ($file =~ s#:(syslog|csv|stderr|pgbouncer)\d*$##)
+	if ($file =~ s#:(syslog|csv|stderr|pgbouncer|logplex)\d*$##)
 	{
 		&logmsg('DEBUG', "Autodetected log format '$1' from URI '$file'");
 		return $1;
@@ -14597,6 +14636,12 @@ sub search_log_format
 		$fmt = 'syslog2';
 		$ident_name = $1;
 
+	} elsif ($line =~
+		  /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[(\d+)\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+	   )
+	{
+		$fmt = 'logplex';
+		$ident_name = 'postgres';
 	# Are csv lines ?
 	} elsif (
 		(
@@ -14906,7 +14951,7 @@ sub get_file_size
 	my $logf = shift;
 
 	# Remove log format from log file if any
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
@@ -15041,7 +15086,7 @@ sub get_log_file
 
 	return $lfile if ($totalsize == 0);
 
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;

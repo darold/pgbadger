@@ -26,8 +26,8 @@ SYNOPSIS
                                  Be warned that this can really slow down pgBadger.
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                                 cvs and pgbouncer. Use this option when pgBadger is
-                                 not able to auto-detect the log format.
+                                 logplex, cvs and pgbouncer. Use this option when
+                                 pgBadger is not able to auto-detect the log format.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.
         -h | --help            : show this message and exit.
         -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -196,8 +196,8 @@ SYNOPSIS
     Use URI notation for remote log file:
 
             perl pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
-            perl pgbadger ftp://username.12.110.14/postgresql-10.1-main.log
-            perl pgbadger ssh://username.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+            perl pgbadger ftp://username@172.12.110.14/postgresql-10.1-main.log
+            perl pgbadger ssh://username@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
 
     You can use together a local PostgreSQL log and a remote pgbouncer log
     file to parse:
@@ -257,6 +257,12 @@ SYNOPSIS
         pgbadger -X -I -O /path/to/reports/ --rebuild
 
     it will also update all resource files (JS and CSS).
+
+    pgBadger also support Heroku PostgreSQL logs using logplex format:
+
+        heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
+
+    this will stream Heroku's PostgreSQL log to pgbadger through stdin.
 
 DESCRIPTION
     pgBadger is a PostgreSQL log analyzer built for speed with fully reports

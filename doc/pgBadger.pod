@@ -28,8 +28,8 @@ Options:
                              Be warned that this can really slow down pgBadger.
     -e | --end datetime    : end date/time for the data to be parsed in log.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                             cvs and pgbouncer. Use this option when pgBadger is
-                             not able to auto-detect the log format.
+                             logplex, cvs and pgbouncer. Use this option when
+                             pgBadger is not able to auto-detect the log format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -i | --ident name      : programname used as syslog ident. Default: postgres
@@ -202,7 +202,7 @@ Use URI notation for remote log file:
 
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
-	perl pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username@172.12.110.14/pgbouncer.log
+	perl pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username.12.110.14/pgbouncer.log
 
 Generate Tsung sessions XML file with select queries only:
 
@@ -256,6 +256,12 @@ To rebuild all incremental html reports after, proceed as follow:
     pgbadger -X -I -O /path/to/reports/ --rebuild
 
 it will also update all resource files (JS and CSS).
+
+pgBadger also support Heroku PostgreSQL logs using logplex format:
+
+    heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
+
+this will stream Heroku's PostgreSQL log to pgbadger through stdin. 
 
 =head1 DESCRIPTION
 
