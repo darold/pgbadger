@@ -1,9 +1,10 @@
-use Test::Simple tests => 6;
+use Test::Simple tests => 8;
 use JSON::XS;
 
 my $json = new JSON::XS;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
+my $HLOG = 't/fixtures/logplex.gz';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
 
@@ -27,6 +28,15 @@ ok( $json_ref->{overall_stat}{histogram}{query_total} == 629, "Consistent query_
 ok( $json_ref->{overall_stat}{peak}{"2017-09-06 08:48:45"}{write} == 1, "Consistent peak write");
 
 ok( $json_ref->{pgb_session_info}{chronos}{20180912}{16}{count} == 63943, "pgBouncer connections");
+
+`rm -f $OUT`;
+
+$ret = `perl pgbadger -q -o $OUT $HLOG`;
+ok( $? == 0, "Generate json report for heroku log file");
+
+$json_ref = $json->decode(`cat $OUT`);
+
+ok( $json_ref->{database_info}{unknown}{"CTE|duration"} eq "21761.546", "Consistent CTE duration");
 
 `rm -f $OUT`;
 
