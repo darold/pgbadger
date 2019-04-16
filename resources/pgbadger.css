@@ -46,13 +46,8 @@ h3 small {
 
 .analysis-item {
 	background: #fff;
-	margin: 2em 0;
-	padding: 2em 0;
-}
-
-.analysis-item h2 {
-	margin: 1em 0 .5em 1em;
-
+	margin-bottom:2em;
+	padding-bottom:15px;
 }
 
 h3 {
