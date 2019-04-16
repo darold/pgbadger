@@ -31,6 +31,7 @@ jQuery(function (){
 			jQuery('#main-container li.slide').removeClass('active-slide').hide();
 			jQuery(slideId).addClass("active-slide").fadeIn();
 		}
+		scrollTo(0,0);
 	});
 
 	jQuery('.navbar li ul li').click(function() {
