@@ -10094,7 +10094,7 @@ sub print_histogram_query_times
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
 	print $fh qq{
-	<h2><i class="glyphicon icon-question-sign"></i> Top Queries</h2>
+	<h1 class="page-header"><i class="glyphicon icon-question-sign"></i> Top Queries</h1>
 	<div class="analysis-item row" id="histogram-query-times">
 		<h2><i class="glyphicon icon-signal"></i> Histogram of query times</h2>
 		<div class="col-md-3">
