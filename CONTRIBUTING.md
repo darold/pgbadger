@@ -1,6 +1,6 @@
-# How to contribute #
+# How to contribute
 
-##Before Submitting an issue##
+## Before Submitting an issue
 
 1. Upgrade to the latest version of pgBadger and see if the problem remains
 
