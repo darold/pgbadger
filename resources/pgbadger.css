@@ -6,6 +6,7 @@ body {
 	background: -ms-linear-gradient( bottom, #cdd5da, #e8e7e7); 
 	background: -o-linear-gradient( bottom, #cdd5da, #e8e7e7); 
 	background: linear-gradient( to bottom, #cdd5da, #e8e7e7);
+	margin-top: 50px;
 }
 
 ul.nav li.dropdown:hover ul.dropdown-menu{
