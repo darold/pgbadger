@@ -9672,9 +9672,9 @@ sub print_lock_queries_report
 				print $fh qq{
 					<dt>
 						<div id="query-a-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
-					</dt>
 					<pre>$details</pre>
 					$explain
+					</dt>
 };
 				$idx++;
 
@@ -9833,8 +9833,8 @@ sub print_tempfile_report
 						<dt>
 						<div id="query-c-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 
-						</dt>
 						<pre>$details</pre>
+						</dt>
 };
 				$idx++
 
@@ -9977,8 +9977,8 @@ sub print_cancelled_report
 						<dt>
 						<div id="query-d-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 
-						</dt>
 						<pre>$details</pre>
+						</dt>
 };
 				$idx++
 
@@ -10333,7 +10333,6 @@ sub print_time_consuming
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="time-consuming-queries-user-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
@@ -10349,7 +10348,6 @@ sub print_time_consuming
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
@@ -10360,7 +10358,6 @@ sub print_time_consuming
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="time-consuming-queries-app-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
@@ -10376,7 +10373,6 @@ sub print_time_consuming
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-queries-app-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of app involved collapse -->
@@ -10408,9 +10404,9 @@ sub print_time_consuming
 			print $fh qq{
 								<dt>
 								<div id="query-e-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
-								</dt>
 								<pre>$details</pre>
 								$explain
+								</dt>
 };
 			$idx++;
 		}
@@ -10570,7 +10566,6 @@ sub print_most_frequent
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="most-frequent-queries-user-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
@@ -10586,7 +10581,6 @@ sub print_most_frequent
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#most-frequent-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
@@ -10596,7 +10590,6 @@ sub print_most_frequent
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="most-frequent-queries-app-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
@@ -10612,7 +10605,6 @@ sub print_most_frequent
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#most-frequent-queries-app-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of app involved collapse -->
@@ -10645,9 +10637,9 @@ sub print_most_frequent
 			print $fh qq{
 								<dt>
 								<div id="query-f-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
-								</dt>
 								<pre>$details</pre>
 								$explain
+								</dt>
 };
 			$idx++;
 		}
@@ -10810,7 +10802,6 @@ sub print_slowest_queries
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="normalized-slowest-queries-user-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{users}{$b}{duration} <=> $normalyzed_info{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$k}{users}}) {
@@ -10826,7 +10817,6 @@ sub print_slowest_queries
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#normalized-slowest-queries-user-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of user involved collapse -->
@@ -10836,7 +10826,6 @@ sub print_slowest_queries
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="normalized-slowest-queries-app-involved-rank-$rank" class="collapse">
-							<dl>
 };
 			my $idx = 1;
 			foreach my $u (sort {$normalyzed_info{$k}{apps}{$b}{duration} <=> $normalyzed_info{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$k}{apps}}) {
@@ -10852,7 +10841,6 @@ sub print_slowest_queries
 				}
 			}
 			print $fh qq{
-							</dl>
 							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#normalized-slowest-queries-app-involved-rank-$rank">x Hide</button></p>
 						</div>
 						<!-- end of app involved collapse -->
@@ -10885,9 +10873,9 @@ sub print_slowest_queries
 			print $fh qq{
 								<dt>
 								<div id="query-g-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
-								</dt>
 								<pre>$details</pre>
 								$explain
+								</dt>
 };
 			$idx++;
 		}
