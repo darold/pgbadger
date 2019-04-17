@@ -7289,7 +7289,7 @@ sub print_user_session
 		}
 	}
 	$drawn_graphs{usersessions_graph} = &jqplot_piegraph($graphid++, 'graph_usersessions', 'Sessions per user', %infos);
-	$sess_user_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
+	$sess_user_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
 	<div class="analysis-item row" id="sessions-per-user">
