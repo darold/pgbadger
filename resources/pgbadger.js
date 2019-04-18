@@ -254,3 +254,16 @@ function format_number(val) {
 }
 
 
+function draw_charts() {
+	window.charts = $.grep(window.charts, function(chart) {
+		var chart_copy = chart.slice();
+		var type = chart_copy.shift();
+		var divid = chart[1];
+		if ($('#' + divid).is(':visible')) {
+			window['create_' + type].apply(null, chart_copy);
+			// chart loaded, don't keep it in the list
+			return false;
+		}
+		return true;
+	});
+};
