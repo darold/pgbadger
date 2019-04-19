@@ -32,6 +32,7 @@ jQuery(function (){
 			jQuery(slideId).addClass("active-slide").fadeIn();
 		}
 		scrollTo(0,0);
+		draw_charts();
 	});
 
 	jQuery('.navbar li ul li').click(function() {
@@ -40,7 +41,10 @@ jQuery(function (){
 		var slideId = '#'+id+'-slide';
 		jQuery('#main-container li.slide').removeClass('active-slide').hide();
 		jQuery(slideId).addClass("active-slide").fadeIn();
+		draw_charts();
 	});
+
+	draw_charts();
 });
 
 jQuery(document).ready(function () {
