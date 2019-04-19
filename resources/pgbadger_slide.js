@@ -65,5 +65,14 @@ jQuery(document).ready(function () {
             textRange.select();
         }
     });
+
+	function shiftWindow() {
+		scrollBy(0, -50);
+	}
+
+	if (location.hash) {
+		shiftWindow();
+	}
+	window.addEventListener("hashchange",shiftWindow);
 });
 
