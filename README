@@ -26,7 +26,7 @@ SYNOPSIS
                                  Be warned that this can really slow down pgBadger.
         -e | --end datetime    : end date/time for the data to be parsed in log.
         -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                                 logplex, cvs and pgbouncer. Use this option when
+                                 cvs, pgbouncer and logplex. Use this option when
                                  pgBadger is not able to auto-detect the log format.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.
         -h | --help            : show this message and exit.
@@ -76,7 +76,7 @@ SYNOPSIS
         -T | --title string    : change title of the HTML page report.
         -u | --dbuser username : only report on entries for the given user.
         -U | --exclude-user username : exclude entries for the specified user from
-                                 report.
+                                 report. Can be used multiple time.
         -v | --verbose         : enable verbose or debug mode. Disabled by default.
         -V | --version         : show pgBadger version and exit.
         -w | --watch-mode      : only report errors just like logwatch could do.
@@ -126,8 +126,8 @@ SYNOPSIS
                                  report. Example: "pg_dump". Can be used multiple
                                  time.
         --exclude-appname name : exclude entries for the specified application name
-                                 from report. Example: "pg_dump". Can be used multiple
-                                 time.
+                                 from report.  Example: "pg_dump".  Can be used
+                                 multiple time.
         --exclude-line regex   : pgBadger will start to exclude any log entry that
                                  will match the given regex. Can be used multiple
                                  time.
@@ -146,7 +146,7 @@ SYNOPSIS
         --pid-file file        : set the name of the pid file to manage concurrent
                                  execution of pgBadger. Default: pgbadger.pid
         --rebuild              : used to rebuild all html reports in incremental
-                                 output directories where there is binary data files.
+                                 output directories where there's binary data files.
         --pgbouncer-only       : only show PgBouncer related menu in the header.
         --start-monday         : in incremental mode, calendar's weeks start on
                                  sunday. Use this option to start on monday.
@@ -172,10 +172,10 @@ SYNOPSIS
                                      -o PreferredAuthentications=hostbased,publickey
 
     Log file to parse can also be specified using an URI, supported protocol
-    are http[s] [s]ftp. The curl command will be used to download the file
-    and the file will be parsed during download. The ssh protocol is also
-    supported and will use the ssh command like with the remote host use.
-    See examples bellow.
+    are http[s] and [s]ftp. The curl command will be used to download the
+    file and the file will be parsed during download. The ssh protocol is
+    also supported and will use the ssh command like with the remote host
+    use. See examples bellow.
 
     Examples:
 
@@ -262,7 +262,7 @@ SYNOPSIS
 
         heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
 
-    this will stream Heroku's PostgreSQL log to pgbadger through stdin.
+    this will stream Heroku PostgreSQL log to pgbadger through stdin.
 
 DESCRIPTION
     pgBadger is a PostgreSQL log analyzer built for speed with fully reports
