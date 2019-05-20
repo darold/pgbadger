@@ -1,7 +1,25 @@
-NAME
+### TABLE OF CONTENTS
+- [NAME](#name)
+- [SYNOPSIS](#synopsis)
+- [DESCRIPTION](#description)
+- [FEATURE](#feature)
+- [REQUIREMENT](#requirement)
+- [INSTALLATION](#installation)
+- [POSTGRESQL CONFIGURATION](#postgresql-configuration)
+- [PARALLEL PROCESSING](#parallel-processing)
+- [INCREMENTAL REPORTS](#incremental-reports)
+- [BINARY FORMAT](#binary-format)
+- [JSON FORMAT](#json-format)
+- [AUTHORS](#authors)
+- [LICENSE](#license)
+	
+
+
+
+### NAME
     pgBadger - a fast PostgreSQL log analysis report
 
-SYNOPSIS
+### SYNOPSIS
     Usage: pgbadger [options] logfile [...]
 
             PostgreSQL log analyzer with fully detailed reports and graphs.
@@ -264,7 +282,7 @@ SYNOPSIS
 
     this will stream Heroku PostgreSQL log to pgbadger through stdin.
 
-DESCRIPTION
+### DESCRIPTION
     pgBadger is a PostgreSQL log analyzer built for speed with fully reports
     from your PostgreSQL log file. It's a single and small Perl script that
     outperforms any other PostgreSQL log analyzer.
@@ -299,7 +317,7 @@ DESCRIPTION
     instead of log_min_duration_statement to have reports on duration and
     number of queries only.
 
-FEATURE
+### FEATURE
     pgBadger reports everything about your SQL queries:
 
             Overall statistics.
@@ -376,7 +394,7 @@ FEATURE
     compressed files and in the multiprocess per file mode (-J) but can not
     be used with the CSV log format.
 
-REQUIREMENT
+### REQUIREMENT
     pgBadger comes as a single Perl script - you do not need anything other
     than a modern Perl distribution. Charts are rendered using a JavaScript
     library so you don't need anything other than a web browser. Your
@@ -425,7 +443,7 @@ REQUIREMENT
     Note that multiprocessing can not be used with compressed files or CSV
     files as well as under Windows platform.
 
-INSTALLATION
+### INSTALLATION
     Download the tarball from GitHub and unpack the archive as follow:
 
             tar xzf pgbadger-7.x.tar.gz
@@ -448,7 +466,7 @@ INSTALLATION
 
     By default INSTALLDIRS is set to site.
 
-POSTGRESQL CONFIGURATION
+### POSTGRESQL CONFIGURATION
     You must enable and set some configuration directives in your
     postgresql.conf before starting.
 
@@ -529,7 +547,7 @@ log_min_duration_statement, log_duration and log_statement
     will also increase drastically the size of your log.
     log_min_duration_statement should always be preferred.
 
-PARALLEL PROCESSING
+### PARALLEL PROCESSING
     To enable parallel processing you just have to use the -j N option where
     N is the number of cores you want to use.
 
@@ -584,7 +602,7 @@ PARALLEL PROCESSING
     are all named with the following template tmp_pgbadgerXXXX.bin so they
     can be easily identified.
 
-INCREMENTAL REPORTS
+### INCREMENTAL REPORTS
     pgBadger includes an automatic incremental report mode using option -I
     or --incremental. When running in this mode, pgBadger will generate one
     report per day and a cumulative report per week. Output is first done in
@@ -613,7 +631,7 @@ INCREMENTAL REPORTS
     files in the output directory. The resources will then be loaded using
     script and link tags.
 
-BINARY FORMAT
+### BINARY FORMAT
     Using the binary format it is possible to create custom incremental and
     cumulative reports. For example, if you want to refresh a pgBadger
     report each hour from a daily PostgreSQL log file, you can proceed by
@@ -642,12 +660,12 @@ BINARY FORMAT
 
     Adjust the commands to suit your particular needs.
 
-JSON FORMAT
+### JSON FORMAT
     JSON format is good for sharing data with other languages, which makes
     it easy to integrate pgBadger result into other monitoring tools like
     Cacti or Graphite.
 
-AUTHORS
+### AUTHORS
     pgBadger is an original work from Gilles Darold.
 
     The pgBadger logo is an original creation of Damien Cazeils.
@@ -662,7 +680,7 @@ AUTHORS
     Many people have contributed to pgBadger, they are all quoted in the
     Changelog file.
 
-LICENSE
+### LICENSE
     pgBadger is free software distributed under the PostgreSQL Licence.
 
     Copyright (c) 2012-2019, Gilles Darold
