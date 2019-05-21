@@ -14092,7 +14092,7 @@ sub store_queries
 					$cur_info{$t_pid}{query} =~ s/"$//s;
 					$cur_info{$t_pid}{plan} .= "\n";
 				# TEXT format
-				} elsif ($cur_info{$t_pid}{query} =~ s/Query Text: ([^"])/$1/s) {
+				} elsif ($cur_info{$t_pid}{query} =~ s/Query Text: ([^"]+)/$1/s) {
 					$cur_info{$t_pid}{plan} .= "\n";
 				# JSON format
 				} elsif ($cur_info{$t_pid}{query} =~ s/.*"Query Text": "//s) {
