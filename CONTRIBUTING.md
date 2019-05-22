@@ -6,7 +6,7 @@
 
 2. Look at the [closed issues](https://github.com/darold/pgbadger/issues?state=closed), we may have already answered a similar problem
 
-3. [Read the doc](http://darold.github.com/pgbadger/). It is short and useful.
+3. [Read the doc](http://pgbadger.darold.net/documentation.html). It is short and useful.
 
 
 ## Coding style
