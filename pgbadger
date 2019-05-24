@@ -280,6 +280,8 @@ my $nohighlight             = 0;
 my $noprettify              = 0;
 my $from                    = '';
 my $to                      = '';
+my $from_hour               = '';
+my $to_hour                 = '';
 my $quiet                   = 0;
 my $progress                = 1;
 my $error_only              = 0;
@@ -887,21 +889,34 @@ if ($#include_query >= 0) {
 
 # Check start/end date time
 if ($from) {
-	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		localdie("FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
-	} else {
-                my $fractional_seconds = $7 || "0";
-                $from = "$1-$2-$3 $4:$5:$6.$7"
-        }
-
+    if ( $from =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        # only time, trick around the date part
+        my $fractional_seconds = $4 || "0";
+        $from_hour = "$1:$2:$3.$4";
+        &logmsg('DEBUG', "Setting begin time to [$from_hour]" );
+    }
+    elsif( $from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/ ) {
+        localdie("FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
+    } else {
+        my $fractional_seconds = $7 || "0";
+        $from = "$1-$2-$3 $4:$5:$6.$7"
+    }
 }
+
 if ($to) {
-	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
-	} else {
-                my $fractional_seconds = $7 || "0";
-                $to = "$1-$2-$3 $4:$5:$6.$7"
-        }
+
+    if ( $to =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        # only time, trick around the date part
+        my $fractional_seconds = $4 || "0";
+        $to_hour = "$1:$2:$3.$4";
+        &logmsg('DEBUG', "Setting end time to [$to_hour]" );
+    }
+    elsif( $to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
+    } else {
+        my $fractional_seconds = $7 || "0";
+        $to = "$1-$2-$3 $4:$5:$6.$7"
+    }
 }
 if ($from && $to && ($from gt $to)) {
 	localdie("FATAL: begin date is after end time!\n") ;
@@ -15488,7 +15503,6 @@ sub localdie
 
 sub skip_unwanted_line
 {
-
 	# Skip unwanted lines
 	if ($#exclude_time >= 0) {
 		my $found = 0;
@@ -15512,8 +15526,19 @@ sub skip_unwanted_line
 		return 1 if ($found);
 	}
 
+  # check begin or end time without the date
+  # and extract the hour here, late, to get the timezone
+  # already applied
+  if ( $from_hour || $to_hour ){
+      $prefix_vars{'t_time'} = $prefix_vars{'t_timestamp'};
+      $prefix_vars{'t_time'} =~ s/^(\d{4})-(\d{2})-(\d{2}) //;
 
-	return 1  if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+      return 1  if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
+      return -1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
+  }
+
+  # check against date/timestamp
+ 	return 1  if ($from && ($from gt $prefix_vars{'t_timestamp'}));
   return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
 	return 0;
 }
