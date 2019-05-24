@@ -1746,13 +1746,15 @@ Options:
                              queries and connections. Default 5 minutes.
     -A | --histo-average min: number of minutes to build the histogram graphs
                              of queries. Default 60 minutes.
-    -b | --begin datetime  : start date/time for the data to be parsed in log.
+    -b | --begin datetime  : start date/time for the data to be parsed in log
+                             (either a timestamp or a time)
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
     -D | --dns-resolv      : client ip addresses are replaced by their DNS name.
                              Be warned that this can really slow down pgBadger.
-    -e | --end datetime    : end date/time for the data to be parsed in log.
+    -e | --end datetime    : end date/time for the data to be parsed in log
+                             (either a timestamp or a time)
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
                              cvs, pgbouncer and logplex. Use this option when
                              pgBadger is not able to auto-detect the log format.
