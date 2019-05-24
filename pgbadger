@@ -15508,17 +15508,13 @@ sub skip_unwanted_line
 				$found = 1;
 				last;
 			}
-        }
+    }
 		return 1 if ($found);
 	}
 
 
-	return 1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-
-	if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
-		return -1;
-	}
-
+	return 1  if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+  return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
 	return 0;
 }
 
