@@ -2436,7 +2436,6 @@ sub build_incremental_reports
 			my $tmp_dir = "$dest_dir/$db";
 			$tmp_dir = $dest_dir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
-
 			# set path and create subdirectories
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
 			if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#) {
@@ -15997,6 +15996,8 @@ sub skip_unwanted_line
 				last;
 			}
     }
+    return 1 if ( $found );
+  }
 
   # check begin or end time without the date
   # and extract the hour here, late, to get the timezone
