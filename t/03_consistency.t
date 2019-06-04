@@ -21,11 +21,11 @@ my $json_ref = $json->decode(`cat $OUT`);
 #
 # Assert that analyzing json file provide the right results
 #
-ok( $json_ref->{database_info}{postgres}{count} == 629, "Consistent count");
+ok( $json_ref->{database_info}{postgres}{postgres}{count} == 629, "Consistent count");
 
-ok( $json_ref->{overall_stat}{histogram}{query_total} == 629, "Consistent query_total");
+ok( $json_ref->{overall_stat}{postgres}{histogram}{query_total} == 629, "Consistent query_total");
 
-ok( $json_ref->{overall_stat}{peak}{"2017-09-06 08:48:45"}{write} == 1, "Consistent peak write");
+ok( $json_ref->{overall_stat}{postgres}{peak}{"2017-09-06 08:48:45"}{write} == 1, "Consistent peak write");
 
 ok( $json_ref->{pgb_session_info}{chronos}{20180912}{16}{count} == 63943, "pgBouncer connections");
 
@@ -36,7 +36,7 @@ ok( $? == 0, "Generate json report for heroku log file");
 
 $json_ref = $json->decode(`cat $OUT`);
 
-ok( $json_ref->{database_info}{unknown}{"CTE|duration"} eq "21761.546", "Consistent CTE duration");
+ok( $json_ref->{database_info}{postgres}{unknown}{"CTE|duration"} eq "21761.546", "Consistent CTE duration");
 
 `rm -f $OUT`;
 
