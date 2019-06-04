@@ -16003,11 +16003,9 @@ sub skip_unwanted_line
   # and extract the hour here, late, to get the timezone
   # already applied
   if ( $from_hour || $to_hour ){
-      $prefix_vars{'t_time'} = $prefix_vars{'t_timestamp'};
-      $prefix_vars{'t_time'} =~ s/^(\d{4})-(\d{2})-(\d{2}) //;
-
-      return 1  if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
-      return -1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
+      my $time = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+      return  1 if ( $from_hour && ( $from_hour gt $time ) );
+      return -1 if ( $to_hour   && ( $to_hour   lt $time ) );
   }
 
   # check against date/timestamp
