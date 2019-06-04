@@ -159,8 +159,8 @@ SYNOPSIS
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
-    hostname. There's also some additional options to fully control the ssh
-    connection.
+    hostname. There are also some additional options to fully control the ssh
+    connection:
 
         --ssh-program ssh        path to the ssh program to use. Default: ssh.
         --ssh-user username      connection login name. Default to running user.
