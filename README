@@ -4,7 +4,7 @@ NAME
 SYNOPSIS
     Usage: pgbadger [options] logfile [...]
 
-            PostgreSQL log analyzer with fully detailed reports and graphs.
+        PostgreSQL log analyzer with fully detailed reports and graphs.
 
     Arguments:
 
