@@ -459,7 +459,7 @@ POSTGRESQL CONFIGURATION
     Here every statement will be logged, on a busy server you may want to
     increase this value to only log queries with a longer duration. Note
     that if you have log_statement set to 'all' nothing will be logged
-    through the log_min_duration_statement directive. See the next chapter
+    through the log_min_duration_statement directive. See the next section
     for more information.
 
     pgBadger supports any custom format set into the log_line_prefix
