@@ -2206,9 +2206,10 @@ sub set_file_list
 				my($filename, $dirs, $suffix) = fileparse($file);
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
 				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
+        $dirs = '' if ( @rfiles <= 1 );
 				foreach my $f (@rfiles)
 				{
-					push(@lfiles, "ssh://$host_info/$f$fmt");
+					push(@lfiles, "ssh://$host_info/$dirs$f$fmt");
 				}
 			}
 			$empty_files = 0;
