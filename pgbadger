@@ -630,7 +630,7 @@ if ($logfile_list) {
 if (!$rebuild && $empty_files) {
 	&logmsg('DEBUG', "All log files are empty, exiting...");
 	unlink("$PID_FILE");
-#	exit 0;
+	exit 0;
 }
 
 # Logfile is a mandatory parameter when journalctl command is not set.
