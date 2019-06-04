@@ -382,8 +382,8 @@ REQUIREMENT
     library so you don't need anything other than a web browser. Your
     browser will do all the work.
 
-    If you planned to parse PostgreSQL CSV log files you might need some
-    Perl Modules:
+    If you planned to parse PostgreSQL CSV log files you need a
+    Perl module:
 
             Text::CSV_XS - to parse PostgreSQL CSV log files.
 
