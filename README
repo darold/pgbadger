@@ -559,8 +559,8 @@ PARALLEL PROCESSING
     of the -J option starts being really interesting with 8 Cores. Using
     this method you will be sure not to lose any queries in the reports.
 
-    He are a benchmark done on a server with 8 CPUs and a single file of
-    9.5GB.
+    The following is a benchmark done on a server with 8 CPUs and a single
+    file of 9.5GB:
 
              Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
             --------+---------+-------+-------+------
