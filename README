@@ -4,7 +4,7 @@ NAME
 SYNOPSIS
     Usage: pgbadger [options] logfile [...]
 
-            PostgreSQL log analyzer with fully detailed reports and graphs.
+        PostgreSQL log analyzer with fully detailed reports and graphs.
 
     Arguments:
 
@@ -159,8 +159,8 @@ SYNOPSIS
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
-    hostname. There's also some additional options to fully control the ssh
-    connection.
+    hostname. There are also some additional options to fully control the ssh
+    connection:
 
         --ssh-program ssh        path to the ssh program to use. Default: ssh.
         --ssh-user username      connection login name. Default to running user.
@@ -382,8 +382,8 @@ REQUIREMENT
     library so you don't need anything other than a web browser. Your
     browser will do all the work.
 
-    If you planned to parse PostgreSQL CSV log files you might need some
-    Perl Modules:
+    If you planned to parse PostgreSQL CSV log files you need a
+    Perl module:
 
             Text::CSV_XS - to parse PostgreSQL CSV log files.
 
@@ -459,7 +459,7 @@ POSTGRESQL CONFIGURATION
     Here every statement will be logged, on a busy server you may want to
     increase this value to only log queries with a longer duration. Note
     that if you have log_statement set to 'all' nothing will be logged
-    through the log_min_duration_statement directive. See the next chapter
+    through the log_min_duration_statement directive. See the next section
     for more information.
 
     pgBadger supports any custom format set into the log_line_prefix
@@ -559,8 +559,8 @@ PARALLEL PROCESSING
     of the -J option starts being really interesting with 8 Cores. Using
     this method you will be sure not to lose any queries in the reports.
 
-    He are a benchmark done on a server with 8 CPUs and a single file of
-    9.5GB.
+    The following is a benchmark done on a server with 8 CPUs and a single
+    file of 9.5GB:
 
              Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
             --------+---------+-------+-------+------
