@@ -283,6 +283,8 @@ my $nohighlight             = 0;
 my $noprettify              = 0;
 my $from                    = '';
 my $to                      = '';
+my $from_hour               = '';
+my $to_hour                 = '';
 my $quiet                   = 0;
 my $progress                = 1;
 my $error_only              = 0;
@@ -909,21 +911,35 @@ if ($#include_query >= 0) {
 
 # Check start/end date time
 if ($from) {
-	if ($from !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		localdie("FATAL: bad format for begin datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
-	} else {
-		my $fractional_seconds = $7 || "0";
-		$from = "$1-$2-$3 $4:$5:$6.$7"
-	}
-
+    if ( $from =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        # only time, trick around the date part
+        my $fractional_seconds = $4 || "0";
+        $from_hour = "$1:$2:$3.$fractional_seconds";
+        &logmsg('DEBUG', "Setting begin time to [$from_hour]" );
+    }
+    elsif( $from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/ ) {
+        my $fractional_seconds = $7 || "0";
+        $from = "$1-$2-$3 $4:$5:$6.$fractional_seconds"
+        &logmsg('DEBUG', "Setting begin datetime to [$from]" );
+    } else {
+        localdie("FATAL: bad format for begin datetime/time, should be yyyy-mm-dd hh:mm:ss.l+tz or hh:mm:ss.l+tz\n");      
+    }
 }
+
 if ($to) {
-	if ($to !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
-		localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz\n");
-	} else {
-		my $fractional_seconds = $7 || "0";
-		$to = "$1-$2-$3 $4:$5:$6.$7"
-	}
+    if ( $to =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        # only time, trick around the date part
+        my $fractional_seconds = $4 || "0";
+        $to_hour = "$1:$2:$3.$fractional_seconds";
+        &logmsg('DEBUG', "Setting end time to [$to_hour]" );
+    }
+    elsif( $to =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+        my $fractional_seconds = $7 || "0";
+        $to = "$1-$2-$3 $4:$5:$6.$fractional_seconds";
+        &logmsg('DEBUG', "Setting end time to [$to]" );
+    } else {
+        localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz or hh:mm:ss.l+tz\n");
+    }
 }
 if ($from && $to && ($from gt $to)) {
 	localdie("FATAL: begin date is after end time!\n") ;
@@ -1806,14 +1822,16 @@ Options:
     -a | --average minutes : number of minutes to build the average graphs of
 			     queries and connections. Default 5 minutes.
     -A | --histo-average min: number of minutes to build the histogram graphs
-			     of queries. Default 60 minutes.
-    -b | --begin datetime  : start date/time for the data to be parsed in log.
+                             of queries. Default 60 minutes.
+    -b | --begin datetime  : start date/time for the data to be parsed in log
+                             (either a timestamp or a time)
     -c | --dbclient host   : only report on entries for the given client host.
     -C | --nocomment       : remove comments like /* ... */ from queries.
     -d | --dbname database : only report on entries for the given database.
     -D | --dns-resolv      : client ip addresses are replaced by their DNS name.
-			     Be warned that this can really slow down pgBadger.
-    -e | --end datetime    : end date/time for the data to be parsed in log.
+                             Be warned that this can really slow down pgBadger.
+    -e | --end datetime    : end date/time for the data to be parsed in log
+                             (either a timestamp or a time)
     -E | --explode	   : explode the main report by generating one report
 			     per database. Global information not related to a
 			     database are added to the postgres database report.
@@ -2419,7 +2437,6 @@ sub build_incremental_reports
 			my $tmp_dir = "$dest_dir/$db";
 			$tmp_dir = $dest_dir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
-
 			# set path and create subdirectories
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
 			if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#) {
@@ -15960,7 +15977,6 @@ sub localdie
 
 sub skip_unwanted_line
 {
-
 	# Skip unwanted lines
 	if ($#exclude_time >= 0) {
 		my $found = 0;
@@ -15980,17 +15996,22 @@ sub skip_unwanted_line
 				$found = 1;
 				last;
 			}
-	}
-		return 1 if ($found);
-	}
+    }
+    return 1 if ( $found );
+  }
 
+  # check begin or end time without the date
+  # and extract the hour here, late, to get the timezone
+  # already applied
+  if ( $from_hour || $to_hour ){
+      my $time = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+      return  1 if ( $from_hour && ( $from_hour gt $time ) );
+      return -1 if ( $to_hour   && ( $to_hour   lt $time ) );
+  }
 
-	return 1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-
-	if ($to   && ($to lt $prefix_vars{'t_timestamp'})) {
-		return -1;
-	}
-
+  # check against date/timestamp
+ 	return 1  if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+  return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
 	return 0;
 }
 
