@@ -186,27 +186,27 @@ SYNOPSIS
             pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
             cat /var/log/postgres.log | pgbadger -
             # Log prefix with stderr log output
-            perl pgbadger --prefix '%t [%p]: user=%u,db=%d,client=%h' /pglog/postgresql-2012-08-21*
-            perl pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+            pgbadger --prefix '%t [%p]: user=%u,db=%d,client=%h' /pglog/postgresql-2012-08-21*
+            pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
             # Log line prefix with syslog log output
-            perl pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
+            pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
             # Use my 8 CPUs to parse my 10GB file faster, much faster
-            perl pgbadger -j 8 /pglog/postgresql-10.1-main.log
+            pgbadger -j 8 /pglog/postgresql-10.1-main.log
 
     Use URI notation for remote log file:
 
-            perl pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
-            perl pgbadger ftp://username@172.12.110.14/postgresql-10.1-main.log
-            perl pgbadger ssh://username@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+            pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
+            pgbadger ftp://username@172.12.110.14/postgresql-10.1-main.log
+            pgbadger ssh://username@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
 
     You can use together a local PostgreSQL log and a remote pgbouncer log
     file to parse:
 
-            perl pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username.12.110.14/pgbouncer.log
+            pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username.12.110.14/pgbouncer.log
 
     Generate Tsung sessions XML file with select queries only:
 
-        perl pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-10.1.log
+           pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-10.1.log
 
     Reporting errors every week by cron job:
 
