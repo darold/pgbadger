@@ -1809,7 +1809,7 @@ sub usage
 	print qq{
 Usage: pgbadger [options] logfile [...]
 
-	PostgreSQL log analyzer with fully detailed reports and graphs.
+    PostgreSQL log analyzer with fully detailed reports and graphs.
 
 Arguments:
 
@@ -1991,29 +1991,29 @@ use the ssh command like with the remote host use. See examples bellow.
 
 Examples:
 
-	pgbadger /var/log/postgresql.log
-	pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
-	pgbadger /var/log/postgresql/postgresql-2012-05-*
-	pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
-	pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
-	cat /var/log/postgres.log | pgbadger -
-	# Log prefix with stderr log output
-	pgbadger --prefix '%t [%p]: user=%u,db=%d,client=%h' /pglog/postgresql-2012-08-21*
-	pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
-	# Log line prefix with syslog log output
-	pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
-	# Use my 8 CPUs to parse my 10GB file faster, much faster
-	pgbadger -j 8 /pglog/postgresql-10.1-main.log
+    pgbadger /var/log/postgresql.log
+    pgbadger /var/log/postgres.log.2.gz /var/log/postgres.log.1.gz /var/log/postgres.log
+    pgbadger /var/log/postgresql/postgresql-2012-05-*
+    pgbadger --exclude-query="^(COPY|COMMIT)" /var/log/postgresql.log
+    pgbadger -b "2012-06-25 10:56:11" -e "2012-06-25 10:59:11" /var/log/postgresql.log
+    cat /var/log/postgres.log | pgbadger -
+    # Log prefix with stderr log output
+    pgbadger --prefix '%t [%p]: user=%u,db=%d,client=%h' /pglog/postgresql-2012-08-21*
+    pgbadger --prefix '%m %u@%d %p %r %a : ' /pglog/postgresql.log
+    # Log line prefix with syslog log output
+    pgbadger --prefix 'user=%u,db=%d,client=%h,appname=%a' /pglog/postgresql-2012-08-21*
+    # Use my 8 CPUs to parse my 10GB file faster, much faster
+    pgbadger -j 8 /pglog/postgresql-10.1-main.log
 
 Use URI notation for remote log file:
 
-	pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
-	pgbadger ftp://username\@172.12.110.14/postgresql-10.1-main.log
-	pgbadger ssh://username\@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+    pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
+    pgbadger ftp://username\@172.12.110.14/postgresql-10.1-main.log
+    pgbadger ssh://username\@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
 
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
-	pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username@172.12.110.14/pgbouncer.log
+    pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username@172.12.110.14/pgbouncer.log
 
 Generate Tsung sessions XML file with select queries only:
 
