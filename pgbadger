@@ -3056,7 +3056,7 @@ sub process_file
 						}
 					}
 					$prefix_vars{'t_timestamp'} =
-"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+              "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 				}
 
 				# Change log level for some relevant messages
@@ -3072,6 +3072,7 @@ sub process_file
 					$prefix_vars{'t_query'} = 'Stats: ' . $prefix_vars{'t_query'};
 				}
 
+        $prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
 				next if ($res == 1);
@@ -3201,6 +3202,7 @@ sub process_file
 					$prefix_vars{'t_sec'} = $6;
 					my $milli = $7 || 0;
 					$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+          $prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
 					# Remove newline characters from queries
 					for (my $i = 0; $i <= $#$row; $i++) {
@@ -3400,7 +3402,9 @@ sub process_file
 						}
 					}
 					$prefix_vars{'t_timestamp'} =
-"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+              "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+          $prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
 						# Remove the port part
@@ -3520,7 +3524,9 @@ sub process_file
 						 $prefix_vars{'t_timestamp'} .= $ms;
 					}
 					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+           $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+          $prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -3773,6 +3779,8 @@ sub parse_jsonlog_input
 		$infos{'t_sec'} = $6;
 		my $milli = $7 || 0;
 		$infos{'t_timestamp'} = "$infos{'t_year'}-$infos{'t_month'}-$infos{'t_day'} $infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+    $infos{'t_time'} = "$infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+
 	}
 
 	# Set query parameters as global variables
@@ -16004,13 +16012,12 @@ sub skip_unwanted_line
   # and extract the hour here, late, to get the timezone
   # already applied
   if ( $from_hour || $to_hour ){
-      my $time = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-      return  1 if ( $from_hour && ( $from_hour gt $time ) );
-      return -1 if ( $to_hour   && ( $to_hour   lt $time ) );
+      return  1 if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
+      return -1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
   }
 
   # check against date/timestamp
- 	return 1  if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+ 	return  1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
   return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
 	return 0;
 }
