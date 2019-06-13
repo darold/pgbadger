@@ -1427,12 +1427,11 @@ my $parallel_process = 0;
 # Open a pipe for interprocess communication
 my $reader = new IO::Handle;
 my $writer = new IO::Handle;
-$pipe = IO::Pipe->new($reader, $writer);
-$writer->autoflush(1);
-
 # Fork the logger process
-if ($progress)
+if ($^O !~ /MSWin32|dos/i && $progress)
 {
+	$pipe = IO::Pipe->new($reader, $writer);
+	$writer->autoflush(1);
 	spawn sub
 	{
 		&multiprocess_progressbar($global_totalsize);
@@ -1548,7 +1547,10 @@ foreach my $logfile ( @given_log_files )
 }
 
 my $minproc = 1;
-$minproc = 0 if (!$progress);
+if ($^O =~ /MSWin32|dos/i || !$progress)
+{
+	$minproc = 0;
+}
 # Wait for all child processes to localdie except for the logger
 while (scalar keys %RUNNING_PIDS > $minproc)
 {
@@ -2800,7 +2802,7 @@ sub update_progress_bar
 {
 	my ($tmpoutfile, $nlines, $stop_offset, $totalsize, $cursize, $old_queries_count, $old_errors_count) = @_;
 
-	if (!$tmpoutfile) {
+	if (!$tmpoutfile || not defined $pipe) {
 		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
 			if ($totalsize) {
 				print STDERR &progress_bar($$cursize, $stop_offset || $totalsize, 25, '=');
@@ -2888,7 +2890,7 @@ sub process_file
 	{
 		if ($progress && ($getout != 1))
 		{
-			if (!$tmpoutfile)
+			if (!$tmpoutfile || not defined $pipe)
 			{
 				if ($totalsize)
 				{
@@ -3663,7 +3665,7 @@ sub process_file
 			$cursize = $totalsize;
 		}
 
-		if (!$tmpoutfile)
+		if (!$tmpoutfile|| not defined $pipe)
 		{
 			if ($totalsize)
 			{
