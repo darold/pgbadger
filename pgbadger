@@ -1407,7 +1407,7 @@ if ($incremental && !$remote_host)
 }
 
 # Pipe used for progress bar in multiprocess
-my $pipe;
+my $pipe = undef;
 
 # Seeking to an old log position is not possible outside incremental mode
 if (!$last_parsed) {
@@ -3284,7 +3284,7 @@ sub process_file
 	elsif ($fmt eq 'binary')
 	{
 		&load_stats($lfile);
-		$pipe->print("$totalsize 0 0\n");
+		$pipe->print("$totalsize 0 0\n") if (defined $pipe);
 	}
 	# Format is not CSV and in incremental mode we are not at end of the file
 	else
@@ -3665,7 +3665,7 @@ sub process_file
 			$cursize = $totalsize;
 		}
 
-		if (!$tmpoutfile|| not defined $pipe)
+		if (!$tmpoutfile || not defined $pipe)
 		{
 			if ($totalsize)
 			{
