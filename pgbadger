@@ -2320,13 +2320,13 @@ sub set_parser_regex
 		       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 
 		       $llp =
-				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+'
+				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+'
 			       . $llp
 			       . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
-		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid');
+		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 		       push(@prefix_params, 't_loglevel', 't_query');
-		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*)/;
+		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.\d+\]:\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s+(.*)/;
 		}
 		elsif ($fmt eq 'stderr' || $fmt eq 'default')
 		{
@@ -2362,10 +2362,10 @@ sub set_parser_regex
 	{
 	       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 	       $compiled_prefix =
-			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
-	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid');
+			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
-	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[\d+\-\d+\]\s+(.*)/;
+	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[(postgres)\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
 	}
 
 	elsif ($fmt eq 'stderr')
@@ -3472,12 +3472,14 @@ sub process_file
 
 					$cur_pid = $8;
 					my $t_query = $10;
+					if ($fmt eq 'logplex' && not exists $cur_info{$cur_pid}{cur_db}) {
+						$cur_info{$cur_pid}{cur_db} = $9;
+					}
 					$t_query =~ s/#011/\t/g;
 					next if ($t_query eq "\t");
 
 					# Some log line may be written by applications
 					next if ($t_query =~ /\bLOG:  /);
-
 					# Parse orphan lines to append inforamtion to the right place
 					&parse_orphan_line($cur_pid, $t_query);
 
@@ -3487,7 +3489,7 @@ sub process_file
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
-					# Parse orphan lines to append inforamtion to the right place
+					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $line);
 
 				} else {
@@ -3847,18 +3849,28 @@ sub parse_jsonlog_input
 
 sub parse_orphan_line
 {
-	my ($cur_pid, $line) = @_;
+	my ($cur_pid, $line, $t_dbname) = @_;
+
+	my $curdb = undef;
+	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db}) {
+		$curdb = set_current_db($t_dbname);
+	} else {
+		$curdb = $cur_info{$cur_pid}{cur_db};
+	}
+	if (!$report_per_database) {
+		$curdb = $DBALL;
+	}
 
 	# Store vacuum related information
-	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t?(pages|tuples|buffer usage|avg read rate|system usage):/)) {
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t*(pages|tuples|buffer usage|avg read rate|system usage):/)) {
 		if ($line =~ /^\t?(pages|tuples): (\d+) removed, (\d+) remain/) {
-			$autovacuum_info{$cur_info{$cur_pid}{cur_db}}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
 		}
 		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-			if ($1 > $autovacuum_info{$cur_info{$cur_pid}{cur_db}}{peak}{system_usage}{elapsed}) {
-				$autovacuum_info{$cur_info{$cur_pid}{cur_db}}{peak}{system_usage}{elapsed} = $1;
-				$autovacuum_info{$cur_info{$cur_pid}{cur_db}}{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
-				$autovacuum_info{$cur_info{$cur_pid}{cur_db}}{peak}{system_usage}{date} =
+			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
+				$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
+				$autovacuum_info{$curdb}{peak}{system_usage}{date} =
 					"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
 					"$cur_info{$cur_pid}{hour}:$cur_info{$cur_pid}{min}:$cur_info{$cur_pid}{sec}";
 			}
@@ -3905,7 +3917,6 @@ sub parse_orphan_line
 			$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
 		}
 	}
-
 }
 
 
@@ -13761,12 +13772,16 @@ sub parse_query
 	   )
 	{
 		return if ($disable_autovacuum);
-
+		
 		$cur_info{$t_pid}{vacuum} = $1;
+
 		my $idxscan = $2;
 		$cur_info{$t_pid}{vacuum} =~ /^([^\.]+)\./;
 		$curdb = $1;
 
+		if (!$report_per_database) {
+			$curdb = $DBALL;
+		}
 		$autovacuum_info{$curdb}{count}++;
 		$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{vacuums} += 1;
 		$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{idxscans} += $idxscan;
@@ -13812,6 +13827,9 @@ sub parse_query
 		my $table = $1;
 		$table =~ /^([^\.]+)\./;
 		$curdb = $1;
+		if (!$report_per_database) {
+			$curdb = $DBALL;
+		}
 		$autoanalyze_info{$curdb}{count}++;
 		$autoanalyze_info{$curdb}{tables}{$table}{analyzes} += 1;
 		$autoanalyze_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
