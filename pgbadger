@@ -645,6 +645,11 @@ if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd) {
 	}
 }
 
+if ($#outfiles >= 1 && $dump_normalized_only)
+{
+	localdie("FATAL: dump of normalized queries can not ne used with multiple output.\n\n");
+}
+
 # Remove follow option from journalctl command to prevent infinit loop
 if ($journalctl_cmd) {
 	$journalctl_cmd =~ s/(-f|--follow)\b//;
@@ -711,7 +716,11 @@ if (!$timezone) {
 }
 
 # Set output file
-my $outfile = $outfiles[0];
+my $outfile = '';
+$outfile = $outfiles[0] if ($#outfiles >= 0);
+if ($dump_normalized_only && $outfile && $outfile !~ /\.txt$/){
+	localdie("FATAL: dump of normalized queries can be done in text output format, please use .txt extension.\n\n");
+}
 
 # With multiple output format we must use a temporary binary file
 my $dft_extens = '';
@@ -733,6 +742,7 @@ if ($#outfiles >= 1)
 }
 elsif ($#outfiles == -1)
 {
+	$extension = 'txt' if ($dump_normalized_only);
 	($extension) ? push(@outfiles, 'out.' . $extension) : push(@outfiles, 'out.html');
 	map { s/\.text/.txt/; } @outfiles;
 
