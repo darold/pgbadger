@@ -270,6 +270,7 @@ my @dbappname               = ();
 my @exclude_user            = ();
 my @exclude_appname         = ();
 my @exclude_db              = ();
+my @exclude_dbclient        = ();
 my @exclude_line            = ();
 my $ident                   = '';
 my $top                     = 0;
@@ -484,6 +485,7 @@ my $result = GetOptions(
 	"exclude-query=s"          => \@exclude_query,
 	"exclude-file=s"           => \$exclude_file,
 	"exclude-db=s"             => \@exclude_db,
+	"exclude-dbclient=s"       => \@exclude_dbclient,
 	"exclude-appname=s"        => \@exclude_appname,
 	"include-query=s"          => \@include_query,
 	"exclude-line=s"           => \@exclude_line,
@@ -1946,6 +1948,8 @@ Options:
     --exclude-line regex   : pgBadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple
 			     time.
+    --exclude-client name  : exclude log entries for the specified client ip.
+			     Can be used multiple time.
     --anonymize	           : obscure all literals in queries, useful to hide
 			     confidential data.
     --noreport	           : prevent pgBadger to create reports in incremental
@@ -13302,6 +13306,12 @@ sub compute_arg_list
 	@exclude_line = ();
 	push(@exclude_line, @tmp);
 
+	@tmp = ();
+	foreach my $v (@exclude_dbclient) {
+		push(@tmp, split(/,/, $v));
+	}
+	@exclude_dbclient = ();
+	push(@exclude_dbclient, @tmp);
 
 }
 
@@ -13395,6 +13405,14 @@ sub validate_log_line
 		}
 	}
 
+	if ($#exclude_dbclient >= 0) {
+
+		# Log line matches the excluded dbclient
+		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_dbclient)) {
+			delete $current_sessions{$prefix_vars{'t_pid'}};
+			return 0;
+		}
+	}
 	return 1;
 }
 
@@ -14212,7 +14230,7 @@ sub parse_pgbouncer
 
 		my $usr = $prefix_vars{'t_dbuser'} || $2;
 		my $db  = $prefix_vars{'t_dbname'} || $1;
-		my $host= $prefix_vars{'t_client'} || '';
+		my $host= $prefix_vars{'t_client'} || $prefix_vars{t_dbclient} || '';
 		$host = _gethostbyaddr($host) if ($dns_resolv);
 		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{connection}++;
 
@@ -14252,7 +14270,7 @@ sub parse_pgbouncer
 
 		my $usr = $prefix_vars{'t_dbuser'} || '(nousr)';
 		my $db  = $prefix_vars{'t_dbname'} || '(nodb)';
-		my $host= $prefix_vars{'t_client'} || '';
+		my $host= $prefix_vars{'t_client'} || $prefix_vars{t_dbclient} || '';
 		$host = _gethostbyaddr($host) if ($dns_resolv && $host);
 
 		# Store time in milliseconds since the connection attempt
