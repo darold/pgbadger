@@ -7442,15 +7442,20 @@ sub print_histogram_session_times
 			$most_range_value = $overall_stat{$curdb}{histogram}{session_time}{$histogram_session_time[$i-1]};
 		}
 	}
-	if ($overall_stat{$curdb}{histogram}{session_total} > 0) {
-		$histogram_info .= "<tr><td> &gt; " . &convert_time($histogram_session_time[-1]) . "</td><td>" . &comma_numbers($overall_stat{$curdb}{histogram}{session_time}{'-1'}) .
-			"</td><td>" . sprintf("%0.2f", ($overall_stat{$curdb}{histogram}{session_time}{'-1'} * 100) / ($overall_stat{$curdb}{histogram}{session_total}||1)) . "%</td></tr>";
-		$data{"> $histogram_session_time[-1]ms"} = ($overall_stat{$curdb}{histogram}{session_time}{"-1"} || 0);
-		if ($overall_stat{$curdb}{histogram}{session_time}{"-1"} > $most_range_value) {
-			$most_range = "> $histogram_session_time[-1]ms";
-			$most_range_value = $overall_stat{$curdb}{histogram}{session_time}{"-1"};
+	if ($graph) {
+		if ($overall_stat{$curdb}{histogram}{session_total} > 0) {
+			$histogram_info .= "<tr><td> &gt; " . &convert_time($histogram_session_time[-1]) . "</td><td>" . &comma_numbers($overall_stat{$curdb}{histogram}{session_time}{'-1'}) .
+				"</td><td>" . sprintf("%0.2f", ($overall_stat{$curdb}{histogram}{session_time}{'-1'} * 100) / ($overall_stat{$curdb}{histogram}{session_total}||1)) . "%</td></tr>";
+			$data{"> $histogram_session_time[-1]ms"} = ($overall_stat{$curdb}{histogram}{session_time}{"-1"} || 0);
+			if ($overall_stat{$curdb}{histogram}{session_time}{"-1"} > $most_range_value) {
+				$most_range = "> $histogram_session_time[-1]ms";
+				$most_range_value = $overall_stat{$curdb}{histogram}{session_time}{"-1"};
+			}
+			$drawn_graphs{histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
+		} else {
+			$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
+			$drawn_graphs{histogram_session_times_graph} = qq{$NODATA};
 		}
-		$drawn_graphs{histogram_session_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_session_times', 'Sessions', \@histogram_session_time, %data);
 	} else {
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 		$drawn_graphs{histogram_session_times_graph} = qq{$NODATA};
@@ -8893,10 +8898,12 @@ sub print_vacuum
 		$graph_data{$_} =~ s/,$//;
 	}
 	# VACUUMs vs ANALYZEs chart
-	$drawn_graphs{autovacuum_graph} =
-		&jqplot_linegraph($graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount},
+	$drawn_graphs{autovacuum_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{autovacuum_graph} = &jqplot_linegraph($graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount},
 		'', 'Autovacuum actions (' . $avg_minutes . ' minutes period)', '', 'VACUUMs', 'ANALYZEs'
 		);
+	}
 
 	my $vacuum_size_peak = 0;
 	my $vacuum_size_peak_date = '';
@@ -9049,7 +9056,10 @@ sub print_vacuum_per_table
 		$infos{$small[0]} = $infos{"Sum vacuums < $pie_percentage_limit%"};
 		delete $infos{"Sum vacuums < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{tablevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tablevacuums', 'Vacuums per tables', %infos);
+	$drawn_graphs{tablevacuums_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{tablevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tablevacuums', 'Vacuums per tables', %infos);
+	}
 	$vacuum_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -9144,7 +9154,10 @@ sub print_vacuum_tuple_removed
 		$infos_tuple{$small[0]} = $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 		delete $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{tuplevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tuplevacuums', 'Tuples removed per tables', %infos_tuple);
+	$drawn_graphs{tuplevacuums_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{tuplevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_tuplevacuums', 'Tuples removed per tables', %infos_tuple);
+	}
 	$vacuum_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = '';
@@ -9243,7 +9256,10 @@ sub print_vacuum_page_removed
 		$infos_page{$small[0]} = $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 		delete $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 	}
-	$drawn_graphs{pagevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_pagevacuums', 'Pages removed per tables', %infos_page);
+	$drawn_graphs{pagevacuums_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{pagevacuums_graph} = &jqplot_piegraph($graphid++, 'graph_pagevacuums', 'Pages removed per tables', %infos_page);
+	}
 	$vacuum_info = qq{<tr><td colspan="5">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	my $database = 'unknown';
@@ -10452,7 +10468,10 @@ sub print_histogram_query_times
 	} else {
 		$histogram_info = qq{<tr><td colspan="3">$NODATA</td></tr>};
 	}
-	$drawn_graphs{histogram_query_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_query_times', 'Queries', \@histogram_query_time, %data);
+	$drawn_graphs{histogram_query_times_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{histogram_query_times_graph} = &jqplot_duration_histograph($graphid++, 'graph_histogram_query_times', 'Queries', \@histogram_query_time, %data);
+	}
 
 	$most_range_value = &comma_numbers($most_range_value) if ($most_range_value);
 
@@ -10660,8 +10679,10 @@ sub print_time_consuming
 		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0) {
 			$apps_involved = qq{<button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-queries-app-involved-rank-$rank">App(s) involved</button>};
 		}
-		my $query_histo =
-		&jqplot_histograph($graphid++, 'time_consuming_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		my $query_histo = '';
+		if ($graph) {
+			$query_histo = &jqplot_histograph($graphid++, 'time_consuming_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		}
 
 		print $fh qq{
 				<tr>
@@ -10889,8 +10910,10 @@ sub print_most_frequent
 		%hourly_count = ();
 		%hourly_duration = ();
 
-		my $query_histo =
-		&jqplot_histograph($graphid++, 'most_frequent_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		my $query_histo = '';
+		if ($graph) {
+			$query_histo = &jqplot_histograph($graphid++, 'most_frequent_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		}
 
 		my $users_involved = '';
 		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0) {
@@ -11127,8 +11150,10 @@ sub print_slowest_queries
 		%hourly_count = ();
 		%hourly_duration = ();
 
-		my $query_histo =
-		&jqplot_histograph($graphid++, 'normalized_slowest_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		my $query_histo = '';
+		if ($graph) {
+			$query_histo = &jqplot_histograph($graphid++, 'normalized_slowest_queries_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		}
 
 		my $users_involved = '';
 		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0) {
@@ -11949,8 +11974,10 @@ sub show_error_as_html
 		$graph_data{count} =~ s/,$//;
 		%hourly_count = ();
 
-		my $error_histo =
-		&jqplot_histograph($graphid++, 'most_frequent_error_'.$rank, $graph_data{count}, '', 'Events', '');
+		my $error_histo = '';
+		if ($graph) {
+			$error_histo = &jqplot_histograph($graphid++, 'most_frequent_error_'.$rank, $graph_data{count}, '', 'Events', '');
+		}
 		# Escape HTML code in error message
 		$msg = &escape_html($msg);
 		print $fh qq{
@@ -12138,8 +12165,10 @@ sub show_pgb_error_as_html
 		$graph_data{count} =~ s/,$//;
 		%hourly_count = ();
 
-		my $error_histo =
-		&jqplot_histograph($graphid++, 'pgbmost_frequent_error_'.$rank, $graph_data{count}, '', 'Events', '');
+		my $error_histo = '';
+		if ($graph) {
+			$error_histo = &jqplot_histograph($graphid++, 'pgbmost_frequent_error_'.$rank, $graph_data{count}, '', 'Events', '');
+		}
 
 		# Escape HTML code in error message
 		$msg = &escape_html($msg);
@@ -12299,8 +12328,10 @@ sub show_pgb_reserved_pool
 		$graph_data{count} =~ s/,$//;
 		%hourly_count = ();
 
-		my $pool_histo =
-		&jqplot_histograph($graphid++, 'pgbmost_used_reserved_pool_'.$rank, $graph_data{count}, '', 'Avg. used', '');
+		my $pool_histo = '';
+		if ($graph) {
+			$pool_histo = &jqplot_histograph($graphid++, 'pgbmost_used_reserved_pool_'.$rank, $graph_data{count}, '', 'Avg. used', '');
+		}
 
 		# Escape HTML code in pool message
 		print $fh qq{
