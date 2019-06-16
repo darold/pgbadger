@@ -39,7 +39,7 @@ use IO::File;
 use Benchmark;
 use File::Basename;
 use Storable qw(store_fd fd_retrieve);
-use Time::Local qw(timegm_nocheck timelocal_nocheck);
+use Time::Local qw(timegm_nocheck timelocal_nocheck timegm timelocal);
 use POSIX qw(locale_h sys_wait_h _exit strftime);
 setlocale(LC_NUMERIC, '');
 setlocale(LC_ALL,     'C');
@@ -708,11 +708,9 @@ $timezone = ((0-$timezone)*3600);
 $log_timezone = ((0-$log_timezone)*3600);
 if (!$timezone) {
 	my @lt = localtime();
-	my @gt = gmtime();
-	my $hour_diff = $gt[2] - $lt[2];
-	my $min_diff  = $gt[1] - $lt[1];
-	$hour_diff += $lt[8];
-	$timezone = ($hour_diff * 3600) + ($min_diff * 60);
+	# count TimeZone and Daylight Saving Time
+	$timezone = timelocal(@lt) - timegm(@lt);
+        &logmsg('DEBUG', "timezone not specified, using $timezone seconds" );
 }
 
 # Set output file
