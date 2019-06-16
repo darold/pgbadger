@@ -354,6 +354,7 @@ my @log_files   = ();
 my %prefix_vars = ();
 my $q_prefix    = '';
 my @prefix_q_params = ();
+my %last_execute_stmt = ();
 
 my $remote_host = '';
 my $ssh_command = '';
@@ -13392,6 +13393,7 @@ sub validate_log_line
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13400,6 +13402,7 @@ sub validate_log_line
 		# Log line does not match the required dbuser
 		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13408,6 +13411,7 @@ sub validate_log_line
 		# Log line does not match the required dbclient
 		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13416,6 +13420,7 @@ sub validate_log_line
 		# Log line does not match the required dbname
 		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13424,6 +13429,7 @@ sub validate_log_line
 		# Log line matches the excluded db
 		if ($prefix_vars{'t_dbname'} && grep(/^\Q$prefix_vars{'t_dbname'}\E$/i, @exclude_db)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13432,6 +13438,7 @@ sub validate_log_line
 		# Log line matches the excluded dbuser
 		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13440,6 +13447,7 @@ sub validate_log_line
 		# Log line matches the excluded appname
 		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13449,6 +13457,7 @@ sub validate_log_line
 		# Log line matches the excluded dbclient
 		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_dbclient)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
@@ -13512,6 +13521,11 @@ sub parse_query
 	my $cur_last_log_timestamp = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
 				     "$prefix_vars{t_hour}:$prefix_vars{t_min}:$prefix_vars{t_sec}";
 
+	# Delete old bind query temporary storage
+	foreach my $p (keys %last_execute_stmt) {
+		delete $last_execute_stmt{$p} if ($p > $t_pid);
+	}
+
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
@@ -13552,12 +13566,14 @@ sub parse_query
 	# Remove session failure from current workload because there is no disconnection entry
 	if (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'FATAL')) {
 		delete $current_sessions{$prefix_vars{'t_pid'}};
+		delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 		if ($is_tsung_output) {
 			delete $tsung_session{$prefix_vars{'t_pid'}}
 		}
 	} elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING')) {
 		if ($prefix_vars{'t_query'} =~ /terminating connection/) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			if ($is_tsung_output) {
 				delete $tsung_session{$prefix_vars{'t_pid'}}
 			}
@@ -13700,7 +13716,9 @@ sub parse_query
 		$overall_stat{$curdb}{'peak'}{$cur_last_log_timestamp}{tempfile_size} += $size;
 		$overall_stat{$curdb}{'peak'}{$cur_last_log_timestamp}{tempfile_count}++;
 		if ($fmt eq 'csv') {
-			$cur_temp_info{$t_pid}{query}     = $prefix_vars{'t_statement'};
+			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_statement'};
+		} elsif (exists $last_execute_stmt{$t_pid}) {
+			$cur_temp_info{$t_pid}{query} = $last_execute_stmt{$t_pid}{query};
 		}
 		# Stores information related to first created temporary file
 		if (!exists $cur_temp_info{$t_pid}{timestamp}) {
@@ -13790,6 +13808,7 @@ sub parse_query
 		$host = _gethostbyaddr($host) if ($dns_resolv);
 
 		delete $current_sessions{$prefix_vars{'t_pid'}};
+		delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 
 		if ($is_tsung_output) {
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
@@ -14121,6 +14140,13 @@ sub parse_query
 		$overall_stat{$curdb}{histogram}{query_time}{$k}++;
 		$overall_stat{$curdb}{histogram}{query_total}++;
 		$prefix_vars{'t_bind'} = 1;
+		# Stores execute query in case of temporary file
+		# only if log_disconnection is enabled otherwise
+		# the risk is to fill memory with this storage.
+		if (scalar keys %session_info) {
+			$last_execute_stmt{$prefix_vars{'t_pid'}}{query} = $prefix_vars{'t_query'};
+			$last_execute_stmt{$prefix_vars{'t_pid'}}{timestamp} = $cur_last_log_timestamp;
+		}
 	# Activate storage of the explain plan generated by auto_explain
 	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+plan://s) {
 		$cur_plan_info{$prefix_vars{'t_pid'}}{duration} = $1;
@@ -14144,6 +14170,8 @@ sub parse_query
 		# Skipping parse and bind logs
 		return if ($t_action !~ /query|statement|execute/);
 		$prefix_vars{'t_bind'} = 1;
+		# Stores execute query in case of temporary file
+		$last_execute_stmt{$prefix_vars{'t_pid'}} = $prefix_vars{'t_query'};
 	# Log line that could not be parsed
 	} elsif ($is_log_level) {
 		if ($prefix_vars{'t_query'} !~
