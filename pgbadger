@@ -1557,13 +1557,9 @@ foreach my $logfile ( @given_log_files )
 	last if ($interrupt);
 }
 
-my $minproc = 1;
-if ($^O =~ /MSWin32|dos/i || !$progress)
-{
-	$minproc = 0;
-}
 # Wait for all child processes to localdie except for the logger
-while (scalar keys %RUNNING_PIDS > $minproc)
+# On Windows OS $progress is disabled so we don't go here
+while (scalar keys %RUNNING_PIDS > $progress)
 {
 	my $kid = waitpid(-1, WNOHANG);
 	if ($kid > 0) {
@@ -1573,13 +1569,16 @@ while (scalar keys %RUNNING_PIDS > $minproc)
 }
 
 # Terminate the process logger
-foreach my $k (keys %RUNNING_PIDS)
+if ($^O !~ /MSWin32|dos/i)
 {
-	kill('USR1', $k);
-	%RUNNING_PIDS = ();
+	foreach my $k (keys %RUNNING_PIDS)
+	{
+		kill('USR1', $k);
+		%RUNNING_PIDS = ();
+	}
 }
 
-# Clear previous statistics
+# Clear previous statistics
 &init_stats_vars();
 
 # Load all data gathered by all the different processes
