@@ -63,7 +63,7 @@ my $parent_pid   = $$;
 my $interrupt    = 0;
 my $tmp_last_parsed = '';
 my $tmp_dblist = '';
-my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY TO', 'CTE', 'DDL', 'TCL');
+my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY TO', 'CTE', 'DDL', 'TCL', 'CURSOR');
 my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="jqplot-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
@@ -864,7 +864,7 @@ my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
 my $regex_prefix_sqlstate = qr/(?:error_code|state|state_code)=([^,]*)/;
 
 # Set pattern to look for query type
-my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT)/is;
+my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT|DECLARE|CLOSE|FETCH|MOVE)/is;
 
 
 # Loading excluded query from file if any
@@ -6027,12 +6027,12 @@ sub print_general_activity
 			}
 
 			$cur_period_info{$curdb}{average} = $cur_period_info{$curdb}{duration} / ($cur_period_info{$curdb}{count} || 1);
-			$cur_period_info{$curdb}{'SELECT'}{average} = $cur_period_info{$curdb}{'SELECT'}{duration} / ($cur_period_info{$curdb}{'SELECT'}{count} || 1);
 
 			$read_average_duration = ($cur_period_info{$curdb}{'SELECT'}{duration} +
 					$cur_period_info{$curdb}{'COPY TO'}{duration});
 			$read_average_count = ($cur_period_info{$curdb}{'SELECT'}{count} +
 					$cur_period_info{$curdb}{'COPY TO'}{count});
+			$cur_period_info{$curdb}{'SELECT'}{average} = $cur_period_info{$curdb}{'SELECT'}{duration} / ($cur_period_info{$curdb}{'SELECT'}{count} || 1);
 			$write_average_duration = ($cur_period_info{$curdb}{'INSERT'}{duration} +
 					$cur_period_info{$curdb}{'UPDATE'}{duration} +
 					$cur_period_info{$curdb}{'DELETE'}{duration} +
@@ -14794,6 +14794,8 @@ sub store_queries
 					$action = 'DDL';
 				} elsif ($action eq 'BEGIN' || $action eq 'COMMIT' || $action eq 'ROLLBACK' || $action eq 'START' || $action eq 'END' || $action eq 'SAVEPOINT') {
 					$action = 'TCL';
+				} elsif ($action eq 'DECLARE' || $action eq 'CLOSE' || $action eq 'FETCH' || $action eq 'MOVE') {
+					$action = 'CURSOR';
 				}
 			} else {
 				$action = 'OTHERS';
