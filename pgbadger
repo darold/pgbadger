@@ -276,7 +276,7 @@ my $ident                   = '';
 my $top                     = 0;
 my $sample                  = 3;
 my $extension               = '';
-my $maxlength               = 0;
+my $maxlength               = 10240;
 my $graph                   = 1;
 my $nograph                 = 0;
 my $debug                   = 0;
@@ -345,6 +345,7 @@ my $json_prettify           = 0;
 my $is_tsung_output         = 0;
 my $report_per_database     = 0;
 my $html_outdir             = '';
+my $param_size_limit        = 24;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -4320,7 +4321,48 @@ sub anonymize_query
 	return $orig_query;
 }
 
-# Format numbers with comma for better reading
+# Limit size of SQL queries by truncating parameters values
+sub limit_param_size
+{
+	my $orig_query = shift;
+
+	return if (!$orig_query);
+
+	# Variable to hold parameters
+	my @param_cache = ();
+
+	# Remove comments
+	$orig_query =~ s/\/\*(.*?)\*\///gs;
+
+	# Clean query
+	$orig_query =~ s/\\'//g;
+	$orig_query =~ s/('')+//g;
+
+	# Anonymize each values
+	my $i = 0;
+	while ($orig_query =~ s/([^\s]+[\s\(]*)'([^']*)'/$1\%PGB$i\%/s)
+	{
+		push(@param_cache, $2);
+		$i++;
+	}
+
+	# Limit size of paramaters
+	for ($i = 0; $i <= $#param_cache; $i++)
+	{
+		if (length($param_cache[$i]) > $param_size_limit)
+		{
+			$param_cache[$i] = substr($param_cache[$i], 0, $param_size_limit) . '[...]';
+		}
+	}
+
+	# Restore parameters
+	$orig_query =~ s/\%PGB(\d+)\%/'$param_cache[$1]'/g;
+
+	return $orig_query;
+}
+
+
+# Format numbers with comma for betterparam_cache reading
 sub comma_numbers
 {
 	return 0 if ($#_ < 0);
@@ -14554,6 +14596,12 @@ sub store_queries
 			return 1;
 		}
 
+		# First limit query size at parameter length
+		if ($maxlength > 0 && (length($cur_info{$t_pid}{query}) > $maxlength))
+		{
+			$cur_info{$t_pid}{query} = &limit_param_size($cur_info{$t_pid}{query});
+		}
+
 		# Truncate the query if requested by the user
 		$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
 			if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
@@ -14563,6 +14611,12 @@ sub store_queries
 	# We only process stored object with query here
 	if ($cur_info{$t_pid}{statement})
 	{
+		# First limit statement size at parameter length
+		if ($maxlength > 0 && (length($cur_info{$t_pid}{statement}) > $maxlength))
+		{
+			$cur_info{$t_pid}{statement} = &limit_param_size($cur_info{$t_pid}{statement});
+		}
+
 		# Truncate the statement if requested by the user
 		$cur_info{$t_pid}{statement} = substr($cur_info{$t_pid}{statement}, 0, $maxlength) . '[...]'
 			if (($maxlength > 0) && (length($cur_info{$t_pid}{statement}) > $maxlength));
@@ -14874,6 +14928,16 @@ sub store_temporary_and_lock_infos
 			$cur_temp_info{$t_pid}{query} = &anonymize_query($cur_temp_info{$t_pid}{query});
 		}
 
+		# First limit query size at parameter length
+		if ($maxlength > 0 && (length($cur_temp_info{$t_pid}{query}) > $maxlength))
+		{
+			$cur_temp_info{$t_pid}{query} = &limit_param_size($cur_temp_info{$t_pid}{query});
+		}
+
+		# Truncate the query if requested by the user
+		$cur_temp_info{$t_pid}{query} = substr($cur_temp_info{$t_pid}{query}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_temp_info{$t_pid}{query}) > $maxlength));
+
 		# Normalize query
 		my $normalized = &normalize_query($cur_temp_info{$t_pid}{query});
 
@@ -14925,6 +14989,16 @@ sub store_temporary_and_lock_infos
 			$cur_lock_info{$t_pid}{query} = &anonymize_query($cur_lock_info{$t_pid}{query});
 		}
 
+		# First limit query size at parameter length
+		if ($maxlength > 0 && (length($cur_lock_info{$t_pid}{query}) > $maxlength))
+		{
+			$cur_lock_info{$t_pid}{query} = &limit_param_size($cur_lock_info{$t_pid}{query});
+		}
+
+		# Truncate the query if requested by the user
+		$cur_lock_info{$t_pid}{query} = substr($cur_lock_info{$t_pid}{query}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_lock_info{$t_pid}{query}) > $maxlength));
+
 		# Normalize query
 		my $normalized = &normalize_query($cur_lock_info{$t_pid}{query});
 
@@ -14970,6 +15044,16 @@ sub store_temporary_and_lock_infos
 		if ($anonymize) {
 			$cur_cancel_info{$t_pid}{query} = &anonymize_query($cur_cancel_info{$t_pid}{query});
 		}
+
+		# First limit query size at parameter length
+		if ($maxlength > 0 && (length($cur_cancel_info{$t_pid}{query}) > $maxlength))
+		{
+			$cur_cancel_info{$t_pid}{query} = &limit_param_size($cur_cancel_info{$t_pid}{query});
+		}
+
+		# Truncate the query if requested by the user
+		$cur_cancel_info{$t_pid}{query} = substr($cur_cancel_info{$t_pid}{query}, 0, $maxlength) . '[...]'
+			if (($maxlength > 0) && (length($cur_cancel_info{$t_pid}{query}) > $maxlength));
 
 		# Normalize query
 		my $normalized = &normalize_query($cur_cancel_info{$t_pid}{query});
