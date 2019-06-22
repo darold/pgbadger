@@ -12413,6 +12413,11 @@ sub load_stats
 	my $fd = shift;
 
 	my %stats = %{ fd_retrieve($fd) };
+	if (!exists $stats{version})
+	{
+		warn("can not load incompatible binary data, binary file is from version < 4.0.\n");
+		return;
+	}
 	my %_overall_stat = %{$stats{overall_stat}};
 	my %_pgb_overall_stat = %{$stats{pgb_overall_stat}};
 	my %_overall_checkpoint = %{$stats{overall_checkpoint}};
@@ -13154,6 +13159,7 @@ sub dump_as_binary
 	my $lfh = shift();
 
 	store_fd({
+		'version' => \$VERSION,
 		'overall_stat' => \%overall_stat,
 		'pgb_overall_stat' => \%pgb_overall_stat,
 		'overall_checkpoint' => \%overall_checkpoint,
