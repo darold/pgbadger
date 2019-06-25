@@ -1,3 +1,108 @@
+2019-06-25 - v11.0
+
+This release of pgBadger adds some major new features and fixes some
+issues reported by users since the last four months. New features:
+
+  - Regroup cursor related query (DECLARE,CLOSE,FETCH,MOVE) into new
+    query type CURSOR.
+  - Add top bind queries that generate the more temporary files.
+    Require log_connection and log_disconnection be activated.
+  - Add --exclude-client command line option to be able to exclude log
+    entries for the specified client ip. Can be used multiple time.
+  - Allow to use time only in --begin and --end filters.
+  - Add -H, --html-dir option to be able to set a different path where
+    HTML report must be written in incremental mode. Binary files stay
+    on directory defined with -O, --outdir option.
+  - Add -E | --explode option to explode the main report into one
+    report per database. Global information not related to a database
+    are added to the postgres database report.
+  - Add per database report to incremental mode. In this mode there
+    will be a sub directory per database with dedicated incremental
+    reports.
+  - Add support to Heroku's PostgreSQL logplex format. Log can be
+    parsed using:
+
+      heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
+
+  - When a query is > 10Kb we first limit size of all constant string
+    parameters to 30 characters and then the query is truncated to 10Kb.
+    This prevent pgbadger to waste time/hang with very long queries
+    when inserting bytea for example. The 10Kb limit can be controlled
+    with the --maxlength command line parameter.
+    The query is normalized or truncated to maxlength value only after
+    this first attempt to limit size.
+
+This new release breaks backward compatibility with old binary or JSON
+files. This also mean that incremental mode will not be able to read
+old binary file. If you want to update pgBadger and keep you old reports
+take care to upgrade at start of a new week otherwise weekly report will
+be broken. pgBadger will print a warning and just skip the old binary
+file.
+
+There's also some bugs fixes and features enhancements.
+
+  - Add a warning about version and skip loading incompatible binary file.
+  - Update code formatter to pgFormatter 4.0.
+  - Fix pgbadger hang on Windows OS. Thanks to JMLessard for the report.
+  - Update tools/pgbadger_tools script to be compatible with new binary
+    file format in pgBadger v11.
+  - Add top bind queries that generate the more temporary files. This
+    collect is possible only if log_connection and log_disconnection
+    are activated in postgresql.conf. Thanks to Ildefonso Camargo for
+    the feature request.
+  - Fix auto detection of timezone. Thanks to massimosala for the fix.
+  - Remove some remaining graph when --nograph is used
+  - Force use of .txt extension when --normalized-only is used.
+  - Fix report of auto vacuum/analyze in logplex format. Thanks to
+    Konrad zichul for the report.
+  - Fix use of progress bar on Windows operating system. Thanks to
+    JMLessard for the report.
+  - Use a `$prefix_vars{'t_time'} to store the log time. Thanks to Luca
+    Ferrari for the patch.
+  - Update usage and documentation to remove perl command from pgbadger
+    invocations. Thanks to Luca Ferrari for the patch.
+  - Use begin and end with times without date. Thanks to Luca Ferrari
+    for the patch.
+  - Added some very minor spelling and grammar fixes to the readme file.
+    Thanks to ofni yratilim for the patch.
+  - Fix remote paths using SSH. Thanks to Luca Ferrari for the patch.
+  - Update regression test to works with new structure introduced with
+    the per database report feature.
+  - Fix fractional seconds in all begin and end parameters. Thanks to
+    Luca Ferrari for the patch.
+  - Fix documentation URL. Thanks to Kara Mansel for the report.
+  - Fix parsing of auto_explain.
+    Add more information about -U option that can be used multiple time.
+    Thanks to Douglas J Hunley for the report.
+  - Lot of HTML / CSS report improvements. Thanks to Pierre Giraud for
+    the patches.
+  - Update resource file.
+  - Add regression test for logplex format.
+  - Add support to Heroku's PostgreSQL logplex format. You should be able
+    to parse these logs as follow:
+        heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
+    or if you have already saved the output to a file:
+        pgbadger heroku.log
+    The logplex format is auto-dectected like any other supported format.
+    pgBadger understand the following default log_line_prefix:
+        database = %d connection_source = %r sql_error_code = %e
+    or simply:
+        sql_error_code = %e
+    Let me know if there's any other default log_line_prefix. The prefix
+    can always be set using the -p | --prefix pgbadger option:
+        pgbadger --p 'base = %d source = %r sql_state = %e' heroku.log
+    for example.
+    Thanks to Anthony Sosso for the feature request.
+  - Fix pgbadger help on URI use.
+  - Fix broken wildcard use in ssh URI introduced in previous patch.
+    Thanks to Tobias Bussmann for the report.
+  - Allow URI with space in path to log file. Thanks to Tobias Bussmann
+    for the report.
+  - Fix URI samples in documentation. Thanks to Tobias Bussmann for the
+    patch.
+  - Fix t/02_basics.t to don't fail if syslog test takes more than 10s.
+    Thanks to Christoph Berg for the patch.
+
 2019-02-14 - v10.3
 
 This release of pgBadger is a maintenance release that fixes some
