@@ -141,6 +141,8 @@ Options:
     --exclude-line regex   : pgBadger will start to exclude any log entry that
 			     will match the given regex. Can be used multiple
 			     time.
+    --exclude-client name  : exclude log entries for the specified client ip.
+			     Can be used multiple time.
     --anonymize	           : obscure all literals in queries, useful to hide
 			     confidential data.
     --noreport	           : prevent pgBadger to create reports in incremental
