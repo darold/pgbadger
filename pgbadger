@@ -2083,7 +2083,10 @@ pgBadger also support Heroku PostgreSQL logs using logplex format:
     heroku logs -p postgres | pgbadger -f logplex -o heroku.html -
 
 this will stream Heroku PostgreSQL log to pgbadger through stdin.
+
 };
+# Note that usage must be terminated by an extra newline
+# to not break POD documentation at make time.
 
 	exit 0;
 }
