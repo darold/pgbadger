@@ -16255,7 +16255,7 @@ sub set_output_extension
 	# Append the current database name to the output file.
 	$of = $db . '_' . $of if ($report_per_database && $db ne $DBALL && $of ne '-');
 
-	&logmsg('DEBUG', "Output '$ext' reports will be written to $of");
+	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild);
 
 	return ($of, $ext);
 }
