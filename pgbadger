@@ -4592,7 +4592,7 @@ Log start from $t_log_min to $t_log_max
 	# Overall statistics
 	my $fmt_unique  = &comma_numbers(scalar keys %{$normalyzed_info{$curdb}});
 	my $fmt_queries = &comma_numbers($overall_stat{$curdb}{'queries_number'});
-	my $fmt_duration = &convert_time($overall_stat{$curdb}{'queries_duration'});
+	my $fmt_duration = &convert_time($overall_stat{$curdb}{'queries_duration'}{'execute'}+($overall_stat{$curdb}{'queries_duration'}{'prepare'}||0)+($overall_stat{$curdb}{'queries_duration'}{'bind'}||0));
 	$overall_stat{$curdb}{'first_query_ts'} ||= '-';
 	$overall_stat{$curdb}{'last_query_ts'} ||= '-';
 	print $fh qq{
@@ -4633,7 +4633,8 @@ Average size of temporary files: $fmt_temp_avsize
 		my $avg_session_duration = &convert_time($session_info{$curdb}{duration} / $session_info{$curdb}{count});
 		my $tot_session_duration = &convert_time($session_info{$curdb}{duration});
 		my $avg_queries = &comma_numbers(int($overall_stat{$curdb}{'queries_number'}/$session_info{$curdb}{count}));
-		my $avg_duration = &convert_time(int($overall_stat{$curdb}{'queries_duration'}/$session_info{$curdb}{count}));
+		my $q_duration = $overall_stat{$curdb}{'queries_duration'}{'execute'}+($overall_stat{$curdb}{'queries_duration'}{'prepare'}||0)+($overall_stat{$curdb}{'queries_duration'}{'bind'}||0);
+		my $avg_duration = &convert_time(int($q_duration/$session_info{$curdb}{count}));
 		print $fh qq{Total number of sessions: $session_info{$curdb}{count}
 Total duration of sessions: $tot_session_duration
 Average duration of sessions: $avg_session_duration
@@ -5813,7 +5814,12 @@ sub print_overall_statistics
 
 	my $fmt_unique  = &comma_numbers(scalar keys %{$normalyzed_info{$curdb}});
 	my $fmt_queries = &comma_numbers($overall_stat{$curdb}{'queries_number'});
-	my $fmt_duration = &convert_time($overall_stat{$curdb}{'queries_duration'});
+	my $avg_queries = &comma_numbers(int($overall_stat{$curdb}{'queries_number'}/($session_info{$curdb}{count} || 1)));
+	my $q_duration = ($overall_stat{$curdb}{'queries_duration'}{'execute'}||0)+($overall_stat{$curdb}{'queries_duration'}{'prepare'}||0)+($overall_stat{$curdb}{'queries_duration'}{'bind'}||0);
+	my $fmt_duration_prepare = &convert_time($overall_stat{$curdb}{'queries_duration'}{'prepare'}||0);
+	my $fmt_duration_bind = &convert_time($overall_stat{$curdb}{'queries_duration'}{'bind'}||0);
+	my $fmt_duration_execute = &convert_time($overall_stat{$curdb}{'queries_duration'}{'execute'}||0);
+	my $fmt_duration = &convert_time($q_duration);
 	$overall_stat{$curdb}{'first_query_ts'} ||= '-';
 	$overall_stat{$curdb}{'last_query_ts'} ||= '-';
 	my $query_peak = 0;
@@ -5823,8 +5829,7 @@ sub print_overall_statistics
 		$query_peak_date = $_ if ($query_peak);
 		last;
 	}
-	my $avg_queries = &comma_numbers(int($overall_stat{$curdb}{'queries_number'}/($session_info{$curdb}{count} || 1)));
-	my $avg_duration = &convert_time(int($overall_stat{$curdb}{'queries_duration'}/($session_info{$curdb}{count} || 1)));
+	my $avg_duration = &convert_time(int($q_duration/($session_info{$curdb}{count} || 1)));
 	my $fmt_errors = &comma_numbers($overall_stat{$curdb}{'errors_number'});
 	my $fmt_unique_error = &comma_numbers(scalar keys %{$error_info{$curdb}});
 	my $autovacuum_count = &comma_numbers($autovacuum_info{$curdb}{count});
@@ -5870,6 +5875,7 @@ sub print_overall_statistics
 			<div class="tabbable">
 				<ul class="nav nav-tabs">
 					<li class="active"><a href="#tab-queries" data-toggle="tab"><i class="glyphicon icon-question-sign"></i> Queries</a></li>
+					<li><a href="#tab-durations" data-toggle="tab"><i class="glyphicon icon-time"></i> Durations</a></li>
 					<li><a href="#tab-events" data-toggle="tab"><i class="glyphicon icon-bullhorn"></i> Events</a></li>
 					<li><a href="#tab-vacuums" data-toggle="tab"><i class="glyphicon icon-cogs"></i> Vacuums</a></li>
 					<li><a href="#tab-tempfiles" data-toggle="tab"><i class="glyphicon icon-file"></i> Temporary files</a></li>
@@ -5885,6 +5891,14 @@ sub print_overall_statistics
 							<li><span class="figure">$overall_stat{$curdb}{'first_query_ts'}</span> <span class="figure-label">First query</span></li>
 							<li><span class="figure">$overall_stat{$curdb}{'last_query_ts'}</span> <span class="figure-label">Last query</span></li>
 							<li><span class="figure">$query_peak queries/s at $query_peak_date</span> <span class="figure-label">Query peak</span></li>
+						</ul>
+					</div>
+					<div class="tab-pane" id="tab-durations">
+						<ul>
+							<li class="first"><span class="figure">$fmt_duration</span> <span class="figure-label">Total query duration</span></li>
+							<li><span class="figure">$fmt_duration_prepare</span> <span class="figure-label">Prepare/parse total duration</span></li>
+							<li><span class="figure">$fmt_duration_bind</span> <span class="figure-label">Bind total duration</span></li>
+							<li><span class="figure">$fmt_duration_execute</span> <span class="figure-label">Execute total duration</span></li>
 						</ul>
 					</div>
 					<div class="tab-pane" id="tab-events">
@@ -6264,7 +6278,7 @@ sub print_sql_traffic
 		last;
 	}
 
-	my $fmt_duration = &convert_time($overall_stat{$curdb}{'queries_duration'});
+	my $fmt_duration = &convert_time($overall_stat{$curdb}{'queries_duration'}{'execute'}+($overall_stat{$curdb}{'queries_duration'}{'prepare'}||0)+($overall_stat{$curdb}{'queries_duration'}{'bind'}||0));
 
 	print $fh qq{
 	<div id="sql-traffic" class="analysis-item row">
@@ -12454,7 +12468,15 @@ sub load_stats
 			if not $overall_stat{$curdb}{'last_query_ts'}
 				or $overall_stat{$curdb}{'last_query_ts'} lt $_overall_stat{$curdb}{'last_query_ts'};
 
-		$overall_stat{$curdb}{queries_duration} += $_overall_stat{$curdb}{queries_duration};
+		if (exists $_overall_stat{$curdb}{'queries_duration'} && $_overall_stat{$curdb}{'queries_duration'} !~ /HASH/)
+		{
+			# Backward compatibility
+			$overall_stat{$curdb}{'queries_duration'}{'execute'} += $_overall_stat{$curdb}{'queries_duration'};
+		} else {
+			$overall_stat{$curdb}{'queries_duration'}{'execute'} += $_overall_stat{$curdb}{'queries_duration'}{'execute'};
+			$overall_stat{$curdb}{'queries_duration'}{'prepare'} += $_overall_stat{$curdb}{'queries_duration'}{'prepare'};
+			$overall_stat{$curdb}{'queries_duration'}{'bind'} += $_overall_stat{$curdb}{'queries_duration'}{'bind'};
+		}
 
 		foreach my $a (@SQL_ACTION) {
 			$overall_stat{$curdb}{$a} += $_overall_stat{$curdb}{$a}
@@ -14074,7 +14096,10 @@ sub parse_query
 			$overall_stat{lc($1)}++;
 			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
 			# We do not store prepare statement
-			return if (lc($1) eq 'prepare');
+			if ($2 eq 'prepare') {
+				$overall_stat{$curdb}{'queries_duration'}{'prepare'} += $prefix_vars{'t_duration'} if ($prefix_vars{'t_duration'});
+				return;
+			}
 		}
 	# Log line with duration and statement from prepared queries
 	} elsif ($prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(prepare|parse|bind|execute from fetch|execute)\s+[^:]+:\s//s)
@@ -14085,8 +14110,13 @@ sub parse_query
 		$t_action = 'prepare' if ($t_action eq 'parse');
 		$overall_stat{$t_action}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
-		# Skipping prepare, parse and bind logs
-		return if ($t_action !~ /query|statement|execute/);
+		if ($t_action !~ /query|statement|execute/)
+		{
+			if ($prefix_vars{'t_duration'}) {
+				$overall_stat{$curdb}{'queries_duration'}{$t_action} += $prefix_vars{'t_duration'};
+			}
+			return;
+		}
 		my $k = &get_hist_inbound($prefix_vars{'t_duration'}, @histogram_query_time);
 		$overall_stat{$curdb}{histogram}{query_time}{$k}++;
 		$overall_stat{$curdb}{histogram}{query_total}++;
@@ -14118,7 +14148,7 @@ sub parse_query
 		$t_action = 'prepare' if ($t_action eq 'parse');
 		$overall_stat{$t_action}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
-		# Skipping parse and bind logs
+		# Skipping parse and bind logs but after storing their duration time
 		return if ($t_action !~ /query|statement|execute/);
 		$prefix_vars{'t_bind'} = 1;
 		# Stores execute query in case of temporary file
@@ -14502,7 +14532,7 @@ sub store_queries
 			# Stores global statistics
 			$overall_stat{'queries_number'}++;
 			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_number'}++;
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'}{'execute'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			return 1;
 		}
 
@@ -14614,7 +14644,7 @@ sub store_queries
 
 		$overall_stat{'queries_number'}++;
 		$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_number'}++;
-		$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+		$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'}{'execute'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
