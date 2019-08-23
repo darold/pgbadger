@@ -984,24 +984,24 @@ my @histogram_session_time = (0, 500, 1000, 30000, 60000, 600000, 1800000, 36000
 my %overall_stat	= ();
 my %pgb_overall_stat    = ();
 my %overall_checkpoint  = ();
-my %top_slowest	 = ();
+my %top_slowest	        = ();
 my %normalyzed_info     = ();
-my %error_info	  = ();
+my %error_info	        = ();
 my %pgb_error_info      = ();
 my %pgb_pool_info       = ();
-my %logs_type	   = ();
-my %errors_code	 = ();
+my %logs_type	        = ();
+my %errors_code	        = ();
 my %per_minute_info     = ();
 my %pgb_per_minute_info = ();
-my %lock_info	   = ();
+my %lock_info	        = ();
 my %tempfile_info       = ();
 my %cancelled_info      = ();
 my %connection_info     = ();
 my %pgb_connection_info = ();
 my %database_info       = ();
 my %application_info    = ();
-my %user_info	   = ();
-my %host_info	   = ();
+my %user_info	        = ();
+my %host_info	        = ();
 my %session_info	= ();
 my %pgb_session_info    = ();
 my %conn_received       = ();
@@ -1009,13 +1009,13 @@ my %checkpoint_info     = ();
 my %autovacuum_info     = ();
 my %autoanalyze_info    = ();
 my @graph_values	= ();
-my %cur_info	    = ();
+my %cur_info	        = ();
 my %cur_temp_info       = ();
 my %cur_plan_info       = ();
 my %cur_cancel_info     = ();
 my %cur_lock_info       = ();
-my $nlines	      = 0;
-my %last_line	   = ();
+my $nlines	        = 0;
+my %last_line	        = ();
 my %pgb_last_line       = ();
 our %saved_last_line    = ();
 our %pgb_saved_last_line= ();
@@ -1024,6 +1024,9 @@ my %top_locked_info     = ();
 my %top_tempfile_info   = ();
 my %top_cancelled_info  = ();
 my %drawn_graphs	= ();
+my %cur_bind_info       = ();
+my %prepare_info        = ();
+my %bind_info           = ();
 
 # Global output filehandle
 my $fh = undef;
@@ -4408,6 +4411,48 @@ sub set_top_tempfile_info
 	}
 }
 
+# Stores top N slowest sample queries
+sub set_top_prepare_bind_sample
+{
+	my ($type, $q, $dt, $t, $param, $db, $user, $remote, $app) = @_;
+
+	return if ($sample <= 0);
+
+	if ($type eq 'prepare') {
+		$prepare_info{$db}{$q}{samples}{$dt}{query}  = $q;
+		$prepare_info{$db}{$q}{samples}{$dt}{date}   = $t;
+		$prepare_info{$db}{$q}{samples}{$dt}{db}     = $db;
+		$prepare_info{$db}{$q}{samples}{$dt}{user}   = $user;
+		$prepare_info{$db}{$q}{samples}{$dt}{remote} = $remote;
+		$prepare_info{$db}{$q}{samples}{$dt}{app}    = $app;
+		$prepare_info{$db}{$q}{samples}{$dt}{params} = $param;
+		my $i = 1;
+		foreach my $k (sort {$b <=> $a} keys %{$prepare_info{$db}{$q}{samples}}) {
+			if ($i > $sample) {
+				delete $prepare_info{$db}{$q}{samples}{$k};
+			}
+			$i++;
+		}
+	}
+
+	if ($type eq 'bind') {
+		$bind_info{$db}{$q}{samples}{$dt}{query}  = $q;
+		$bind_info{$db}{$q}{samples}{$dt}{date}   = $t;
+		$bind_info{$db}{$q}{samples}{$dt}{db}     = $db;
+		$bind_info{$db}{$q}{samples}{$dt}{user}   = $user;
+		$bind_info{$db}{$q}{samples}{$dt}{remote} = $remote;
+		$bind_info{$db}{$q}{samples}{$dt}{app}    = $app;
+		$bind_info{$db}{$q}{samples}{$dt}{params} = $param;
+		my $i = 1;
+		foreach my $k (sort {$b <=> $a} keys %{$bind_info{$db}{$q}{samples}}) {
+			if ($i > $sample) {
+				delete $bind_info{$db}{$q}{samples}{$k};
+			}
+			$i++;
+		}
+	}
+}
+
 # Stores the top N queries cancelled
 sub set_top_cancelled_info
 {
@@ -4458,7 +4503,7 @@ sub set_top_sample
 {
 	my ($curdb, $norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
 
-	return if (!$norm || !$q);
+	return if (!$norm || !$q || $sample <= 0);
 
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{query}  = $q;
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{date}   = $date;
@@ -4469,14 +4514,12 @@ sub set_top_sample
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{bind}   = $bind;
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{plan}   = $plan;
 
-	if ($sample > 0) {
-		my $i = 1;
-		foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$norm}{samples}}) {
-			if ($i > $sample) {
-				delete $normalyzed_info{$curdb}{$norm}{samples}{$k};
-			}
-			$i++;
+	my $i = 1;
+	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$norm}{samples}}) {
+		if ($i > $sample) {
+			delete $normalyzed_info{$curdb}{$norm}{samples}{$k};
 		}
+		$i++;
 	}
 }
 
@@ -5645,6 +5688,8 @@ sub html_header
      				<li><a href="#time-consuming-queries">Time Consuming queries (N)</a></li>
      				<li><a href="#most-frequent-queries">Most frequent queries (N)</a></li>
      				<li><a href="#normalized-slowest-queries">Normalized slowest queries</a></li>
+     				<li><a href="#time-consuming-prepare">Time consuming prepare</a></li>
+     				<li><a href="#time-consuming-bind">Time consuming bind</a></li>
      			</ul>
      		</li>
 };
@@ -11306,6 +11351,472 @@ sub print_slowest_queries
 
 }
 
+sub print_prepare_consuming
+{
+	my $curdb = shift;
+
+	print $fh qq{
+		<div class="analysis-item row" id="time-consuming-prepare">
+			<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Time consuming prepare</h2>
+                        <div class="col-md-12">
+                                <table class="table table-striped" id="time-consuming-prepare-table">
+                                <thead>
+				<tr>
+					<th>Rank</th>
+					<th>Total duration</th>
+					<th>Times executed</th>
+					<th>Min duration</th>
+					<th>Max duration</th>
+					<th>Avg duration</th>
+					<th>Query</th>
+				</tr>
+				</thead>
+				<tbody>
+};
+	my $rank = 1;
+	my $found = 0;
+	foreach my $k (sort {$prepare_info{$curdb}{$b}{duration} <=> $prepare_info{$curdb}{$a}{duration}} keys %{$prepare_info{$curdb}}) {
+		next if (!$prepare_info{$curdb}{$k}{count} || !exists $prepare_info{$curdb}{$k}{duration});
+		last if ($rank > $top);
+		$found++;
+		$prepare_info{$curdb}{$k}{average} = $prepare_info{$curdb}{$k}{duration} / $prepare_info{$curdb}{$k}{count};
+		my $duration = &convert_time($prepare_info{$curdb}{$k}{duration});
+		my $count = &comma_numbers($prepare_info{$curdb}{$k}{count});
+		my $min = &convert_time($prepare_info{$curdb}{$k}{min});
+		my $max = &convert_time($prepare_info{$curdb}{$k}{max});
+		my $avg = &convert_time($prepare_info{$curdb}{$k}{average});
+		my $query = &highlight_code($k);
+		my $md5 = '';
+		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
+		my $details = '';
+		my %hourly_count = ();
+		my %hourly_duration = ();
+		my $days = 0;
+		foreach my $d (sort keys %{$prepare_info{$curdb}{$k}{chronos}}) {
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$2} $3";
+			my $dd = $3;
+			my $mo = $2 -1 ;
+			my $y = $1 - 1900;
+			foreach my $h (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}}) {
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$prepare_info{$curdb}{$k}{chronos}{$d}{$h}{average} =
+					$prepare_info{$curdb}{$k}{chronos}{$d}{$h}{duration} / ($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{count} || 1);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
+					&comma_numbers($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+				$zday = "";
+				foreach my $m (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$ht:$rd"} += $prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$ht:$rd"} += ($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+				}
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}/($hourly_count{"$ht:$rd"}||1)) .  "</td></tr>";
+					}
+				}
+			}
+		}
+		# Set graph dataset
+		my %graph_data = ();
+		foreach my $h ("00" .. "23") {
+			foreach my $rd (@histo_avgs) {
+				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
+				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
+			}
+		}
+		$graph_data{count} =~ s/,$//;
+		$graph_data{duration} =~ s/,$//;
+		%hourly_count = ();
+		%hourly_duration = ();
+
+		my $users_involved = '';
+		if (scalar keys %{$prepare_info{$curdb}{$k}{users}} > 0) {
+			$users_involved = qq{<button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-user-involved-rank-$rank">User(s) involved</button>};
+		}
+		my $apps_involved = '';
+		if (scalar keys %{$prepare_info{$curdb}{$k}{apps}} > 0) {
+			$apps_involved = qq{<button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-app-involved-rank-$rank">App(s) involved</button>};
+		}
+		my $query_histo = '';
+		if ($graph) {
+			$query_histo = &jqplot_histograph($graphid++, 'time_consuming_prepare_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		}
+
+		print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$duration</td>
+				<td>$count
+					<p><a href="#Atime_consuming_prepare_details_$rank" class="btn btn-default btn-xs" data-toggle="collapse">Details</a></p>
+				</td>
+				<td>$min</td>
+				<td>$max</td>
+				<td>$avg</td>
+				<td id="time-consuming-prepare-examples-details-rank-$rank">
+					<div id="query-e-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
+						<!-- Details collapse -->
+					    <div id="Atime_consuming_prepare_details_$rank" class="collapse">
+						<h3>Times Reported <small>Time consuming prepare #$rank</small></h3>
+						$query_histo
+								<table class="table table-stripped table-condensed">
+									<thead>
+										<tr>
+											<th>Day</th>
+											<th>Hour</th>
+											<th>Count</th>
+											<th>Duration</th>
+											<th>Avg duration</th>
+										</tr>
+									</thead>
+									<tbody>
+										$details
+									</tbody>
+								</table>
+						    <p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#Atime_consuming_prepare_details_$rank">x Hide</button></p>
+						</div><!-- end of details collapse -->
+	<p> <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
+};
+		if (scalar keys %{$prepare_info{$curdb}{$k}{users}} > 0) {
+			print $fh qq{
+						<!-- Involved users list collapse -->
+						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+};
+			my $idx = 1;
+			foreach my $u (sort {$prepare_info{$curdb}{$k}{users}{$b}{duration} <=> $prepare_info{$curdb}{$k}{users}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{users}}) {
+				if ($prepare_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+					my $details = "[ <b>User:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($prepare_info{$curdb}{$k}{users}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $prepare_info{$curdb}{$k}{users}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of user involved collapse -->
+};
+		}
+
+		if (scalar keys %{$prepare_info{$curdb}{$k}{apps}} > 0) {
+			print $fh qq{
+						<!-- Involved apps list collapse -->
+						<div id="time-consuming-prepare-app-involved-rank-$rank" class="collapse">
+};
+			my $idx = 1;
+			foreach my $u (sort {$prepare_info{$curdb}{$k}{apps}{$b}{duration} <=> $prepare_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{apps}}) {
+				if ($prepare_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+					my $details = "[ <b>Application:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($prepare_info{$curdb}{$k}{apps}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $prepare_info{$curdb}{$k}{apps}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-app-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of app involved collapse -->
+};
+		}
+		print $fh qq{
+						<!-- Examples collapse -->
+						<div id="time-consuming-prepare-examples-rank-$rank" class="collapse">
+							<dl>
+};
+
+		my $idx = 1;
+		foreach my $d (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$k}{samples}}) {
+			last if ($idx > $sample);
+			my $details = "<b>Date:</b> $prepare_info{$curdb}{$k}{samples}{$d}{date}\n";
+			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+			$details .= "<b>Database:</b> $prepare_info{$curdb}{$k}{samples}{$d}{db}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{db});
+			$details .= "<b>User:</b> $prepare_info{$curdb}{$k}{samples}{$d}{user}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{user});
+			$details .= "<b>Remote:</b> $prepare_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{remote});
+			$details .= "<b>Application:</b> $prepare_info{$curdb}{$k}{samples}{$d}{app}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>parameters:</b> $prepare_info{$curdb}{$k}{samples}{$d}{params}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{params});
+			$query = &highlight_code($prepare_info{$curdb}{$k}{samples}{$d}{query});
+			my $md5 = '';
+			$md5 = 'md5: ' . md5_hex($prepare_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
+			print $fh qq{
+								<dt>
+								<div id="query-e-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
+								<pre>$details</pre>
+								</dt>
+};
+			$idx++;
+		}
+		print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-examples-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of details collapse -->
+					</td>
+				</tr>
+};
+		$rank++;
+	}
+	if (!$found) {
+		print $fh qq{<tr><td colspan="3">$NODATA</td></tr>};
+	}
+	print $fh qq{
+			</tbody>
+			</table>
+		</div>
+	</div><!-- end of time-consuming-preapre -->
+};
+
+}
+
+sub print_bind_consuming
+{
+	my $curdb = shift;
+
+	print $fh qq{
+		<div class="analysis-item row" id="time-consuming-bind">
+			<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Time consuming bind</h2>
+                        <div class="col-md-12">
+                                <table class="table table-striped" id="time-consuming-bind-table">
+                                <thead>
+				<tr>
+					<th>Rank</th>
+					<th>Total duration</th>
+					<th>Times executed</th>
+					<th>Min duration</th>
+					<th>Max duration</th>
+					<th>Avg duration</th>
+					<th>Query</th>
+				</tr>
+				</thead>
+				<tbody>
+};
+	my $rank = 1;
+	my $found = 0;
+	foreach my $k (sort {$bind_info{$curdb}{$b}{duration} <=> $bind_info{$curdb}{$a}{duration}} keys %{$bind_info{$curdb}}) {
+		next if (!$bind_info{$curdb}{$k}{count} || !exists $bind_info{$curdb}{$k}{duration});
+		last if ($rank > $top);
+		$found++;
+		$bind_info{$curdb}{$k}{average} = $bind_info{$curdb}{$k}{duration} / $bind_info{$curdb}{$k}{count};
+		my $duration = &convert_time($bind_info{$curdb}{$k}{duration});
+		my $count = &comma_numbers($bind_info{$curdb}{$k}{count});
+		my $min = &convert_time($bind_info{$curdb}{$k}{min});
+		my $max = &convert_time($bind_info{$curdb}{$k}{max});
+		my $avg = &convert_time($bind_info{$curdb}{$k}{average});
+		my $query = &highlight_code($k);
+		my $md5 = '';
+		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
+		my $details = '';
+		my %hourly_count = ();
+		my %hourly_duration = ();
+		my $days = 0;
+		foreach my $d (sort keys %{$bind_info{$curdb}{$k}{chronos}}) {
+			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
+			$days++;
+			my $zday = "$abbr_month{$2} $3";
+			my $dd = $3;
+			my $mo = $2 -1 ;
+			my $y = $1 - 1900;
+			foreach my $h (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}}) {
+				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
+				$t += $timezone;
+				my $ht = sprintf("%02d", (localtime($t))[2]);
+				$bind_info{$curdb}{$k}{chronos}{$d}{$h}{average} =
+					$bind_info{$curdb}{$k}{chronos}{$d}{$h}{duration} / ($bind_info{$curdb}{$k}{chronos}{$d}{$h}{count} || 1);
+				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
+					&comma_numbers($bind_info{$curdb}{$k}{chronos}{$d}{$h}{count}) .   "</td><td>" .
+					&convert_time($bind_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
+					&convert_time($bind_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
+				$zday = "";
+				foreach my $m (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+					my $rd = &average_per_minutes($m, $histo_avg_minutes);
+					$hourly_count{"$ht:$rd"} += $bind_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
+					$hourly_duration{"$ht:$rd"} += ($bind_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
+				}
+				if ($#histo_avgs > 0) {
+					foreach my $rd (@histo_avgs) {
+						next if (!exists $hourly_count{"$ht:$rd"});
+						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
+							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}) . "</td><td>" .
+							&convert_time($hourly_duration{"$ht:$rd"}/($hourly_count{"$ht:$rd"}||1)) .  "</td></tr>";
+					}
+				}
+			}
+		}
+		# Set graph dataset
+		my %graph_data = ();
+		foreach my $h ("00" .. "23") {
+			foreach my $rd (@histo_avgs) {
+				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
+				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
+			}
+		}
+		$graph_data{count} =~ s/,$//;
+		$graph_data{duration} =~ s/,$//;
+		%hourly_count = ();
+		%hourly_duration = ();
+
+		my $users_involved = '';
+		if (scalar keys %{$bind_info{$curdb}{$k}{users}} > 0) {
+			$users_involved = qq{<button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-user-involved-rank-$rank">User(s) involved</button>};
+		}
+		my $apps_involved = '';
+		if (scalar keys %{$bind_info{$curdb}{$k}{apps}} > 0) {
+			$apps_involved = qq{<button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-app-involved-rank-$rank">App(s) involved</button>};
+		}
+		my $query_histo = '';
+		if ($graph) {
+			$query_histo = &jqplot_histograph($graphid++, 'time_consuming_bind_details_'.$rank, $graph_data{count}, $graph_data{duration}, 'Queries', 'Avg. duration');
+		}
+
+		print $fh qq{
+				<tr>
+				<td>$rank</td>
+				<td>$duration</td>
+				<td>$count
+					<p><a href="#Atime_consuming_bind_details_$rank" class="btn btn-default btn-xs" data-toggle="collapse">Details</a></p>
+				</td>
+				<td>$min</td>
+				<td>$max</td>
+				<td>$avg</td>
+				<td id="time-consuming-bind-examples-details-rank-$rank">
+					<div id="query-e-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
+						<!-- Details collapse -->
+					    <div id="Atime_consuming_bind_details_$rank" class="collapse">
+						<h3>Times Reported <small>Time consuming bind #$rank</small></h3>
+						$query_histo
+								<table class="table table-stripped table-condensed">
+									<thead>
+										<tr>
+											<th>Day</th>
+											<th>Hour</th>
+											<th>Count</th>
+											<th>Duration</th>
+											<th>Avg duration</th>
+										</tr>
+									</thead>
+									<tbody>
+										$details
+									</tbody>
+								</table>
+						    <p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#Atime_consuming_bind_details_$rank">x Hide</button></p>
+						</div><!-- end of details collapse -->
+	<p> <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
+};
+		if (scalar keys %{$bind_info{$curdb}{$k}{users}} > 0) {
+			print $fh qq{
+						<!-- Involved users list collapse -->
+						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+};
+			my $idx = 1;
+			foreach my $u (sort {$bind_info{$curdb}{$k}{users}{$b}{duration} <=> $bind_info{$curdb}{$k}{users}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{users}}) {
+				if ($bind_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+					my $details = "[ <b>User:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($bind_info{$curdb}{$k}{users}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $bind_info{$curdb}{$k}{users}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-user-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of user involved collapse -->
+};
+		}
+
+		if (scalar keys %{$bind_info{$curdb}{$k}{apps}} > 0) {
+			print $fh qq{
+						<!-- Involved apps list collapse -->
+						<div id="time-consuming-bind-app-involved-rank-$rank" class="collapse">
+};
+			my $idx = 1;
+			foreach my $u (sort {$bind_info{$curdb}{$k}{apps}{$b}{duration} <=> $bind_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{apps}}) {
+				if ($bind_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+					my $details = "[ <b>Application:</b> $u";
+					$details .= " - <b>Total duration:</b> ".&convert_time($bind_info{$curdb}{$k}{apps}{$u}{duration});
+					$details .= " - <b>Times executed:</b> $bind_info{$curdb}{$k}{apps}{$u}{count}";
+					$details .= " ]\n";
+					print $fh qq{
+							<pre>$details</pre>
+};
+					$idx++;
+				}
+			}
+			print $fh qq{
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-app-involved-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of app involved collapse -->
+};
+		}
+		print $fh qq{
+						<!-- Examples collapse -->
+						<div id="time-consuming-bind-examples-rank-$rank" class="collapse">
+							<dl>
+};
+
+		my $idx = 1;
+		foreach my $d (sort {$b <=> $a} keys %{$bind_info{$curdb}{$k}{samples}}) {
+			last if ($idx > $sample);
+			my $details = "<b>Date:</b> $bind_info{$curdb}{$k}{samples}{$d}{date}\n";
+			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
+			$details .= "<b>Database:</b> $bind_info{$curdb}{$k}{samples}{$d}{db}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{db});
+			$details .= "<b>User:</b> $bind_info{$curdb}{$k}{samples}{$d}{user}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{user});
+			$details .= "<b>Remote:</b> $bind_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{remote});
+			$details .= "<b>Application:</b> $bind_info{$curdb}{$k}{samples}{$d}{app}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>parameters:</b> $bind_info{$curdb}{$k}{samples}{$d}{params}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{params});
+			$query = &highlight_code($bind_info{$curdb}{$k}{samples}{$d}{query});
+			my $md5 = '';
+			$md5 = 'md5: ' . md5_hex($bind_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
+			print $fh qq{
+								<dt>
+								<div id="query-e-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
+								<pre>$details</pre>
+								</dt>
+};
+			$idx++;
+		}
+		print $fh qq{
+							</dl>
+							<p class="pull-right"><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-examples-rank-$rank">x Hide</button></p>
+						</div>
+						<!-- end of details collapse -->
+					</td>
+				</tr>
+};
+		$rank++;
+	}
+	if (!$found) {
+		print $fh qq{<tr><td colspan="3">$NODATA</td></tr>};
+	}
+	print $fh qq{
+			</tbody>
+			</table>
+		</div>
+	</div><!-- end of time-consuming-preapre -->
+};
+
+}
+
 sub dump_as_html
 {
 
@@ -11493,7 +12004,14 @@ sub dump_as_html
 			&print_most_frequent($curdb);
 
 			# Print normalized slowest queries
-			&print_slowest_queries($curdb)
+			&print_slowest_queries($curdb);
+
+			# Show prepare that took up the most time
+			&print_prepare_consuming($curdb);
+
+			# Show bind that took up the most time
+			&print_bind_consuming($curdb);
+
 		}
 
 		# Show pgbouncer sessions and connections statistics
@@ -12427,6 +12945,8 @@ sub load_stats
 	my %_top_locked_info = %{$stats{top_locked_info}};
 	my %_top_tempfile_info = %{$stats{top_tempfile_info}};
 	my %_top_cancelled_info = %{$stats{top_cancelled_info}};
+	my %_prepare_info = %{$stats{prepare_info}};
+	my %_bind_info = %{$stats{bind_info}};
 
 	### overall_stat ###
 
@@ -13134,6 +13654,182 @@ sub load_stats
 		}
 	}
 
+	### prepare_info ###
+
+	foreach my $curdb (keys %_prepare_info) {
+		foreach my $stmt (keys %{$_prepare_info{$curdb}}) {
+
+			foreach my $dt (keys %{$_prepare_info{$curdb}{$stmt}{samples}} ) {
+				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{samples}{$dt}} ) {
+					$prepare_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_prepare_info{$curdb}{$stmt}{samples}{$dt}{$k};
+				}
+			}
+
+			# Keep only the top N samples
+			my $i = 1;
+			foreach my $k (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$stmt}{samples}}) {
+				if ($i > $sample) {
+					delete $prepare_info{$curdb}{$stmt}{samples}{$k};
+				}
+				$i++;
+			}
+
+			$prepare_info{$curdb}{$stmt}{count} += $_prepare_info{$curdb}{$stmt}{count};
+
+			# Set min / max duration for this query
+			if (!exists $prepare_info{$curdb}{$stmt}{min} || ($prepare_info{$curdb}{$stmt}{min} > $_prepare_info{$curdb}{$stmt}{min})) {
+				$prepare_info{$curdb}{$stmt}{min} = $_prepare_info{$curdb}{$stmt}{min};
+			}
+			if (!exists $prepare_info{$curdb}{$stmt}{max} || ($prepare_info{$curdb}{$stmt}{max} < $_prepare_info{$curdb}{$stmt}{max})) {
+				$prepare_info{$curdb}{$stmt}{max} = $_prepare_info{$curdb}{$stmt}{max};
+			}
+
+			foreach my $day (keys %{$_prepare_info{$curdb}{$stmt}{chronos}} ) {
+				foreach my $hour (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}} ) {
+					$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
+						$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
+					$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
+						$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
+					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} ) {
+						$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
+							$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
+					}
+					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+						$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
+							$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+					}
+				}
+			}
+
+			$prepare_info{$curdb}{$stmt}{duration} += $_prepare_info{$curdb}{$stmt}{duration};
+
+			if (exists $_prepare_info{$curdb}{$stmt}{locks}) {
+				$prepare_info{$curdb}{$stmt}{locks}{count} += $_prepare_info{$curdb}{$stmt}{locks}{count};
+				$prepare_info{$curdb}{$stmt}{locks}{wait} += $_prepare_info{$curdb}{$stmt}{locks}{wait};
+				if (!exists $prepare_info{$curdb}{$stmt}{locks}{minwait} || ($prepare_info{$curdb}{$stmt}{locks}{minwait} > $_prepare_info{$stmt}{locks}{minwait})) {
+					$prepare_info{$curdb}{$stmt}{locks}{minwait} = $_prepare_info{$curdb}{$stmt}{locks}{minwait};
+				}
+				if (!exists $prepare_info{$curdb}{$stmt}{locks}{maxwait} || ($prepare_info{$curdb}{$stmt}{locks}{maxwait} < $_prepare_info{$curdb}{$stmt}{locks}{maxwait})) {
+					$prepare_info{$curdb}{$stmt}{locks}{maxwait} = $_prepare_info{$curdb}{$stmt}{locks}{maxwait};
+				}
+			}
+
+			if (exists $_prepare_info{$curdb}{$stmt}{tempfiles}) {
+				$prepare_info{$curdb}{$stmt}{tempfiles}{count} += $_prepare_info{$curdb}{$stmt}{tempfiles}{count};
+				$prepare_info{$curdb}{$stmt}{tempfiles}{size} += $_prepare_info{$curdb}{$stmt}{tempfiles}{size};
+				if (!exists $prepare_info{$curdb}{$stmt}{tempfiles}{minsize} || ($prepare_info{$curdb}{$stmt}{tempfiles}{minsize} > $_prepare_info{$curdb}{$stmt}{tempfiles}{minsize})) {
+					$prepare_info{$curdb}{$stmt}{tempfiles}{minsize} = $_prepare_info{$curdb}{$stmt}{tempfiles}{minsize};
+				}
+				if (!exists $prepare_info{$curdb}{$stmt}{tempfiles}{maxsize} || ($prepare_info{$curdb}{$stmt}{tempfiles}{maxsize} < $_prepare_info{$curdb}{$stmt}{tempfiles}{maxsize})) {
+					$prepare_info{$curdb}{$stmt}{tempfiles}{maxsize} = $_prepare_info{$curdb}{$stmt}{tempfiles}{maxsize};
+				}
+			}
+
+			if (exists $_prepare_info{$curdb}{$stmt}{cancelled}) {
+				$prepare_info{$curdb}{$stmt}{cancelled}{count} += $_prepare_info{$curdb}{$stmt}{cancelled}{count};
+			}
+
+			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{users}} ) {
+				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{users}{$u}} ) {
+					$prepare_info{$curdb}{$stmt}{users}{$u}{$k} += $_prepare_info{$curdb}{$stmt}{users}{$u}{$k};
+				}
+			}
+			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{apps}} ) {
+				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{apps}{$u}} ) {
+					$prepare_info{$curdb}{$stmt}{apps}{$u}{$k} += $_prepare_info{$curdb}{$stmt}{apps}{$u}{$k};
+				}
+			}
+		}
+	}
+
+	### bind_info ###
+
+	foreach my $curdb (keys %_bind_info) {
+		foreach my $stmt (keys %{$_bind_info{$curdb}}) {
+
+			foreach my $dt (keys %{$_bind_info{$curdb}{$stmt}{samples}} ) {
+				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{samples}{$dt}} ) {
+					$bind_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_bind_info{$curdb}{$stmt}{samples}{$dt}{$k};
+				}
+			}
+
+			# Keep only the top N samples
+			my $i = 1;
+			foreach my $k (sort {$b <=> $a} keys %{$bind_info{$curdb}{$stmt}{samples}}) {
+				if ($i > $sample) {
+					delete $bind_info{$curdb}{$stmt}{samples}{$k};
+				}
+				$i++;
+			}
+
+			$bind_info{$curdb}{$stmt}{count} += $_bind_info{$curdb}{$stmt}{count};
+
+			# Set min / max duration for this query
+			if (!exists $bind_info{$curdb}{$stmt}{min} || ($bind_info{$curdb}{$stmt}{min} > $_bind_info{$curdb}{$stmt}{min})) {
+				$bind_info{$curdb}{$stmt}{min} = $_bind_info{$curdb}{$stmt}{min};
+			}
+			if (!exists $bind_info{$curdb}{$stmt}{max} || ($bind_info{$curdb}{$stmt}{max} < $_bind_info{$curdb}{$stmt}{max})) {
+				$bind_info{$curdb}{$stmt}{max} = $_bind_info{$curdb}{$stmt}{max};
+			}
+
+			foreach my $day (keys %{$_bind_info{$curdb}{$stmt}{chronos}} ) {
+				foreach my $hour (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}} ) {
+					$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
+						$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
+					$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
+						$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
+					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} ) {
+						$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
+							$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
+					}
+					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+						$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
+							$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+					}
+				}
+			}
+
+			$bind_info{$curdb}{$stmt}{duration} += $_bind_info{$curdb}{$stmt}{duration};
+
+			if (exists $_bind_info{$curdb}{$stmt}{locks}) {
+				$bind_info{$curdb}{$stmt}{locks}{count} += $_bind_info{$curdb}{$stmt}{locks}{count};
+				$bind_info{$curdb}{$stmt}{locks}{wait} += $_bind_info{$curdb}{$stmt}{locks}{wait};
+				if (!exists $bind_info{$curdb}{$stmt}{locks}{minwait} || ($bind_info{$curdb}{$stmt}{locks}{minwait} > $_bind_info{$stmt}{locks}{minwait})) {
+					$bind_info{$curdb}{$stmt}{locks}{minwait} = $_bind_info{$curdb}{$stmt}{locks}{minwait};
+				}
+				if (!exists $bind_info{$curdb}{$stmt}{locks}{maxwait} || ($bind_info{$curdb}{$stmt}{locks}{maxwait} < $_bind_info{$curdb}{$stmt}{locks}{maxwait})) {
+					$bind_info{$curdb}{$stmt}{locks}{maxwait} = $_bind_info{$curdb}{$stmt}{locks}{maxwait};
+				}
+			}
+
+			if (exists $_bind_info{$curdb}{$stmt}{tempfiles}) {
+				$bind_info{$curdb}{$stmt}{tempfiles}{count} += $_bind_info{$curdb}{$stmt}{tempfiles}{count};
+				$bind_info{$curdb}{$stmt}{tempfiles}{size} += $_bind_info{$curdb}{$stmt}{tempfiles}{size};
+				if (!exists $bind_info{$curdb}{$stmt}{tempfiles}{minsize} || ($bind_info{$curdb}{$stmt}{tempfiles}{minsize} > $_bind_info{$curdb}{$stmt}{tempfiles}{minsize})) {
+					$bind_info{$curdb}{$stmt}{tempfiles}{minsize} = $_bind_info{$curdb}{$stmt}{tempfiles}{minsize};
+				}
+				if (!exists $bind_info{$curdb}{$stmt}{tempfiles}{maxsize} || ($bind_info{$curdb}{$stmt}{tempfiles}{maxsize} < $_bind_info{$curdb}{$stmt}{tempfiles}{maxsize})) {
+					$bind_info{$curdb}{$stmt}{tempfiles}{maxsize} = $_bind_info{$curdb}{$stmt}{tempfiles}{maxsize};
+				}
+			}
+
+			if (exists $_bind_info{$curdb}{$stmt}{cancelled}) {
+				$bind_info{$curdb}{$stmt}{cancelled}{count} += $_bind_info{$curdb}{$stmt}{cancelled}{count};
+			}
+
+			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{users}} ) {
+				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{users}{$u}} ) {
+					$bind_info{$curdb}{$stmt}{users}{$u}{$k} += $_bind_info{$curdb}{$stmt}{users}{$u}{$k};
+				}
+			}
+			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{apps}} ) {
+				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{apps}{$u}} ) {
+					$bind_info{$curdb}{$stmt}{apps}{$u}{$k} += $_bind_info{$curdb}{$stmt}{apps}{$u}{$k};
+				}
+			}
+		}
+	}
+
 	return;
 }
 
@@ -13172,6 +13868,8 @@ sub dump_as_binary
 		'autoanalyze_info' => \%autoanalyze_info,
 		'top_tempfile_info' => \%top_tempfile_info,
 		'top_locked_info' => \%top_locked_info,
+		'prepare_info' => \%prepare_info,
+		'bind_info' => \%bind_info,
 	}, $lfh) || localdie ("Couldn't save binary data to «$current_out_file»!\n");
 }
 
@@ -14031,6 +14729,7 @@ sub parse_query
 
 			# Apply bind parameters if any
 			if ($prefix_vars{'t_query'} =~ /parameters: (.*)/) {
+				$cur_bind_info{$t_pid}{'bind'}{'parameters'} = $1 if (exists $cur_bind_info{$t_pid});
 				$cur_info{$t_pid}{parameters} = "$1";
 				# go look at other params
 				return;
@@ -14058,6 +14757,7 @@ sub parse_query
 
 	# Apply bind parameters if any
 	if ($prefix_vars{'t_detail'} =~ /parameters: (.*)/) {
+		$cur_bind_info{$t_pid}{'bind'}{'parameters'} = $1 if (exists $cur_bind_info{$t_pid});
 		$cur_info{$t_pid}{parameters} = "$1";
 		# go look at other params
 	}
@@ -14092,12 +14792,16 @@ sub parse_query
 		my $k = &get_hist_inbound($1, @histogram_query_time);
 		$overall_stat{$curdb}{histogram}{query_time}{$k}++;
 		$overall_stat{$curdb}{histogram}{query_total}++;
-		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)\b/i) {
+		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)/i) {
 			$overall_stat{lc($1)}++;
 			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
-			# We do not store prepare statement
-			if ($2 eq 'prepare') {
-				$overall_stat{$curdb}{'queries_duration'}{'prepare'} += $prefix_vars{'t_duration'} if ($prefix_vars{'t_duration'});
+
+			if ($prefix_vars{'t_query'} =~ /^PREPARE$/i) {
+				$t_action = 'prepare';
+				$overall_stat{$curdb}{'queries_duration'}{$t_action} += $prefix_vars{'t_duration'} if ($prefix_vars{'t_duration'});
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
 				return;
 			}
 		}
@@ -14114,6 +14818,9 @@ sub parse_query
 		{
 			if ($prefix_vars{'t_duration'}) {
 				$overall_stat{$curdb}{'queries_duration'}{$t_action} += $prefix_vars{'t_duration'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
 			}
 			return;
 		}
@@ -14703,35 +15410,35 @@ sub store_queries
 
 		if ($cur_info{$t_pid}{query}) {
 
-			# Add a semi-colon at end of the query
+			# add a semi-colon at end of the query
 			$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 
-			# Normalize query
+			# normalize query
 			my $normalized = &normalize_query($cur_info{$t_pid}{query});
 			my $action = uc($1);
 			if ($normalized =~ $action_regex) {
 				$action = uc($1);
-				# If this is a copy statement try to find if this is a write or read statement
-				if (($action eq 'COPY') && (($normalized =~ /FROM\s+STDIN/i) || ($normalized =~ /FROM\s+'[^']+'/is))) {
-					$action = 'COPY FROM';
-				} elsif ($action eq 'COPY') {
-					$action = 'COPY TO';
-				} elsif ($action eq 'WITH') {
-					$action = 'CTE';
-				} elsif ($action eq 'CREATE' || $action eq 'DROP' || $action eq 'ALTER' || $action eq 'TRUNCATE') {
-					$action = 'DDL';
-				} elsif ($action eq 'BEGIN' || $action eq 'COMMIT' || $action eq 'ROLLBACK' || $action eq 'START' || $action eq 'END' || $action eq 'SAVEPOINT') {
-					$action = 'TCL';
-				} elsif ($action eq 'DECLARE' || $action eq 'CLOSE' || $action eq 'FETCH' || $action eq 'MOVE') {
-					$action = 'CURSOR';
+				# if this is a copy statement try to find if this is a write or read statement
+				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+'[^']+'/is))) {
+					$action = 'copy from';
+				} elsif ($action eq 'copy') {
+					$action = 'copy to';
+				} elsif ($action eq 'with') {
+					$action = 'cte';
+				} elsif ($action eq 'create' || $action eq 'drop' || $action eq 'alter' || $action eq 'truncate') {
+					$action = 'ddl';
+				} elsif ($action eq 'begin' || $action eq 'commit' || $action eq 'rollback' || $action eq 'start' || $action eq 'end' || $action eq 'savepoint') {
+					$action = 'tcl';
+				} elsif ($action eq 'declare' || $action eq 'close' || $action eq 'fetch' || $action eq 'move') {
+					$action = 'cursor';
 				}
 			} else {
-				$action = 'OTHERS';
+				$action = 'others';
 			}
 			$overall_stat{$cur_info{$t_pid}{cur_db}}{$action}++;
-			if ($action eq 'SELECT') {
+			if ($action eq 'select') {
 				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{select}++;
-			} elsif ($action ne 'OTHERS') {
+			} elsif ($action ne 'others') {
 				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{write}++;
 			}
 			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
@@ -14766,16 +15473,16 @@ sub store_queries
 				$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 
-			# Store normalized query count
+			# store normalized query count
 			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{count}++;
 
-			# Store normalized query count and duration per time
+			# store normalized query count and duration per time
 			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
 			if ($cur_info{$t_pid}{duration}) {
 
-				# Update top slowest queries statistics
+				# update top slowest queries statistics
 				&set_top_slowest($cur_info{$t_pid}{cur_db}, 	$cur_info{$t_pid}{query},
 										$cur_info{$t_pid}{duration},
 										$cur_last_log_timestamp,
@@ -14787,11 +15494,11 @@ sub store_queries
 										$cur_info{$t_pid}{plan}
 									);
 
-				# Store normalized query total duration
+				# store normalized query total duration
 				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{duration} += $cur_info{$t_pid}{duration};
 				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $cur_info{$t_pid}{duration};
 
-				# Store min / max duration
+				# store min / max duration
 				if (!exists $normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} || ($normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} > $cur_info{$t_pid}{duration})) {
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} = $cur_info{$t_pid}{duration};
 				}
@@ -14799,22 +15506,22 @@ sub store_queries
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} = $cur_info{$t_pid}{duration};
 				}
 
-				# Stores query/user information
+				# stores query/user information
 				if ($cur_info{$t_pid}{dbuser}) {
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
 				}
 
-				# Stores query/app information
+				# stores query/app information
 				if ($cur_info{$t_pid}{dbappname}) {
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
 					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
 				}
 
-				# Store normalized query count and duration per time
+				# store normalized query count and duration per time
 				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
 
-				# Store normalized query samples
+				# store normalized query samples
 				&set_top_sample($cur_info{$t_pid}{cur_db}, 	$normalized,
 										$cur_info{$t_pid}{query},
 										$cur_info{$t_pid}{duration},
@@ -14827,6 +15534,137 @@ sub store_queries
 										$cur_info{$t_pid}{plan}
 									);
 			}
+		}
+		
+		if (exists $cur_bind_info{$t_pid})
+		{
+
+			if (exists $cur_bind_info{$t_pid}{'prepare'})
+			{
+				my $duration = $cur_bind_info{$t_pid}{'prepare'}{duration} || 0;
+				my $query = $cur_bind_info{$t_pid}{'prepare'}{query} || '';
+				my $timestamp = $cur_bind_info{$t_pid}{'prepare'}{timestamp} || '';
+
+				my $cur_day = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
+				my $cur_hour = "$cur_info{$t_pid}{hour}";
+				if ($timestamp =~ /^(\d{4}-\d{2}-\d{2}) (\d{2}):\d{2}:\d{2}/)
+				{
+					$cur_day = $1;
+					$cur_hour = $2;
+				}
+
+				# add a semi-colon at end of the query
+				$query .= ';' if ($query !~ /;\s*$/s);
+
+				# store normalized query count
+				$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{count}++;
+
+				# store normalized query count and duration per time
+				$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{count}++;
+				$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
+
+				if ($duration)
+				{
+					# store normalized query total duration
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{duration} += $duration;
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $duration;
+
+					# store min / max duration
+					if (!exists $prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{min} || ($prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{min} > $duration)) {
+						$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{min} = $duration;
+					}
+					if (!exists $prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{max} || ($prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{max} < $duration)) {
+						$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{max} = $duration;
+					}
+
+					# store normalized query count and duration per time
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{duration} += $duration;
+				}
+				# stores query/user information
+				if ($cur_info{$t_pid}{dbuser}) {
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+				}
+
+				# stores query/app information
+				if ($cur_info{$t_pid}{dbappname}) {
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
+					$prepare_info{$cur_info{$t_pid}{cur_db}}{$query}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
+				}
+
+				# store prepare query samples
+				&set_top_prepare_bind_sample('prepare', $query, $duration, $timestamp, $cur_bind_info{$t_pid}{'prepare'}{'parameters'},
+									$cur_info{$t_pid}{cur_db},
+									$cur_info{$t_pid}{'dbname'},
+									$cur_info{$t_pid}{'dbuser'},
+									$cur_info{$t_pid}{'dbclient'},
+									$cur_info{$t_pid}{'dbappname'}
+							);
+			}
+
+			if (exists $cur_bind_info{$t_pid}{'bind'})
+			{
+				my $duration = $cur_bind_info{$t_pid}{'bind'}{duration} || 0;
+				my $query = $cur_bind_info{$t_pid}{'bind'}{query} || '';
+				my $timestamp = $cur_bind_info{$t_pid}{'bind'}{timestamp} || '';
+
+				my $cur_day = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
+				my $cur_hour = "$cur_info{$t_pid}{hour}";
+				if ($timestamp =~ /^(\d{4}-\d{2}-\d{2}) (\d{2}):\d{2}:\d{2}/)
+				{
+					$cur_day = $1;
+					$cur_hour = $2;
+				}
+
+				# add a semi-colon at end of the query
+				$query .= ';' if ($query !~ /;\s*$/s);
+
+				# store normalized query count
+				$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{count}++;
+
+				# store normalized query count and duration per time
+				$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{count}++;
+				$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
+
+				if ($duration)
+				{
+					# store normalized query total duration
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{duration} += $duration;
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $duration;
+
+					# store min / max duration
+					if (!exists $bind_info{$cur_info{$t_pid}{cur_db}}{$query}{min} || ($bind_info{$cur_info{$t_pid}{cur_db}}{$query}{min} > $duration)) {
+						$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{min} = $duration;
+					}
+					if (!exists $bind_info{$cur_info{$t_pid}{cur_db}}{$query}{max} || ($bind_info{$cur_info{$t_pid}{cur_db}}{$query}{max} < $duration)) {
+						$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{max} = $duration;
+					}
+
+					# store normalized query count and duration per time
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{chronos}{"$cur_day"}{"$cur_hour_str"}{duration} += $duration;
+				}
+				# stores query/user information
+				if ($cur_info{$t_pid}{dbuser}) {
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+				}
+
+				# stores query/app information
+				if ($cur_info{$t_pid}{dbappname}) {
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
+					$bind_info{$cur_info{$t_pid}{cur_db}}{$query}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
+				}
+
+				# store bind query samples
+				&set_top_prepare_bind_sample('bind', $query, $duration, $timestamp, $cur_bind_info{$t_pid}{'bind'}{'parameters'},
+									$cur_info{$t_pid}{cur_db},
+									$cur_info{$t_pid}{'dbname'},
+									$cur_info{$t_pid}{'dbuser'},
+									$cur_info{$t_pid}{'dbclient'},
+									$cur_info{$t_pid}{'dbappname'}
+							);
+			}
+			delete $cur_bind_info{$t_pid};
 		}
 	}
 

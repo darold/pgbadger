@@ -327,6 +327,7 @@ FEATURE
             Applications involved in top queries.
             Queries generating the most cancellation.
             Queries most cancelled.
+            The most time consuming prepare/bind queries
 
     The following reports are also available with hourly charts divided into
     periods of five minutes:
