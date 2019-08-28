@@ -274,8 +274,9 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
 .sql .nu0 {color: #cc66cc;}
 .sql span.xtra { display:block; }
 .sql-smallsize  {width: 450px; }
-.sql-mediumsize  {width: 600px; }
-.sql-largesize  {width: 100%; }
+.sql-mediumsize  {width: 600px;max-height:200px;overflow:auto;}
+.sql-largesize  {width: 950px;max-height:200px;overflow:auto;}
+.pre-smallfont {font-size:10px;}
 
 .jqplot-target {
     position: relative;
