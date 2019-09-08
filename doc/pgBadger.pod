@@ -430,8 +430,8 @@ well as under Windows platform.
 
 Download the tarball from GitHub and unpack the archive as follow:
 
-	tar xzf pgbadger-7.x.tar.gz
-	cd pgbadger-7.x/
+	tar xzf pgbadger-11.x.tar.gz
+	cd pgbadger-11.x/
 	perl Makefile.PL
 	make && sudo make install
 
