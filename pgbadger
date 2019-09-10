@@ -1503,7 +1503,7 @@ foreach my $logfile ( @given_log_files )
 		$fmt = &autodetect_format($logfile, $file_size{$logfile});
 		$fmt ||= $format;
 		# Remove log format from filename if any
-		$logfile =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
+		$logfile =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
 		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 	}
 	else
@@ -1849,8 +1849,8 @@ Options:
 			     per database. Global information not related to a
 			     database are added to the postgres database report.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-			     cvs, pgbouncer and logplex. Use this option when
-			     pgBadger is not able to auto-detect the log format.
+			     cvs, pgbouncer, logplex and rds. Use this option
+			     when pgBadger is not able to detect the log format.
     -G | --nograph	   : disable graphs on HTML output. Enabled by default.
     -h | --help	           : show this message and exit.
     -H | --html-dir path   : path to directory where HTML report must be written
@@ -2089,6 +2089,11 @@ pgBadger also support Heroku PostgreSQL logs using logplex format:
 
 this will stream Heroku PostgreSQL log to pgbadger through stdin.
 
+pgBadger can auto detect RDS and cloudwatch PostgreSQL logs using
+rds format:
+
+    pgbadger -f rds -o rds_out.html rds.log
+
 };
 # Note that usage must be terminated by an extra newline
 # to not break POD documentation at make time.
@@ -2166,7 +2171,7 @@ sub set_file_list
 	my $file_orig = $file;
 	my $fmt = '';
 	# Remove log format from log file if any
-	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*)$//i)
+	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*)$//i)
 	{
 		$fmt = $1;
 	}
@@ -2344,6 +2349,18 @@ sub set_parser_regex
 		       push(@prefix_params, 't_loglevel', 't_query');
 		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.\d+\]:\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s+(.*)/;
 		}
+		elsif ($fmt =~ /^rds$/)
+		{
+		       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
+		       # With Cloudwatch it is prefixed with an other timestamp
+
+		       $llp =
+				 '^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^\(:]+\(\d+\):([^\@]+)\@([^:]+):\[(\d+)\]:'
+			       . $llp
+			       . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
+		       $compiled_prefix = qr/$llp/;
+		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid');
+		}
 		elsif ($fmt eq 'stderr' || $fmt eq 'default')
 		{
 			$fmt = 'stderr';
@@ -2382,6 +2399,15 @@ sub set_parser_regex
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
 	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[(postgres)\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
+       }
+	elsif ($fmt eq 'rds')
+	{
+	       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
+	       # With Cloudwatch it is prefixed with an other timestamp
+
+	       $compiled_prefix =
+			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^\(:]+)\(\d+\):([^\@]+)\@([^:]+):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
 	}
 
 	elsif ($fmt eq 'stderr')
@@ -3506,8 +3532,9 @@ sub process_file
 					&logmsg('DEBUG', "Unknown $fmt line format: $line");
 				}
 
-			} elsif ($fmt eq 'stderr') {
-
+			}
+			elsif ($fmt eq 'stderr' or $fmt eq 'rds')
+			{
 				@matches = ($line =~ $compiled_prefix);
 
 				my $q_match = 0;
@@ -3517,7 +3544,6 @@ sub process_file
 				}
 
 				if ($#matches >= 0) {
-
 					if (!$q_match) {
 						for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 							$prefix_vars{$prefix_params[$i]} = $matches[$i];
@@ -3547,8 +3573,12 @@ sub process_file
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
 						 $prefix_vars{'t_timestamp'} .= $ms;
 					}
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
-						$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+
+					if ($prefix_vars{'t_timestamp'})
+					{
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+							$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+					}
 					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
@@ -4030,7 +4060,18 @@ sub check_file_changed
 					"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
 			}
 
-		} elsif ($fmt eq 'stderr') {
+		}
+		elsif ($fmt =~ /pgbouncer/)
+		{
+
+			my @matches = ($line =~ $pgbouncer_log_parse1);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
+				}
+			}
+
+		} else {
 
 			my @matches = ($line =~ $compiled_prefix);
 			if ($#matches >= 0) {
@@ -4049,14 +4090,6 @@ sub check_file_changed
 				}
 			}
 
-		} elsif ($fmt =~ /pgbouncer/) {
-
-			my @matches = ($line =~ $pgbouncer_log_parse1);
-			if ($#matches >= 0) {
-				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
-					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
-				}
-			}
 		}
 
 		# Unwanted line
@@ -15968,7 +16001,7 @@ sub autodetect_format
 				$nfound++ if ($f);
 				$fmt = $f;
 				$ident_name{$i}++ if ($i);
-				last if (($nfound >= 10) || ($nline > 5000));
+				last if (($nfound > 10) || ($nline > 5000));
 			}
 			$tfile->close();
 		}
@@ -16074,6 +16107,12 @@ sub search_log_format
 	{
 	       $fmt = 'logplex';
 	       $ident_name = 'postgres';
+
+	} elsif ($line =~
+	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+\s*[^:]*:[^\(:]+\(\d+\):[^\@]+\@[^:]+:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+	  )
+	{
+	       $fmt = 'rds';
 
 	# Are csv lines ?
 	} elsif (
@@ -16387,7 +16426,7 @@ sub get_file_size
 	my $logf = shift;
 
 	# Remove log format from log file if any
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
@@ -16523,7 +16562,7 @@ sub get_log_file
 
 	return $lfile if ($totalsize == 0);
 
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
