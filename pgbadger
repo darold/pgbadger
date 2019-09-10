@@ -1382,7 +1382,9 @@ if ($incremental && !$remote_host)
 		else
 		{
 			# Auto detect log format for proper parsing
-			my $fmt = autodetect_format($f, $file_size{$f});
+			my $fmt = $format || 'stderr';
+			$fmt = autodetect_format($f, $file_size{$f});
+			$fmt ||= $format;
 
 			# Set regex to parse the log file
 			$fmt = set_parser_regex($fmt);
@@ -15966,7 +15968,7 @@ sub autodetect_format
 				$nfound++ if ($f);
 				$fmt = $f;
 				$ident_name{$i}++ if ($i);
-				last if (($nfound > 10) || ($nline > 5000));
+				last if (($nfound >= 10) || ($nline > 5000));
 			}
 			$tfile->close();
 		}
@@ -16011,8 +16013,9 @@ sub autodetect_format
 			}
 		}
 	}
-	else
+	elsif (!$fmt)
 	{
+		# Force format if forced as parameter with -f
 		$fmt = $format;
 	}
 
