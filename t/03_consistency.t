@@ -33,7 +33,6 @@ ok( $json_ref->{pgb_session_info}{chronos}{20180912}{16}{count} == 63943, "pgBou
 
 $ret = `perl pgbadger -q -o $OUT $HLOG`;
 ok( $? == 0, "Generate json report for heroku log file");
-
 $json_ref = $json->decode(`cat $OUT`);
 ok( $json_ref->{database_info}{postgres}{GREEN}{"CTE|duration"} eq "21761.546", "Consistent CTE duration");
 

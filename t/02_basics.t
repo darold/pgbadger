@@ -37,9 +37,9 @@ $ret = `cat $JSON | perl -pe 's/.*"SELECT":(\\d+),.*/\$1/'`;
 ok( $? == 0 && $ret > 0, "Light log from STDIN");
 
 $ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > t/ret.json`;
-$ret = `stat --printf='%s' t/ret.json $TEXT $JSON`;
+my $ret2 = `stat --printf='%s' t/ret.json $TEXT $JSON`;
 chomp($ret);
-ok( $? == 0 && $ret eq '13474715985134747', "Multiple output format");
+ok( $? == 0 && $ret2 eq '13276116001132761', "Multiple output format '$ret2' = '13276116001132761'");
 
 $ret = `perl pgbadger -q -o - $SYSLOG`;
 ok( $? == 0 && (length($ret) >= 24060), "syslog report to stdout");
