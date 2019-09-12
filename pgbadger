@@ -15466,6 +15466,7 @@ sub store_queries
 			my $action = uc($1);
 			if ($normalized =~ $action_regex) {
 				$action = uc($1);
+				$action = 'CTE' if ($action eq 'WITH');
 				# if this is a copy statement try to find if this is a write or read statement
 				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+'[^']+'/is))) {
 					$action = 'copy from';
