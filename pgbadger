@@ -403,15 +403,15 @@ sub wait_child
 	$interrupt = 2;
 
 	print STDERR "Received terminating signal ($sig).\n";
-	if ($^O !~ /MSWin32|dos/i)
-	{
+	#	if ($^O !~ /MSWin32|dos/i)
+	#{
 		1 while wait != -1;
 		$SIG{INT} = \&wait_child;
 		$SIG{TERM} = \&wait_child;
-		foreach my $f (@tempfiles)
-		{
-			unlink("$f->[1]") if (-e "$f->[1]");
-		}
+		#}
+	foreach my $f (@tempfiles)
+	{
+		unlink("$f->[1]") if (-e "$f->[1]");
 	}
 	if ($report_per_database)
 	{
@@ -433,7 +433,9 @@ sub wait_child
 }
 $SIG{INT} = \&wait_child;
 $SIG{TERM} = \&wait_child;
-$SIG{USR2} = \&stop_parsing;
+if ($^O !~ /MSWin32|dos/i) {
+	$SIG{USR2} = \&stop_parsing;
+}
 
 $| = 1;
 
@@ -1539,7 +1541,7 @@ foreach my $logfile ( @given_log_files )
 			}
 			localdie("FATAL: Abort signal received when processing to next chunk\n") if ($interrupt == 2);
 			last if ($interrupt);
-			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
+			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, O_TEMPORARY => 1, UNLINK => 1 ) ]);
 			spawn sub
 			{
 				&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], $chunks[$i], $chunks[$i+1], $i);
@@ -1552,11 +1554,18 @@ foreach my $logfile ( @given_log_files )
 	{
 		# Start parsing one file per parallel process
 		push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
-		spawn sub
+		if ($^O !~ /MSWin32|dos/i)
+		{
+			spawn sub
+			{
+				&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
+			};
+			$child_count++;
+		}
+		else
 		{
 			&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
-		};
-		$child_count++;
+		}
 	}
 
 	localdie("FATAL: Abort signal received when processing next file\n") if ($interrupt == 2);
@@ -3665,7 +3674,11 @@ sub process_file
 
 	# Inform the parent that it should stop parsing other files
 	if ($terminate) {
-		kill('USR2', $parent_pid);
+		if ($^O !~ /MSWin32|dos/i) {
+			kill('USR2', $parent_pid);
+		} else {
+			kill('TERM', $parent_pid);
+		}
 		return $terminate;
 	}
 
