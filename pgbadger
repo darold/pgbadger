@@ -403,12 +403,9 @@ sub wait_child
 	$interrupt = 2;
 
 	print STDERR "Received terminating signal ($sig).\n";
-	#	if ($^O !~ /MSWin32|dos/i)
-	#{
-		1 while wait != -1;
-		$SIG{INT} = \&wait_child;
-		$SIG{TERM} = \&wait_child;
-		#}
+	1 while wait != -1;
+	$SIG{INT} = \&wait_child;
+	$SIG{TERM} = \&wait_child;
 	foreach my $f (@tempfiles)
 	{
 		unlink("$f->[1]") if (-e "$f->[1]");
