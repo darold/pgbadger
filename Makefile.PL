@@ -37,12 +37,16 @@ if ($ExtUtils::MakeMaker::VERSION >= 6.46) {
 
 sub MY::postamble {
     return <<'EOMAKE';
+USE_MARKDOWN=$(shell which pod2markdown)
+
 README: doc/pgBadger.pod
 	pod2text $^ > $@
+ifneq ("$(USE_MARKDOWN)", "")
 	cat doc/pgBadger.pod | grep "=head1 " | sed 's/^=head1 \(.*\)/- [\1](#\1)/' | sed 's/ /-/g' | sed 's/--/- /' > $@.md
 	sed -i '1s/^/### TABLE OF CONTENTS\n\n/' $@.md
 	echo >> $@.md
 	pod2markdown $^ | sed 's/^# /### /' >> $@.md
+endif
 
 .INTERMEDIATE: doc/synopsis.pod
 doc/synopsis.pod: Makefile pgbadger
