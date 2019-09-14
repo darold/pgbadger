@@ -524,7 +524,10 @@ POSTGRESQL CONFIGURATION
 
     but this is not only recommended by pgBadger.
 
-log_min_duration_statement, log_duration and log_statement
+LOG STATEMENTS
+    Considerations about log_min_duration_statement, log_duration and
+    log_statement configuration directives.
+
     If you want the query statistics to include the actual query strings,
     you must set log_min_duration_statement to 0 or more milliseconds.
 
@@ -538,11 +541,11 @@ log_min_duration_statement, log_duration and log_statement
     Enabling log_min_duration_statement will add reports about slowest
     queries and queries that took up the most time. Take care that if you
     have log_statement set to 'all' nothing will be logged with
-    log_line_prefix.
+    log_min_duration_statement.
 
     Warning: Do not enable both log_min_duration_statement, log_duration and
-    log_statement, this will result in wrong counter values. Note that this
-    will also increase drastically the size of your log.
+    log_statement all together, this will result in wrong counter values.
+    Note that this will also increase drastically the size of your log.
     log_min_duration_statement should always be preferred.
 
 PARALLEL PROCESSING
