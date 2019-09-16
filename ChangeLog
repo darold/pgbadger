@@ -1,3 +1,54 @@
+2019-09-16 - v11.1
+
+This release of pgBadger fix several issues reported by users since
+three months. It also adds some new features and reports:
+
+  - Add report of top N queries that consume the most time in the
+    prepare or parse stage.
+  - Add report of top N queries that consume the most time in the
+    bind stage.
+  - Add report of timing for prepare/bind/execute queries parts.
+    Reported in a new "Duration" tab in Global Stats report. Example:
+        Total query duration: 6m16s
+        Prepare/parse total duration: 45s564ms
+        Bind total duration: 4m46s
+        Execute total duration: 44s71m
+    This also fix previous report of "Total query duration" that was
+    only reporting execute total duration.
+  - Add support to RDS and CloudWatch log format, they are detected
+    automatically. You can use -f rds if pgbadger is not able to
+    auto-detect the log format.
+  - Add new configuration option --month-report to be able to build
+    monthly incremental reports.
+  - Restore support to Windows operating system.
+
+There's also some bugs fixes and features enhancements.
+
+  - Add auto-generated Markdown documentation in README.md using tool
+    pod2markdown. If the command is not present the file will just not
+    be generated. Thanks to Derek Yang for the patch.
+  - Translate action WITH into CTE, regression introduced in last release.
+  - Fix support of Windows Operating System
+  - Add support to RDS and CloudWatch log format, use -f rds if pgbadger is
+    not able to auto-detect this log format. Thanks to peruuparkar for the
+    feature request.
+  - Fix option -f | --format that was not applied on all files get from the
+    parameter list where log format auto-detection was failing, the format was
+    taken from the fist file parsed. Thanks to Levente Birta for the report.
+  - Update source documentation file to replace reference to pgBadger v7.x
+    with v11. Thanks to Will Buckner for the patch.
+  - Limit height display size of top queries to avoid taking the whole page
+    with huge queries. Thanks to ilias ilisepe1 for the patch.
+  - Fix overflow of queries and detail in Slowest individual queries.
+  - Fix SSH URIs for files, directories and wildcards. Thanks to tbussmann for
+    the patch.
+  - Fix URI samples in documentation. Thanks to tbussmann for the patch.
+  - Hide message of use of default out file when --rebuild is used.
+  - Add extra newline to usage() output to not bread POD documentation at
+    make time.
+  - Reapply --exclude-client option description in documentation. Thanks to
+    Christoph Berg for the report.
+
 2019-06-25 - v11.0
 
 This release of pgBadger adds some major new features and fixes some
