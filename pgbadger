@@ -346,6 +346,7 @@ my $is_tsung_output         = 0;
 my $report_per_database     = 0;
 my $html_outdir             = '';
 my $param_size_limit        = 24;
+my $month_report            = 0;
 
 my $NUMPROGRESS = 10000;
 my @DIMENSIONS  = (800, 300);
@@ -525,11 +526,17 @@ my $result = GetOptions(
 	'normalized-only!'	   => \$dump_normalized_only,
 	'log-timezone=i'	   => \$log_timezone,
 	'prettify-json!'	   => \$json_prettify,
+	'month-report=s'	   => \$month_report,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
+# Force rebuild mode when a month report is asked
+$rebuild =  1 if ($month_report);
+
+# Set report title
 $report_title = &escape_html($report_title) if $report_title;
 
+# Show version and exit if asked
 if ($ver) {
 	print "pgBadger version $VERSION\n";
 	exit 0;
@@ -697,7 +704,7 @@ my @pgb_prefix_parse3 = ();
 
 # Force incremental mode when rebuild mode is used
 if ($rebuild && !$incremental) {
-	print STDERR "WARNING: --rebuild require incremental mode, activating it.\n";
+	print STDERR "WARNING: --rebuild require incremental mode, activating it.\n" if (!$month_report);
 	$incremental = 1;
 }
 
@@ -1074,7 +1081,7 @@ if ($incremental)
 	# Set default output format
 	$extens = 'binary';
 
-	if ($rebuild)
+	if ($rebuild && !$month_report)
 	{
 		# Look for directory where report must be generated again
 		my @build_directories = ();
@@ -1120,6 +1127,51 @@ if ($incremental)
 		my $t2 = Benchmark->new;
 		my $td = timediff($t2, $t0);
 		&logmsg('DEBUG', "rebuilding reports took: " . timestr($td));
+
+		# Remove pidfile
+		unlink("$PID_FILE");
+
+		exit 0;
+	}
+	elsif ($month_report)
+	{
+		# Look for directory where cumulative report must be generated
+		my @build_directories = ();
+
+		# Get year+month as a path
+		$month_report =~ s#/#-#g;
+		my $month_path = $month_report;
+		$month_path =~ s#-#/#g;
+		if ($month_path !~ m#^\d{4}/\d{2}$#)
+		{
+			localdie("Error: invalid format YYYY-MM for --month-report option: $month_report");
+		}
+
+		&logmsg('DEBUG', "building month report into $outdir/$month_path");
+
+		# Find days directories that shoud be used to build the monthly report
+		unless(opendir(DIR, "$outdir/$month_path"))
+		{
+			localdie("Error: can't opendir $outdir/$month_path: $!");
+		}
+		my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+		closedir DIR;
+		foreach my $d (sort { $a <=> $b } @ddays)
+		{
+			unless(opendir(DIR, "$outdir/$month_path/$d"))
+			{
+				localdie("Error: can't opendir $outdir/$month_path/$d: $!");
+			}
+			my @binfiles = grep { $_ =~ /\.bin$/ } readdir(DIR);
+			closedir DIR;
+			push(@build_directories, "$month_report-$d") if ($#binfiles >= 0);
+		}
+
+		&build_month_reports($month_path, @build_directories);
+
+		my $t2 = Benchmark->new;
+		my $td = timediff($t2, $t0);
+		&logmsg('DEBUG', "building month report took: " . timestr($td));
 
 		# Remove pidfile
 		unlink("$PID_FILE");
@@ -1990,7 +2042,9 @@ Options:
 			     log file before beeing parsed. Using this option
 			     make more difficult log search with a date/time.
     --prettify-json	   : use it if you want json output to be prettified.
-
+    --month-report YYYY-MM : create a cumulative HTML report over the specified
+                             month. Requires incremental output directories and
+                             the presence of all necessary binary data files
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2099,6 +2153,13 @@ pgBadger can auto detect RDS and cloudwatch PostgreSQL logs using
 rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
+
+To create a cumulative report over a month use command:
+
+    pgbadger --month-report 2919-05 /path/to/incremantal/reports/
+
+this will add a link to the month name into the calendar view in
+incremental reports to look at report for month 2019 May.
 
 };
 # Note that usage must be terminated by an extra newline
@@ -2501,7 +2562,6 @@ sub build_incremental_reports
 			if (not defined $fh) {
 				localdie("FATAL: can't write to $tmp_dir/$bpath/$current_out_file, $!\n");
 			}
-			# Create instance to prettify SQL query
 			&dump_as_html('../../..', $db);
 			$fh->close;
 		}
@@ -2536,6 +2596,9 @@ sub build_incremental_reports
 					$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
 					&load_stats($fht);
 					$fht->close();
+					foreach my $db (sort keys %{$overall_stat{nlines}}) {
+						$DBLIST{$db} = 1;
+					}
 				}
 			}
 		}
@@ -2547,18 +2610,87 @@ sub build_incremental_reports
 			$tmp_dir = $dest_dir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML weekly report into $tmp_dir/$wdir/...");
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
-			mkdir("$tmp_dir/$wdir") if (!-d "$tmp_dir/$wdir");
+			my $path = $tmp_dir;
+			foreach my $d (split('/', $wdir)) {
+				mkdir("$path/$d") if (!-d "$path/$d");
+				$path .= "/$d";
+			}
 
 			$fh = new IO::File ">$tmp_dir/$wdir/$current_out_file";
 			if (not defined $fh) {
 				localdie("FATAL: can't write to $tmp_dir/$wdir/$current_out_file, $!\n");
 			}
-			# Create instance to prettify SQL query
 			&dump_as_html('../..', $db);
 			$fh->close;
 		}
 	}
 
+	# Generate global index to access incremental reports
+	&build_global_index();
+}
+
+sub build_month_reports
+{
+	my ($mont_path, @build_directories) = @_;
+
+	# First clear previous stored statistics
+	&init_stats_vars();
+
+	foreach my $bpath (sort @build_directories) {
+
+		$incr_date = $bpath;
+		$last_incr_date = $bpath;
+
+		# Set the path to binary files
+		$bpath =~ s/\-/\//g;
+
+		# Get the week number following the date
+		$incr_date =~ /^(\d+)-(\d+)\-(\d+)$/;
+
+		&logmsg('DEBUG', "reading month statistics from $outdir/$bpath");
+
+		# Load all data gathered by all the different processes
+		unless(opendir(DIR, "$outdir/$bpath")) {
+			localdie("Error: can't opendir $outdir/$bpath: $!");
+		}
+		my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
+		closedir DIR;
+		foreach my $f (@mfiles) {
+			my $fht = new IO::File;
+			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
+			&load_stats($fht);
+			$fht->close();
+			foreach my $db (sort keys %{$overall_stat{nlines}}) {
+				$DBLIST{$db} = 1;
+			}
+		}
+	}
+
+	my $dest_dir = $html_outdir || $outdir;
+	foreach my $db (sort keys %DBLIST)
+	{
+		my $tmp_dir = "$dest_dir/$db";
+		$tmp_dir = $dest_dir if (!$report_per_database);
+		&logmsg('LOG', "Ok, generating HTML monthly report into $tmp_dir/$mont_path/index.html");
+		mkdir("$tmp_dir") if (!-d "$tmp_dir");
+		my $path = $tmp_dir;
+		foreach my $d (split('/', $mont_path)) {
+			mkdir("$path/$d") if (!-d "$path/$d");
+			$path .= "/$d";
+		}
+		$fh = new IO::File ">$tmp_dir/$mont_path/index.html";
+		if (not defined $fh) {
+			localdie("FATAL: can't write to $tmp_dir/$mont_path/index.html, $!\n");
+		}
+		&dump_as_html('../..', $db);
+		$fh->close;
+	}
+	# Generate global index to access incremental reports
+	&build_global_index();
+}
+
+sub build_global_index
+{
 	&logmsg('LOG', "Ok, generating global index to access incremental reports...");
 
 	my $dest_dir = $html_outdir || $outdir;
@@ -2679,6 +2811,7 @@ sub build_incremental_reports
 		$fh->close;
 	}
 }
+
 
 sub cleanup_directory
 {
@@ -13915,7 +14048,7 @@ sub dump_as_binary
 		'top_locked_info' => \%top_locked_info,
 		'prepare_info' => \%prepare_info,
 		'bind_info' => \%bind_info,
-	}, $lfh) || localdie ("Couldn't save binary data to «$current_out_file»!\n");
+	}, $lfh) || localdie ("Couldn't save binary data to \"$current_out_file\"!\n");
 }
 
 sub dump_error_as_json
@@ -16937,10 +17070,14 @@ sub get_calendar
 		'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
 		'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 	);
+	my $month_title = $month_name{$month};
+	if (-f "$tmp_dir/$year/$month/index.html") {
+		$month_title = "<a href=\"$year/$month/index.html\" target=\"new\">$month_name{$month}</a>";
+	}
 	return qq{
 	      <div class="panel panel-default">
 		<div class="panel-heading">
-		<i class="fa fa-cogs fa-2x pull-left fa-border"></i>&nbsp;<h2>$month_name{$month}</h2>
+		<i class="fa fa-cogs fa-2x pull-left fa-border"></i>&nbsp;<h2>$month_title</h2>
 		</div>
 		<div class="panel-body">
 		$str

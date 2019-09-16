@@ -185,6 +185,9 @@ Options:
                              log file before beeing parsed. Using this option
                              make more difficult log search with a date/time.
     --prettify-json        : use it if you want json output to be prettified.
+    --month-report YYYY-MM : create a cumulative HTML report over the specified
+                             month. Requires incremental output directories and
+                             the presence of all necessary binary data files
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -293,6 +296,13 @@ pgBadger can auto detect RDS and cloudwatch PostgreSQL logs using
 rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
+
+To create a cumulative report over a month use command:
+
+    pgbadger --month-report 2919-05 /path/to/incremantal/reports/
+
+this will add a link to the month name into the calendar view in
+incremental reports to look at report for month 2019 May.
 
 ### DESCRIPTION
 
@@ -630,6 +640,17 @@ To save disk space you may want to use the -X or --extra-files command line
 option to force pgBadger to write JavaScript and CSS to separate files in
 the output directory. The resources will then be loaded using script and
 link tags.
+
+By default pgBadger in incremental mode only compute daily and weekly reports.
+If you want monthly cumulative reports you will have to use a separate command
+to specify the report to build. For example to build a report for August 2019:
+
+    pgbadger -X --month-report 2919-08 /var/www/pg_reports/
+
+this will add a link to the month name into the calendar view of incremental
+reports to look at monthly report. The report for a current month can be run
+every day it is entirely rebuilt each time. The monthly report is not built by
+default because it could take lot of time following the amount of data.
 
 ### BINARY FORMAT
 
