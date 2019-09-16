@@ -284,7 +284,8 @@ To rebuild all incremental html reports after, proceed as follow:
     rm /path/to/reports/*.css
     pgbadger -X -I -O /path/to/reports/ --rebuild
 
-it will also update all resource files (JS and CSS).
+it will also update all resource files (JS and CSS). Use -E or --explode
+if the reports were built using this option.
 
 pgBadger also support Heroku PostgreSQL logs using logplex format:
 
@@ -303,6 +304,7 @@ To create a cumulative report over a month use command:
 
 this will add a link to the month name into the calendar view in
 incremental reports to look at report for month 2019 May.
+Use -E or --explode if the reports were built using this option.
 
 ### DESCRIPTION
 
@@ -641,6 +643,21 @@ option to force pgBadger to write JavaScript and CSS to separate files in
 the output directory. The resources will then be loaded using script and
 link tags.
 
+#### Rebuilding reports
+
+Incremental reports can be rebuilt after a pgbadger report fix or a new
+feature to update all HTML reports. To rebuild all reports where a binary
+file is still present proceed as follow:
+
+    rm /path/to/reports/*.js
+    rm /path/to/reports/*.css
+    pgbadger -X -I -O /path/to/reports/ --rebuild
+
+it will also update all resource files (JS and CSS). Use -E or --explode
+if the reports were built using this option.
+
+#### Monthly reports
+
 By default pgBadger in incremental mode only compute daily and weekly reports.
 If you want monthly cumulative reports you will have to use a separate command
 to specify the report to build. For example to build a report for August 2019:
@@ -651,6 +668,13 @@ this will add a link to the month name into the calendar view of incremental
 reports to look at monthly report. The report for a current month can be run
 every day it is entirely rebuilt each time. The monthly report is not built by
 default because it could take lot of time following the amount of data.
+
+If reports were built with the per database option ( -E | --explode ) it must
+be used too when calling pgbadger to build monthly report:
+
+    pgbadger -E -X --month-report 2919-08 /var/www/pg_reports/
+
+This is the same when using the rebuild option ( -R | --rebuild ).
 
 ### BINARY FORMAT
 

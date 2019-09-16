@@ -2141,7 +2141,8 @@ To rebuild all incremental html reports after, proceed as follow:
     rm /path/to/reports/*.css
     pgbadger -X -I -O /path/to/reports/ --rebuild
 
-it will also update all resource files (JS and CSS).
+it will also update all resource files (JS and CSS). Use -E or --explode
+if the reports were built using this option.
 
 pgBadger also support Heroku PostgreSQL logs using logplex format:
 
@@ -2160,6 +2161,7 @@ To create a cumulative report over a month use command:
 
 this will add a link to the month name into the calendar view in
 incremental reports to look at report for month 2019 May.
+Use -E or --explode if the reports were built using this option.
 
 };
 # Note that usage must be terminated by an extra newline
