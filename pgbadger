@@ -2424,7 +2424,7 @@ sub set_parser_regex
 		       # With Cloudwatch it is prefixed with an other timestamp
 
 		       $llp =
-				 '^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^\(:]+\(\d+\):([^\@]+)\@([^:]+):\[(\d+)\]:'
+				 '^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:'
 			       . $llp
 			       . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
@@ -2475,7 +2475,7 @@ sub set_parser_regex
 	       # With Cloudwatch it is prefixed with an other timestamp
 
 	       $compiled_prefix =
-			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^\(:]+)\(\d+\):([^\@]+)\@([^:]+):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
 	}
 
@@ -3694,6 +3694,7 @@ sub process_file
 							$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
 						}
 					}
+					$prefix_vars{'t_client'} =~ s/\(.*// if ($fmt eq 'rds');
 					$prefix_vars{'t_pid'} = $prefix_vars{'t_session_id'} if ($use_sessionid_as_pid);
 
 					# Skip location information
@@ -16255,7 +16256,7 @@ sub search_log_format
 	       $ident_name = 'postgres';
 
 	} elsif ($line =~
-	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+\s*[^:]*:[^\(:]+\(\d+\):[^\@]+\@[^:]+:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+\s*[^:]*:[^:]*:[^\@]*\@[^:]*:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
 	       $fmt = 'rds';
