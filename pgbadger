@@ -4458,7 +4458,8 @@ sub generate_anonymized_string
 	return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
 	return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
 	# Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
-	return $original if $original =~ m{\A(?:FM|FX|TM)?(?:HH|HH12|HH24|MI|SS|MS|US|SSSS|AM|A\.M\.|PM|P\.M\.|am|a\.m\.|pm|p\.m\.|Y,YYY|YYYY|YYY|YY|Y|IYYY|IYY|IY|I|BC|B\.C\.|AD|A\.D\.|bc|b\.c\.|ad|a\.d\.|MONTH|Month|month|MON|Mon|mon|MM|DAY|Day|day|DY|Dy|dy|DDD|DD|D|W|WW|IW|CC|J|Q|RM|rm|TZ|tz|[\s\/\-:])+(?:TH|th|SP)?$};
+	return $original if $original =~ m{\A(?:FM|FX|TM)?(?:HH|HH12|HH24|MI|SS|MS|US|SSSS|AM|A\.M\.|PM|P\.M\.|am|a\.m\.|pm|p\.m\.|Y,YYY|YYYY|YYY|YY|IYYY|IYY|IY|BC|B\.C\.|AD|A\.D\.|bc|b\.c\.|ad|a\.d\.|MONTH|Month|month|MON|Mon|mon|MM|DAY|Day|day|DY|Dy|dy|DDD|DD|WW|IW|CC|RM|rm|TZ|tz|[\s\/\-:])+(?:TH|th|SP)?$};
+	return $original if ($original =~ m{^[IDYWJQ]$} && $before =~ /to_(char|date|number|timestamp)/i);
 	# Prevent interval from being anonymized
 	return $original if $before =~ /interval/i;
 
