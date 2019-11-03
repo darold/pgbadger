@@ -15602,26 +15602,26 @@ sub store_queries
 				$action = uc($1);
 				$action = 'CTE' if ($action eq 'WITH');
 				# if this is a copy statement try to find if this is a write or read statement
-				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+'[^']+'/is))) {
-					$action = 'copy from';
-				} elsif ($action eq 'copy') {
-					$action = 'copy to';
-				} elsif ($action eq 'with') {
-					$action = 'cte';
-				} elsif ($action eq 'create' || $action eq 'drop' || $action eq 'alter' || $action eq 'truncate') {
-					$action = 'ddl';
-				} elsif ($action eq 'begin' || $action eq 'commit' || $action eq 'rollback' || $action eq 'start' || $action eq 'end' || $action eq 'savepoint') {
-					$action = 'tcl';
-				} elsif ($action eq 'declare' || $action eq 'close' || $action eq 'fetch' || $action eq 'move') {
-					$action = 'cursor';
+				if (($action eq 'COPY') && ($normalized =~ /^COPY\s+(.*?)\s+TO\s+/i)) {
+					$action = 'COPY TO';
+				} elsif ($action eq 'COPY') {
+					$action = 'COPY FROM';
+				} elsif ($action eq 'WITH') {
+					$action = 'CTE';
+				} elsif ($action eq 'CREATE' || $action eq 'DROP' || $action eq 'ALTER' || $action eq 'TRUNCATE') {
+					$action = 'DDL';
+				} elsif ($action eq 'BEGIN' || $action eq 'COMMIT' || $action eq 'ROLLBACK' || $action eq 'START' || $action eq 'END' || $action eq 'SAVEPOINT') {
+					$action = 'TCL';
+				} elsif ($action eq 'DECLARE' || $action eq 'CLOSE' || $action eq 'FETCH' || $action eq 'MOVE') {
+					$action = 'CURSOR';
 				}
 			} else {
-				$action = 'others';
+				$action = 'OTHERS';
 			}
 			$overall_stat{$cur_info{$t_pid}{cur_db}}{$action}++;
-			if ($action eq 'select') {
+			if ($action eq 'SELECT') {
 				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{select}++;
-			} elsif ($action ne 'others') {
+			} elsif ($action ne 'OTHERS') {
 				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{write}++;
 			}
 			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
