@@ -3720,6 +3720,8 @@ sub process_file
 					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 							$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+					} else {
+						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 					}
 					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 
@@ -3737,7 +3739,6 @@ sub process_file
 						$getout = 2;
 						last;
 					}
-
 					# Jump to the last line parsed if required
 					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
@@ -3882,7 +3883,6 @@ sub process_file
 		}
 		my $bpath = $incr_date;
 		$bpath =~ s/\-/\//g;
-
 		# Mark the directory as needing index update
 		if (open(my $out, '>>', "$last_parsed.tmp")) {
 			flock($out, 2) || return $getout;
@@ -4268,7 +4268,6 @@ sub check_file_changed
 sub check_incremental_position
 {
 	my ($fmt, $cur_date, $line) = @_;
-
 	if ($last_parsed && ($fmt !~ /pgbouncer/)) {
 		if ($saved_last_line{datetime}) {
 			if ($cur_date lt $saved_last_line{datetime}) {
