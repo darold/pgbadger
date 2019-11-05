@@ -4896,7 +4896,7 @@ Report not supported by text format
 	# INSERT/DELETE/UPDATE/SELECT repartition
 	my $totala = 0;
 	foreach my $a (@SQL_ACTION) {
-		$totala += $overall_stat{$curdb}{$a};
+		$totala += $overall_stat{$curdb}{lc($a)};
 	}
 	if (!$disable_type && $totala) {
 
@@ -4904,7 +4904,7 @@ Report not supported by text format
 		print $fh "\n- Queries by type ------------------------------------------------------\n\n";
 		print $fh "Type     Count     Percentage\n";
 		foreach my $a (@SQL_ACTION) {
-			print $fh "$a: ", &comma_numbers($overall_stat{$curdb}{$a}), " ", sprintf("%0.2f", ($overall_stat{$curdb}{$a} * 100) / $total), "%\n";
+			print $fh "$a: ", &comma_numbers($overall_stat{$curdb}{lc($a)}), " ", sprintf("%0.2f", ($overall_stat{$curdb}{lc($a)} * 100) / $total), "%\n";
 		}
 		print $fh "OTHERS: ", &comma_numbers($total - $totala), " ", sprintf("%0.2f", (($total - $totala) * 100) / $total), "%\n"
 			if (($total - $totala) > 0);
@@ -6208,10 +6208,10 @@ sub print_general_activity
 				push(@{$all_query_duration{'query'}}, $per_minute_info{$curdb}{$d}{$h}{$m}{query}{duration}||0);
 
 				foreach my $a (@SQL_ACTION) {
-					$cur_period_info{$curdb}{$a}{count} += ($per_minute_info{$curdb}{$d}{$h}{$m}{$a}{count} || 0);
-					$cur_period_info{$curdb}{$a}{duration} += ($per_minute_info{$curdb}{$d}{$h}{$m}{$a}{duration} || 0);
-					push(@{$all_query_duration{$a}}, $per_minute_info{$curdb}{$d}{$h}{$m}{$a}{duration}||0);
-					$cur_period_info{$curdb}{usual} += ($per_minute_info{$curdb}{$d}{$h}{$m}{$a}{count} || 0);
+					$cur_period_info{$curdb}{lc($a)}{count} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{count} || 0);
+					$cur_period_info{$curdb}{lc($a)}{duration} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration} || 0);
+					push(@{$all_query_duration{lc($a)}}, $per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration}||0);
+					$cur_period_info{$curdb}{usual} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{count} || 0);
 				}
 				$cur_period_info{$curdb}{prepare} += ($per_minute_info{$curdb}{$d}{$h}{$m}{prepare} || 0);
 				$cur_period_info{$curdb}{execute} += ($per_minute_info{$curdb}{$d}{$h}{$m}{execute} || 0);
@@ -6478,7 +6478,7 @@ sub print_sql_traffic
 
 	my $bind_vs_prepared = sprintf("%.2f", $overall_stat{$curdb}{'execute'} / ($overall_stat{$curdb}{'prepare'} || 1));
 	my $total_usual_queries = 0;
-	map { $total_usual_queries += $overall_stat{$curdb}{$_}; } @SQL_ACTION;
+	map { $total_usual_queries += $overall_stat{$curdb}{lc($_)}; } @SQL_ACTION;
 	my $prepared_vs_normal = sprintf("%.2f", ($overall_stat{$curdb}{'execute'} / ($total_usual_queries || 1))*100);
 
 	my $query_peak = 0;
@@ -6775,18 +6775,18 @@ sub compute_query_graphs
 
 						if (!$disable_query) {
 							foreach my $action (@SQL_ACTION) {
-								$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{count} || 0);
-								$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{duration} || 0);
-								if ( ($action ne 'SELECT') && exists $per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{count}) {
-									$a_dataavg{write}{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{count} || 0);
-									$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{duration} || 0);
+								$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{count} || 0);
+								$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{duration} || 0);
+								if ( ($action ne 'SELECT') && exists $per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{count}) {
+									$a_dataavg{write}{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{count} || 0);
+									$a_dataavg{write}{duration}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{duration} || 0);
 								}
 								# Search minimum and maximum during this minute
-								foreach my $s (keys %{$per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{second}}) {
-									$a_dataavg{$action}{max}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{second}{$s}
-										if ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{second}{$s} > $a_dataavg{$action}{max}{"$rd"});
-									$a_dataavg{$action}{min}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{second}{$s}
-										if ($per_minute_info{$curdb}{$tm}{$h}{$m}{$action}{second}{$s} < $a_dataavg{$action}{min}{"$rd"});
+								foreach my $s (keys %{$per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{second}}) {
+									$a_dataavg{$action}{max}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{second}{$s}
+										if ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{second}{$s} > $a_dataavg{$action}{max}{"$rd"});
+									$a_dataavg{$action}{min}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{second}{$s}
+										if ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{second}{$s} < $a_dataavg{$action}{min}{"$rd"});
 								}
 							}
 						}
@@ -9652,19 +9652,19 @@ sub print_query_type
 	my $total_select = 0;
 	my $total_write = 0;
 	foreach my $a (@SQL_ACTION) {
-		$total_queries += $overall_stat{$curdb}{$a};
+		$total_queries += $overall_stat{$curdb}{lc($a)};
 		if ($a eq 'SELECT') {
-			$total_select += $overall_stat{$curdb}{$a};
+			$total_select += $overall_stat{$curdb}{lc($a)};
 		} elsif ($a ne 'OTHERS') {
-			$total_write += $overall_stat{$curdb}{$a};
+			$total_write += $overall_stat{$curdb}{lc($a)};
 		}
 	}
 	my $total = $overall_stat{$curdb}{'queries_number'};
 
 	my $querytype_info = '';
 	foreach my $a (@SQL_ACTION) {
-		$querytype_info .= "<tr><td>$a</td><td>" . &comma_numbers($overall_stat{$curdb}{$a}) .
-			"</td><td>" . sprintf("%0.2f", ($overall_stat{$curdb}{$a} * 100) / ($total||1)) . "%</td></tr>";
+		$querytype_info .= "<tr><td>$a</td><td>" . &comma_numbers($overall_stat{$curdb}{lc($a)}) .
+			"</td><td>" . sprintf("%0.2f", ($overall_stat{$curdb}{lc($a)} * 100) / ($total||1)) . "%</td></tr>";
 	}
 	if (($total - $total_queries) > 0) {
 		$querytype_info .= "<tr><td>OTHERS</td><td>" . &comma_numbers($total - $total_queries) .
@@ -9674,10 +9674,10 @@ sub print_query_type
 
 	if ($graph && $total) {
 		foreach my $t (@SQL_ACTION) {
-			if ((($overall_stat{$curdb}{$t} * 100) / ($total||1)) > $pie_percentage_limit) {
-				$data{$t} = $overall_stat{$curdb}{$t} || 0;
+			if ((($overall_stat{$curdb}{lc($t)} * 100) / ($total||1)) > $pie_percentage_limit) {
+				$data{$t} = $overall_stat{$curdb}{lc($t)} || 0;
 			} else {
-				$data{"Sum query types < $pie_percentage_limit%"} += $overall_stat{$curdb}{$t} || 0;
+				$data{"Sum query types < $pie_percentage_limit%"} += $overall_stat{$curdb}{lc($t)} || 0;
 			}
 		}
 		if (((($total - $total_queries) * 100) / ($total||1)) > $pie_percentage_limit) {
@@ -13180,7 +13180,9 @@ sub load_stats
 		}
 
 		foreach my $a (@SQL_ACTION) {
-			$overall_stat{$curdb}{$a} += $_overall_stat{$curdb}{$a}
+			$overall_stat{$curdb}{lc($a)} += $_overall_stat{$curdb}{lc($a)}
+			if exists $_overall_stat{$curdb}{lc($a)};
+			$overall_stat{$curdb}{lc($a)} += $_overall_stat{$curdb}{$a}
 			if exists $_overall_stat{$curdb}{$a};
 		}
 
@@ -13480,12 +13482,12 @@ sub load_stats
 							($_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{second}{$sec} || 0);
 					}
 					foreach my $action (@SQL_ACTION) {
-						next if (!exists $_per_minute_info{$curdb}{$day}{$hour}{$min}{$action});
-						$per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{count} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{count} || 0);
-						$per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{duration} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{duration} || 0);
-						foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{second} }) {
-							$per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{second}{$sec} +=
-								($_per_minute_info{$curdb}{$day}{$hour}{$min}{$action}{second}{$sec} || 0);
+						next if (!exists $_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)});
+						$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{count} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{count} || 0);
+						$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{duration} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{duration} || 0);
+						foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second} }) {
+							$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second}{$sec} +=
+								($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second}{$sec} || 0);
 						}
 					}
 					foreach my $k ('prepare', 'bind','execute') {
@@ -15598,10 +15600,10 @@ sub store_queries
 			my $normalized = &normalize_query($cur_info{$t_pid}{query});
 			my $action = uc($1);
 			if ($normalized =~ $action_regex) {
-				$action = uc($1);
-				$action = 'CTE' if ($action eq 'WITH');
+				$action = lc($1);
+				$action = 'cte' if ($action eq 'with');
 				# if this is a copy statement try to find if this is a write or read statement
-				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+'[^']+'/is))) {
+				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+\?/is))) {
 					$action = 'copy from';
 				} elsif ($action eq 'copy') {
 					$action = 'copy to';
