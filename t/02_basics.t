@@ -1,4 +1,4 @@
-use Test::Simple tests => 11;
+use Test::Simple tests => 10;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
 my $SYSLOG = 't/fixtures/pg-syslog.1.bz2';
@@ -39,15 +39,10 @@ ok( $? == 0 && $ret > 0, "Light log from STDIN");
 $ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > t/ret.json`;
 my $ret2 = `stat --printf='%s' t/ret.json $TEXT $JSON`;
 chomp($ret);
-ok( $? == 0 && $ret2 eq '13478015985134780', "Multiple output format '$ret2' = '13478015985134780'");
+ok( $? == 0 && $ret2 eq '13276116001132761', "Multiple output format '$ret2' = '13276116001132761'");
 
 $ret = `perl pgbadger -q -o - $SYSLOG`;
 ok( $? == 0 && (length($ret) >= 24060), "syslog report to stdout");
-
-$ret = `perl pgbadger -q -f stderr -o /tmp/report$$.txt t/fixtures/stmt_type.log`;
-$ret = `grep -E "^(SELECT|INSERT|UPDATE|DELETE|COPY|CTE|DDL|TCL|CURSOR)" /tmp/report$$.txt > /tmp/stmt_type.out`;
-$ret = `diff t/exp/stmt_type.out /tmp/stmt_type.out`;
-ok( $? == 0 && ($ret eq ''), "statement type");
 
 `rm -f out.html`;
 # Remove files generated during the tests
@@ -56,6 +51,5 @@ ok( $? == 0 && ($ret eq ''), "statement type");
 `rm -r $TEXT`;
 `rm -f $BIN`;
 `rm -rf t/test_incr/`;
-`rm t/ret.json`;
-`rm /tmp/report$$.txt`;
-`rm /tmp/stmt_type.out`;
+`rm t/ret.json`
+
