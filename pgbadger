@@ -2423,12 +2423,10 @@ sub set_parser_regex
 		       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
 		       # With Cloudwatch it is prefixed with an other timestamp
 
-		       $llp =
-				 '^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:'
-			       . $llp
-			       . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
+		       $llp = '^' . $llp
+			      . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
-		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid');
+		       @prefix_params = ('t_timestamp', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
 		}
 		elsif ($fmt eq 'stderr' || $fmt eq 'default')
 		{
@@ -3720,10 +3718,11 @@ sub process_file
 					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 							$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
-					} else {
-						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 					}
 					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
+					# Skip this line if there is no timestamp
+					next if (!$prefix_vars{'t_timestamp'} || $prefix_vars{'t_timestamp'} eq '-- ::');
 
 					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
@@ -4268,6 +4267,7 @@ sub check_file_changed
 sub check_incremental_position
 {
 	my ($fmt, $cur_date, $line) = @_;
+
 	if ($last_parsed && ($fmt !~ /pgbouncer/)) {
 		if ($saved_last_line{datetime}) {
 			if ($cur_date lt $saved_last_line{datetime}) {
@@ -16538,10 +16538,12 @@ sub build_log_line_prefix_regex
 		push(@$param_list, $regex_map{"$1"}->[0]);
 	}
 	my $q_prefix_param = [];
-	while ($q_prefix =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
-		push(@$q_prefix_param, $regex_map{"$1"}->[0]);
+		if ($q_prefix) {
+		while ($q_prefix =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
+			push(@$q_prefix_param, $regex_map{"$1"}->[0]);
+		}
+		push(@$q_prefix_param, 't_loglevel', 't_query');
 	}
-	push(@$q_prefix_param, 't_loglevel', 't_query');
 
 	# replace %% by a single %
 	$llp =~ s/\%\%/\%/g;
@@ -16554,7 +16556,6 @@ sub build_log_line_prefix_regex
 
 	# Check regex in log line prefix from command line
 	&check_regex($llp, '--prefix');
-
 	return (
 		'llp' => $llp, 'param_list' => $param_list,
 		'q_prefix' => $q_prefix, 'q_param_list' => $q_prefix_param
