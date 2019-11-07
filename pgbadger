@@ -350,7 +350,7 @@ my $month_report            = 0;
 my $noexplain               = 0;
 my $log_command             = '';
 
-my $NUMPROGRESS = 10000;
+my $NUMPROGRESS = 10;
 my @DIMENSIONS  = (800, 300);
 my $RESRC_URL   = '';
 my $img_format  = 'png';
@@ -2986,7 +2986,6 @@ sub multiprocess_progressbar
 	my $cursize  = 0;
 	my $nqueries = 0;
 	my $nerrors  = 0;
-	my $last     = 0;
 	$pipe->reader();
 	while (my $r = <$pipe>) {
 		chomp($r);
@@ -2995,7 +2994,8 @@ sub multiprocess_progressbar
 		$cursize  += $infos[0];
 		$nqueries += $infos[1];
 		$nerrors  += $infos[2];
-		$cursize = $totalsize if ($cursize > $totalsize);
+
+		$cursize = $totalsize if ($totalsize > 0 && $cursize > $totalsize);
 		print STDERR &progress_bar($cursize, $totalsize, 25, '=', $nqueries, $nerrors);
 	}
 	print STDERR "\n";
@@ -3007,20 +3007,22 @@ sub update_progress_bar
 {
 	my ($tmpoutfile, $nlines, $stop_offset, $totalsize, $cursize, $old_queries_count, $old_errors_count) = @_;
 
-	if (!$tmpoutfile || not defined $pipe) {
+	if (!$tmpoutfile || not defined $pipe)
+	{
 		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
-			if ($totalsize) {
-				print STDERR &progress_bar($$cursize, $stop_offset || $totalsize, 25, '=');
-			} else {
-				print STDERR ".";
-			}
+			print STDERR &progress_bar($$cursize, $stop_offset || $totalsize, 25, '=');
+			$NUMPROGRESS *= 10 if ($NUMPROGRESS < 10000);
 		}
-	} else {
-		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
+	}
+	else
+	{
+		if ($progress && ($nlines % $NUMPROGRESS) == 0)
+		{
 			$pipe->print("$$cursize " . ($overall_stat{'queries_number'} - $$old_queries_count) . " " . (($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}) - $$old_errors_count) . "\n");
 			$$old_queries_count = $overall_stat{'queries_number'};
 			$$old_errors_count = $overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'};
 			$$cursize = 0;
+			$NUMPROGRESS *= 10 if ($NUMPROGRESS < 10000);
 		}
 	}
 }
@@ -3097,10 +3099,7 @@ sub process_file
 		{
 			if (!$tmpoutfile || not defined $pipe)
 			{
-				if ($totalsize)
-				{
-					print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
-				}
+				print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
 			}
 			else
 			{
@@ -3888,11 +3887,8 @@ sub process_file
 
 		if (!$tmpoutfile || not defined $pipe)
 		{
-			if ($totalsize)
-			{
-				print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
-				print STDERR "\n";
-			}
+			print STDERR &progress_bar($cursize, $stop_offset || $totalsize, 25, '=',$overall_stat{'queries_number'},($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $logfile);
+			print STDERR "\n";
 		}
 		else
 		{
@@ -16341,9 +16337,11 @@ sub progress_bar
 
 	$width ||= 25;
 	$char  ||= '=';
+
 	my $num_width = length $total;
 	my $nchars = (($width - 1) * $got / ($total||1));
 	$nchars = ($width - 1) if ($nchars >= $width);
+	$got = 0 if ($got < 0);
 	if ($is_tsung_output) {
 		sprintf(
 			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d\r",
@@ -16357,11 +16355,20 @@ sub progress_bar
 			$overall_stat{'queries_number'}, ($overall_stat{'errors_number'}+$pgb_overall_stat{'errors_number'}), $file
 		);
 	} else {
-		sprintf(
-			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
-			$char x $nchars . '>',
-			$got, $total, 100 * $got / (+$total||1), ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
-		);
+		if ($total) {
+			sprintf(
+				"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), queries: %d, events: %d\r",
+				$char x $nchars . '>',
+				$got, $total, 100 * $got / (+$total||1), ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
+			);
+		} else {
+			$char = '+';
+			sprintf(
+				"[%s] Parsed %d bytes, queries: %d, events: %d\r",
+				$char,
+				$got, ($queries || $overall_stat{'queries_number'}), ($errors || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
+			);
+		}
 	}
 }
 
