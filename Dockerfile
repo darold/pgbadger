@@ -17,6 +17,6 @@ RUN \
   apk del --purge .build && \
   rm -rf /workdir/*
 
-
+WORKDIR /workdir
 ENTRYPOINT ["/usr/local/bin/pgbadger"]
 CMD ["--help"]
