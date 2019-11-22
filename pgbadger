@@ -3982,7 +3982,11 @@ sub process_file
 
 	# Inform the parent that it should stop parsing other files
 	if ($getout) {
-		kill('USR2', $parent_pid);
+		if ($^O !~ /MSWin32|dos/i) {
+			kill('USR2', $parent_pid);
+		} else {
+			kill('TERM', $parent_pid);
+		}
 	}
 
 	# Write the list of database we have proceeded in this process
