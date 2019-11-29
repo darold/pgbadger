@@ -251,11 +251,20 @@ my $journalctl_cmd          = '';
 my $zcat_cmd                = 'gunzip -c';
 my $zcat                    = $zcat_cmd;
 my $bzcat                   = 'bunzip2 -c';
+my $lz4cat                  = 'lz4cat';
 my $ucat                    = 'unzip -p';
 my $xzcat                   = 'xzcat';
+my $zstdcat                 = 'zstdcat';
 my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
+
+# lz4 archive can only contain one file.
+# Original size can be retrieved only if --content-size has been used for compression
+# it seems lz4 send output to stderr so redirect to stdout
+my $lz4_uncompress_size     = " lz4 -v -c --list %f 2>&1 |tail -n 2|head -n1 | awk '{print \$6}'";
+
 my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
 my $xz_uncompress_size      = "xz --robot -l %f | grep totals | awk '{print \$5}'";
+my $zstd_uncompress_size    = "zstd -v -l %f |grep Decompressed | awk  -F\"[ (]*\" '{print \$5}'";
 my $format                  = '';
 my @outfiles                = ();
 my $outdir                  = '';
@@ -359,6 +368,8 @@ my %prefix_vars = ();
 my $q_prefix    = '';
 my @prefix_q_params = ();
 my %last_execute_stmt = ();
+
+my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
 my $remote_host = '';
 my $ssh_command = '';
@@ -3895,7 +3906,7 @@ sub process_file
 
 		# Bzip2 and remote download compressed files has an
 		# estimated size. Force 100% at end of log parsing
-		if (($http_download && $logfile =~ /\.(zip|gz|xz|bz2)$/i )
+		if (($http_download && $logfile =~ $compress_extensions )
 			|| $logfile =~ /\.bz2$/i)
 		{
 			$cursize = $totalsize;
@@ -4202,7 +4213,7 @@ sub check_file_changed
 	return if (!defined $lfile);
 
 	# Compressed files do not allow seeking
-	my $iscompressed   = ($file =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
+	my $iscompressed   = ($file =~ $compress_extensions) ? 1 : 0;
 	if ($iscompressed) {
 		close($lfile);
 		return (1, "log file is compressed");
@@ -16663,7 +16674,7 @@ sub get_file_size
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
-	my $iscompressed   = ($logf =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
+	my $iscompressed   = ($logf =~ $compress_extensions) ? 1 : 0;
 
 	# Get file size
 	my $totalsize = 0;
@@ -16725,7 +16736,7 @@ sub get_file_size
 
 	# Real size of the file is unknown with compressed file, try to find
 	# size using uncompress command (bz2 does not report real size)
-	elsif (!$http_download && $logf =~ /\.(gz|zip|xz|bz2)$/i)
+	elsif (!$http_download && $logf =~ $compress_extensions)
 	{
 
 		my $cmd_file_size = $gzip_uncompress_size;
@@ -16733,6 +16744,10 @@ sub get_file_size
 			$cmd_file_size = $zip_uncompress_size;
 		} elsif ($logf =~ /\.xz$/i) {
 			$cmd_file_size = $xz_uncompress_size;
+		} elsif ($logf =~ /\.lz4$/i) {
+			$cmd_file_size = $lz4_uncompress_size;
+		} elsif ($logf =~ /\.zst$/i) {
+			$cmd_file_size = $zstd_uncompress_size;
 		} elsif ($logf =~ /\.bz2$/i) {
 			$cmd_file_size = "ls -l '%f' | awk '{print \$5}'";
 		}
@@ -16741,6 +16756,18 @@ sub get_file_size
 			$cmd_file_size =~ s/\%f/$logf/g;
 			&logmsg('DEBUG', "Looking for file size using command: $cmd_file_size");
 			$totalsize = `$cmd_file_size`;
+
+			chomp($totalsize);
+			# lz4 archive must be compressed with --content-size option to determine size. If not $totalsize is '-'
+			if ($logf =~ /\.lz4$/i && $totalsize eq "-") {
+				&logmsg('DEBUG', "Can't determine file size. Maybe file compressed without --content-size option ?");
+
+				# Thus we use a hack to determine size
+				$cmd_file_size = "ls -l '%f' | awk '{print \$5}'";
+				$cmd_file_size =~ s/\%f/$logf/g;
+				$totalsize = `$cmd_file_size`;
+				$totalsize *= $XZ_FACTOR;
+			}
 		} elsif ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
 			my $host_info = $1;
 			my $file = $2;
@@ -16784,7 +16811,7 @@ sub get_file_size
 		{
 			$totalsize *= $GZ_FACTOR;
 		}
-		elsif ($logf =~ /\.xz$/i)
+		elsif ($logf =~ /\.(xz|lz4|zst)$/i)
 		{
 			$totalsize *= $XZ_FACTOR;
 		}
@@ -16805,7 +16832,7 @@ sub get_log_file
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
-	my $iscompressed   = ($logf =~ /\.(gz|bz2|zip|xz)$/i) ? 1 : 0;
+	my $iscompressed   = ($logf =~ $compress_extensions) ? 1 : 0;
 
 	chomp($logf);
 
@@ -16908,6 +16935,10 @@ sub get_log_file
 			$sample_cmd = 'bzgrep';
 		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $ucat;
+		} elsif (($logf =~ /\.lz4/i) && ($zcat =~ /^$zcat_cmd$/)) {
+			$uncompress = $lz4cat;
+		} elsif (($logf =~ /\.zst/i) && ($zcat =~ /^$zcat_cmd$/)) {
+			$uncompress = $zstdcat;
 		}
 		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $xzcat;

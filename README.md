@@ -322,8 +322,11 @@ the FontAwesome webfont for better design. Everything is embedded.
 pgBadger is able to autodetect your log file format (syslog, stderr, csvlog
 or jsonlog) if the file is long enough. It is designed to parse huge log
 files as well as compressed files. Supported compressed format are gzip,
-bzip2 and xz.  For the xz format you must have an xz version upper than 5.05
-that supports the --robot option. For the complete list of features see below.
+bzip2, lz4, xz, zip and zstd. For the xz format you must have an xz version
+upper than 5.05 that supports the --robot option. In order pgbadger determine
+uncompressed file size with lz4, file must be compressed with --content-size
+option. For the complete list of features see below.
+
 
 All charts are zoomable and can be saved as PNG images.
 
@@ -442,8 +445,9 @@ and in RPM like system using:
         sudo yum install perl-JSON-XS
 
 Compressed log file format is autodetected from the file extension. If pgBadger find
-a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat
-and if the file extension is zip or xz then the unzip or xz utilities will be used.
+a gz extension it will use the zcat utility, with a bz2 extension it will use bzcat,
+with lz4 it will use lz4cat, with zst it will use zstdcat and if the file extension
+is zip or xz then the unzip or xz utilities will be used.
 
 If those utilities are not found in the PATH environment variable then use the --zcat
 command line option to change this path. For example:
@@ -451,10 +455,10 @@ command line option to change this path. For example:
         --zcat="/usr/local/bin/gunzip -c" or --zcat="/usr/local/bin/bzip2 -dc"
         --zcat="C:\tools\unzip -p"
 
-By default pgBadger will use the zcat, bzcat and unzip utilities following the
-file extension. If you use the default autodetection compress format you can
-mixed gz, bz2, xz or zip files. Specifying a custom value to --zcat option will
-remove this feature of mixed compressed format.
+By default pgBadger will use the zcat, bzcat, lz4cat, zstdcat and unzip utilities
+following the file extension. If you use the default autodetection compress format
+you can mixed gz, bz2, lz4, xz, zip or zstd files. Specifying a custom value to
+--zcat option will remove this feature of mixed compressed format.
 
 Note that multiprocessing can not be used with compressed files or CSV files as
 well as under Windows platform.
