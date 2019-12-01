@@ -1597,10 +1597,11 @@ foreach my $logfile ( @given_log_files )
 
 	# Do not use split method with remote and compressed files, stdin, custom or journalctl command
 	if ( ($parallel_process > 1) && ($queue_size > 1) &&
-			($logfile !~ /\.(gz|bz2|zip|xz|bin)$/i) && ($logfile ne '-') &&
+			($logfile !~ $compress_extensions) &&
+			($logfile !~ /\.bin$/i) && ($logfile ne '-') &&
 			($logfile !~ /^(http[s]*|ftp[s]*|ssh):/i) &&
-			 (!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) &&
-			 (!$log_command || ($logfile !~ /\Q$log_command\E/))
+			(!$journalctl_cmd || ($logfile !~ /\Q$journalctl_cmd\E/)) &&
+			(!$log_command || ($logfile !~ /\Q$log_command\E/))
 		)
 	{
 
