@@ -16759,10 +16759,13 @@ sub get_file_size
 			$totalsize = `$cmd_file_size`;
 
 			chomp($totalsize);
-			# lz4 archive must be compressed with --content-size option to determine size. If not $totalsize is '-'
-			if ($logf =~ /\.lz4$/i && $totalsize eq "-") {
-				&logmsg('DEBUG', "Can't determine file size. Maybe file compressed without --content-size option ?");
-
+			if ($totalsize !~ /\d+/) {
+				if ($logf =~ /\.lz4$/i) {
+					# lz4 archive must be compressed with --content-size option to determine size. If not $totalsize is '-'
+					&logmsg('DEBUG', "Can't determine lz4 file size. Maybe file compressed without --content-size option ?");
+				} else {
+					&logmsg('DEBUG', "Can't determine uncompressed file size. Guess with compressed size * $XZ_FACTOR");
+				}
 				# Thus we use a hack to determine size
 				$cmd_file_size = "ls -l '%f' | awk '{print \$5}'";
 				$cmd_file_size =~ s/\%f/$logf/g;
