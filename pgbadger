@@ -540,7 +540,7 @@ my $result = GetOptions(
 	'log-timezone=i'	   => \$log_timezone,
 	'prettify-json!'	   => \$json_prettify,
 	'month-report=s'	   => \$month_report,
-	'no-explain!'              => \$noexplain,
+	'noexplain!'               => \$noexplain,
 	'command=s'                => \$log_command,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
