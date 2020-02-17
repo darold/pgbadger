@@ -1883,11 +1883,11 @@ elsif (!$incremental || !$noreport)
 		} else {
 			&logmsg('ERROR', "can't read file $last_parsed.tmp, $!");
 		}
+
+		&build_incremental_reports(@build_directories);
 	} else {
 		&logmsg('DEBUG', "no new entries in your log(s) since last run.");
 	}
-
-	&build_incremental_reports(@build_directories);
 }
 
 my $t2 = Benchmark->new;
