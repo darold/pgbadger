@@ -358,6 +358,7 @@ my $param_size_limit        = 24;
 my $month_report            = 0;
 my $noexplain               = 0;
 my $log_command             = '';
+my $wide_char               = 0;
 
 my $NUMPROGRESS = 10;
 my @DIMENSIONS  = (800, 300);
@@ -491,6 +492,7 @@ my $result = GetOptions(
 	"v|verbose!"               => \$debug,
 	"V|version!"               => \$ver,
 	"w|watch-mode!"            => \$error_only,
+	"W|wide-char!"             => \$wide_char,
 	"x|extension=s"            => \$extension,
 	"X|extra-files!"           => \$extra_files,
 	"z|zcat=s"                 => \$zcat,
@@ -2002,6 +2004,8 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
+    -W | --wide-char       : encode html output of queries into UTF8 to avoid
+                             Perl message "Wide character in print".
     -x | --extension       : output format. Values: text, html, bin, json or
 			     tsung. Default: html
     -X | --extra-files     : in incremental mode allow pgBadger to write CSS and
@@ -12834,7 +12838,10 @@ sub show_error_as_html
 				$details .= "<b>Code:</b> $error_info{$curdb}{$k}{sqlstate}[$i]\n" if ($error_info{$curdb}{$k}{sqlstate}[$i]);
 			}
 			$details =~ s/<br\/>$//s;
-			$info = encode('UTF-8', $info);
+			if ($wide_char)
+			{
+				$info = encode('UTF-8', $info);
+			}
 			print $fh qq{
 								<dt><span class="$error_level_class">$message</span></dt>
 								<p>$info</p>
@@ -14220,7 +14227,11 @@ sub highlight_code
 	}
 	return $code if ($nohighlight);
 
-	return encode('UTF-8', $code);
+	if ($wide_char)
+	{
+		$code = encode('UTF-8', $code);
+	}
+	return $code;
 }
 
 sub compute_arg_list

@@ -1,4 +1,4 @@
-use Test::Simple tests => 11;
+use Test::Simple tests => 13;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
 my $SYSLOG = 't/fixtures/pg-syslog.1.bz2';
@@ -48,6 +48,14 @@ $ret = `perl pgbadger -q -f stderr -o /tmp/report$$.txt t/fixtures/stmt_type.log
 $ret = `grep -E "^(SELECT|INSERT|UPDATE|DELETE|COPY|CTE|DDL|TCL|CURSOR)" /tmp/report$$.txt > /tmp/stmt_type.out`;
 $ret = `diff t/exp/stmt_type.out /tmp/stmt_type.out`;
 ok( $? == 0 && ($ret eq ''), "statement type");
+
+$ret = `grep "forêt & océan" /tmp/report$$.txt |wc -l`;
+chomp($ret);
+ok( $? == 0 && ($ret eq '7'), "French encoding");
+
+$ret = `grep "камень & почка" /tmp/report$$.txt | wc -l`;
+chomp($ret);
+ok( $? == 0 && ($ret eq '7'), "Cyrillic encoding");
 
 # Remove files generated during the tests
 `rm -f out.html`;

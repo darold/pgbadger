@@ -90,6 +90,8 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
+    -W | --wide-char       : encode html output of queries into UTF8 to avoid
+                             Perl message "Wide character in print".
     -x | --extension       : output format. Values: text, html, bin, json or
 			     tsung. Default: html
     -X | --extra-files     : in incremental mode allow pgBadger to write CSS and
