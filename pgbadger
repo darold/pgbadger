@@ -1320,12 +1320,18 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 		# Search the current week following the last parse date
 		my $limit = $1;
 		my $wn = &get_week_number($1, $2, $3);
+		# Case of year overlap
 		if (($wn - $retention) < 1) {
+			# Rewind to previous year
 			$limit--;
-			$limit .= "52";
+			# Get number of last week of previous year, can be 52 or 53
+			my $prevwn = &get_week_number($limit, 12, 31);
+			# Add week number including retention to the previous year
+			$limit .= sprintf("%02d", $prevwn - abs($wn - $retention));
 		} else {
 			$limit .= sprintf("%02d", $wn - $retention);
 		}
+		&logmsg('DEBUG', "Retention cleanup: directories and files older than <$limit> will be removed");
 
 		# Find obsolete weeks dir that shoud be cleaned
 		unless(opendir(DIR, "$outdir")) {
