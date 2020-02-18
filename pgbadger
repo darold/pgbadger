@@ -2418,6 +2418,15 @@ sub set_parser_regex
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
 		$pgbouncer_log_parse3 = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: ([^:]+: .*)/;
 		@pgb_prefix_parse3 = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_query');
+	} elsif ($fmt eq 'pgbouncer3') {
+		$pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)(?:\(\d+\))??[:\d]* (.*)/;
+		@pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
+		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
+		@pgb_prefix_parse1 = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_query');
+		$pgbouncer_log_parse2 = qr/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+(?: [A-Z\+\-\d]{3,6})? \[\d+\] [^\s]+ .\-0x[0-9a-f\.]*: ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?(?:\(\d+\))?[:\d]* (.*)/;
+		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
+		$pgbouncer_log_parse3 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) ([^:]+: .*)/;
+		@pgb_prefix_parse3 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
 
 	}
 	elsif ($log_line_prefix)
@@ -16370,6 +16379,11 @@ sub search_log_format
 	# Are pgbouncer lines ?
 	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
 		$fmt = 'pgbouncer';
+		# If we just have one single pgbouncer file, force pgbouncer_only to 1
+		$pgbouncer_only = 1 if ($#log_files == 0);
+
+	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
+		$fmt = 'pgbouncer3';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
 
