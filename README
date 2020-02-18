@@ -51,7 +51,7 @@ SYNOPSIS
                                  report per day with a log rotated each week.
         -L | --logfile-list file:file containing a list of log file to parse.
         -m | --maxlength size  : maximum length of a query, it will be restricted to
-                                 the given size. Default: no truncate
+                                 the given size. Default truncate size is 10480.
         -M | --no-multiline    : do not collect multiline statement to avoid garbage
                                  especially on errors that generate a huge report.
         -n | --nohighlight     : disable SQL code highlighting.
