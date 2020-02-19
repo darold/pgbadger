@@ -233,7 +233,7 @@ sub spawn
 
 	my $pid;
 	if (!defined($pid = fork)) {
-		print STDERR "Error: cannot fork: $!\n";
+		print STDERR "ERROR: cannot fork: $!\n";
 		return;
 	} elsif ($pid) {
 		$RUNNING_PIDS{$pid} = $pid;
@@ -792,7 +792,7 @@ $img_format = 'png' if ($img_format ne 'jpeg');
 # be created in the same directory
 if ($current_out_file ne '-')
 {
-	if (!$outdir)
+	if (!$html_outdir && !$outdir)
 	{
 		my @infs = fileparse($current_out_file);
 		if ($infs[0] ne '')
@@ -805,13 +805,18 @@ if ($current_out_file ne '-')
 			localdie("FATAL: output file $current_out_file is a directory, should be a file\nor maybe you want to use -O | --outdir option instead.\n");
 		}
 	}
-	elsif (!-d "$outdir")
+	elsif ($outdir && !-d "$outdir")
 	{
 		# An output directory has been passed as command line parameter
 		localdie("FATAL: $outdir is not a directory or doesn't exist.\n");
 	}
+	elsif ($html_outdir && !-d "$html_outdir")
+	{
+		# An HTML output directory has been passed as command line parameter
+		localdie("FATAL: $html_outdir is not a directory or doesn't exist.\n");
+	}
 	$current_out_file = basename($current_out_file);
-	$current_out_file = $outdir . '/' . $current_out_file;
+	$current_out_file = ($html_outdir || $outdir) . '/' . $current_out_file;
 }
 
 # Remove graph support if output is not html
@@ -1064,21 +1069,21 @@ my @jscode = &write_resources();
 if ($incremental)
 {
 	# In incremental mode an output directory must be set
-	if (!$outdir)
+	if (!$html_outdir && !$outdir)
 	{
 		localdie("FATAL: you must specify an output directory with incremental mode, see -O or --outdir.\n")
 	}
 	# Ensure this is not a relative path
-	if (dirname($outdir) eq '.')
+	if ($outdir && dirname($outdir) eq '.')
 	{
 		localdie("FATAL: output directory ($outdir) is not an absolute path.\n");
 	}
 	if ($html_outdir && dirname($html_outdir) eq '.')
 	{
-		localdie("FATAL: output directory ($html_outdir) is not an absolute path.\n");
+		localdie("FATAL: output HTML directory ($html_outdir) is not an absolute path.\n");
 	}
 	# Ensure that the directory already exists
-	if (!-d $outdir)
+	if ($outdir && !-d $outdir)
 	{
 		localdie("FATAL: output directory $outdir does not exists.\n");
 	}
@@ -1105,7 +1110,7 @@ if ($incremental)
 		# Find directories that shoud be rebuilt
 		unless(opendir(DIR, "$outdir"))
 		{
-			localdie("Error: can't opendir $outdir: $!");
+			localdie("FATAL: can't opendir $outdir: $!\n");
 		}
 		my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
@@ -1113,7 +1118,7 @@ if ($incremental)
 		{
 			unless(opendir(DIR, "$outdir/$y"))
 			{
-				localdie("Error: can't opendir $outdir/$y: $!");
+				localdie("FATAL: can't opendir $outdir/$y: $!\n");
 			}
 			my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
@@ -1121,7 +1126,7 @@ if ($incremental)
 			{
 				unless(opendir(DIR, "$outdir/$y/$m"))
 				{
-					localdie("Error: can't opendir $outdir/$y/$m: $!");
+					localdie("FATAL: can't opendir $outdir/$y/$m: $!\n");
 				}
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 				closedir DIR;
@@ -1129,7 +1134,7 @@ if ($incremental)
 				{
 					unless(opendir(DIR, "$outdir/$y/$m/$d"))
 					{
-						localdie("Error: can't opendir $outdir/$y/$m/$d: $!");
+						localdie("FATAL: can't opendir $outdir/$y/$m/$d: $!\n");
 					}
 					my @binfiles = grep { $_ =~ /\.bin$/ } readdir(DIR);
 					closedir DIR;
@@ -1160,7 +1165,7 @@ if ($incremental)
 		$month_path =~ s#-#/#g;
 		if ($month_path !~ m#^\d{4}/\d{2}$#)
 		{
-			localdie("Error: invalid format YYYY-MM for --month-report option: $month_report");
+			localdie("FATAL: invalid format YYYY-MM for --month-report option: $month_report");
 		}
 
 		&logmsg('DEBUG', "building month report into $outdir/$month_path");
@@ -1168,7 +1173,7 @@ if ($incremental)
 		# Find days directories that shoud be used to build the monthly report
 		unless(opendir(DIR, "$outdir/$month_path"))
 		{
-			localdie("Error: can't opendir $outdir/$month_path: $!");
+			localdie("FATAL: can't opendir $outdir/$month_path: $!\n");
 		}
 		my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
@@ -1176,7 +1181,7 @@ if ($incremental)
 		{
 			unless(opendir(DIR, "$outdir/$month_path/$d"))
 			{
-				localdie("Error: can't opendir $outdir/$month_path/$d: $!");
+				localdie("FATAL: can't opendir $outdir/$month_path/$d: $!\n");
 			}
 			my @binfiles = grep { $_ =~ /\.bin$/ } readdir(DIR);
 			closedir DIR;
@@ -1265,20 +1270,20 @@ if (!$noclean && $outdir &&
 	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
 	# Find obsolete dir days that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
-		localdie("Error: can't opendir $outdir: $!");
+		localdie("FATAL: can't opendir $outdir: $!\n");
 	}
 	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 	closedir DIR;
 	my @obsolete_days = ();
 	foreach my $y (sort { $a <=> $b } @dyears) {
 		unless(opendir(DIR, "$outdir/$y")) {
-			localdie("Error: can't opendir $outdir/$y: $!");
+			localdie("FATAL: can't opendir $outdir/$y: $!\n");
 		}
 		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
 		foreach my $m (sort { $a <=> $b } @dmonths) {
 			unless(opendir(DIR, "$outdir/$y/$m")) {
-				localdie("Error: can't opendir $outdir/$y/$m: $!");
+				localdie("FATAL: can't opendir $outdir/$y/$m: $!\n");
 			}
 			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
@@ -1291,7 +1296,7 @@ if (!$noclean && $outdir &&
 	}
 	foreach my $p (@obsolete_days) {
 		unless(opendir(DIR, "$p")) {
-			localdie("Error: can't opendir $p: $!");
+			localdie("FATAL: can't opendir $p: $!\n");
 		}
 		my @hfiles = grep { $_ =~ /\.(html|txt|tsung|json)$/i } readdir(DIR);
 		next if ($#hfiles == -1); # do not remove files if report file has not been generated
@@ -1329,14 +1334,14 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 
 		# Find obsolete weeks dir that shoud be cleaned
 		unless(opendir(DIR, "$outdir")) {
-			localdie("Error: can't opendir $outdir: $!");
+			localdie("FATAL: can't opendir $outdir: $!\n");
 		}
 		my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
 		my @obsolete_weeks = ();
 		foreach my $y (sort { $a <=> $b } @dyears) {
 			unless(opendir(DIR, "$outdir/$y")) {
-				localdie("Error: can't opendir $outdir/$y: $!");
+				localdie("FATAL: can't opendir $outdir/$y: $!\n");
 			}
 			my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
 			closedir DIR;
@@ -1352,14 +1357,14 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 		# Now removed the corresponding days
 		foreach my $y (sort { $a <=> $b } @dyears) {
 			unless(opendir(DIR, "$outdir/$y")) {
-				localdie("Error: can't opendir $outdir/$y: $!");
+				localdie("FATAL: can't opendir $outdir/$y: $!\n");
 			}
 			my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
 			my @rmmonths = ();
 			foreach my $m (sort { $a <=> $b } @dmonths) {
 				unless(opendir(DIR, "$outdir/$y/$m")) {
-					localdie("Error: can't opendir $outdir/$y/$m: $!");
+					localdie("FATAL: can't opendir $outdir/$y/$m: $!\n");
 				}
 				my @rmdays = ();
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
@@ -1439,7 +1444,7 @@ if ($incremental && !$remote_host)
 		}
 		elsif ($f =~ /\.bin$/)
 		{
-			&logmsg('DEBUG', "binary file as input, there is no log to parse.");
+			&logmsg('DEBUG', "binary file \"$f\" as input, there is no log to parse.");
 			$saved_last_line{current_pos} = 0;
 			push(@tmpfilelist, $f);
 		}
@@ -1546,6 +1551,28 @@ $DBLIST{$DBALL} = 1;
 # Parse each log file following the multiprocess mode chosen (-j or -J)
 foreach my $logfile ( @given_log_files )
 {
+
+	# If we just want to build incremental reports from binary files
+	# just build the list of input directories with binary files
+	if ($incremental && $html_outdir && !$outdir)
+	{
+		my $incr_date = '';
+		my $binpath = '';
+		if ($logfile =~ /^(.*\/)(\d+)\/(\d+)\/(\d+)\/[^\/]+\.bin$/)
+		{
+			$binpath = $1;
+			$incr_date = "$2-$3-$4";
+		}
+		# Mark the directory as needing index update
+		if (open(my $out, '>>', "$last_parsed.tmp")) {
+			print $out "$binpath$incr_date\n";
+			close($out);
+		} else {
+			&logmsg('ERROR', "can't save last parsed line into $last_parsed.tmp, $!");
+		}
+		next;
+	}
+
 	# Confirm if we can use multiprocess for this file
 	my $pstatus = confirm_multiprocess($logfile);
 	if ($pstatus >= 0)
@@ -2567,8 +2594,14 @@ sub build_incremental_reports
 {
 	my @build_directories = @_;
 
+	my $destdir = $html_outdir || $outdir;
+
 	my %weeks_directories = ();
-	foreach my $bpath (sort @build_directories) {
+	foreach my $bpath (sort @build_directories)
+	{
+		my $binpath = '';
+		$binpath = $1 if ($bpath =~ s/^(.*\/)(\d+\-\d+\-\d+)$/$2/);
+		&logmsg('DEBUG', "Building incremental report for " . $bpath);
 
 		$incr_date = $bpath;
 		$last_incr_date = $bpath;
@@ -2581,30 +2614,36 @@ sub build_incremental_reports
 		my $wn = &get_week_number($1, $2, $3);
 		if (!$noweekreport)
 		{
-			$weeks_directories{$wn} = "$1-$2" if ($rebuild || !exists $weeks_directories{$wn});
+			if ($rebuild || !exists $weeks_directories{$wn})
+			{
+				$weeks_directories{$wn}{dir} = "$1-$2";
+				$weeks_directories{$wn}{prefix} = $binpath if ($binpath);
+			}
 		}
 
 		# First clear previous stored statistics
 		&init_stats_vars();
 
 		# Load all data gathered by all the different processes
-		unless(opendir(DIR, "$outdir/$bpath")) {
-			localdie("Error: can't opendir $outdir/$bpath: $!");
-		}
-		my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
-		closedir DIR;
-		foreach my $f (@mfiles) {
-			my $fht = new IO::File;
-			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
-			&load_stats($fht);
-			$fht->close();
+		$destdir = $binpath || $outdir;
+		if (opendir(DIR, "$destdir/$bpath"))
+		{
+			my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
+			closedir DIR;
+			foreach my $f (@mfiles)
+			{
+				my $fht = new IO::File;
+				$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
+				&load_stats($fht);
+				$fht->close();
+			}
 		}
 
-		my $dest_dir = $html_outdir || $outdir;
+		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
-			my $tmp_dir = "$dest_dir/$db";
-			$tmp_dir = $dest_dir if (!$report_per_database);
+			my $tmp_dir = "$destdir/$db";
+			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
 			# set path and create subdirectories
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
@@ -2631,7 +2670,9 @@ sub build_incremental_reports
 		&init_stats_vars();
 
 		# Get all days of the current week
-		my @wdays = &get_wdays_per_month($wn - 1, $weeks_directories{$wn});
+		my @wdays = &get_wdays_per_month($wn - 1, $weeks_directories{$wn}{dir});
+		my $binpath = '';
+		$binpath = $weeks_directories{$wn}{prefix} if (defined $weeks_directories{$wn}{prefix});
 		my $wdir = '';
 
 		# Load data per day
@@ -2642,16 +2683,17 @@ sub build_incremental_reports
 			$incr_date =~ /^(\d+)\-(\d+)\-(\d+)$/;
 			$wdir = "$1/week-$wn";
 
+			$destdir = $binpath || $outdir;
 			# Load all data gathered by all the differents processes
-			if (-e "$outdir/$bpath") {
-				unless(opendir(DIR, "$outdir/$bpath")) {
-					localdie("Error: can't opendir $outdir/$bpath: $!");
+			if (-e "$destdir/$bpath") {
+				unless(opendir(DIR, "$destdir/$bpath")) {
+					localdie("FATAL: can't opendir $destdir/$bpath: $!\n");
 				}
 				my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
 				closedir DIR;
 				foreach my $f (@mfiles) {
 					my $fht = new IO::File;
-					$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
+					$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
 					&load_stats($fht);
 					$fht->close();
 					foreach my $db (sort keys %{$overall_stat{nlines}}) {
@@ -2661,11 +2703,11 @@ sub build_incremental_reports
 			}
 		}
 
-		my $dest_dir = $html_outdir || $outdir;
+		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
-			my $tmp_dir = "$dest_dir/$db";
-			$tmp_dir = $dest_dir if (!$report_per_database);
+			my $tmp_dir = "$destdir/$db";
+			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML weekly report into $tmp_dir/$wdir/...");
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
 			my $path = $tmp_dir;
@@ -2709,7 +2751,7 @@ sub build_month_reports
 
 		# Load all data gathered by all the different processes
 		unless(opendir(DIR, "$outdir/$bpath")) {
-			localdie("Error: can't opendir $outdir/$bpath: $!");
+			localdie("FATAL: can't opendir $outdir/$bpath: $!\n");
 		}
 		my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
 		closedir DIR;
@@ -2755,7 +2797,7 @@ sub build_global_index
 
 	# Get database directories
 	unless(opendir(DIR, "$dest_dir")) {
-		localdie("Error: can't opendir $dest_dir: $!");
+		localdie("FATAL: can't opendir $dest_dir: $!\n");
 	}
 	my @dbs = grep { !/^\./ && !/^\d{4}$/ && -d "$dest_dir/$_" } readdir(DIR);
 	closedir DIR;
@@ -2823,7 +2865,7 @@ sub build_global_index
 };
 		# get year directories
 		unless(opendir(DIR, "$tmp_dir")) {
-			localdie("Error: can't opendir $tmp_dir: $!");
+			localdie("FATAL: can't opendir $tmp_dir: $!\n");
 		}
 		my @dyears = grep { !/^\./ && /^\d{4}$/ } readdir(DIR);
 		closedir DIR;
@@ -2835,7 +2877,7 @@ sub build_global_index
 };
 			# foreach year directory look for week directories
 			unless(opendir(DIR, "$tmp_dir/$y")) {
-				localdie("Error: can't opendir $tmp_dir/$y: $!");
+				localdie("FATAL: can't opendir $tmp_dir/$y: $!\n");
 			}
 
 			my @ymonths = grep { /^\d{2}$/ } readdir(DIR);
@@ -2876,7 +2918,7 @@ sub cleanup_directory
 	my ($dir, $remove_dir) = @_;
 
 	unless(opendir(DIR, "$dir")) {
-		localdie("Error: can't opendir $dir: $!");
+		localdie("FATAL: can't opendir $dir: $!\n");
 	}
 	my @todel = grep { !/^\./ } readdir(DIR);
 	closedir DIR;
@@ -2894,6 +2936,8 @@ sub write_resources
 	my $file = '';
 	my $major_version = $VERSION;
 	$major_version =~ s/\..*//;
+
+	my $rscdir = $html_outdir || $outdir;
 	while (my $l = <DATA>) {
 		if ($l =~ /^WRFILE: ([^\s]+)/) {
 			$file = $1;
@@ -2916,12 +2960,15 @@ sub write_resources
 			} elsif ($file =~ /\.js$/i) {
 					push(@contents, "<script type=\"text/javascript\" src=\"EDIT_URI/$major_version/$file\"></script>\n");
 			}
-			if (!-e "$outdir/$major_version") {
-				mkdir("$outdir/$major_version");
-			}
-			if (!-e "$outdir/$major_version/$file") {
-				$rscfh = new IO::File ">$outdir/$major_version/$file";
-				localdie("FATAL: can't write file $outdir/$major_version/$file\n") if (not defined $rscfh);
+			if ($extra_files)
+			{
+				if (!-e "$rscdir/$major_version") {
+					mkdir("$rscdir/$major_version");
+				}
+				if (!-e "$rscdir/$major_version/$file") {
+					$rscfh = new IO::File ">$rscdir/$major_version/$file";
+					localdie("FATAL: can't write file $rscdir/$major_version/$file\n") if (not defined $rscfh);
+				}
 			}
 			next;
 		}
@@ -3950,6 +3997,15 @@ sub process_file
 		}
 	}
 
+	# Case where we build reports from binary only with no new log entries.
+	if ($incremental && $html_outdir && !$outdir)
+	{
+		if ($logfile =~ /\/(\d+)\/(\d+)\/(\d+)\/[^\/]+\.bin$/)
+		{
+			$last_line{datetime} = "$1-$2-$3";
+		}
+	}
+
 	%cur_info = ();
 	# In incremental mode data are saved to disk per day
 	if ($incremental && ($last_line{datetime} || (($fmt =~ /pgbouncer/) && $pgb_last_line{datetime}))) {
@@ -3975,14 +4031,17 @@ sub process_file
 		}
 
 		# Save binary data
-		my $filenum = $$;
-		$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
-		my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
-		if (not defined $fhb) {
-			localdie("FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n");
+		if ($outdir)
+		{
+			my $filenum = $$;
+			$filenum++ while (-e "$outdir/$bpath/$incr_date-$filenum.bin");
+			my $fhb = new IO::File ">$outdir/$bpath/$incr_date-$filenum.bin";
+			if (not defined $fhb) {
+				localdie("FATAL: can't write to $outdir/$bpath/$incr_date-$filenum.bin, $!\n");
+			}
+			&dump_as_binary($fhb);
+			$fhb->close;
 		}
-		&dump_as_binary($fhb);
-		$fhb->close;
 
 	} elsif ($tmpoutfile) {
 
@@ -17297,7 +17356,8 @@ sub localdie
 {
 	my $msg = shift;
 
-	print STDERR "$msg";
+	my ($package, $filename, $line) = caller;
+	print STDERR "$msg    - Error at line $line\n";
 	unlink("$PID_FILE");
 
 	exit 1;
