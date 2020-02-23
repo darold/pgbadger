@@ -812,7 +812,7 @@ if ($current_out_file ne '-')
 	}
 	elsif ($html_outdir && !-d "$html_outdir")
 	{
-		# An HTML output directory has been passed as command line parameter
+		# An HTML output directory has been passed as command line parameter
 		localdie("FATAL: $html_outdir is not a directory or doesn't exist.\n");
 	}
 	$current_out_file = basename($current_out_file);
@@ -13529,7 +13529,7 @@ sub load_stats
 	### log_files ###
 
 	foreach my $f (@_log_files) {
-		push(@log_files, $f) if (!grep(m#^$f$#, @_log_files));
+		push(@log_files, $f) if (!grep(m#^\Q$f\E$#, @_log_files));
 	}
 
 	### error_info ###
