@@ -1,25 +1,8 @@
-### TABLE OF CONTENTS
-
-- [NAME](#NAME)
-- [SYNOPSIS](#SYNOPSIS)
-- [DESCRIPTION](#DESCRIPTION)
-- [FEATURE](#FEATURE)
-- [REQUIREMENT](#REQUIREMENT)
-- [INSTALLATION](#INSTALLATION)
-- [POSTGRESQL-CONFIGURATION](#POSTGRESQL-CONFIGURATION)
-- [LOG-STATEMENTS](#LOG-STATEMENTS)
-- [PARALLEL-PROCESSING](#PARALLEL-PROCESSING)
-- [INCREMENTAL-REPORTS](#INCREMENTAL-REPORTS)
-- [BINARY-FORMAT](#BINARY-FORMAT)
-- [JSON-FORMAT](#JSON-FORMAT)
-- [AUTHORS](#AUTHORS)
-- [LICENSE](#LICENSE)
-
-### NAME
+# NAME
 
 pgBadger - a fast PostgreSQL log analysis report
 
-### SYNOPSIS
+# SYNOPSIS
 
 Usage: pgbadger \[options\] logfile \[...\]
 
@@ -50,8 +33,9 @@ Options:
                              per database. Global information not related to a
                              database are added to the postgres database report.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                             cvs, pgbouncer, logplex and rds. Use this option
-                             when pgBadger is not able to detect the log format.
+                             cvs, pgbouncer, logplex, rds and redshift. Use this
+                             option when pgBadger is not able to detect the log
+                             format.
     -G | --nograph         : disable graphs on HTML output. Enabled by default.
     -h | --help            : show this message and exit.
     -H | --html-dir path   : path to directory where HTML report must be written
@@ -308,6 +292,10 @@ rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
 
+or AWS RedShift logs using:
+
+    pgbadger -f redshift -o red_out.html red.log
+
 To create a cumulative report over a month use command:
 
     pgbadger --month-report 2919-05 /path/to/incremantal/reports/
@@ -316,7 +304,7 @@ this will add a link to the month name into the calendar view in
 incremental reports to look at report for month 2019 May.
 Use -E or --explode if the reports were built using this option.
 
-### DESCRIPTION
+# DESCRIPTION
 
 pgBadger is a PostgreSQL log analyzer built for speed with fully reports
 from your PostgreSQL log file. It's a single and small Perl script that
@@ -350,7 +338,7 @@ files through the use of the -j option specifying the number of CPUs.
 If you want to save system performance you can also use log\_duration instead of
 log\_min\_duration\_statement to have reports on duration and number of queries only.
 
-### FEATURE
+# FEATURE
 
 pgBadger reports everything about your SQL queries:
 
@@ -426,7 +414,7 @@ pgBadger can also be used in a central place to parse remote log files using a
 passwordless SSH connection. This mode can be used with compressed files and in
 the multiprocess per file mode (-J) but can not be used with the CSV log format.
 
-### REQUIREMENT
+# REQUIREMENT
 
 pgBadger comes as a single Perl script - you do not need anything other than a modern
 Perl distribution. Charts are rendered using a JavaScript library so you don't need
@@ -471,7 +459,7 @@ you can mixed gz, bz2, lz4, xz, zip or zstd files. Specifying a custom value to
 Note that multiprocessing can not be used with compressed files or CSV files as
 well as under Windows platform.
 
-### INSTALLATION
+# INSTALLATION
 
 Download the tarball from GitHub and unpack the archive as follow:
 
@@ -494,7 +482,7 @@ For example, to install everything just like Debian does, proceed as follows:
 
 By default INSTALLDIRS is set to site.
 
-### POSTGRESQL CONFIGURATION
+# POSTGRESQL CONFIGURATION
 
 You must enable and set some configuration directives in your postgresql.conf
 before starting.
@@ -552,7 +540,7 @@ Of course your log messages should be in English with or without locale support:
 
 pgBadger parser do not support other locale like 'fr\_FR.UTF-8' for example.
 
-### LOG STATEMENTS
+# LOG STATEMENTS
 
 Considerations about log\_min\_duration\_statement, log\_duration and log\_statement
 configuration directives.
@@ -575,7 +563,7 @@ log\_statement all together, this will result in wrong counter values. Note
 that this will also increase drastically the size of your log.
 log\_min\_duration\_statement should always be preferred.
 
-### PARALLEL PROCESSING
+# PARALLEL PROCESSING
 
 To enable parallel processing you just have to use the -j N option where N is
 the number of cores you want to use.
@@ -629,7 +617,7 @@ end, so do not remove those files unless pgBadger is not running. They are
 all named with the following template tmp\_pgbadgerXXXX.bin so they can be
 easily identified.
 
-### INCREMENTAL REPORTS
+# INCREMENTAL REPORTS
 
 pgBadger includes an automatic incremental report mode using option -I or
 \--incremental. When running in this mode, pgBadger will generate one report
@@ -657,7 +645,7 @@ option to force pgBadger to write JavaScript and CSS to separate files in
 the output directory. The resources will then be loaded using script and
 link tags.
 
-#### Rebuilding reports
+## Rebuilding reports
 
 Incremental reports can be rebuilt after a pgbadger report fix or a new
 feature to update all HTML reports. To rebuild all reports where a binary
@@ -670,7 +658,7 @@ file is still present proceed as follow:
 it will also update all resource files (JS and CSS). Use -E or --explode
 if the reports were built using this option.
 
-#### Monthly reports
+## Monthly reports
 
 By default pgBadger in incremental mode only compute daily and weekly reports.
 If you want monthly cumulative reports you will have to use a separate command
@@ -690,7 +678,7 @@ be used too when calling pgbadger to build monthly report:
 
 This is the same when using the rebuild option ( -R | --rebuild ).
 
-### BINARY FORMAT
+# BINARY FORMAT
 
 Using the binary format it is possible to create custom incremental and
 cumulative reports. For example, if you want to refresh a pgBadger
@@ -720,13 +708,13 @@ is generated, just do the following:
 
 Adjust the commands to suit your particular needs.
 
-### JSON FORMAT
+# JSON FORMAT
 
 JSON format is good for sharing data with other languages, which makes it
 easy to integrate pgBadger result into other monitoring tools like Cacti
 or Graphite.
 
-### AUTHORS
+# AUTHORS
 
 pgBadger is an original work from Gilles Darold.
 
@@ -740,7 +728,7 @@ pgBadger is maintained by Gilles Darold and every one who wants to contribute.
 
 Many people have contributed to pgBadger, they are all quoted in the Changelog file.
 
-### LICENSE
+# LICENSE
 
 pgBadger is free software distributed under the PostgreSQL Licence.
 

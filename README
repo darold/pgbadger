@@ -31,8 +31,9 @@ SYNOPSIS
                                  per database. Global information not related to a
                                  database are added to the postgres database report.
         -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-                                 cvs, pgbouncer, logplex and rds. Use this option
-                                 when pgBadger is not able to detect the log format.
+                                 cvs, pgbouncer, logplex, rds and redshift. Use this
+                                 option when pgBadger is not able to detect the log
+                                 format.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.
         -h | --help            : show this message and exit.
         -H | --html-dir path   : path to directory where HTML report must be written
@@ -292,6 +293,10 @@ SYNOPSIS
     format:
 
         pgbadger -f rds -o rds_out.html rds.log
+
+    or AWS RedShift logs using:
+
+        pgbadger -f redshift -o red_out.html red.log
 
     To create a cumulative report over a month use command:
 
