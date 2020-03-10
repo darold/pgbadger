@@ -380,6 +380,7 @@ my $ssh_identity = '';
 my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
+my $force_sample = 0;
 
 my $curl_command = 'curl -k -s ';
 
@@ -1612,7 +1613,7 @@ foreach my $logfile ( @given_log_files )
 		$fmt = &autodetect_format($logfile, $file_size{$logfile});
 		$fmt ||= $format;
 		# Remove log format from filename if any
-		$logfile =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
+		$logfile =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
 		&logmsg('DEBUG', "pgBadger will use log format $fmt to parse $logfile.");
 	}
 	else
@@ -1967,8 +1968,9 @@ Options:
 			     per database. Global information not related to a
 			     database are added to the postgres database report.
     -f | --format logtype  : possible values: syslog, syslog2, stderr, jsonlog,
-			     cvs, pgbouncer, logplex and rds. Use this option
-			     when pgBadger is not able to detect the log format.
+			     cvs, pgbouncer, logplex, rds and redshift. Use this
+			     option when pgBadger is not able to detect the log
+			     format.
     -G | --nograph	   : disable graphs on HTML output. Enabled by default.
     -h | --help	           : show this message and exit.
     -H | --html-dir path   : path to directory where HTML report must be written
@@ -2310,7 +2312,7 @@ sub set_file_list
 	my $file_orig = $file;
 	my $fmt = '';
 	# Remove log format from log file if any
-	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*)$//i)
+	if ($file =~ s/(:(?:stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*)$//i)
 	{
 		$fmt = $1;
 	}
@@ -2513,6 +2515,16 @@ sub set_parser_regex
 		       $compiled_prefix = qr/$llp/;
 		       @prefix_params = ('t_timestamp', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
 		}
+		elsif ($fmt =~ /^redshift$/)
+		{
+		       # Look at format of the AWS redshift pg logs, for example:
+		       # '2020-03-07T16:09:43Z UTC [ db=dev user=rdsdb pid=16929 userid=1 xid=7382 ]'
+
+		       $llp = '^' . $llp
+			      . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
+		       $compiled_prefix = qr/$llp/;
+		       @prefix_params = ('t_timestamp', 't_dbname', 't_user', 't_pid', 't_loglevel', 't_query');
+		}
 		elsif ($fmt eq 'stderr' || $fmt eq 'default')
 		{
 			$fmt = 'stderr';
@@ -2551,7 +2563,7 @@ sub set_parser_regex
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
 	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[(postgres)\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
-       }
+	}
 	elsif ($fmt eq 'rds')
 	{
 	       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
@@ -2561,6 +2573,15 @@ sub set_parser_regex
 			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
 	}
+	elsif ($fmt eq 'redshift')
+	{
+	       # Look at format of the AWS redshift pg logs, for example:
+	       # '2020-03-07T16:09:43Z UTC [ db=dev user=rdsdb pid=16929 userid=1 xid=7382 ]'
+	       $compiled_prefix =
+			 qr/^'(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)Z [^\s]+ \[ db=(.*?) user=(.*?) pid=(\d+) userid=\d+ xid=(?:.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_dbname', 't_user', 't_pid', 't_loglevel', 't_query');
+	}
+
 
 	elsif ($fmt eq 'stderr')
 	{
@@ -3798,7 +3819,7 @@ sub process_file
 				}
 
 			}
-			elsif ($fmt eq 'stderr' or $fmt eq 'rds')
+			elsif ($fmt eq 'stderr' or $fmt eq 'rds' or $fmt eq 'redshift')
 			{
 				@matches = ($line =~ $compiled_prefix);
 
@@ -3848,7 +3869,6 @@ sub process_file
 						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 					}
 					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-
 					# Skip this line if there is no timestamp
 					next if (!$prefix_vars{'t_timestamp'} || $prefix_vars{'t_timestamp'} eq '-- ::');
 
@@ -3857,6 +3877,10 @@ sub process_file
 						# Remove the port part
 						$prefix_vars{'t_client'} =~ s/\(.*//;
 					}
+
+					$force_sample = 1 if ($fmt eq 'redshift'
+									&& $prefix_vars{'t_loglevel'} eq 'LOG'
+									&& $prefix_vars{'t_client'} !~ /duration: /);
 
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
@@ -15199,6 +15223,25 @@ sub parse_query
 		$prefix_vars{'t_bind'} = 1;
 		# Stores execute query in case of temporary file
 		$last_execute_stmt{$prefix_vars{'t_pid'}} = $prefix_vars{'t_query'};
+	# Log line without duration at all
+	} elsif ($fmt eq 'redshift' and $prefix_vars{'t_query'}) {
+		$t_action = 'statement';
+		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)\b/i) {
+			$overall_stat{lc($1)}++;
+			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
+		}
+		$overall_stat{$curdb}{histogram}{query_total}++;
+		if (($t_action eq 'statement') && $prefix_vars{'t_query'} =~ /^(PREPARE|EXECUTE)/i) {
+			$overall_stat{lc($1)}++;
+			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{lc($1)}++;
+
+			if ($prefix_vars{'t_query'} =~ /^PREPARE$/i) {
+				$t_action = 'prepare';
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
+				return;
+			}
+		}
 	# Log line that could not be parsed
 	} elsif ($is_log_level) {
 		if ($prefix_vars{'t_query'} !~
@@ -15822,8 +15865,8 @@ sub store_queries
 			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
 			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
-			if ($cur_info{$t_pid}{duration}) {
-
+			if ($cur_info{$t_pid}{duration} || $force_sample)
+			{
 				# update top slowest queries statistics
 				&set_top_slowest($cur_info{$t_pid}{cur_db}, 	$cur_info{$t_pid}{query},
 										$cur_info{$t_pid}{duration},
@@ -16421,6 +16464,12 @@ sub search_log_format
 	{
 	       $fmt = 'rds';
 
+	} elsif ($line =~
+			 /^'\d+-\d+-\d+T\d+:\d+:\d+Z [^\s]+ \[ db=(.*?) user=(.*?) pid=\d+ userid=\d+ xid=(.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+	  )
+	{
+	       $fmt = 'redshift';
+
 	# Are csv lines ?
 	} elsif (
 		(
@@ -16704,7 +16753,7 @@ sub build_log_line_prefix_regex
 		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?')],	      # remote host
 		'%p' => [('t_pid',	  '(\d+)')],							# process ID
 		'%n' => [('t_epoch',    '(\d{10}\.\d{3})')],      # timestamp as Unix epoch
-		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
+		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})[Z]*(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
 		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
 		'%l' => [('t_session_line', '(\d+)')],							# session line number
 		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2} \d{2}):\d{2}:\d{2}(?: [A-Z\+\-\d]{3,6})?')],    # session start timestamp
@@ -16763,7 +16812,7 @@ sub get_file_size
 	my $logf = shift;
 
 	# Remove log format from log file if any
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
@@ -16924,7 +16973,7 @@ sub get_log_file
 
 	return $lfile if ($totalsize == 0);
 
-	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds)\d*$//i;
+	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
 	my $ssh_download   = ($logf =~ /^ssh:/i) ? 1 : 0;
@@ -20227,10 +20276,10 @@ sub set_dicts {
 
     my @redshift_keywords =  map { uc } qw(
         AES128 AES256 ALLOWOVERWRITE BACKUP BLANKSASNULL BYTEDICT BZIP2 CREDENTIALS CURRENT_USER_ID DEFLATE DEFRAG
-        DELTA DELTA32K DISABLE DISTKEY EMPTYASNULL ENABLE ENCODE ENCRYPT ENCRYPTION EXPLICIT GLOBALDICT256
+        DELTA DELTA32K DISABLE DISTKEY EMPTYASNULL ENABLE ENCODE ENCRYPT ENCRYPTION ESCAPE EXPLICIT GLOBALDICT256
         GLOBALDICT64K GZIP INTERLEAVED LUN LUNS LZO LZOP MINUS MOSTLY13 MOSTLY32 MOSTLY8 NEW OFFLINE OFFSET OID OLD
         PARALLEL PERCENT PERMISSIONS RAW READRATIO RECOVER REJECTLOG RESORT RESPECT RESTORE SORTKEY SYSDATE TAG TDES
-        TEXT255 TEXT32K TIMESTAMP TOP TRUNCATECOLUMNS WALLET
+        TEXT255 TEXT32K TIMESTAMP TOP TRUNCATECOLUMNS UNLOAD WALLET ADDQUOTES
         );
 
     for my $k ( @pg_keywords ) {
@@ -20239,8 +20288,8 @@ sub set_dicts {
     }
 
     for my $k ( @redshift_keywords ) {
-        next if grep { $k eq $_ } @sql_keywords;
-        push @sql_keywords, $k;
+        next if grep { $k eq $_ } @pg_keywords;
+        push @pg_keywords, $k;
     }
 
     my @pg_functions = map { lc } qw(
