@@ -285,7 +285,7 @@ my $ident                   = '';
 my $top                     = 0;
 my $sample                  = 3;
 my $extension               = '';
-my $maxlength               = 10480;
+my $maxlength               = 100000;
 my $graph                   = 1;
 my $nograph                 = 0;
 my $debug                   = 0;
@@ -1989,7 +1989,7 @@ Options:
 			     report per day with a log rotated each week.
     -L | --logfile-list file:file containing a list of log file to parse.
     -m | --maxlength size  : maximum length of a query, it will be restricted to
-			     the given size. Default truncate size is 10480.
+			     the given size. Default truncate size is $maxlength.
     -M | --no-multiline    : do not collect multiline statement to avoid garbage
 			     especially on errors that generate a huge report.
     -n | --nohighlight     : disable SQL code highlighting.

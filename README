@@ -52,7 +52,7 @@ SYNOPSIS
                                  report per day with a log rotated each week.
         -L | --logfile-list file:file containing a list of log file to parse.
         -m | --maxlength size  : maximum length of a query, it will be restricted to
-                                 the given size. Default truncate size is 10480.
+                                 the given size. Default truncate size is 100000.
         -M | --no-multiline    : do not collect multiline statement to avoid garbage
                                  especially on errors that generate a huge report.
         -n | --nohighlight     : disable SQL code highlighting.
@@ -293,10 +293,6 @@ SYNOPSIS
     format:
 
         pgbadger -f rds -o rds_out.html rds.log
-
-    or AWS RedShift logs using:
-
-        pgbadger -f redshift -o red_out.html red.log
 
     To create a cumulative report over a month use command:
 
