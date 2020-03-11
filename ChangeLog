@@ -4,20 +4,17 @@ This release of pgBadger fix several issues reported by users since
 past six months. It also adds some new features:
 
   * Add support and autodetection of AWS redshift log format.
-
   * Add support to pgbouncer 1.11 new log format.
-
   * Handle zstd and lz4 compression format
-
   * Allow to fully separate statistics build and HTML report build in
-    incremental mode without having to read a log file.  For example
+    incremental mode without having to read a log file. For example
     it is possible to run pgbadger each hours as follow:
     
         pgbadger -I -O "/out-dir/data" --noreport /var/log/postgresql*.log
     
-    thanks to `--noreport` it will just create the data binary files
-    in "/out-dir/data". Then for example you can make reports each
-    night for the next day in a separate directory `/out-dir/reports`:
+    It just creates the data binary files in "/out-dir/data" then
+   for example you can make reports each night for the next day in
+   a separate directory `/out-dir/reports`:
     
         pgbadger -I -l "/out-dir/data/LAST_PARSED" -H "/out-dir/reports" /out-dir/data/2020/02/19/*.bin
     
@@ -25,7 +22,7 @@ past six months. It also adds some new features:
     path where HTML reports will be written and the binary data file
     of the day.
 
-There is a new command line option:
+There is also new command line options:
 
   * Add new command line option --explain-url used to override the url
     of the graphical explain tool. Default URL is:
@@ -38,7 +35,7 @@ There is a new command line option:
 
   * Add new option --no-week to instruct pgbadger to not build weekly
     reports in incremental mode. Useful if it takes too much time and
-    memory.
+    resources.
 
   * Add new command line option --command to be able to set a command
     that pgBadger will execute to retrieve log entries on stdin.
@@ -62,11 +59,12 @@ There is a new command line option:
 
 Backward compatibility:
 
-  - By default pgBadger will truncate all queries to 10480 characters.
-    This arbitrary value and can be increased using --maxlength.
-    Previous behavior was to not truncate queries at all but this could
+  - By default pgBadger will truncate queries up to 100000 characters.
+    This arbitrary value and can be adjusted using option --maxlength.
+    Previous behavior was to not truncate queries but this could
     lead in excessive resources usage. Limiting default size is safer
-    and the size limit might allow no truncate in most cases.
+    and the size limit might allow no truncate in most cases. However
+    queries will not be beautified if they exceed 25000 characters.
 
 Here is the complete list of changes and acknowledgments:
 
@@ -98,7 +96,7 @@ Here is the complete list of changes and acknowledgments:
   - Update documentation to inform that lc_messages = 'en_US.UTF-8'
     is valid too. Thanks to nodje for the report.
   - Update documentation about --maxlength which default truncate size
-    is 10480 and no more default to no truncate. Thanks to nodje for
+    is 100000 and no more default to no truncate. Thanks to nodje for
     the report.
   - Fix retention calculation at year overlap. Thanks to Fabio Pereira
     for the patch.
@@ -140,7 +138,6 @@ Here is the complete list of changes and acknowledgments:
     Massimo Sala for the report.
   - Fix RDS log parsing for rows without client/user/db information.
     Thanks to Konrad for the report.
-
 
 2019-09-16 - v11.1
 
