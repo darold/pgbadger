@@ -1,10 +1,11 @@
-use Test::Simple tests => 8;
+use Test::Simple tests => 10;
 use JSON::XS;
 
 my $json = new JSON::XS;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
 my $HLOG = 't/fixtures/logplex.gz';
+my $RDS_LOG = 't/fixtures/rds.log.bz2';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
 
@@ -35,6 +36,13 @@ $ret = `perl pgbadger -q -o $OUT $HLOG`;
 ok( $? == 0, "Generate json report for heroku log file");
 $json_ref = $json->decode(`cat $OUT`);
 ok( $json_ref->{database_info}{postgres}{GREEN}{"cte|duration"} eq "21761.546", "Consistent CTE duration");
+
+#`rm -f $OUT`;
+
+$ret = `perl pgbadger -q -o $OUT --exclude-client 192.168.1.201 $RDSLOG`;
+ok( $? == 0, "Generate json report from RDS log file with --exclude-client");
+$json_ref = $json->decode(`cat $OUT`);
+ok( $json_ref->{overall_stat}{postgres}{queries_number} eq "3", "Consistent RDS + exclude client");
 
 `rm -f $OUT`;
 
