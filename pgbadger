@@ -279,7 +279,7 @@ my @dbappname               = ();
 my @exclude_user            = ();
 my @exclude_appname         = ();
 my @exclude_db              = ();
-my @exclude_dbclient        = ();
+my @exclude_client        = ();
 my @exclude_line            = ();
 my $ident                   = '';
 my $top                     = 0;
@@ -494,7 +494,7 @@ my $result = GetOptions(
 	"exclude-query=s"          => \@exclude_query,
 	"exclude-file=s"           => \$exclude_file,
 	"exclude-db=s"             => \@exclude_db,
-	"exclude-dbclient=s"       => \@exclude_dbclient,
+	"exclude-client=s"         => \@exclude_client,
 	"exclude-appname=s"        => \@exclude_appname,
 	"include-query=s"          => \@include_query,
 	"exclude-line=s"           => \@exclude_line,
@@ -14381,11 +14381,11 @@ sub compute_arg_list
 	push(@exclude_line, @tmp);
 
 	@tmp = ();
-	foreach my $v (@exclude_dbclient) {
+	foreach my $v (@exclude_client) {
 		push(@tmp, split(/,/, $v));
 	}
-	@exclude_dbclient = ();
-	push(@exclude_dbclient, @tmp);
+	@exclude_client = ();
+	push(@exclude_client, @tmp);
 
 }
 
@@ -14486,10 +14486,10 @@ sub validate_log_line
 		}
 	}
 
-	if ($#exclude_dbclient >= 0) {
+	if ($#exclude_client >= 0) {
 
 		# Log line matches the excluded dbclient
-		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_dbclient)) {
+		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_client)) {
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
