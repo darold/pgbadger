@@ -67,7 +67,7 @@ my @SQL_ACTION   = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'COPY FROM', 'COPY T
 my @LATENCY_PERCENTILE = sort {$a <=> $b} (99,95,90);
 my $graphid      = 1;
 my $NODATA       = '<div class="jqplot-graph"><blockquote><b>NO DATASET</b></blockquote></div>';
-my $MAX_QUERY_LENGTH = 20480;
+my $MAX_QUERY_LENGTH = 25000;
 my $terminate = 0;
 my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
