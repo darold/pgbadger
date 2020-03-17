@@ -68,6 +68,9 @@ Backward compatibility:
 
 Here is the complete list of changes and acknowledgments:
 
+  - Fix non working --exclude-client option. Thanks to John Walsh
+    for the report.
+  - Add regression test for RDS log parsing and --exclude-client.
   - Fix progress bar for pgbouncer log file. The "queries" label is
     changed in "stats" for pgbouncer log files.
   - Add command line option --explain-url used to override the url
