@@ -376,6 +376,7 @@ my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 my $remote_host = '';
 my $ssh_command = '';
 my $ssh_bin = 'ssh';
+my $ssh_port = 22;
 my $ssh_identity = '';
 my $ssh_user = '';
 my $ssh_timeout = 10;
@@ -515,6 +516,7 @@ my $result = GetOptions(
 	"exclude-time=s"           => \@exclude_time,
 	'ssh-command=s'	           => \$ssh_command,
 	'ssh-program=s'	           => \$ssh_bin,
+	'ssh-port=i'	           => \$ssh_port,
 	'ssh-identity=s'	   => \$ssh_identity,
 	'ssh-option=s'	           => \$ssh_options,
 	'ssh-user=s'	           => \$ssh_user,
@@ -2122,7 +2124,8 @@ pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
 some additional options to fully control the ssh connection.
 
-    --ssh-program ssh	path to the ssh program to use. Default: ssh.
+    --ssh-program ssh	     path to the ssh program to use. Default: ssh.
+    --ssh-port port          ssh port to use for the connection. Default: 22.
     --ssh-user username      connection login name. Default to running user.
     --ssh-identity file      path to the identity file to use.
     --ssh-timeout second     timeout to ssh connection failure. Default 10 secs.
@@ -2156,7 +2159,7 @@ Use URI notation for remote log file:
 
     pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
     pgbadger ftp://username\@172.12.110.14/postgresql-10.1-main.log
-    pgbadger ssh://username\@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+    pgbadger ssh://username\@172.12.110.14:2222//var/log/postgresql/postgresql-10.1-main.log*
 
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
@@ -2288,6 +2291,7 @@ sub set_ssh_command
 	}
 
 	$ssh_cmd = $ssh_bin || 'ssh';
+	$ssh_cmd .= " -p $ssh_port" if ($ssh_port);
 	$ssh_cmd .= " -i $ssh_identity" if ($ssh_identity);
 	$ssh_cmd .= " $ssh_options" if ($ssh_options);
 	if ($ssh_user && $rhost !~ /\@/) {
@@ -2373,12 +2377,16 @@ sub set_file_list
 				my $host_info = $1;
 				my $file = $2;
 				my $ssh = $ssh_command || 'ssh';
+				if ($host_info =~ s/:(\d+)$//) {
+					$host_info = "-p $1 $host_info";
+				}
 				my($filename, $dirs, $suffix) = fileparse($file);
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
 				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
 				$dirs = '' if ( $filename ne '' ); #ls returns relative paths for an directory but absolute ones for a file or filename pattern 
 				foreach my $f (@rfiles)
 				{
+					$host_info =~ s/-p (\d+) (.*)/$2:$1/; 
 					push(@lfiles, "ssh://$host_info/$dirs$f$fmt");
 				}
 			}
@@ -16861,6 +16869,9 @@ sub get_file_size
 			my $host_info = $1;
 			my $file = $2;
 			my $ssh = $ssh_command || 'ssh';
+			if ($host_info =~ s/:(\d+)$//) {
+				$host_info = "-p $1 $host_info";
+			}
 			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l '$file'\" | awk '{print \$5}'");
 			$totalsize = `$ssh $host_info "ls -l '$file'" | awk '{print \$5}'`;
 			chomp($totalsize);
@@ -16917,6 +16928,9 @@ sub get_file_size
 			my $host_info = $1;
 			my $file = $2;
 			my $ssh = $ssh_command || 'ssh';
+			if ($host_info =~ s/:(\d+)$//) {
+				$host_info = "-p $1 $host_info";
+			}
 			$cmd_file_size =~ s/\%f/$file/g;
 			$cmd_file_size =~ s/\$/\\\$/g;
 			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"$cmd_file_size\"");
@@ -17032,6 +17046,9 @@ sub get_log_file
 					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
 						my $host_info = $1;
 						my $file = $2;
+						if ($host_info =~ s/:(\d+)$//) {
+							$host_info = "-p $1 $host_info";
+						}
 						my $ssh = $ssh_command || 'ssh';
 						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat '$file'\" |");
 						# Open a pipe to cat program
@@ -17053,6 +17070,9 @@ sub get_log_file
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
+					if ($host_info =~ s/:(\d+)$//) {
+						$host_info = "-p $1 $host_info";
+					}
 					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 '$file'\" |");
 					# Open a pipe to cat program
 					open($lfile, '-|', "$ssh $host_info \"tail -n 100 '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
@@ -17103,6 +17123,9 @@ sub get_log_file
 						my $host_info = $1;
 						my $file = $2;
 						my $ssh = $ssh_command || 'ssh';
+						if ($host_info =~ s/:(\d+)$//) {
+							$host_info = "-p $1 $host_info";
+						}
 						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 						# Open a pipe to zcat program for compressed log
 						open($lfile, '-|', "$ssh $host_info \"$uncompress '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
@@ -17123,6 +17146,9 @@ sub get_log_file
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
+					if ($host_info =~ s/:(\d+)$//) {
+						$host_info = "-p $1 $host_info";
+					}
 					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 					# Open a pipe to zcat program for compressed log
 					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' '$file'\". $!\n");

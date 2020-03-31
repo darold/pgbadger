@@ -186,7 +186,8 @@ SYNOPSIS
     hostname. There's also some additional options to fully control the ssh
     connection.
 
-        --ssh-program ssh   path to the ssh program to use. Default: ssh.
+        --ssh-program ssh        path to the ssh program to use. Default: ssh.
+        --ssh-port port          ssh port to use for the connection. Default: 22.
         --ssh-user username      connection login name. Default to running user.
         --ssh-identity file      path to the identity file to use.
         --ssh-timeout second     timeout to ssh connection failure. Default 10 secs.
@@ -221,7 +222,7 @@ SYNOPSIS
 
         pgbadger http://172.12.110.1//var/log/postgresql/postgresql-10.1-main.log
         pgbadger ftp://username@172.12.110.14/postgresql-10.1-main.log
-        pgbadger ssh://username@172.12.110.14//var/log/postgresql/postgresql-10.1-main.log*
+        pgbadger ssh://username@172.12.110.14:2222//var/log/postgresql/postgresql-10.1-main.log*
 
     You can use together a local PostgreSQL log and a remote pgbouncer log
     file to parse:
