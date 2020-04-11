@@ -255,7 +255,7 @@ my $lz4cat                  = 'lz4cat';
 my $ucat                    = 'unzip -p';
 my $xzcat                   = 'xzcat';
 my $zstdcat                 = 'zstdcat';
-my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
+my $gzip_uncompress_size    = "gunzip -l \"%f\" | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 
 # lz4 archive can only contain one file.
 # Original size can be retrieved only if --content-size has been used for compression
