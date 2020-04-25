@@ -370,6 +370,7 @@ my %prefix_vars = ();
 my $q_prefix    = '';
 my @prefix_q_params = ();
 my %last_execute_stmt = ();
+my $disable_process_title = 0;
 
 my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
@@ -541,6 +542,7 @@ my $result = GetOptions(
 	'no-week!'                 => \$noweekreport,
 	'explain-url=s'            => \$EXPLAIN_URL,
 	'tempdir=s'                => \$TMP_DIR,
+	'no-process-info!'          => \$disable_process_title
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -2129,6 +2131,8 @@ Options:
                              tool. Default: $EXPLAIN_URL
     --tempdir DIR          : set directory where temporary files will be written
                              Default: File::Spec->tmpdir() || '/tmp'
+    --no-process-info      : disable changing process title to help identify
+                             pgbadger process, some system do not support it.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -3092,7 +3096,7 @@ sub multiprocess_progressbar
 
 	&logmsg('DEBUG', "Starting progressbar writer process");
 
-	$0 = 'pgbadger logger';
+	$0 = 'pgbadger logger' if (!$disable_process_title);
 
 	# Terminate the process when we haven't read the complete file but must exit
 	local $SIG{USR1} = sub {
@@ -3191,7 +3195,7 @@ sub process_file
 
 	$start_offset       ||= 0;
 
-	$0 = 'pgbadger parser';
+	$0 = 'pgbadger parser' if (!$disable_process_title);
 
 	&init_stats_vars() if ($tmpoutfile);
 

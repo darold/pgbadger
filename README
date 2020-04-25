@@ -182,6 +182,8 @@ SYNOPSIS
                                  tool. Default: http://explain.depesz.com/?is_public=0&is_anon=0&plan=
         --tempdir DIR          : set directory where temporary files will be written
                                  Default: File::Spec->tmpdir() || '/tmp'
+        --no-process-info      : disable changing process title to help identify
+                                 pgbadger process, some system do not support it.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
