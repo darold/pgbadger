@@ -199,6 +199,8 @@ Options:
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
                              tool. Default: http://explain.depesz.com/?is_public=0&is_anon=0&plan=
+    --tempdir DIR          : set directory where temporary files will be written
+                             Default: File::Spec->tmpdir() || '/tmp'
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also

@@ -540,6 +540,7 @@ my $result = GetOptions(
 	'command=s'                => \$log_command,
 	'no-week!'                 => \$noweekreport,
 	'explain-url=s'            => \$EXPLAIN_URL,
+	'tempdir=s'                => \$TMP_DIR,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -555,6 +556,13 @@ if ($ver) {
 	exit 0;
 }
 &usage() if ($help);
+
+# Create temporary file directory if not exists
+mkdir("$TMP_DIR") if (!-d "$TMP_DIR");
+if (!-d "$TMP_DIR")
+{
+	die("Can not use temporary directory $TMP_DIR.\n");
+}
 
 # Try to load Digest::MD5 when asked
 if ($enable_checksum) {
@@ -2119,6 +2127,8 @@ Options:
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
                              tool. Default: $EXPLAIN_URL
+    --tempdir DIR          : set directory where temporary files will be written
+                             Default: File::Spec->tmpdir() || '/tmp'
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
