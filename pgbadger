@@ -14899,17 +14899,17 @@ sub parse_query
 	if (
 		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
-/automatic vacuum of table "([^\s]+)": index scans: (\d+)/
+/automatic (aggressive )?vacuum (to prevent wraparound )?of table "([^\s]+)": index scans: (\d+)/
 		   )
 	   )
 	{
 		return if ($disable_autovacuum);
 		
-		$cur_info{$t_pid}{vacuum} = $1;
+		$cur_info{$t_pid}{vacuum} = $3;
 
-		my $idxscan = $2;
+		my $idxscan = $4;
 		$cur_info{$t_pid}{vacuum} =~ /^([^\.]+)\./;
-		$curdb = $1;
+		$curdb = $3;
 
 		if (!$report_per_database) {
 			$curdb = $DBALL;
@@ -14922,14 +14922,14 @@ sub parse_query
 
 		if ($fmt eq 'csv') {
 			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-				if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
-					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
+				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
 					$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$t_pid}{vacuum};
 					$autovacuum_info{$curdb}{peak}{system_usage}{date} =
 						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
