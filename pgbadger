@@ -371,6 +371,7 @@ my $q_prefix    = '';
 my @prefix_q_params = ();
 my %last_execute_stmt = ();
 my $disable_process_title = 0;
+my $dump_all_queries = 0;
 
 my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
@@ -542,7 +543,8 @@ my $result = GetOptions(
 	'no-week!'                 => \$noweekreport,
 	'explain-url=s'            => \$EXPLAIN_URL,
 	'tempdir=s'                => \$TMP_DIR,
-	'no-process-info!'          => \$disable_process_title
+	'no-process-info!'         => \$disable_process_title,
+	'dump-all-queries!'        => \$dump_all_queries
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -683,7 +685,7 @@ if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command) {
 	}
 }
 
-if ($#outfiles >= 1 && $dump_normalized_only)
+if ($#outfiles >= 1 && ($dump_normalized_only || $dump_all_queries))
 {
 	localdie("FATAL: dump of normalized queries can not ne used with multiple output.\n\n");
 }
@@ -754,7 +756,7 @@ if (!$timezone) {
 # Set output file
 my $outfile = '';
 $outfile = $outfiles[0] if ($#outfiles >= 0);
-if ($dump_normalized_only && $outfile && $outfile !~ /\.txt$/){
+if (($dump_normalized_only || $dump_all_queries) && $outfile && $outfile !~ /\.txt$/){
 	localdie("FATAL: dump of normalized queries can be done in text output format, please use .txt extension.\n\n");
 }
 
@@ -778,7 +780,7 @@ if ($#outfiles >= 1)
 }
 elsif ($#outfiles == -1)
 {
-	$extension = 'txt' if ($dump_normalized_only);
+	$extension = 'txt' if ($dump_normalized_only || $dump_all_queries);
 	($extension) ? push(@outfiles, 'out.' . $extension) : push(@outfiles, 'out.html');
 	map { s/\.text/.txt/; } @outfiles;
 
@@ -1532,6 +1534,12 @@ if (!$last_parsed) {
 	$pgb_saved_last_line{current_pos} = 0;
 }
 
+if ($dump_all_queries)
+{
+	$fh = new IO::File;
+	$fh->open($outfiles[0], '>') or localdie("FATAL: can't open output file $outfiles[0], $!\n");
+}
+
 ####
 # Start parsing all log files
 ####
@@ -1804,6 +1812,19 @@ if ($terminate)
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
+
+if ($dump_all_queries)
+{
+	$fh->close();
+
+	# Remove pidfile and temporary file
+	unlink($tmp_dblist) if ($tmp_dblist);
+	unlink("$PID_FILE");
+	unlink("$last_parsed.tmp") if (-e "$last_parsed.tmp");
+	unlink($TMP_DIR . "/pgbadger_tmp_$$.bin") if ($#outfiles >= 1);
+
+	exit 0;
+}
 
 # Read the list of database we have proceeded in all child process
 if ($report_per_database)
@@ -15562,6 +15583,31 @@ sub store_queries
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
 	}
 
+	# In dump all queries mode we just print the query to output file
+	if ($dump_all_queries && $cur_info{$t_pid}{loglevel} eq 'LOG')
+	{
+
+		# Replace bind parameters values in the query if any
+		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/)) {
+			my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
+			shift(@t_res);
+			for (my $i = 0 ; $i < $#t_res ; $i += 2) {
+				$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+			}
+		} else {
+			# parameters from EXECUTE statements
+			my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
+			for (my $i = 0 ; $i <= $#t_res ; $i++) {
+				my $num = $i + 1;
+				$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
+			}
+		}
+		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
+		print $fh "$cur_info{$t_pid}{query}\n";
+		$overall_stat{'queries_number'}++;
+		return 1;
+	}
+
 	# Anonymize query if requested by the user
 	if ($anonymize && exists $cur_info{$t_pid}{query}) {
 		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
@@ -17563,10 +17609,10 @@ sub set_output_extension
 
 	$is_tsung_output = 1 if ($ext eq 'tsung');
 
-	if ($dump_normalized_only) {
+	if ($dump_normalized_only || $dump_all_queries) {
 		$ext = 'txt';
 		$incremental = 0;
-		$report_title = 'Normalized query report' if (!$report_title);
+		$report_title = 'Normalized query report' if (!$report_title && !$dump_all_queries);
 	}
 
 	$of ||= 'out.' . $ext;
