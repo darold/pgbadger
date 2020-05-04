@@ -1,11 +1,12 @@
-use Test::Simple tests => 10;
+use Test::Simple tests => 12;
 use JSON::XS;
 
 my $json = new JSON::XS;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
 my $HLOG = 't/fixtures/logplex.gz';
-my $RDS_LOG = 't/fixtures/rds.log.bz2';
+my $RDSLOG = 't/fixtures/rds.log.bz2';
+my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
 
@@ -37,12 +38,19 @@ ok( $? == 0, "Generate json report for heroku log file");
 $json_ref = $json->decode(`cat $OUT`);
 ok( $json_ref->{database_info}{postgres}{GREEN}{"cte|duration"} eq "21761.546", "Consistent CTE duration");
 
-#`rm -f $OUT`;
+`rm -f $OUT`;
 
 $ret = `perl pgbadger -q -o $OUT --exclude-client 192.168.1.201 $RDSLOG`;
 ok( $? == 0, "Generate json report from RDS log file with --exclude-client");
 $json_ref = $json->decode(`cat $OUT`);
-ok( $json_ref->{overall_stat}{postgres}{queries_number} eq "3", "Consistent RDS + exclude client");
+ok( $json_ref->{normalyzed_info}{postgres}{'select datname from pg_database where not datistemplate and datallowconn;'}{duration} eq "2.667", "Consistent RDS + exclude client");
+
+`rm -f $OUT`;
+
+$ret = `perl pgbadger -q -o $OUT $GCPLOG`;
+ok( $? == 0, "Generate json report from CloudSQL log file");
+$json_ref = $json->decode(`cat $OUT`);
+ok( $json_ref->{connection_info}{postgres}{database_user}{cloudsqladmin}{cloudsqladmin} eq "151", "Consistent CloudSQL log format");
 
 `rm -f $OUT`;
 

@@ -2268,6 +2268,15 @@ rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
 
+CloudSQL Postgresql logs it's fairly normal PostgreSQL log but encapsulated in
+JSON format. It is auto detected too by pgBagder but in case you need to force
+the log format, use `jsonlog`
+
+    pgbadger -f jsonlog -o cloudsql_out.html cloudsql.log
+
+This is the same than with the jsonlog extension, the json format is different
+but pgBadger can parse both format.
+
 To create a cumulative report over a month use command:
 
     pgbadger --month-report 2919-05 /path/to/incremantal/reports/
@@ -3701,9 +3710,21 @@ sub process_file
 			%prefix_vars = ();
 
 			# Parse jsonlog lines
-			if ($is_json_log) {
-
+			if ($is_json_log)
+			{
 				%prefix_vars = parse_jsonlog_input($line);
+
+				$cur_pid = $prefix_vars{'t_pid'} if ($prefix_vars{'t_pid'});
+
+				# Collect orphaned lines of multiline queries
+				if (!$prefix_vars{'t_loglevel'} && $cur_pid)
+				{
+					# Some log line may be written by applications
+					next if ($line =~ /\bLOG:  /);
+
+					# Parse orphan lines to append information to the right place
+					&parse_orphan_line($cur_pid, $line);
+				}
 
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
@@ -3848,7 +3869,7 @@ sub process_file
 
 					# Some log line may be written by applications
 					next if ($t_query =~ /\bLOG:  /);
-					# Parse orphan lines to append inforamtion to the right place
+					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $t_query);
 
 				# Collect orphaned lines of multiline queries
@@ -4188,7 +4209,7 @@ sub parse_jsonlog_input
 	my %infos = ();
 
 	# Extract the date
-	if ($str =~ m/\{"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
+	if ($str =~ m/[\{,]"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
 
 		$infos{'t_year'} = $1;
 		$infos{'t_month'} = $2;
@@ -4205,11 +4226,17 @@ sub parse_jsonlog_input
 	# Set query parameters as global variables
 	if ($str =~ m/"user":"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbuser'}  = $1;
+	} elsif ($str =~ m/,user=([\s]*) /) {
+		$infos{'t_dbuser'}  = $1;
 	}
 	if ($str =~ m/"dbname":"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbname'}  = $1;
+	} elsif ($str =~ m/ db=([^,]*),/) {
+		$infos{'t_dbname'}  = $1;
 	}
 	if ($str =~ m/"application_name":"(.*?)"(?:,"|\})/) {
+		$infos{'t_appname'} = $1;
+	} elsif ($str =~ m/"project_id":"([^"])"/) {
 		$infos{'t_appname'} = $1;
 	}
 	if ($str =~ m/"remote_host":"(.*?)"(?:,"|\})/) {
@@ -4220,9 +4247,16 @@ sub parse_jsonlog_input
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
 	if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
 		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"textPayload":"\[(\d+)\]:/) {
+		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"textPayload":"(.*)","timestamp":"/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
 	}
 	if ($str =~ m/"error_severity":"(.*?)"(?:,"|\})/) {
 		$infos{'t_loglevel'} = $1;
+	} elsif ($str =~ m/user=[^\s]* ([^:]+):  (.*)","timestamp":"/) {
+		$infos{'t_loglevel'} = $1;
+		$infos{'t_query'} = unescape_jsonlog($2);
 	}
 	if ($str =~ m/"state_code":"(.*?)"(?:,"|\})/) {
 		$infos{'t_sqlstate'} = $1;
@@ -14944,7 +14978,7 @@ sub parse_query
 		$autovacuum_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{count}++;
 
-		if ($fmt eq 'csv') {
+		if ($fmt eq 'csv' || $fmt eq 'jsonlog') {
 			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
 				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $3;
 			}
@@ -16578,7 +16612,7 @@ sub search_log_format
 		$pgbouncer_only = 1 if ($#log_files == 0);
 
 	# jsonlog lines
-	} elsif ($line =~ /\{"timestamp":"/) {
+	} elsif ($line =~ /\{"(timestamp|insertId)":"/) {
 		$fmt = 'jsonlog';
 	}
 
