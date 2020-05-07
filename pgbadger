@@ -255,7 +255,7 @@ my $lz4cat                  = 'lz4cat';
 my $ucat                    = 'unzip -p';
 my $xzcat                   = 'xzcat';
 my $zstdcat                 = 'zstdcat';
-my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
+my $gzip_uncompress_size    = "gunzip -l \"%f\" | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 
 # lz4 archive can only contain one file.
 # Original size can be retrieved only if --content-size has been used for compression
@@ -370,6 +370,8 @@ my %prefix_vars = ();
 my $q_prefix    = '';
 my @prefix_q_params = ();
 my %last_execute_stmt = ();
+my $disable_process_title = 0;
+my $dump_all_queries = 0;
 
 my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
@@ -540,6 +542,9 @@ my $result = GetOptions(
 	'command=s'                => \$log_command,
 	'no-week!'                 => \$noweekreport,
 	'explain-url=s'            => \$EXPLAIN_URL,
+	'tempdir=s'                => \$TMP_DIR,
+	'no-process-info!'         => \$disable_process_title,
+	'dump-all-queries!'        => \$dump_all_queries
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -555,6 +560,13 @@ if ($ver) {
 	exit 0;
 }
 &usage() if ($help);
+
+# Create temporary file directory if not exists
+mkdir("$TMP_DIR") if (!-d "$TMP_DIR");
+if (!-d "$TMP_DIR")
+{
+	die("Can not use temporary directory $TMP_DIR.\n");
+}
 
 # Try to load Digest::MD5 when asked
 if ($enable_checksum) {
@@ -673,7 +685,7 @@ if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command) {
 	}
 }
 
-if ($#outfiles >= 1 && $dump_normalized_only)
+if ($#outfiles >= 1 && ($dump_normalized_only || $dump_all_queries))
 {
 	localdie("FATAL: dump of normalized queries can not ne used with multiple output.\n\n");
 }
@@ -744,7 +756,7 @@ if (!$timezone) {
 # Set output file
 my $outfile = '';
 $outfile = $outfiles[0] if ($#outfiles >= 0);
-if ($dump_normalized_only && $outfile && $outfile !~ /\.txt$/){
+if (($dump_normalized_only || $dump_all_queries) && $outfile && $outfile !~ /\.txt$/){
 	localdie("FATAL: dump of normalized queries can be done in text output format, please use .txt extension.\n\n");
 }
 
@@ -768,7 +780,7 @@ if ($#outfiles >= 1)
 }
 elsif ($#outfiles == -1)
 {
-	$extension = 'txt' if ($dump_normalized_only);
+	$extension = 'txt' if ($dump_normalized_only || $dump_all_queries);
 	($extension) ? push(@outfiles, 'out.' . $extension) : push(@outfiles, 'out.html');
 	map { s/\.text/.txt/; } @outfiles;
 
@@ -1522,6 +1534,12 @@ if (!$last_parsed) {
 	$pgb_saved_last_line{current_pos} = 0;
 }
 
+if ($dump_all_queries)
+{
+	$fh = new IO::File;
+	$fh->open($outfiles[0], '>') or localdie("FATAL: can't open output file $outfiles[0], $!\n");
+}
+
 ####
 # Start parsing all log files
 ####
@@ -1794,6 +1812,19 @@ if ($terminate)
 my $t1 = Benchmark->new;
 my $td = timediff($t1, $t0);
 &logmsg('DEBUG', "the log statistics gathering took:" . timestr($td));
+
+if ($dump_all_queries)
+{
+	$fh->close();
+
+	# Remove pidfile and temporary file
+	unlink($tmp_dblist) if ($tmp_dblist);
+	unlink("$PID_FILE");
+	unlink("$last_parsed.tmp") if (-e "$last_parsed.tmp");
+	unlink($TMP_DIR . "/pgbadger_tmp_$$.bin") if ($#outfiles >= 1);
+
+	exit 0;
+}
 
 # Read the list of database we have proceeded in all child process
 if ($report_per_database)
@@ -2119,6 +2150,13 @@ Options:
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
                              tool. Default: $EXPLAIN_URL
+    --tempdir DIR          : set directory where temporary files will be written
+                             Default: File::Spec->tmpdir() || '/tmp'
+    --no-process-info      : disable changing process title to help identify
+                             pgbadger process, some system do not support it.
+    --dump-all-queries     : dump all queries found in the log file replacing
+                             bind parameters are included in the queries at
+			     their respective placeholders position.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -2229,6 +2267,15 @@ pgBadger can auto detect RDS and cloudwatch PostgreSQL logs using
 rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
+
+CloudSQL Postgresql logs it's fairly normal PostgreSQL log but encapsulated in
+JSON format. It is auto detected too by pgBagder but in case you need to force
+the log format, use `jsonlog`
+
+    pgbadger -f jsonlog -o cloudsql_out.html cloudsql.log
+
+This is the same than with the jsonlog extension, the json format is different
+but pgBadger can parse both format.
 
 To create a cumulative report over a month use command:
 
@@ -3082,7 +3129,7 @@ sub multiprocess_progressbar
 
 	&logmsg('DEBUG', "Starting progressbar writer process");
 
-	$0 = 'pgbadger logger';
+	$0 = 'pgbadger logger' if (!$disable_process_title);
 
 	# Terminate the process when we haven't read the complete file but must exit
 	local $SIG{USR1} = sub {
@@ -3181,7 +3228,7 @@ sub process_file
 
 	$start_offset       ||= 0;
 
-	$0 = 'pgbadger parser';
+	$0 = 'pgbadger parser' if (!$disable_process_title);
 
 	&init_stats_vars() if ($tmpoutfile);
 
@@ -3663,9 +3710,21 @@ sub process_file
 			%prefix_vars = ();
 
 			# Parse jsonlog lines
-			if ($is_json_log) {
-
+			if ($is_json_log)
+			{
 				%prefix_vars = parse_jsonlog_input($line);
+
+				$cur_pid = $prefix_vars{'t_pid'} if ($prefix_vars{'t_pid'});
+
+				# Collect orphaned lines of multiline queries
+				if (!$prefix_vars{'t_loglevel'} && $cur_pid)
+				{
+					# Some log line may be written by applications
+					next if ($line =~ /\bLOG:  /);
+
+					# Parse orphan lines to append information to the right place
+					&parse_orphan_line($cur_pid, $line);
+				}
 
 				# Skip unwanted lines
 				my $res = &skip_unwanted_line();
@@ -3810,7 +3869,7 @@ sub process_file
 
 					# Some log line may be written by applications
 					next if ($t_query =~ /\bLOG:  /);
-					# Parse orphan lines to append inforamtion to the right place
+					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $t_query);
 
 				# Collect orphaned lines of multiline queries
@@ -4150,7 +4209,7 @@ sub parse_jsonlog_input
 	my %infos = ();
 
 	# Extract the date
-	if ($str =~ m/\{"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
+	if ($str =~ m/[\{,]"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
 
 		$infos{'t_year'} = $1;
 		$infos{'t_month'} = $2;
@@ -4167,11 +4226,17 @@ sub parse_jsonlog_input
 	# Set query parameters as global variables
 	if ($str =~ m/"user":"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbuser'}  = $1;
+	} elsif ($str =~ m/,user=([\s]*) /) {
+		$infos{'t_dbuser'}  = $1;
 	}
 	if ($str =~ m/"dbname":"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbname'}  = $1;
+	} elsif ($str =~ m/ db=([^,]*),/) {
+		$infos{'t_dbname'}  = $1;
 	}
 	if ($str =~ m/"application_name":"(.*?)"(?:,"|\})/) {
+		$infos{'t_appname'} = $1;
+	} elsif ($str =~ m/"project_id":"([^"])"/) {
 		$infos{'t_appname'} = $1;
 	}
 	if ($str =~ m/"remote_host":"(.*?)"(?:,"|\})/) {
@@ -4182,9 +4247,16 @@ sub parse_jsonlog_input
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
 	if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
 		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"textPayload":"\[(\d+)\]:/) {
+		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"textPayload":"(.*)","timestamp":"/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
 	}
 	if ($str =~ m/"error_severity":"(.*?)"(?:,"|\})/) {
 		$infos{'t_loglevel'} = $1;
+	} elsif ($str =~ m/user=[^\s]* ([^:]+):  (.*)","timestamp":"/) {
+		$infos{'t_loglevel'} = $1;
+		$infos{'t_query'} = unescape_jsonlog($2);
 	}
 	if ($str =~ m/"state_code":"(.*?)"(?:,"|\})/) {
 		$infos{'t_sqlstate'} = $1;
@@ -14885,17 +14957,17 @@ sub parse_query
 	if (
 		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
-/automatic vacuum of table "([^\s]+)": index scans: (\d+)/
+/automatic (aggressive )?vacuum (to prevent wraparound )?of table "([^\s]+)": index scans: (\d+)/
 		   )
 	   )
 	{
 		return if ($disable_autovacuum);
 		
-		$cur_info{$t_pid}{vacuum} = $1;
+		$cur_info{$t_pid}{vacuum} = $3;
 
-		my $idxscan = $2;
+		my $idxscan = $4;
 		$cur_info{$t_pid}{vacuum} =~ /^([^\.]+)\./;
-		$curdb = $1;
+		$curdb = $3;
 
 		if (!$report_per_database) {
 			$curdb = $DBALL;
@@ -14906,16 +14978,16 @@ sub parse_query
 		$autovacuum_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{count}++;
 
-		if ($fmt eq 'csv') {
+		if ($fmt eq 'csv' || $fmt eq 'jsonlog') {
 			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-				if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
-					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
+				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
 					$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$t_pid}{vacuum};
 					$autovacuum_info{$curdb}{peak}{system_usage}{date} =
 						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
@@ -15546,6 +15618,31 @@ sub store_queries
 	# Remove comments if required
 	if ($remove_comment) {
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
+	}
+
+	# In dump all queries mode we just print the query to output file
+	if ($dump_all_queries && $cur_info{$t_pid}{loglevel} eq 'LOG')
+	{
+
+		# Replace bind parameters values in the query if any
+		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/)) {
+			my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
+			shift(@t_res);
+			for (my $i = 0 ; $i < $#t_res ; $i += 2) {
+				$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+			}
+		} else {
+			# parameters from EXECUTE statements
+			my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
+			for (my $i = 0 ; $i <= $#t_res ; $i++) {
+				my $num = $i + 1;
+				$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
+			}
+		}
+		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
+		print $fh "$cur_info{$t_pid}{query}\n";
+		$overall_stat{'queries_number'}++;
+		return 1;
 	}
 
 	# Anonymize query if requested by the user
@@ -16515,7 +16612,7 @@ sub search_log_format
 		$pgbouncer_only = 1 if ($#log_files == 0);
 
 	# jsonlog lines
-	} elsif ($line =~ /\{"timestamp":"/) {
+	} elsif ($line =~ /\{"(timestamp|insertId)":"/) {
 		$fmt = 'jsonlog';
 	}
 
@@ -17549,10 +17646,10 @@ sub set_output_extension
 
 	$is_tsung_output = 1 if ($ext eq 'tsung');
 
-	if ($dump_normalized_only) {
+	if ($dump_normalized_only || $dump_all_queries) {
 		$ext = 'txt';
 		$incremental = 0;
-		$report_title = 'Normalized query report' if (!$report_title);
+		$report_title = 'Normalized query report' if (!$report_title && !$dump_all_queries);
 	}
 
 	$of ||= 'out.' . $ext;

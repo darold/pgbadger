@@ -199,6 +199,13 @@ Options:
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
                              tool. Default: http://explain.depesz.com/?is_public=0&is_anon=0&plan=
+    --tempdir DIR          : set directory where temporary files will be written
+                             Default: File::Spec->tmpdir() || '/tmp'
+    --no-process-info      : disable changing process title to help identify
+                             pgbadger process, some system do not support it.
+    --dump-all-queries     : dump all queries found in the log file replacing
+                             bind parameters are included in the queries at
+                             their respective placeholders position.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -309,6 +316,15 @@ pgBadger can auto detect RDS and cloudwatch PostgreSQL logs using
 rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
+
+CloudSQL Postgresql logs it's fairly normal PostgreSQL log but encapsulated in
+JSON format. It is auto detected too by pgBagder but in case you need to force
+the log format, use \`jsonlog\`
+
+    pgbadger -f jsonlog -o cloudsql_out.html cloudsql.log
+
+This is the same than with the jsonlog extension, the json format is different
+but pgBadger can parse both format.
 
 To create a cumulative report over a month use command:
 
