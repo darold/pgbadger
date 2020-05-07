@@ -18086,6 +18086,8 @@ sub _pop_level
         print STDERR "DEBUG_POP: line: $line => last=", ($last_token||''), ", token=$token\n";
     }
 
+    return 0 if ($#{ $self->{ '_level_stack' } } == -1);
+
     return pop( @{ $self->{ '_level_stack' } } ) || 0;
 
 }
