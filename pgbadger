@@ -19605,7 +19605,7 @@ sub beautify
 			    and !$self->{ '_is_in_exception' }
 	    )
 	    {
-		$self->_set_level($self->{ '_level_stack' }[-1], $token, $last);
+		$self->_set_level($self->{ '_level_stack' }[-1], $token, $last) if ($#{$self->{ '_level_stack' }} >= 0);
 		$self->{ '_is_in_exception' } = 0;
 	    }
             $self->_new_line($token,$last) if (not defined $last or $last !~ /^CASE|,|\($/i );
@@ -19644,9 +19644,9 @@ sub beautify
 	{
             $self->_add_token( $token );
             $self->_new_line($token,$last);
-	    $self->_set_level($self->{ '_level_stack' }[-1], $token, $last) if ($self->{ '_is_in_if' });
+	    $self->_set_level($self->{ '_level_stack' }[-1], $token, $last) if ($self->{ '_is_in_if' }  and $#{$self->{ '_level_stack' }} >= 0);
 	    if ($self->{ '_is_in_case' } && defined $self->_next_token() and $self->_next_token() !~ /^(\(|RAISE)$/i) {
-		$self->_set_level($self->{ '_level_stack' }[-1], $token, $last);
+		$self->_set_level($self->{ '_level_stack' }[-1], $token, $last) if ($#{$self->{ '_level_stack' }} >= 0);
 	        $self->_over($token,$last);
 	    }
             $self->{ '_is_in_if' } = 0;
