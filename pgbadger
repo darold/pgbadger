@@ -2568,7 +2568,7 @@ sub set_parser_regex
 		       $llp = '^' . $llp
 			      . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
-		       @prefix_params = ('t_timestamp', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
+		       @prefix_params = ('t_timestamp', 't_client', 't_dbuser', 't_dbname', 't_pid', 't_loglevel', 't_query');
 		}
 		elsif ($fmt =~ /^redshift$/)
 		{
@@ -2578,7 +2578,7 @@ sub set_parser_regex
 		       $llp = '^' . $llp
 			      . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
-		       @prefix_params = ('t_timestamp', 't_dbname', 't_user', 't_pid', 't_loglevel', 't_query');
+		       @prefix_params = ('t_timestamp', 't_dbname', 't_dbuser', 't_pid', 't_loglevel', 't_query');
 		}
 		elsif ($fmt eq 'stderr' || $fmt eq 'default')
 		{
@@ -2626,7 +2626,7 @@ sub set_parser_regex
 
 	       $compiled_prefix =
 			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
-	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_user', 't_dbname', 't_pid', 't_loglevel', 't_query');
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_client', 't_dbuser', 't_dbname', 't_pid', 't_loglevel', 't_query');
 	}
 	elsif ($fmt eq 'redshift')
 	{
@@ -2634,7 +2634,7 @@ sub set_parser_regex
 	       # '2020-03-07T16:09:43Z UTC [ db=dev user=rdsdb pid=16929 userid=1 xid=7382 ]'
 	       $compiled_prefix =
 			 qr/^'(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)Z [^\s]+ \[ db=(.*?) user=(.*?) pid=(\d+) userid=\d+ xid=(?:.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
-	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_dbname', 't_user', 't_pid', 't_loglevel', 't_query');
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_dbname', 't_dbuser', 't_pid', 't_loglevel', 't_query');
 	}
 
 
@@ -14489,7 +14489,7 @@ sub validate_log_line
 	$prefix_vars{'t_dbname'} = $current_sessions{$t_pid}{database}
 		if (!$prefix_vars{'t_dbname'} && exists $current_sessions{$t_pid}{database});
 	$prefix_vars{'t_dbuser'} = $current_sessions{$t_pid}{user}
-		if (!$prefix_vars{'t_user'} && exists $current_sessions{$t_pid}{user});
+		if (!$prefix_vars{'t_dbuser'} && exists $current_sessions{$t_pid}{user});
 	$prefix_vars{'t_client'} = $current_sessions{$t_pid}{host}
 		if (!$prefix_vars{'t_client'} && exists $current_sessions{$t_pid}{host});
 	# Clear storage, the authorized session will be reparsed after
