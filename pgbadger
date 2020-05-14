@@ -15640,7 +15640,7 @@ sub store_queries
 			}
 		}
 		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
-		print $fh "$cur_info{$t_pid}{query}\n";
+		print $fh "$cur_info{$t_pid}{query}\n\n";
 		$overall_stat{'queries_number'}++;
 		return 1;
 	}
