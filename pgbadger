@@ -4254,7 +4254,7 @@ sub parse_jsonlog_input
 	}
 	if ($str =~ m/"error_severity":"(.*?)"(?:,"|\})/) {
 		$infos{'t_loglevel'} = $1;
-	} elsif ($str =~ m/user=[^\s]* ([^:]+):  (.*)","timestamp":"/) {
+	} elsif ($str =~ m/user=[^\s]* ([^:]+):\s{1,2}(.*)","timestamp":"/) {
 		$infos{'t_loglevel'} = $1;
 		$infos{'t_query'} = unescape_jsonlog($2);
 	}
