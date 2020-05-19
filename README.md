@@ -92,6 +92,8 @@ Options:
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, not even a progress
                              bar.
+    -Q | --query-numbering : add numbering of queries to the output when using
+                             options --dump-all-queries or --normalized-only.
     -r | --remote-host ip  : set the host where to execute the cat command on
                              remote logfile to parse locally the file.
     -R | --retention N     : number of weeks to keep in incremental mode. Default
