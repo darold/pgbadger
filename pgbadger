@@ -615,12 +615,14 @@ if (open(my $out, '>', $PID_FILE)) {
 # If pgBadger must parse remote files set the ssh command
 # If no user defined ssh command have been set
 my $remote_command = '';
-if ($remote_host && !$ssh_command) {
+if ($remote_host && !$ssh_command)
+{
 	$remote_command = &set_ssh_command($ssh_command, $remote_host);
 }
 
 # Add journalctl command to the file list if not already found
-if ($journalctl_cmd) {
+if ($journalctl_cmd)
+{
 	if (!grep(/^\Q$journalctl_cmd\E$/, @ARGV)) {
 		$journalctl_cmd .= " --output='short-iso'";
 		push(@ARGV, $journalctl_cmd);
@@ -628,7 +630,8 @@ if ($journalctl_cmd) {
 }
 
 # Add custom command to file list
-if ($log_command) {
+if ($log_command)
+{
 	if (!grep(/^\Q$log_command\E$/, @ARGV)) {
 		push(@ARGV, $log_command);
 	}
@@ -1438,14 +1441,11 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 my $global_totalsize = 0;
 my @given_log_files = ( @log_files );
 chomp(@given_log_files);
-# Append journalctl command at top of log file list
-unshift(@given_log_files, $journalctl_cmd) if ($journalctl_cmd);
-# Append custom command at top of log file list
-unshift(@given_log_files, $log_command) if ($log_command);
 
 # Store globaly total size for each log files
 my %file_size = ();
-foreach my $logfile ( @given_log_files ) {
+foreach my $logfile ( @given_log_files )
+{
 	$file_size{$logfile} = &get_file_size($logfile);
 	$global_totalsize += $file_size{$logfile} if ($file_size{$logfile} > 0);
 }
@@ -3285,10 +3285,8 @@ sub process_file
 		}
 		if (!$totalsize && $tmpoutfile)
 		{
-
 			&dump_as_binary($tmpoutfile);
 			$tmpoutfile->close();
-
 		}
 	}
 
@@ -4142,11 +4140,11 @@ sub process_file
 			$fhb->close;
 		}
 
-	} elsif ($tmpoutfile) {
-
+	}
+	elsif (fileno($tmpoutfile))
+	{
 		&dump_as_binary($tmpoutfile);
 		$tmpoutfile->close();
-
 	}
 
 	# Save last line into temporary file
