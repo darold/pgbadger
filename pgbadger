@@ -399,6 +399,9 @@ my $n       = 5 / 2;
 my $num_sep = ',';
 $num_sep = ' ' if ($n =~ /,/);
 
+# Set iso datetime pattern
+my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+
 # Inform the parent that it should stop iterate on parsing other files
 sub stop_parsing
 {
@@ -3343,7 +3346,6 @@ sub process_file
 	# Parse pgbouncer logfile
 	if ($fmt =~ /pgbouncer/)
 	{
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $has_exclusion = 0;
@@ -3668,7 +3670,6 @@ sub process_file
 	else
 	{
 
-		my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = ($incremental) ? 1 : 0;
@@ -4388,6 +4389,114 @@ sub store_current_timestamp
 	}
 }
 
+sub detect_new_log_line
+{
+	my ($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset) = @_;
+
+	my $more_lines = 0;
+
+	while (my $line = <$lfile>)
+	{
+		$line =~ s/\r//;
+		chomp($line);
+		next if (!$line);
+
+		if ($fmt =~ /syslog|logplex/)
+		{
+			my @matches = ($line =~ $compiled_prefix);
+			if ($#matches >= 0)
+			{
+				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+					$prefix_vars{$prefix_params[$i]} = $matches[$i];
+				}
+				# Standard syslog format does not have year information, months are
+				# three letters and days are not always with 2 digits.
+				if ($prefix_vars{'t_month'} !~ /\d/) {
+					$prefix_vars{'t_year'}  = $gyear;
+					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
+					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
+					# Take care of year overlapping
+					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $current_date) {
+						$prefix_vars{'t_year'} = substr($current_date, 0, 4) - 1;
+					}
+				}
+				$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+				$prefix_vars{'t_timestamp'} =
+					"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
+			}
+		}
+		elsif ($fmt =~ /pgbouncer/)
+		{
+			my @matches = ($line =~ $pgbouncer_log_parse1);
+			if ($#matches >= 0) {
+				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
+					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
+				}
+			}
+		}
+		else
+		{
+			my @matches = ($line =~ $compiled_prefix);
+			if ($#matches >= 0)
+			{
+				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+					$prefix_vars{$prefix_params[$i]} = $matches[$i];
+				}
+
+				$prefix_vars{'t_client'} =~ s/\(.*// if ($fmt eq 'rds');
+				if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
+					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
+				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
+					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'}) {
+					$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
+					if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
+						$prefix_vars{'t_timestamp'} .= $1;
+					}
+				} elsif ($prefix_vars{'t_timestamp'} =~ /^\d{10}(\.\d{3})$/) {
+					my $ms = $1;
+					$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
+					$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
+					 $prefix_vars{'t_timestamp'} .= $ms;
+				}
+			}
+
+			if ($prefix_vars{'t_timestamp'})
+			{
+				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+			}
+			elsif ($prefix_vars{'t_year'})
+			{
+				$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+			}
+			$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+
+			# Skip this line if there is no timestamp
+			next if (!$prefix_vars{'t_timestamp'} || $prefix_vars{'t_timestamp'} eq '-- ::');
+		}
+
+		# Unwanted line
+		next if (!$prefix_vars{'t_timestamp'});
+
+		# This file has already been parsed
+		if ($saved_date gt $prefix_vars{'t_timestamp'})
+		{
+			close($lfile);
+			return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
+		}
+		else
+		{
+			$more_lines++;
+			last;
+		}
+
+	}
+
+	return ($more_lines, "more line after the saved position");
+}
+
+
 # Method used to check if the file stores logs after the last incremental position or not
 # This position should have been saved in the incremental file and read in the $last_parsed at
 # start up. Here we just verify that the first date in file is before the last incremental date.
@@ -4411,112 +4520,51 @@ sub check_file_changed
 
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
-	my $CURRENT_DATE = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+	my $current_date = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
 
 	%prefix_vars = ();
 	my $startoffset = 0;
 	# If seeking is not explicitely disabled
-	if (!$look_at_beginning) {
+	if (!$look_at_beginning)
+	{
 		# do not seek if filesize is smaller than the seek position
-		if ($saved_pos < $totalsize) {
+		if ($saved_pos < $totalsize)
+		{
 			$lfile->seek($saved_pos || 0, 0);
 			$startoffset = $saved_pos || 0;
+		}
 		# Case of file with same size
-		} elsif ($saved_pos == $totalsize) {
-			if ($saved_pos > 8192) {
+		elsif ($saved_pos == $totalsize)
+		{
+			if ($saved_pos > 8192)
+			{
 				$lfile->seek($saved_pos - 8192, 0);
 				$startoffset = $saved_pos - 8192;
-			} else {
+			}
+			else
+			{
 				$lfile->seek(0, 0);
 				$startoffset = 0;
 			}
 		}
 	}
 
-	my $more_lines = 0;
-	while (my $line = <$lfile>) {
-
-		$line =~ s/\r//;
-
-		if ($fmt =~ /syslog|logplex/) {
-
-			my @matches = ($line =~ $compiled_prefix);
-			if ($#matches >= 0) {
-
-				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
-					$prefix_vars{$prefix_params[$i]} = $matches[$i];
-				}
-				# Standard syslog format does not have year information, months are
-				# three letters and days are not always with 2 digits.
-				if ($prefix_vars{'t_month'} !~ /\d/) {
-					$prefix_vars{'t_year'}  = $gyear;
-					$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
-					$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
-					# Take care of year overlapping
-					if ("$prefix_vars{'t_year'}$prefix_vars{'t_month'}$prefix_vars{'t_day'}" > $CURRENT_DATE) {
-						$prefix_vars{'t_year'} = substr($CURRENT_DATE, 0, 4) - 1;
-					}
-				}
-				$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-				$prefix_vars{'t_timestamp'} =
-					"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
-			}
-
-		}
-		elsif ($fmt =~ /pgbouncer/)
+	my ($more_lines, $msg) = detect_new_log_line($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset);
+	if (!$more_lines)
+	{
+		$lfile->seek(0, 0);
+		$startoffset = 0;
+		($more_lines, $msg) = detect_new_log_line($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset);
+		if (!$more_lines)
 		{
-
-			my @matches = ($line =~ $pgbouncer_log_parse1);
-			if ($#matches >= 0) {
-				for (my $i = 0 ; $i <= $#pgb_prefix_parse1 ; $i++) {
-					$prefix_vars{$pgb_prefix_parse1[$i]} = $matches[$i];
-				}
-			}
-
-		} else {
-
-			my @matches = ($line =~ $compiled_prefix);
-			if ($#matches >= 0) {
-				for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
-					$prefix_vars{$prefix_params[$i]} = $matches[$i];
-				}
-				if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
-					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
-				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
-					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
-				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'}) {
-					$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
-					if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
-						$prefix_vars{'t_timestamp'} .= $1;
-					}
-				}
-			}
-
-		}
-
-		# Unwanted line
-		next if (!$prefix_vars{'t_timestamp'});
-
-		# This file has already been parsed
-		if ($saved_date gt $prefix_vars{'t_timestamp'}) {
 			close($lfile);
-			return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
-		} else {
-			$more_lines++;
-			last;
+			return (0, "there no new lines in this file");
 		}
-
 	}
 	close($lfile);
 
-	if (!$more_lines) {
-		close($lfile);
-		return (0, "there no new lines in this file");
-	}
-
 	return (1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
 }
-
 
 # Method used to check if we have already reached the last parsing position in incremental mode
 # This position should have been saved in the incremental file and read in the $last_parsed at
