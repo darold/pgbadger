@@ -1478,7 +1478,7 @@ if ($incremental && !$remote_host)
 				$since = " --since='$1-$2-$3 $4:$5:$6'";
 			}
 			&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
-			push(@tmpfilelist, "$f $since");
+			push(@tmpfilelist, "$f$since");
 		}
 		elsif ( $log_command && ($f eq $log_command) )
 		{
@@ -16991,7 +16991,7 @@ sub get_file_size
 	}
 
 	# Log entries extracted from cust command are of indetermined size
-	if ( $log_command && ($logf =~ m/\Q$log_command\E/) )
+	elsif ( $log_command && ($logf =~ m/\Q$log_command\E/) )
 	{
 		$totalsize = -1;
 	}
