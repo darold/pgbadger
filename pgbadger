@@ -2901,8 +2901,10 @@ sub build_global_index
 		}
 		my $date = localtime(time);
 		my @tmpjscode = @jscode;
+		my $path_prefix = '.';
+		$path_prefix = '..' if ($report_per_database);
 		for (my $i = 0; $i <= $#tmpjscode; $i++) {
-			$tmpjscode[$i] =~ s/EDIT_URI/\./;
+			$tmpjscode[$i] =~ s/EDIT_URI/$path_prefix/;
 		}
 		my $local_title = 'Global Index on incremental reports';
 		if ($report_title) {
@@ -5999,8 +6001,10 @@ sub html_header
 	my $global_info = &print_global_information($curdb);
 
 	my @tmpjscode = @jscode;
+	my $path_prefix = '';
+	$path_prefix = '../' if ($report_per_database);
 	for (my $i = 0; $i <= $#tmpjscode; $i++) {
-		$tmpjscode[$i] =~ s/EDIT_URI/$uri/;
+		$tmpjscode[$i] =~ s/EDIT_URI/$path_prefix$uri/;
 	}
 
 	my $local_title = 'PostgreSQL Log Analyzer';
