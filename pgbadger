@@ -1615,6 +1615,7 @@ foreach my $logfile ( @given_log_files )
 	}
 	else
 	{
+		&logmsg('DEBUG', "parallel processing will not ne used.");
 		$parallel_process = 1;
 	}
 
