@@ -6500,28 +6500,32 @@ sub print_general_activity
 	my $prepared_queries = '';
 	my $connections = '';
 	my $sessions = '';
-	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+	{
 		my $c = 1;
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}}) {
+		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}})
+		{
 			my %cur_period_info = ();
 			my $read_average_duration = 0;
 			my $read_average_count = 0;
 			my $write_average_duration = 0;
 			my $write_average_count = 0;
 			my %all_query_duration=();
-			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}}) {
+			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}})
+			{
 				$cur_period_info{$curdb}{count} += ($per_minute_info{$curdb}{$d}{$h}{$m}{query}{count} || 0);
 				$cur_period_info{$curdb}{duration} += ($per_minute_info{$curdb}{$d}{$h}{$m}{query}{duration} || 0);
 				$cur_period_info{$curdb}{min} = $per_minute_info{$curdb}{$d}{$h}{$m}{query}{min} if (!exists $cur_period_info{$curdb}{min} || ($per_minute_info{$curdb}{$d}{$h}{$m}{query}{min} < $cur_period_info{$curdb}{min}));
 				$cur_period_info{$curdb}{max} = $per_minute_info{$curdb}{$d}{$h}{$m}{query}{max} if (!exists $cur_period_info{$curdb}{max} || ($per_minute_info{$curdb}{$d}{$h}{$m}{query}{max} > $cur_period_info{$curdb}{max}));
 				push(@{$all_query_duration{'query'}}, $per_minute_info{$curdb}{$d}{$h}{$m}{query}{duration}||0);
 
-				foreach my $a (@SQL_ACTION) {
-					$cur_period_info{$curdb}{lc($a)}{count} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{count} || 0);
-					$cur_period_info{$curdb}{lc($a)}{duration} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration} || 0);
-					push(@{$all_query_duration{lc($a)}}, $per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration}||0);
+				foreach my $a (@SQL_ACTION)
+				{
+					$cur_period_info{$curdb}{$a}{count} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{count} || 0);
+					$cur_period_info{$curdb}{$a}{duration} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration} || 0);
+					push(@{$all_query_duration{$a}}, $per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{duration}||0);
 					$cur_period_info{$curdb}{usual} += ($per_minute_info{$curdb}{$d}{$h}{$m}{lc($a)}{count} || 0);
 				}
 				$cur_period_info{$curdb}{prepare} += ($per_minute_info{$curdb}{$d}{$h}{$m}{prepare} || 0);
@@ -7085,7 +7089,8 @@ sub compute_query_graphs
 						}
 
 						if (!$disable_query) {
-							foreach my $action (@SQL_ACTION) {
+							foreach my $action (@SQL_ACTION)
+							{
 								$a_dataavg{$action}{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{count} || 0);
 								$a_dataavg{$action}{duration}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{duration} || 0);
 								if ( ($action ne 'SELECT') && exists $per_minute_info{$curdb}{$tm}{$h}{$m}{lc($action)}{count}) {
@@ -7169,8 +7174,10 @@ sub compute_query_graphs
 						# Min connections per minute
 						$graph_data{sess_min} .= "[$t, " . ($s_dataavg{min}{"$rd"} || 0) . "],";
 					}
-					if (!$disable_query && (scalar keys %a_dataavg > 0)) {
-						foreach my $action (@SQL_ACTION) {
+					if (!$disable_query && (scalar keys %a_dataavg > 0))
+					{
+						foreach my $action (@SQL_ACTION)
+						{
 							next if ($select_only && ($action ne 'SELECT'));
 
 							# Average queries per minute
