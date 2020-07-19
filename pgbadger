@@ -1478,7 +1478,9 @@ if ($incremental && !$remote_host)
 				$since = " --since='$1-$2-$3 $4:$5:$6'";
 			}
 			&logmsg('DEBUG', "journalctl call will start since: $saved_last_line{datetime}");
-			push(@tmpfilelist, "$f$since");
+			my $new_journalctl_cmd = "$f$since";
+			push(@tmpfilelist, $new_journalctl_cmd);
+			$file_size{$new_journalctl_cmd} = $file_size{$f};
 		}
 		elsif ( $log_command && ($f eq $log_command) )
 		{
