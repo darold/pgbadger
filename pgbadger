@@ -344,12 +344,14 @@ my $log_duration            = 0;
 my $logfile_list            = '';
 my $enable_checksum         = 0;
 my $timezone                = 0;
+my $opt_timezone            = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
 my $use_sessionid_as_pid    = 0;
 my $dump_normalized_only    = 0;
 my $log_timezone            = 0;
+my $opt_log_timezone        = 0;
 my $json_prettify           = 0;
 my $is_tsung_output         = 0;
 my $report_per_database     = 0;
@@ -389,6 +391,9 @@ my $force_sample = 0;
 my $curl_command = 'curl -k -s ';
 
 my $sql_prettified = pgFormatter::Beautify->new('colorize' => 1, 'format' => 'html', 'uc_keywords' => 0);
+
+# Flag for logs using UTC, in this case we don't autodetect the timezone
+my $isUTC = 0;
 
 # Do not display data in pie where percentage is lower than this value
 # to avoid label overlapping.
@@ -496,7 +501,7 @@ my $result = GetOptions(
 	"x|extension=s"            => \$extension,
 	"X|extra-files!"           => \$extra_files,
 	"z|zcat=s"                 => \$zcat,
-	"Z|timezone=s"             => \$timezone,
+	"Z|timezone=s"             => \$opt_timezone,
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
@@ -540,7 +545,7 @@ my $result = GetOptions(
 	'pgbouncer-only!'	   => \$pgbouncer_only,
 	'start-monday!'	           => \$week_start_monday,
 	'normalized-only!'	   => \$dump_normalized_only,
-	'log-timezone=i'	   => \$log_timezone,
+	'log-timezone=i'	   => \$opt_log_timezone,
 	'prettify-json!'	   => \$json_prettify,
 	'month-report=s'	   => \$month_report,
 	'noexplain!'               => \$noexplain,
@@ -748,18 +753,11 @@ if ($rebuild && !$incremental) {
 	$incremental = 1;
 }
 
+# set timezone to use
+&set_timezone(1);
+
 # Set default top query
 $top ||= 20;
-
-# Set timezone
-$timezone = ((0-$timezone)*3600);
-$log_timezone = ((0-$log_timezone)*3600);
-if (!$timezone) {
-	my @lt = localtime();
-	# count TimeZone and Daylight Saving Time
-	$timezone = timelocal(@lt) - timegm(@lt);
-        &logmsg('DEBUG', "timezone not specified, using $timezone seconds" );
-}
 
 # Set output file
 my $outfile = '';
@@ -1648,6 +1646,9 @@ foreach my $logfile ( @given_log_files )
 	{
 		&logmsg('DEBUG', "Can not autodetect log format, assuming $fmt.");
 	}
+
+	# Set the timezone to use
+	&set_timezone();
 
 	# Set the regex to parse the log file following the format
 	$fmt = set_parser_regex($fmt);
@@ -16585,6 +16586,7 @@ sub autodetect_format
 	}
 
 	&logmsg('DEBUG', "Autodetected log format '$fmt' from $file");
+	&logmsg('DEBUG', "Autodetected UTC timestamp") if ($isUTC);
 
 	return $fmt;
 }
@@ -16596,37 +16598,43 @@ sub search_log_format
 	my $fmt = '';
 	my $ident_name = '';
 
+	$isUTC = 0;
+
 	# Are pgbouncer syslog lines ?
 	if ($line =~
-/^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+(?: [^\s]+)? [^\s]+ [^\s\[]+\[\d+\]: (.\-0x[0-9a-f\.]+|Stats):/
+/^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+( [^\s]+)? [^\s]+ [^\s\[]+\[\d+\]: (?:.\-0x[0-9a-f\.]+|Stats):/
 	   )
 	{
 		$fmt = 'pgbouncer1';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	} elsif ($line =~
-/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
+/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?(\s[^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
 	   )
 	{
 		$fmt = 'pgbouncer2';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are syslog lines ?
 	} elsif ($line =~
-/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 	   )
 	{
 		$fmt = 'syslog';
-		$ident_name = $1;
+		$ident_name = $2;
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	} elsif ($line =~
-/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?\s[^\s]+\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+/^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?(\s[^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 	   )
 	{
 		$fmt = 'syslog2';
-		$ident_name = $1;
+		$ident_name = $2;
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	} elsif ($line =~
 		 /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[(\d+)\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
@@ -16636,52 +16644,59 @@ sub search_log_format
 	       $ident_name = 'postgres';
 
 	} elsif ($line =~
-	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+\s*[^:]*:[^:]*:[^\@]*\@[^:]*:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+(\s[^:]+)?:[^:]*:[^\@]*\@[^:]*:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
-	       $fmt = 'rds';
+		$fmt = 'rds';
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	} elsif ($line =~
-			 /^'\d+-\d+-\d+T\d+:\d+:\d+Z [^\s]+ \[ db=(.*?) user=(.*?) pid=\d+ userid=\d+ xid=(.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+			 /^'\d+-\d+-\d+T\d+:\d+:\d+Z( [^\s]+) \[ db=(.*?) user=(.*?) pid=\d+ userid=\d+ xid=(.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
-	       $fmt = 'redshift';
+		$fmt = 'redshift';
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are csv lines ?
 	} elsif (
 		(
 			$line =~
-			/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+(?: [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
+			/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+( [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
 		)
 		&& ($line =~ tr/,/,/ >= 12)
 		)
 	{
 		$fmt = 'csv';
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are stderr lines ?
 	} elsif ($line =~
-/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\]: \[\d+-\d+\] (.*?)\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+/(?:\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*( [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\]: \[\d+-\d+\] (.*?)\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 		)
 	{
 		$fmt = 'stderr';
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are default stderr lines since 10.0 or minimal prefix for pgbadger?
 	} elsif ($line =~
-/(\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*(?: [A-Z\+\-\d]{3,6})? \[([0-9a-f\.]+)\][:]*\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
+/(?:\d{10}\.\d{3}|\d+-\d+-\d+ \d+:\d+:\d+)[\.0-9]*( [A-Z\+\-\d]{3,6}) \[([0-9a-f\.]+)\][:]*\s+(.*?)(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):\s+/
 		)
 	{
 		$fmt = 'default';
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are pgbouncer lines ?
-	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
+	} elsif ($line =~ /^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+( [A-Z\+\-\d]{3,6})? (\d+) (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
 		$fmt = 'pgbouncer';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
+		$isUTC =  1 if ($1 eq ' UTC');
 
-	} elsif ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
+	} elsif ($line =~ /^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+( [A-Z\+\-\d]{3,6})? \[(\d+)\] (LOG|ERROR) (.\-0x[0-9a-f\.]+|Stats):/) {
 		$fmt = 'pgbouncer3';
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
+		$isUTC =  1 if ($1 eq ' UTC');
 
 	# jsonlog lines
 	} elsif ($line =~ /\{"(timestamp|insertId)":"/) {
@@ -17733,6 +17748,25 @@ sub set_output_extension
 
 	return ($of, $ext);
 }
+
+# Set timezone
+sub set_timezone
+{
+	my $init = shift;
+
+	$timezone = ((0-$opt_timezone)*3600);
+	$log_timezone = ((0-$opt_log_timezone)*3600);
+
+	return if ($init);
+
+	if (!$timezone && !$isUTC) {
+		my @lt = localtime();
+		# count TimeZone and Daylight Saving Time
+		$timezone = timelocal(@lt) - timegm(@lt);
+		&logmsg('DEBUG', "timezone not specified, using $timezone seconds" );
+	}
+}
+
 
 # Inclusion of Perl package pgFormatter::Beautify.
 {
@@ -21627,7 +21661,6 @@ the Artistic License 2.0.
 
 1;
 }
-
 
 __DATA__
 
