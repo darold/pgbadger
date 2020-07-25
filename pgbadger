@@ -4429,6 +4429,17 @@ sub detect_new_log_line
 					"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
 			}
 		}
+		elsif ($fmt eq 'jsonlog')
+		{
+			%prefix_vars = parse_jsonlog_input($line);
+
+			if (!exists $prefix_vars{'t_year'})
+			{
+				($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+					$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+			}
+			$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+		}
 		elsif ($fmt =~ /pgbouncer/)
 		{
 			my @matches = ($line =~ $pgbouncer_log_parse1);
