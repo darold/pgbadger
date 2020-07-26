@@ -1,3 +1,87 @@
+2020-07-26 - v11.3
+
+This release of pgBadger fix several issues reported by users since
+past four months. It also adds some new features and new command line
+options:
+
+  * Add autodetection of UTC timestamp to avoid applying timezone
+    for graphs.
+  * Add support to GCP CloudSQL json log format.
+  * Add new option --dump-all-queries to use pgBadger to dump all
+    queries to a text file, no report is generated just the full list
+    of statements found in the PostgreSQL log. Bind parameters are
+    inserted into the queries at their respective position.
+  * Add new option -Q | --query-numbering used to add numbering of
+    queries to the output when using options --dump-all-queries or
+    --normalized-only.
+  * Add new command line option --tempdir to set the directory where
+    temporary files will be written. Can be useful on system that do
+    not allow writing to /tmp.
+  * Add command line option --ssh-port used to set the ssh port if not
+    default to 22. The URI notation also adds support to ssh port
+    specification by using the form:
+        ssh://192.168.1.100:2222//var/log/postgresql-11.log
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix incremental reports for jsonlog/cloudsql log format. Thanks
+    to Ryan DeShone for the report
+  - Add autodetection of UTC timestamp to avoid applying autodetected
+    timezone for graphs. With UTC time the javascript will apply the
+    local timezone. Thanks to Brett Stauner for the report.
+  - Fix incremental parsing of journalctl logs doesn't work from the
+    second run. Thanks to Paweł Koziol for the patch.
+  - Fix path to resources file when -X and -E are used. Thanks to Ryan
+    DeShone for the report.
+  - Fix General Activity report about read/write queries. Thanks to
+    alexandre-sk5 for the report.
+  - Add debug message when parallel mode is not use.
+  - Fix elsif logic in file size detection and extra space introduced
+    in the journalctl command when the --since option is added. Thanks
+    to Pawel Koziol for the patch.
+  - Fix "not a valid file descriptor" error. Thanks to Pawel Koziol
+    for the report.
+  - Fix incremental mode with RDS files. Thanks to Ildefonso Camargo,
+    nodje and John Walsh for the report.
+  - Add new option -Q | --query-numbering used to add numbering of
+    queries to the output when using options --dump-all-queries or
+    --normalized-only. This can be useful to extract multiline queries
+    in the output file from an external script. Thanks to Shantanu Oak
+    for the feature request.
+  - Fix parsing of cloudsql json logs when log_min_duration_statement
+   is enabled. Thanks to alexandre-sk5 for the report.
+  - Fix wrong hash key for users in RDS log. Thanks to vosmax for the
+    report.
+  - Fix error related to modification of non-creatable array value.
+    Thanks to John Walsh and Mark Fletcher for the report.
+  - Add support to GCP CloudSQL json log format, log format (-f) is
+    jsonlog. Thanks to Thomas Poindessous for the feature request.
+  - Add new option --dump-all-queries to use pgBadger to dump all
+    queries to a text file, no report is generated just the full list
+    of statements found in the PostgreSQL log. Bind parameters are
+    inserted into the queries at their respective position. There is
+    not sort on unique queries, all queries are logged. Thanks to
+    Shantanu Oak for the feature request.
+  - Add documentation for --dump-all-queries option.
+  - Fix vacuum report for new PG version. Thanks to Alexey Timanovsky
+    for the report.
+  - Add new command line option --no-process-info to disable change of
+    process title to help identify pgbadger process, some system do
+    not allow it. Thanks to Akshay2378 for the report.
+  - Add new command line option --tempdir to set the directory where
+    temporary files will be written. Default:
+        File::Spec->tmpdir() || '/tmp'
+    Can be useful on system that do not allow writing to /tmp. Thanks
+    to Akshay2378 for the report.
+  - Fix unsupported compressed filenames with spaces and/or brackets.
+    Thanks to Alexey Timanovsky for the report.
+  - Add command line option --ssh-port used to set the ssh port if not
+    default to 22. The URI notation also adds support to ssh port
+    specification by using the form:
+        ssh://192.168.1.100:2222//var/log/postgresql-11.log
+    Thanks to Augusto Murri for the feature request.
+
+
 2020-03-11 - v11.2
 
 This release of pgBadger fix several issues reported by users since
