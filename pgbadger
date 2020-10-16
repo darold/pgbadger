@@ -753,6 +753,8 @@ if ($rebuild && !$incremental) {
 	$incremental = 1;
 }
 
+&logmsg('DEBUG', "pgBadger version $VERSION." );
+
 # set timezone to use
 &set_timezone(1);
 
