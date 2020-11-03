@@ -10714,7 +10714,7 @@ sub print_tempfile_report
 
 	# Queries generating the most temporary files (N)
 	if ($#top_temporary >= 0) {
-		@top_temporary = sort {"$b->[1]-$b->[2]" cmp "$a->[1]-$b->[2]"} @top_temporary;
+		@top_temporary = sort { $b->[1] <=> $a->[1] } @top_temporary;
 		print $fh qq{
 		<div class="analysis-item row" id="queries-generating-most-temporary-files">
 			<h2 class="col-md-12"><i class="glyphicon icon-pencil"></i> Queries generating the most temporary files (N)</h2>
