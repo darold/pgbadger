@@ -16573,7 +16573,9 @@ sub autodetect_format
 	}
 	elsif (!$format)
 	{
-		if (!$fmt || ($nfound < 10 && $fmt ne 'binary'))
+		# we make exception for binary and jsonlog as
+		# the format can be deduced with just one line.
+		if (!$fmt || ($nfound < 10 && $fmt ne 'binary' && $fmt ne 'jsonlog'))
 		{
 			if ($log_line_prefix =~ /\%(t|m|n).*\%(c|p)/)
 			{
@@ -16613,8 +16615,14 @@ sub search_log_format
 
 	$isUTC = 0;
 
+
+	# jsonlog lines
+	if ($line =~ /\{"(timestamp|insertId)":"/)
+	{
+		$fmt = 'jsonlog';
+	}
 	# Are pgbouncer syslog lines ?
-	if ($line =~
+	elsif ($line =~
 /^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+( [^\s]+)? [^\s]+ [^\s\[]+\[\d+\]: (?:.\-0x[0-9a-f\.]+|Stats):/
 	   )
 	{
@@ -16623,7 +16631,8 @@ sub search_log_format
 		$pgbouncer_only = 1 if ($#log_files == 0);
 		$isUTC =  1 if ($1 eq ' UTC');
 
-	} elsif ($line =~
+	}
+	elsif ($line =~
 /^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?(\s[^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]: (.\-0x[0-9a-f\.]*|Stats):/
 	   )
 	{
@@ -16633,7 +16642,8 @@ sub search_log_format
 		$isUTC =  1 if ($1 eq ' UTC');
 
 	# Are syslog lines ?
-	} elsif ($line =~
+	}
+	elsif ($line =~
 /^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 	   )
 	{
@@ -16641,7 +16651,8 @@ sub search_log_format
 		$ident_name = $2;
 		$isUTC =  1 if ($1 eq ' UTC');
 
-	} elsif ($line =~
+	}
+	elsif ($line =~
 /^\d+-\d+-\d+T\d+:\d+:\d+(?:.[^\s]+)?(\s[^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+\-\d+\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 	   )
 	{
@@ -16649,29 +16660,33 @@ sub search_log_format
 		$ident_name = $2;
 		$isUTC =  1 if ($1 eq ' UTC');
 
-	} elsif ($line =~
+	}
+	elsif ($line =~
 		 /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[(\d+)\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
 	       $fmt = 'logplex';
 	       $ident_name = 'postgres';
 
-	} elsif ($line =~
+	}
+	elsif ($line =~
 	       /^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*\d+-\d+-\d+ \d+:\d+:\d+(\s[^:]+)?:[^:]*:[^\@]*\@[^:]*:\[\d+\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
 		$fmt = 'rds';
 		$isUTC =  1 if ($1 eq ' UTC');
 
-	} elsif ($line =~
+	}
+	elsif ($line =~
 			 /^'\d+-\d+-\d+T\d+:\d+:\d+Z( [^\s]+) \[ db=(.*?) user=(.*?) pid=\d+ userid=\d+ xid=(.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
 		$fmt = 'redshift';
 		$isUTC =  1 if ($1 eq ' UTC');
 
+	}
 	# Are csv lines ?
-	} elsif (
+	elsif (
 		(
 			$line =~
 			/^\d+-\d+-\d+ \d+:\d+:\d+\.\d+( [A-Z\+\-\d]{3,6})?,.*,(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT),/
@@ -16710,12 +16725,7 @@ sub search_log_format
 		# If we just have one single pgbouncer file, force pgbouncer_only to 1
 		$pgbouncer_only = 1 if ($#log_files == 0);
 		$isUTC =  1 if ($1 eq ' UTC');
-
-	# jsonlog lines
-	} elsif ($line =~ /\{"(timestamp|insertId)":"/) {
-		$fmt = 'jsonlog';
 	}
-
 	return ($fmt, $ident_name);
 }
 
