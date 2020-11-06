@@ -3572,8 +3572,8 @@ sub process_file
 				# We received a signal
 				last CSVLOOP if ($terminate);
 
-				# Number of columns in csvlog (22 before 9.0 and 23 from 9.0 to current)
-				next if ( ($#{$row} != 22) && ($#{$row} != 21) );
+				# Number of columns in csvlog (21 before 9.0, 22 before 13.0, 23 current)
+				next if ( ($#{$row} < 21) && ($#{$row} > 23) );
 
 				# Set progress statistics
 				$cursize += length(join(',', @$row));
