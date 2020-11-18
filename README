@@ -36,7 +36,7 @@ SYNOPSIS
                                  format.
         -G | --nograph         : disable graphs on HTML output. Enabled by default.
         -h | --help            : show this message and exit.
-        -H | --html-dir path   : path to directory where HTML report must be written
+        -H | --html-outdir path: path to directory where HTML report must be written
                                  in incremental mode, binary files stay on directory
                                  defined with -O, --outdir option.
         -i | --ident name      : programname used as syslog ident. Default: postgres
