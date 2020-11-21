@@ -913,6 +913,7 @@ my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote|ip|host|connection_source)=([^,\(]*)/;
 my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
 my $regex_prefix_sqlstate = qr/(?:error_code|state|state_code)=([^,]*)/;
+my $regex_prefix_backendtype = qr/(?:backend_type|btype)=([^,]*)/;
 
 # Set pattern to look for query type
 my $action_regex = qr/^[\s\(]*(DELETE|INSERT|UPDATE|SELECT|COPY|WITH|CREATE|DROP|ALTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|START|END|SAVEPOINT|DECLARE|CLOSE|FETCH|MOVE)/is;
@@ -1694,9 +1695,9 @@ foreach my $logfile ( @given_log_files )
 	else
 	{
 		# Start parsing one file per parallel process
-		push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 		if ($^O !~ /MSWin32|dos/i)
 		{
+			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 			spawn sub
 			{
 				&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
@@ -1705,7 +1706,7 @@ foreach my $logfile ( @given_log_files )
 		}
 		else
 		{
-			&process_file($logfile, $file_size{$logfile_orig}, $fmt, $tempfiles[-1]->[0], ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
+			&process_file($logfile, $file_size{$logfile_orig}, $fmt, undef, ($fmt eq 'pgbouncer') ? $pgb_saved_last_line{current_pos} : $saved_last_line{current_pos});
 		}
 	}
 
@@ -1732,10 +1733,10 @@ if ($^O !~ /MSWin32|dos/i)
 		kill('USR1', $k);
 		%RUNNING_PIDS = ();
 	}
-}
 
-# Clear previous statistics
-&init_stats_vars();
+	# Clear previous statistics
+	&init_stats_vars();
+}
 
 # Load all data gathered by all the different processes
 foreach my $f (@tempfiles)
@@ -4195,7 +4196,7 @@ sub process_file
 		}
 	}
 
-	&init_stats_vars();
+	&init_stats_vars() if ($tmpoutfile);
 
 	return $getout;
 }
@@ -4290,6 +4291,11 @@ sub parse_jsonlog_input
 	}
 	if ($str =~ m/"(?:statement|internal_query)":"(.*?)"(?:,"|\})/) {
 		$infos{'t_statement'} = unescape_jsonlog($1);
+	}
+
+	# Backend type information
+	if ($str =~ m/"backend_type":"(.*?)"(?:,"|\})/) {
+		$infos{'t_backend_type'} = $1;
 	}
 
 	return %infos;
@@ -14695,6 +14701,12 @@ sub parse_log_prefix
 		if ($t_logprefix =~ $regex_prefix_sqlstate) {
 			$prefix_vars{'t_sqlstate'} = $1;
 		}
+
+		# Search for backend type
+		if ($t_logprefix =~ $regex_prefix_backendtype) {
+			$prefix_vars{'t_backend_type'} = $1;
+		}
+
 	}
 }
 
@@ -15632,6 +15644,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if ($is_tsung_output && !$cur_info{$t_pid}{date});
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
+	$cur_info{$t_pid}{backendtype}  = $prefix_vars{'t_backend_type'} if (!$cur_info{$t_pid}{backendtype});
 	# Store current report name and list of database
 	$cur_info{$t_pid}{cur_db} = set_current_db($cur_info{$t_pid}{dbname});
 
@@ -16961,7 +16974,7 @@ sub build_log_line_prefix_regex
 	my $llp = shift;
 
 	my %regex_map = (
-		'%a' => [('t_appname',      '(.*)')],				   # application name
+		'%a' => [('t_appname',      '(.*?)')],				   # application name
 		'%u' => [('t_dbuser',       '([0-9a-zA-Z\_\[\]\-\.]*)')],					 # user name
 		'%d' => [('t_dbname',       '([0-9a-zA-Z\_\[\]\-\.]*)')],					 # database name
 		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[\(\d\)]*')],     # remote host and port
@@ -16977,6 +16990,7 @@ sub build_log_line_prefix_regex
 		'%x' => [('t_xid',	       '([0-9a-f\.\/]*)')],					     # transaction ID
 		'%i' => [('t_command',	   '([0-9a-zA-Z\.\-\_\s]*)')],					# command tag
 		'%e' => [('t_sqlstate',	  '([0-9a-zA-Z]+)')],					      # SQL state
+		'%b' => [('t_backend_type',	  '(.*?)')],					      # backend type
 	);
 	my $param_list = [];
 	$llp =~ s/([\[\]\|\(\)\{\}])/\\$1/g;
