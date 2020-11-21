@@ -652,7 +652,7 @@ if ($#ARGV >= 0) {
 }
 
 if (!$incremental && $html_outdir) {
-	localdie("FATAL: parameter -H, --html_outdir can only be used with incremental mode.\n");
+	localdie("FATAL: parameter -H, --html-outdir can only be used with incremental mode.\n");
 }
 
 # Read list of log file to parse from a file
