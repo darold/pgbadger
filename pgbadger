@@ -579,7 +579,8 @@ if (!-d "$TMP_DIR")
 }
 
 # Try to load Digest::MD5 when asked
-if ($enable_checksum) {
+if ($enable_checksum)
+{
 	if (eval {require Digest::MD5;1} ne 1) {
 		die("Can not load Perl module Digest::MD5.\n");
 	} else {
@@ -592,7 +593,8 @@ unless ($PID_FILE) {
   $PID_FILE = $PID_DIR . '/pgbadger.pid';
 }
 
-if (-e "$PID_FILE") {
+if (-e "$PID_FILE")
+{
 	my $is_running = 2;
 	if ($^O !~ /MSWin32|dos/i) {
 		eval { $is_running = `ps auwx | grep pgbadger | grep -v grep | wc -l`; chomp($is_running); };
@@ -606,10 +608,13 @@ if (-e "$PID_FILE") {
 }
 
 # Create pid file
-if (open(my $out, '>', $PID_FILE)) {
+if (open(my $out, '>', $PID_FILE))
+{
 	print $out $$;
 	close($out);
-} else {
+}
+else
+{
 	print "FATAL: can't create pid file $PID_FILE, $!\n";
 	exit 3;
 }
@@ -620,15 +625,15 @@ if (open(my $out, '>', $PID_FILE)) {
 # If pgBadger must parse remote files set the ssh command
 # If no user defined ssh command have been set
 my $remote_command = '';
-if ($remote_host && !$ssh_command)
-{
+if ($remote_host && !$ssh_command) {
 	$remote_command = &set_ssh_command($ssh_command, $remote_host);
 }
 
 # Add journalctl command to the file list if not already found
 if ($journalctl_cmd)
 {
-	if (!grep(/^\Q$journalctl_cmd\E$/, @ARGV)) {
+	if (!grep(/^\Q$journalctl_cmd\E$/, @ARGV))
+	{
 		$journalctl_cmd .= " --output='short-iso'";
 		push(@ARGV, $journalctl_cmd);
 	}
@@ -644,9 +649,9 @@ if ($log_command)
 
 # Log files to be parsed are passed as command line arguments
 my $empty_files = 1;
-if ($#ARGV >= 0) {
-	foreach my $file (@ARGV)
-	{
+if ($#ARGV >= 0)
+{
+	foreach my $file (@ARGV) {
 		push(@log_files, &set_file_list($file));
 	}
 }
@@ -656,15 +661,13 @@ if (!$incremental && $html_outdir) {
 }
 
 # Read list of log file to parse from a file
-if ($logfile_list) {
-
-	if (!-e $logfile_list)
-	{
+if ($logfile_list)
+{
+	if (!-e $logfile_list) {
 		localdie("FATAL: logfile list $logfile_list must exist!\n");
 	}
 	my $in = undef;
-	if (not open($in, "<", $logfile_list))
-	{
+	if (not open($in, "<", $logfile_list)) {
 		localdie("FATAL: can not read logfile list $logfile_list, $!.\n");
 	}
 	my @files = <$in>;
@@ -673,8 +676,7 @@ if ($logfile_list) {
 	{
 		chomp($file);
 		$file =~ s/\r//;
-		if ($file eq '-')
-		{
+		if ($file eq '-') {
 			localdie("FATAL: stdin input - can not be used with logfile list.\n");
 		}
 		push(@log_files, &set_file_list($file));
@@ -682,24 +684,27 @@ if ($logfile_list) {
 }
 
 # Do not warn if all log files are empty
-if (!$rebuild && $empty_files) {
+if (!$rebuild && $empty_files)
+{
 	&logmsg('DEBUG', "All log files are empty, exiting...");
 	unlink("$PID_FILE");
 	exit 0;
 }
 
 # Logfile is a mandatory parameter when journalctl command is not set.
-if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command) {
+if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command)
+{
 	if (!$quiet) {
 		localdie("FATAL: you must give a log file at command line parameter.\n\n");
-	} else {
+	}
+	else
+	{
 		unlink("$PID_FILE");
 		exit 4;
 	}
 }
 
-if ($#outfiles >= 1 && ($dump_normalized_only || $dump_all_queries))
-{
+if ($#outfiles >= 1 && ($dump_normalized_only || $dump_all_queries)) {
 	localdie("FATAL: dump of normalized queries can not ne used with multiple output.\n\n");
 }
 
@@ -3102,37 +3107,37 @@ sub init_stats_vars
 {
 
 	# Empty where statistics are stored
-	%overall_stat	= ();
+	%overall_stat	     = ();
 	%pgb_overall_stat    = ();
 	%overall_checkpoint  = ();
-	%top_slowest	 = ();
+	%top_slowest	     = ();
 	%top_tempfile_info   = ();
 	%top_cancelled_info  = ();
 	%top_locked_info     = ();
 	%normalyzed_info     = ();
-	%error_info	  = ();
+	%error_info	     = ();
 	%pgb_error_info      = ();
 	%pgb_pool_info       = ();
-	%logs_type	   = ();
-	%errors_code	 = ();
+	%logs_type	     = ();
+	%errors_code	     = ();
 	%per_minute_info     = ();
 	%pgb_per_minute_info = ();
-	%lock_info	   = ();
+	%lock_info	     = ();
 	%tempfile_info       = ();
 	%cancelled_info      = ();
 	%connection_info     = ();
 	%pgb_connection_info = ();
 	%database_info       = ();
 	%application_info    = ();
-	%session_info	= ();
+	%session_info	     = ();
 	%pgb_session_info    = ();
 	%conn_received       = ();
 	%checkpoint_info     = ();
 	%autovacuum_info     = ();
 	%autoanalyze_info    = ();
-	@graph_values	= ();
-	%cur_info	    = ();
-	$nlines	      = 0;
+	@graph_values	     = ();
+	%cur_info	     = ();
+	$nlines	             = 0;
 	%tsung_session       = ();
 }
 
@@ -5188,7 +5193,8 @@ Average size of temporary files: $fmt_temp_avsize
 		print $fh qq{Number cancelled queries: $cancelled_info{$curdb}{count}
 };
 	}
-	if (!$disable_session && $session_info{$curdb}{count}) {
+	if (!$disable_session && $session_info{$curdb}{count})
+	{
 		my $avg_session_duration = &convert_time($session_info{$curdb}{duration} / $session_info{$curdb}{count});
 		my $tot_session_duration = &convert_time($session_info{$curdb}{duration});
 		my $avg_queries = &comma_numbers(int($overall_stat{$curdb}{'queries_number'}/$session_info{$curdb}{count}));
@@ -5200,15 +5206,18 @@ Average duration of sessions: $avg_session_duration
 Average queries per sessions: $avg_queries
 Average queries duration per sessions: $avg_duration
 };
-		foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{session} <=> $overall_stat{$curdb}{'peak'}{$a}{session}} keys %{$overall_stat{$curdb}{'peak'}}) {
+		foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{session} <=> $overall_stat{$curdb}{'peak'}{$a}{session}} keys %{$overall_stat{$curdb}{'peak'}})
+		{
 			next if (!$session_info{$curdb}{count});
 			print $fh "Session peak: ", &comma_numbers($overall_stat{$curdb}{'peak'}{$_}{session}), " sessions at $_";
 			last;
 		}
 	}
-	if (!$disable_connection && $connection_info{$curdb}{count}) {
+	if (!$disable_connection && $connection_info{$curdb}{count})
+	{
 		print $fh "Total number of connections: $connection_info{$curdb}{count}\n";
-		foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{connection} <=> $overall_stat{$curdb}{'peak'}{$a}{connection}} keys %{$overall_stat{$curdb}{'peak'}}) {
+		foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{connection} <=> $overall_stat{$curdb}{'peak'}{$a}{connection}} keys %{$overall_stat{$curdb}{'peak'}})
+		{
 			if ($overall_stat{$curdb}{'peak'}{$_}{connection} > 0) {
 				print $fh "Connection peak: ", &comma_numbers($overall_stat{$curdb}{'peak'}{$_}{connection}), " conn/s at $_";
 			}
@@ -8166,10 +8175,11 @@ sub print_user_session
 	my $c	   = 0;
 	my $sess_user_info = '';
 	my @main_user = ('unknown',0);
-	foreach my $u (sort keys %{$session_info{$curdb}{user}}) {
-		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($session_info{$curdb}{user}{$u}{count}) .
-				   "</td><td>" . &convert_time($session_info{$curdb}{user}{$u}{duration}), "</td><td>" .
-				   &convert_time($session_info{$curdb}{user}{$u}{duration} / $session_info{$curdb}{user}{$u}{count}) .
+	foreach my $u (sort keys %{$session_info{$curdb}{user}})
+	{
+		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($pgb_session_info{user}{$u}{count}) .
+				   "</td><td>" . &convert_time($pgb_session_info{user}{$u}{duration}) . "</td><td>" .
+				   &convert_time($pgb_session_info{user}{$u}{duration} / $pgb_session_info{user}{$u}{count}) .
 				   "</td></tr>";
 		$total_count += $session_info{$curdb}{user}{$u}{count};
 		if ($main_user[1] < $session_info{$curdb}{user}{$u}{count}) {
@@ -8249,7 +8259,7 @@ sub print_user_pgb_session
 	my @main_user = ('unknown',0);
 	foreach my $u (sort keys %{$pgb_session_info{user}}) {
 		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($pgb_session_info{user}{$u}{count}) .
-				   "</td><td>" . &convert_time($pgb_session_info{user}{$u}{duration}), "</td><td>" .
+				   "</td><td>" . &convert_time($pgb_session_info{user}{$u}{duration}) . "</td><td>" .
 				   &convert_time($pgb_session_info{user}{$u}{duration} / $pgb_session_info{user}{$u}{count}) .
 				   "</td></tr>";
 		$total_count += $pgb_session_info{user}{$u}{count};
@@ -14018,34 +14028,41 @@ sub load_stats
 
 	### session_info ###
 
-	foreach my $curdb (keys %_session_info) {
-		foreach my $db (keys %{ $_session_info{$curdb}{database}}) {
+	foreach my $curdb (keys %_session_info)
+	{
+		foreach my $db (keys %{ $_session_info{$curdb}{database}})
+		{
 			$session_info{$curdb}{database}{$db}{count} += $_session_info{$curdb}{database}{$db}{count};
 			$session_info{$curdb}{database}{$db}{duration} += $_session_info{$curdb}{database}{$db}{duration};
 		}
 
 		$session_info{$curdb}{count} += $_session_info{$curdb}{count};
 
-		foreach my $day (keys %{ $_session_info{$curdb}{chronos}}) {
-			foreach my $hour (keys %{ $_session_info{$curdb}{chronos}{$day}}) {
+		foreach my $day (keys %{ $_session_info{$curdb}{chronos}})
+		{
+			foreach my $hour (keys %{ $_session_info{$curdb}{chronos}{$day}})
+			{
 				$session_info{$curdb}{chronos}{$day}{$hour}{count} += $_session_info{$curdb}{chronos}{$day}{$hour}{count};
 				$session_info{$curdb}{chronos}{$day}{$hour}{duration} += $_session_info{$curdb}{chronos}{$day}{$hour}{duration};
 			}
 		}
 
-		foreach my $user (keys %{ $_session_info{$curdb}{user}}) {
+		foreach my $user (keys %{ $_session_info{$curdb}{user}})
+		{
 			$session_info{$curdb}{user}{$user}{count}    += $_session_info{$curdb}{user}{$user}{count};
 			$session_info{$curdb}{user}{$user}{duration} += $_session_info{$curdb}{user}{$user}{duration};
 		}
 
 		$session_info{$curdb}{duration} += $_session_info{$curdb}{duration};
 
-		foreach my $host (keys %{ $_session_info{$curdb}{host}}) {
+		foreach my $host (keys %{ $_session_info{$curdb}{host}})
+		{
 			$session_info{$curdb}{host}{$host}{count}    += $_session_info{$curdb}{host}{$host}{count};
 			$session_info{$curdb}{host}{$host}{duration} += $_session_info{$curdb}{host}{$host}{duration};
 		}
 
-		foreach my $app (keys %{ $_session_info{$curdb}{app}}) {
+		foreach my $app (keys %{ $_session_info{$curdb}{app}})
+		{
 			$session_info{$curdb}{app}{$app}{count}    += $_session_info{$curdb}{app}{$app}{count};
 			$session_info{$curdb}{app}{$app}{duration} += $_session_info{$curdb}{app}{$app}{duration};
 		}
@@ -14573,6 +14590,14 @@ sub validate_log_line
 		} elsif ( !$prefix_vars{'t_dbname'} && ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+)(?: database=([^\s]+))?/) ) {
 			$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
 			$current_sessions{$prefix_vars{'t_pid'}}{database} = $2;
+			if ($prefix_vars{'t_query'} =~ /application_name=(.*)/)
+			{
+				if ($1)
+				{
+					$prefix_vars{'t_appname'} = $1;
+					$current_sessions{$prefix_vars{'t_pid'}}{appname} = $1;
+				}
+			}
 		}
 	}
 
@@ -14583,6 +14608,8 @@ sub validate_log_line
 		if (!$prefix_vars{'t_dbuser'} && exists $current_sessions{$t_pid}{user});
 	$prefix_vars{'t_client'} = $current_sessions{$t_pid}{host}
 		if (!$prefix_vars{'t_client'} && exists $current_sessions{$t_pid}{host});
+	$prefix_vars{'t_appname'} = $current_sessions{$t_pid}{appname}
+		if (!$prefix_vars{'t_appname'} && exists $current_sessions{$t_pid}{appname});
 	# Clear storage, the authorized session will be reparsed after
 	delete $current_sessions{$prefix_vars{'t_pid'}};
 
@@ -14593,74 +14620,81 @@ sub validate_log_line
 	}
 
 	# Check user and/or database if required
-	if ($#dbname >= 0) {
-
+	if ($#dbname >= 0)
+	{
 		# Log line does not match the required dbname
-		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname)) {
+		if (!$prefix_vars{'t_dbname'} || !grep(/^$prefix_vars{'t_dbname'}$/i, @dbname))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#dbuser >= 0) {
-
+	if ($#dbuser >= 0)
+	{
 		# Log line does not match the required dbuser
-		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser)) {
+		if (!$prefix_vars{'t_dbuser'} || !grep(/^$prefix_vars{'t_dbuser'}$/i, @dbuser))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#dbclient >= 0) {
-
+	if ($#dbclient >= 0)
+	{
 		# Log line does not match the required dbclient
-		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient)) {
+		if (!$prefix_vars{'t_client'} || !grep(/^$prefix_vars{'t_client'}$/i, @dbclient))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#dbappname >= 0) {
-
+	if ($#dbappname >= 0)
+	{
 		# Log line does not match the required dbname
-		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname)) {
+		if (!$prefix_vars{'t_appname'} || !grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @dbappname))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#exclude_db >= 0) {
-
+	if ($#exclude_db >= 0)
+	{
 		# Log line matches the excluded db
-		if ($prefix_vars{'t_dbname'} && grep(/^\Q$prefix_vars{'t_dbname'}\E$/i, @exclude_db)) {
+		if ($prefix_vars{'t_dbname'} && grep(/^\Q$prefix_vars{'t_dbname'}\E$/i, @exclude_db))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#exclude_user >= 0) {
-
+	if ($#exclude_user >= 0)
+	{
 		# Log line matches the excluded dbuser
-		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user)) {
+		if ($prefix_vars{'t_dbuser'} && grep(/^$prefix_vars{'t_dbuser'}$/i, @exclude_user))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-	if ($#exclude_appname >= 0) {
-
+	if ($#exclude_appname >= 0)
+	{
 		# Log line matches the excluded appname
-		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname)) {
+		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
 		}
 	}
-
-	if ($#exclude_client >= 0) {
-
+	if ($#exclude_client >= 0)
+	{
 		# Log line matches the excluded dbclient
-		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_client)) {
+		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_client))
+		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 			return 0;
@@ -14877,7 +14911,8 @@ sub parse_query
 	}
 
 	# set current session workload
-	if ( !$disable_session ) {
+	if ( !$disable_session )
+	{
 		my $sess_count = scalar keys %current_sessions;
 		$overall_stat{$curdb}{'peak'}{$cur_last_log_timestamp}{session} = $sess_count;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{session}{count} = $sess_count;
@@ -14944,7 +14979,8 @@ sub parse_query
 	}
 
 	# Stores pre-connection activity
-	if ($is_log_level && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/)) {
+	if ($is_log_level && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/))
+	{
 		$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
@@ -14958,6 +14994,14 @@ sub parse_query
 	{
 		$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
 		$current_sessions{$prefix_vars{'t_pid'}}{database} = $2;
+		if ($prefix_vars{'t_query'} =~ /application_name=(.*)/)
+		{
+			if ($1)
+			{
+				$prefix_vars{'t_appname'} = $1;
+				$current_sessions{$prefix_vars{'t_pid'}}{appname} = $1;
+			}
+		}
 
 		return if ($disable_connection);
 
@@ -15021,7 +15065,8 @@ sub parse_query
 		delete $current_sessions{$prefix_vars{'t_pid'}};
 		delete $last_execute_stmt{$prefix_vars{'t_pid'}};
 
-		if ($is_tsung_output) {
+		if ($is_tsung_output)
+		{
 			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
 			&store_tsung_session($prefix_vars{'t_pid'});
 			return;
@@ -15075,15 +15120,18 @@ sub parse_query
 		$autovacuum_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{count}++;
 
-		if ($fmt eq 'csv' || $fmt eq 'jsonlog') {
+		if ($fmt eq 'csv' || $fmt eq 'jsonlog')
+		{
 			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
 				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
 				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $3;
 			}
-			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
+			{
+				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
+				{
 					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
 					$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$t_pid}{vacuum};
 					$autovacuum_info{$curdb}{peak}{system_usage}{date} =
@@ -15558,13 +15606,15 @@ sub parse_pgbouncer
 		$pgb_connection_info{database_host}{$db}{$host}++;
 		$pgb_connection_info{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 
-		if ($graph) {
+		if ($graph)
+		{
 			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{connection}{count}++;
 			$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{"$prefix_vars{'t_min'}"}{connection}{second}{$prefix_vars{'t_sec'}}++;
 		}
 
 		# set current session workload
-		if ( !$disable_session && $t_session_id) {
+		if ( !$disable_session && $t_session_id)
+		{
 			$pgb_current_sessions{$t_session_id} = $prefix_vars{'t_timestamp'};
 			my $sess_count = scalar keys %pgb_current_sessions;
 			$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{session} = $sess_count;
@@ -15590,7 +15640,8 @@ sub parse_pgbouncer
 		$host = _gethostbyaddr($host) if ($dns_resolv && $host);
 
 		# Store time in milliseconds since the connection attempt
-		if ($pgb_current_sessions{$t_session_id} =~ /(\d+):(\d+):(\d+\.\d+)$/) {
+		if ($pgb_current_sessions{$t_session_id} =~ /(\d+):(\d+):(\d+\.\d+)$/)
+		{
 			my $time1 = ($3 * 1000) + ($2 * 60 * 1000) + ($1 * 60 * 60 * 1000);
 			$prefix_vars{'t_timestamp'} =~ /(\d+):(\d+):(\d+\.\d+)$/;
 			my $time2 = ($3 * 1000) + ($2 * 60 * 1000) + ($1 * 60 * 60 * 1000);
