@@ -9802,16 +9802,16 @@ sub print_vacuum_per_table
 			$autovacuum_info{$curdb}{tables}{$b}{vacuums} <=> $autovacuum_info{$curdb}{tables}{$a}{vacuums}
 		} keys %{$autovacuum_info{$curdb}{tables}})
 	{
-		$vacuum_info .= "<tr><td>$t</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{vacuums} .
-			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{idxscans} .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{hits}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{missed}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{dirtied}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{skip_pins}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{skip_frozen}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{wal_record}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{wal_full_page}||0) .
-			"</td><td>" . (&comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_bytes})||0) .
+		$vacuum_info .= "<tr><td>$t</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{vacuums}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{idxscans}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{hits}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{missed}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{dirtied}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{skip_pins}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{skip_frozen}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_record}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_full_page}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_bytes}) .
 			"</td></tr>";
 		$total_count += $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
@@ -9941,13 +9941,13 @@ sub print_vacuum_tuple_removed
 			$autovacuum_info{$curdb}{tables}{$b}{tuples}{removed} <=> $autovacuum_info{$curdb}{tables}{$a}{tuples}{removed}
 		} keys %{$autovacuum_info{$curdb}{tables}})
 	{
-		$vacuum_info .= "<tr><td>$t</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{vacuums} .
-			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{idxscans} .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{removed}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{remain}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{notremovable}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{pages}{removed}||0) .
-			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{pages}{remain}||0) .
+		$vacuum_info .= "<tr><td>$t</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{vacuums}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{idxscans}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{tuples}{removed}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{tuples}{remain}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{tuples}{notremovable}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{pages}{removed}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{pages}{remain}) .
 			"</td></tr>";
 		$total_count += $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
