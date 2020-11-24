@@ -1,3 +1,34 @@
+2020-11-24 - v11.4
+
+This release of pgBadger fix some issues reported by users since
+past four months. Improve support for PostgreSQL 13 log information
+and adds some new features:
+
+  * Add full autovacuum information in "Vacuums per table" report for
+    buffer usage (hits, missed, dirtied), skipped due to pins, skipped
+    frozen and WAL usage (records, full page images, bytes). In report
+    "Tuples removed per table" additional autovacuum information are
+    tuples remaining, tuples not yet removable and pages remaining.
+    These information are only available on the "Table" tab.
+  * Add new repartition report about checkpoint starting causes.
+  * Add detection of application name from connection authorized traces.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix typo in an error message. Thanks to Vidar Tyldum for the patch.
+  - Fix Windows port with error: "can not load incompatible binary data".
+    Thanks to Eric Brawner for the report.
+  - Fix typo on option --html-outdir in pgbadger usage and documentation.
+    Thanks to Vidar Tyldum for the patch.
+  - Fix autodetection of jsonlog/cloudsql format. Thanks to Jon Young
+    for the report.
+  - Fix CSV log parsing with PG v13. Thanks to Kanwei Li for the report
+    and Kaarel Moppel for the patch.
+  - Fix sort of queries generating the most temporary files report.
+    Thanks to Sebastien Lardiere for the report.
+  - Add pgbadger version trace in debug mode.
+
+
 2020-07-26 - v11.3
 
 This release of pgBadger fix several issues reported by users since
