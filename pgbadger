@@ -4322,12 +4322,19 @@ sub parse_orphan_line
 	}
 
 	# Store vacuum related information
-	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t*(pages|tuples|buffer usage|avg read rate|system usage):/)) {
-		if ($line =~ /^\t?(pages|tuples): (\d+) removed, (\d+) remain/) {
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t*(pages|tuples|buffer usage|avg read rate|system usage|WAL usage):/))
+	{
+		if ($line =~ /(pages|tuples): (\d+) removed, (\d+) remain/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{remain} += $3;
 		}
-		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+		if ($line =~ /(\d+) are dead but not yet removable/) {
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{notremovable} += $1;
+		}
+		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
+		{
+			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
+			{
 				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
 				$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
 				$autovacuum_info{$curdb}{peak}{system_usage}{date} =
@@ -4335,34 +4342,52 @@ sub parse_orphan_line
 					"$cur_info{$cur_pid}{hour}:$cur_info{$cur_pid}{min}:$cur_info{$cur_pid}{sec}";
 			}
 		}
-
+		if ($line =~ /, (\d+) skipped due to pins, (\d+) skipped frozen/)
+		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{skip_pins} += $1;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{skip_frozen} += $2;
+		}
+		if ($line =~ /buffer usage: (\d+) hits, (\d+) misses, (\d+) dirtied/)
+		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{hits} += $1;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{misses} += $2;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{dirtied} += $3;
+		}
+		if ($line =~ /WAL usage: (\d+) records, (\d+) full page images, (\d+) bytes/)
+		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{wal_record} += $1;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{wal_full_page} += $2;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{wal_bytes} += $3;
+		}
+	}
 	# stores bind parameters if parameter syntax is detected
-	} elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) ) {
-
+	elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) )
+	{
 		$cur_info{$cur_pid}{parameters} .= " $line" if (!$error_only);
-
-	} elsif (exists $cur_plan_info{$cur_pid}{plan}) {
-
+	}
+	# stores explain plan lines
+	elsif (exists $cur_plan_info{$cur_pid}{plan})
+	{
 		$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
-
+	}
 	# If we have previously stored a temporary file query, append to that query
-	} elsif (exists $cur_temp_info{$cur_pid}{size}) {
-
+	elsif (exists $cur_temp_info{$cur_pid}{size})
+	{
 		$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
-
+	}
 	# If we have previously stored a query that generates locks, append to that query
-	} elsif (exists $cur_lock_info{$cur_pid}{query}) {
-
+	elsif (exists $cur_lock_info{$cur_pid}{query})
+	{
 		$cur_lock_info{$cur_pid}{query} .= "\n" . $line;
-
+	}
 	# If we have previously stored a cancelled query, append to that query
-	} elsif (exists $cur_cancel_info{$cur_pid}{query}) {
-
+	elsif (exists $cur_cancel_info{$cur_pid}{query})
+	{
 		$cur_cancel_info{$cur_pid}{query} .= "\n" . $line;
-
+	}
 	# Otherwise append the orphan line to the corresponding part of the query
-	} else {
-
+	else
+	{
 		# Append to the error statement if one is defined
 		if (exists $cur_info{$cur_pid}{statement}) {
 			$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
@@ -9572,18 +9597,21 @@ sub print_vacuum
 
 	# checkpoint
 	my %graph_data = ();
-	foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+	{
 		$tm =~ /(\d{4})(\d{2})(\d{2})/;
 		my $y  = $1 - 1900;
 		my $mo = $2 - 1;
 		my $d  = $3;
 		my $has_data = 0;
-		foreach my $h ("00" .. "23") {
+		foreach my $h ("00" .. "23")
+		{
 			next if (!exists $per_minute_info{$curdb}{$tm}{$h});
 			my %chk_dataavg = ();
 			my %t_dataavg = ();
 			my %v_dataavg = ();
-			foreach my $m ("00" .. "59") {
+			foreach my $m ("00" .. "59")
+			{
 				next if (!exists $per_minute_info{$curdb}{$tm}{$h}{$m});
 
 				my $rd = &average_per_minutes($m, $avg_minutes);
@@ -9602,7 +9630,8 @@ sub print_vacuum
 			}
 			if ($has_data)
 			{
-				foreach my $rd (@avgs) {
+				foreach my $rd (@avgs)
+				{
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 					$t += ($timezone*1000);
 
@@ -9625,7 +9654,8 @@ sub print_vacuum
 	}
 	# VACUUMs vs ANALYZEs chart
 	$drawn_graphs{autovacuum_graph} = $NODATA;
-	if ($graph) {
+	if ($graph)
+	{
 		$drawn_graphs{autovacuum_graph} = &jqplot_linegraph($graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount},
 		'', 'Autovacuum actions (' . $avg_minutes . ' minutes period)', '', 'VACUUMs', 'ANALYZEs'
 		);
@@ -9633,7 +9663,10 @@ sub print_vacuum
 
 	my $vacuum_size_peak = 0;
 	my $vacuum_size_peak_date = '';
-	foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{vacuum_size} <=> $overall_stat{$curdb}{'peak'}{$a}{vacuum_size}} keys %{$overall_stat{$curdb}{'peak'}}) {
+	foreach (sort {
+			$overall_stat{$curdb}{'peak'}{$b}{vacuum_size} <=> $overall_stat{$curdb}{'peak'}{$a}{vacuum_size}
+		} keys %{$overall_stat{$curdb}{'peak'}})
+	{
 		$vacuum_size_peak = &comma_numbers($overall_stat{$curdb}{'peak'}{$_}{vacuum_size});
 		$vacuum_size_peak_date = $_;
 		last;
@@ -9682,16 +9715,18 @@ $drawn_graphs{autovacuum_graph}
 	&print_vacuum_page_removed($curdb);
 
 	my $vacuum_activity = '';
-	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+	{
 		my $c = 1;
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}}) {
+		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}})
+		{
 			$vacuum_activity .= "<tr><td>$zday</td><td>$h</td>";
 			$zday = "";
 			my %ainf = ();
-			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}}) {
-
+			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}})
+			{
 				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{autovacuum}{count}) {
 					$ainf{vcount} += $per_minute_info{$curdb}{$d}{$h}{$m}{autovacuum}{count};
 				}
@@ -9753,32 +9788,74 @@ sub print_vacuum_per_table
 	# VACUUM stats per table
 	my $total_count   = 0;
 	my $total_idxscan = 0;
+	my $total_hits = 0;
+	my $total_misses = 0;
+	my $total_dirtied = 0;
+	my $total_pins = 0;
+	my $total_frozen = 0;
+	my $total_records = 0;
+	my $total_full_page = 0;
+	my $total_bytes = 0;
 	my $vacuum_info   = '';
 	my @main_vacuum   = ('unknown',0);
-	foreach my $t (sort {$autovacuum_info{$curdb}{tables}{$b}{vacuums} <=> $autovacuum_info{$curdb}{tables}{$a}{vacuums}} keys %{$autovacuum_info{$curdb}{tables}}) {
+	foreach my $t (sort {
+			$autovacuum_info{$curdb}{tables}{$b}{vacuums} <=> $autovacuum_info{$curdb}{tables}{$a}{vacuums}
+		} keys %{$autovacuum_info{$curdb}{tables}})
+	{
 		$vacuum_info .= "<tr><td>$t</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{vacuums} .
 			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{idxscans} .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{hits}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{missed}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{dirtied}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{skip_pins}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{skip_frozen}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{wal_record}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{wal_full_page}||0) .
+			"</td><td>" . (&comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_bytes})||0) .
 			"</td></tr>";
 		$total_count += $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
-		if ($main_vacuum[1] < $autovacuum_info{$curdb}{tables}{$t}{vacuums}) {
+		$total_hits += $autovacuum_info{$curdb}{tables}{$t}{hits};
+		$total_misses += $autovacuum_info{$curdb}{tables}{$t}{misses};
+		$total_dirtied += $autovacuum_info{$curdb}{tables}{$t}{dirtied};
+		$total_pins += $autovacuum_info{$curdb}{tables}{$t}{skip_pins};
+		$total_frozen += $autovacuum_info{$curdb}{tables}{$t}{skip_frozen};
+		$total_records += $autovacuum_info{$curdb}{tables}{$t}{wal_record};
+		$total_full_page += $autovacuum_info{$curdb}{tables}{$t}{wal_full_page};
+		$total_bytes += $autovacuum_info{$curdb}{tables}{$t}{wal_bytes};
+		if ($main_vacuum[1] < $autovacuum_info{$curdb}{tables}{$t}{vacuums})
+		{
 			$main_vacuum[0] = $t;
 			$main_vacuum[1] = $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		}
 	}
-	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count) . "</td><td>" . &comma_numbers($total_idxscan) . "</td></tr>";
+	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_idxscan);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_hits);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_misses);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_dirtied);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_pins);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_frozen);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_records);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_full_page);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_bytes);
+	$vacuum_info .= "</td></tr>";
 
 	my %infos = ();
 	my @small = ();
-	foreach my $d (sort keys %{$autovacuum_info{$curdb}{tables}}) {
+	foreach my $d (sort keys %{$autovacuum_info{$curdb}{tables}})
+	{
 		if ((($autovacuum_info{$curdb}{tables}{$d}{vacuums} * 100) / ($total_count||1)) > $pie_percentage_limit) {
 			$infos{$d} = $autovacuum_info{$curdb}{tables}{$d}{vacuums} || 0;
-		} else {
+		}
+		else
+		{
 			$infos{"Sum vacuums < $pie_percentage_limit%"} += $autovacuum_info{$curdb}{tables}{$d}{vacuums} || 0;
 			push(@small, $d);
 		}
 	}
-	if ($#small == 0) {
+	if ($#small == 0)
+	{
 		$infos{$small[0]} = $infos{"Sum vacuums < $pie_percentage_limit%"};
 		delete $infos{"Sum vacuums < $pie_percentage_limit%"};
 	}
@@ -9817,10 +9894,19 @@ sub print_vacuum_per_table
 					<div class="tab-pane" id="vacuums-per-table-table">
 						<table class="table table-striped table-hover">
 							<thead>
+								<tr><th colspan="2">&nbsp;</th><th style="text-align:center;">Index</th><th colspan="3" style="text-align:center;">Buffer usage</th><th colspan="2" style="text-align:center;">Skipped</th><th colspan="3" style="text-align:center;">WAL usage</th>
 								<tr>
 									<th>Table</th>
-									<th>Number of vacuums</th>
-									<th>Index scans</th>
+									<th>Vacuums</th>
+									<th>scans</th>
+									<th>hits</th>
+									<th>misses</th>
+									<th>dirtied</th>
+									<th>pins</th>
+									<th>frozen</th>
+									<th>records</th>
+									<th>full page</th>
+									<th>bytes</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -9844,39 +9930,62 @@ sub print_vacuum_tuple_removed
 	# VACUUM stats per table
 	my $total_count   = 0;
 	my $total_idxscan = 0;
-	my $total_tuple = 0;
-	my $total_page = 0;
+	my $total_tuple_remove = 0;
+	my $total_tuple_remain = 0;
+	my $total_tuple_notremovable = 0;
+	my $total_page_remove = 0;
+	my $total_page_remain = 0;
 	my $vacuum_info   = '';
 	my @main_tuple   = ('unknown',0);
-	foreach my $t (sort {$autovacuum_info{$curdb}{tables}{$b}{tuples}{removed} <=> $autovacuum_info{$curdb}{tables}{$a}{tuples}{removed}} keys %{$autovacuum_info{$curdb}{tables}}) {
+	foreach my $t (sort {
+			$autovacuum_info{$curdb}{tables}{$b}{tuples}{removed} <=> $autovacuum_info{$curdb}{tables}{$a}{tuples}{removed}
+		} keys %{$autovacuum_info{$curdb}{tables}})
+	{
 		$vacuum_info .= "<tr><td>$t</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{vacuums} .
 			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{idxscans} .
-			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed} .
-			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{pages}{removed} .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{removed}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{remain}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{tuples}{notremovable}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{pages}{removed}||0) .
+			"</td><td>" . ($autovacuum_info{$curdb}{tables}{$t}{pages}{remain}||0) .
 			"</td></tr>";
 		$total_count += $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
-		$total_tuple += $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed};
-		$total_page += $autovacuum_info{$curdb}{tables}{$t}{pages}{removed};
-		if ($main_tuple[1] < $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed}) {
+		$total_tuple_remove += $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed};
+		$total_tuple_remain += $autovacuum_info{$curdb}{tables}{$t}{tuples}{remain};
+		$total_tuple_notremovable += $autovacuum_info{$curdb}{tables}{$t}{tuples}{notremovable};
+		$total_page_remove += $autovacuum_info{$curdb}{tables}{$t}{pages}{removed};
+		$total_page_remain += $autovacuum_info{$curdb}{tables}{$t}{pages}{remain};
+		if ($main_tuple[1] < $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed})
+		{
 			$main_tuple[0] = $t;
 			$main_tuple[1] = $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed};
 		}
 	}
-	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count) . "</td><td>" . &comma_numbers($total_idxscan) .
-			"</td><td>" . &comma_numbers($total_tuple) . "</td><td>" . &comma_numbers($total_page) . "</td></tr>";
+	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_idxscan);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_tuple_remove);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_tuple_remain);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_tuple_notremovable);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_page_remove);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_page_remain);
+	$vacuum_info .= "</td></tr>";
 
 	my %infos_tuple = ();
 	my @small = ();
-	foreach my $d (sort keys %{$autovacuum_info{$curdb}{tables}}) {
-		if ((($autovacuum_info{$curdb}{tables}{$d}{tuples}{removed} * 100) / ($total_tuple||1)) > $pie_percentage_limit) {
+	foreach my $d (sort keys %{$autovacuum_info{$curdb}{tables}})
+	{
+		if ((($autovacuum_info{$curdb}{tables}{$d}{tuples}{removed} * 100) / ($total_tuple_remove||1)) > $pie_percentage_limit) {
 			$infos_tuple{$d} = $autovacuum_info{$curdb}{tables}{$d}{tuples}{removed} || 0;
-		} else {
+		}
+		else
+		{
 			$infos_tuple{"Sum tuples removed < $pie_percentage_limit%"} += $autovacuum_info{$curdb}{tables}{$d}{tuples}{removed} || 0;
 			push(@small, $d);
 		}
 	}
-	if ($#small == 0) {
+	if ($#small == 0)
+	{
 		$infos_tuple{$small[0]} = $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 		delete $infos_tuple{"Sum tuples removed < $pie_percentage_limit%"};
 	}
@@ -9898,7 +10007,7 @@ sub print_vacuum_tuple_removed
 			<div class="well key-figures">
 				<ul>
 					<li><span class="figure">$main_tuple[0] ($main_tuple[1])</span> <span class="figure-label">Main table with removed tuples on database $database</span></li>
-					<li><span class="figure">$total_tuple tuples</span> <span class="figure-label">Total removed</span></li>
+					<li><span class="figure">$total_tuple_remove tuples</span> <span class="figure-label">Total removed</span></li>
 				</ul>
 			</div>
 		</div>
@@ -9915,12 +10024,16 @@ sub print_vacuum_tuple_removed
 					<div class="tab-pane" id="tuples-removed-per-table-table">
 						<table class="table table-striped table-hover">
 							<thead>
+								<tr><th colspan="2">&nbsp;</th><th style="text-align:center;">Index</th><th colspan="3" style="text-align:center;">Tuples</th><th colspan="2" style="text-align:center;">Pages</th></tr>
 								<tr>
 									<th>Table</th>
-									<th>Number of vacuums</th>
-									<th>Index scans</th>
-									<th>Tuples removed</th>
-									<th>Pages removed</th>
+									<th>Vacuums</th>
+									<th>scans</th>
+									<th>removed</th>
+									<th>remain</th>
+									<th>not yet removable</th>
+									<th>removed</th>
+									<th>remain</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -9951,7 +10064,10 @@ sub print_vacuum_page_removed
 	my @main_page   = ('unknown',0);
 	my %infos_page = ();
 	my @small = ();
-	foreach my $t (sort {$autovacuum_info{$curdb}{tables}{$b}{pages}{removed} <=> $autovacuum_info{$curdb}{tables}{$a}{pages}{removed}} keys %{$autovacuum_info{$curdb}{tables}}) {
+	foreach my $t (sort {
+			$autovacuum_info{$curdb}{tables}{$b}{pages}{removed} <=> $autovacuum_info{$curdb}{tables}{$a}{pages}{removed}
+		} keys %{$autovacuum_info{$curdb}{tables}})
+	{
 		$vacuum_info .= "<tr><td>$t</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{vacuums} .
 			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{idxscans} .
 			"</td><td>" . $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed} .
@@ -9961,7 +10077,8 @@ sub print_vacuum_page_removed
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
 		$total_tuple += $autovacuum_info{$curdb}{tables}{$t}{tuples}{removed};
 		$total_page += $autovacuum_info{$curdb}{tables}{$t}{pages}{removed};
-		if ($main_page[1] < $autovacuum_info{$curdb}{tables}{$t}{pages}{removed}) {
+		if ($main_page[1] < $autovacuum_info{$curdb}{tables}{$t}{pages}{removed})
+		{
 			$main_page[0] = $t;
 			$main_page[1] = $autovacuum_info{$curdb}{tables}{$t}{pages}{removed};
 		}
@@ -9969,7 +10086,9 @@ sub print_vacuum_page_removed
 		{
 			if ((($autovacuum_info{$curdb}{tables}{$t}{pages}{removed} * 100) / ($total_page || 1)) > $pie_percentage_limit) {
 				$infos_page{$t} = $autovacuum_info{$curdb}{tables}{$t}{pages}{removed} || 0;
-			} else {
+			}
+			else
+			{
 				$infos_page{"Sum pages removed < $pie_percentage_limit%"} += $autovacuum_info{$curdb}{tables}{$t}{pages}{removed} || 0;
 				push(@small, $t);
 			}
@@ -9978,7 +10097,8 @@ sub print_vacuum_page_removed
 	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count) . "</td><td>" . &comma_numbers($total_idxscan) .
 			"</td><td>" . &comma_numbers($total_tuple) . "</td><td>" . &comma_numbers($total_page) . "</td></tr>";
 
-	if ($#small == 0) {
+	if ($#small == 0)
+	{
 		$infos_page{$small[0]} = $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 		delete $infos_page{"Sum pages removed < $pie_percentage_limit%"};
 	}
@@ -14354,7 +14474,18 @@ sub load_stats
 			$autovacuum_info{$curdb}{tables}{$table}{vacuums} += $_autovacuum_info{$curdb}{tables}{$table}{vacuums};
 			$autovacuum_info{$curdb}{tables}{$table}{idxscans} += $_autovacuum_info{$curdb}{tables}{$table}{idxscans};
 			$autovacuum_info{$curdb}{tables}{$table}{tuples}{removed} += $_autovacuum_info{$curdb}{tables}{$table}{tuples}{removed};
+			$autovacuum_info{$curdb}{tables}{$table}{tuples}{remain} += $_autovacuum_info{$curdb}{tables}{$table}{tuples}{remain};
+			$autovacuum_info{$curdb}{tables}{$table}{tuples}{notremovable} += $_autovacuum_info{$curdb}{tables}{$table}{tuples}{notremovable};
 			$autovacuum_info{$curdb}{tables}{$table}{pages}{removed} += $_autovacuum_info{$curdb}{tables}{$table}{pages}{removed};
+			$autovacuum_info{$curdb}{tables}{$table}{pages}{remain} += $_autovacuum_info{$curdb}{tables}{$table}{pages}{remain};
+			$autovacuum_info{$curdb}{tables}{$table}{hits} += $_autovacuum_info{$curdb}{tables}{$table}{hits};
+			$autovacuum_info{$curdb}{tables}{$table}{misses} += $_autovacuum_info{$curdb}{tables}{$table}{misses};
+			$autovacuum_info{$curdb}{tables}{$table}{dirtied} += $_autovacuum_info{$curdb}{tables}{$table}{dirtied};
+			$autovacuum_info{$curdb}{tables}{$table}{skip_pins} += $_autovacuum_info{$curdb}{tables}{$table}{skip_pins};
+			$autovacuum_info{$curdb}{tables}{$table}{skip_frozen} += $_autovacuum_info{$curdb}{tables}{$table}{skip_frozen};
+			$autovacuum_info{$curdb}{tables}{$table}{wal_record} += $_autovacuum_info{$curdb}{tables}{$table}{wal_record};
+			$autovacuum_info{$curdb}{tables}{$table}{wal_full_page} += $_autovacuum_info{$curdb}{tables}{$table}{wal_full_page};
+			$autovacuum_info{$curdb}{tables}{$table}{wal_bytes} += $_autovacuum_info{$curdb}{tables}{$table}{wal_bytes};
 		}
 		if ($_autovacuum_info{$curdb}{peak}{system_usage}{elapsed} > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 		{
@@ -15328,11 +15459,13 @@ sub parse_query
 
 		if ($fmt eq 'csv' || $fmt eq 'jsonlog')
 		{
-			if ($prefix_vars{'t_query'} =~ /pages: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{removed} += $3;
+			if ($prefix_vars{'t_query'} =~ /(pages|tuples): (\d+) removed, (\d+) remain/)
+			{
+					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
+					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
 			}
-			if ($prefix_vars{'t_query'} =~ /tuples: (\d+) removed, (\d+) remain/) {
-				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{removed} += $3;
+			if ($prefix_vars{'t_query'} =~ /(\d+) are dead but not yet removable/) {
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{notremovable} += $1;
 			}
 			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
 			{
@@ -15344,6 +15477,23 @@ sub parse_query
 						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} " .
 						"$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 				}
+			}
+			if ($prefix_vars{'t_query'} =~ /, (\d+) skipped due to pins, (\d+) skipped frozen/)
+			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{skip_pins} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{skip_frozen} += $2;
+			}
+			if ($prefix_vars{'t_query'} =~ /buffer usage: (\d+) hits, (\d+) misses, (\d+) dirtied/)
+			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{hits} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{misses} += $2;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{dirtied} += $3;
+			}
+			if ($prefix_vars{'t_query'} =~ /WAL usage: (\d+) records, (\d+) full page images, (\d+) bytes/)
+			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{wal_record} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{wal_full_page} += $2;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{wal_bytes} += $3;
 			}
 		}
 		$cur_info{$t_pid}{cur_db} = $curdb;
