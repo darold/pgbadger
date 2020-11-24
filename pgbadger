@@ -6137,6 +6137,7 @@ sub html_header
      				<li><a href="#checkpoints-files">Checkpoints files</a></li>
      				<li><a href="#checkpoints-distance">Checkpoints distance</a></li>
      				<li><a href="#checkpoint-activity">Checkpoint activity</a></li>
+     				<li><a href="#checkpoints-cause">Checkpoint causes</a></li>
      			</ul>
      		</li>
 };
@@ -8754,38 +8755,46 @@ sub print_checkpoint
 
 	# checkpoint
 	my %graph_data = ();
-	if ($graph) {
-		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	if ($graph)
+	{
+		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+		{
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $y  = $1 - 1900;
 			my $mo = $2 - 1;
 			my $d  = $3;
-			foreach my $h ("00" .. "23") {
+			foreach my $h ("00" .. "23")
+			{
 				next if (!exists $per_minute_info{$curdb}{$tm}{$h});
 				my %chk_dataavg = ();
 				my %t_dataavg = ();
 				my %v_dataavg = ();
-				foreach my $m ("00" .. "59") {
+				foreach my $m ("00" .. "59")
+				{
 					next if (!exists $per_minute_info{$curdb}{$tm}{$h}{$m});
 
 					my $rd = &average_per_minutes($m, $avg_minutes);
 
-					if ($checkpoint_info{wbuffer}) {
+					if ($checkpoint_info{wbuffer})
+					{
 						$chk_dataavg{wbuffer}{"$rd"} = 0 if (!exists $chk_dataavg{wbuffer}{"$rd"});
 						$chk_dataavg{file_added}{"$rd"} = 0 if (!exists $chk_dataavg{file_added}{"$rd"});
 						$chk_dataavg{file_removed}{"$rd"} = 0 if (!exists $chk_dataavg{file_removed}{"$rd"});
 						$chk_dataavg{file_recycled}{"$rd"} = 0 if (!exists $chk_dataavg{file_recycled}{"$rd"});
-						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}) {
+						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint})
+						{
 							$chk_dataavg{wbuffer}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{wbuffer} || 0);
 							$chk_dataavg{file_added}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{file_added} || 0);
 							$chk_dataavg{file_removed}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{file_removed}  || 0);
 							$chk_dataavg{file_recycled}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{file_recycled} || 0);
 						}
 					}
-					if (exists $checkpoint_info{distance} || exists $checkpoint_info{estimate}) {
+					if (exists $checkpoint_info{distance} || exists $checkpoint_info{estimate})
+					{
 						$chk_dataavg{distance}{"$rd"} = 0 if (!exists $chk_dataavg{distance}{"$rd"});
 						$chk_dataavg{estimate}{"$rd"} = 0 if (!exists $chk_dataavg{estimate}{"$rd"});
-						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}) {
+						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint})
+						{
 							$chk_dataavg{distance}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{distance} || 0) * 1000;
 							$chk_dataavg{distance_count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{distance_count} || 1);
 							$chk_dataavg{estimate}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{checkpoint}{estimate} || 0) * 1000;
@@ -8793,7 +8802,8 @@ sub print_checkpoint
 					}
 				}
 
-				foreach my $rd (@avgs) {
+				foreach my $rd (@avgs)
+				{
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 					$t += ($timezone*1000);
 
@@ -8801,19 +8811,22 @@ sub print_checkpoint
 					last if ($t > $t_max);
 
 					# Average of written checkpoint buffers and wal files
-					if (exists $chk_dataavg{wbuffer}) {
+					if (exists $chk_dataavg{wbuffer})
+					{
 						$graph_data{wbuffer} .= "[$t, " . ($chk_dataavg{wbuffer}{"$rd"} || 0) . "],";
 						$graph_data{file_added} .= "[$t, " . ($chk_dataavg{file_added}{"$rd"} || 0) . "],";
 						$graph_data{file_removed} .= "[$t, " . ($chk_dataavg{file_removed}{"$rd"} || 0) . "],";
 						$graph_data{file_recycled} .= "[$t, " . ($chk_dataavg{file_recycled}{"$rd"} || 0) . "],";
 					}
-					if (exists $chk_dataavg{distance} || $chk_dataavg{estimate}) {
+					if (exists $chk_dataavg{distance} || $chk_dataavg{estimate})
+					{
 						$graph_data{distance} .= "[$t, " . int(($chk_dataavg{distance}{"$rd"}/($chk_dataavg{distance_count}{"$rd"} || 1)) || 0) . "],";
 						$graph_data{estimate} .= "[$t, " . int(($chk_dataavg{estimate}{"$rd"}/($chk_dataavg{distance_count}{"$rd"} || 1)) || 0) . "],";
 					}
 				}
 			}
 		}
+
 		foreach (keys %graph_data) {
 			$graph_data{$_} =~ s/,$//;
 		}
@@ -8838,21 +8851,30 @@ sub print_checkpoint
 
 	my $checkpoint_wbuffer_peak = 0;
 	my $checkpoint_wbuffer_peak_date = '';
-	foreach (sort {$overall_checkpoint{'peak'}{$b}{checkpoint_wbuffer} <=> $overall_checkpoint{'peak'}{$a}{checkpoint_wbuffer}} keys %{$overall_checkpoint{'peak'}}) {
+	foreach (sort {
+			$overall_checkpoint{'peak'}{$b}{checkpoint_wbuffer} <=> $overall_checkpoint{'peak'}{$a}{checkpoint_wbuffer}
+		} keys %{$overall_checkpoint{'peak'}})
+	{
 		$checkpoint_wbuffer_peak = &comma_numbers($overall_checkpoint{'peak'}{$_}{checkpoint_wbuffer});
 		$checkpoint_wbuffer_peak_date = $_;
 		last;
 	}
 	my $walfile_usage_peak = 0;
 	my $walfile_usage_peak_date = '';
-	foreach (sort {$overall_checkpoint{'peak'}{$b}{walfile_usage} <=> $overall_checkpoint{'peak'}{$a}{walfile_usage}} keys %{$overall_checkpoint{'peak'}}) {
+	foreach (sort {
+			$overall_checkpoint{'peak'}{$b}{walfile_usage} <=> $overall_checkpoint{'peak'}{$a}{walfile_usage}
+		} keys %{$overall_checkpoint{'peak'}})
+	{
 		$walfile_usage_peak = &comma_numbers($overall_checkpoint{'peak'}{$_}{walfile_usage});
 		$walfile_usage_peak_date = $_;
 		last;
 	}
 	my $checkpoint_distance_peak = 0;
 	my $checkpoint_distance_peak_date = '';
-	foreach (sort {$overall_checkpoint{'peak'}{$b}{distance} <=> $overall_checkpoint{'peak'}{$a}{distance}} keys %{$overall_checkpoint{'peak'}}) {
+	foreach (sort {
+			$overall_checkpoint{'peak'}{$b}{distance} <=> $overall_checkpoint{'peak'}{$a}{distance}
+		} keys %{$overall_checkpoint{'peak'}})
+	{
 		$checkpoint_distance_peak = &comma_numbers(sprintf("%.2f", $overall_checkpoint{'peak'}{$_}{distance}/1024));
 		$checkpoint_distance_peak_date = $_;
 		last;
@@ -8924,10 +8946,12 @@ $drawn_graphs{checkpointdistance_graph}
 	my $files = '';
 	my $warnings = '';
 	my $distance = '';
-	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+	{
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}}) {
+		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}})
+		{
 			$buffers .= "<tr><td>$zday</td><td>$h</td>";
 			$files .= "<tr><td>$zday</td><td>$h</td>";
 			$warnings .= "<tr><td>$zday</td><td>$h</td>";
@@ -8938,9 +8962,10 @@ $drawn_graphs{checkpointdistance_graph}
 			my %cainf = ();
 			my %rainf = ();
 			my %dinf = ();
-			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}}) {
-
-				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}) {
+			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}})
+			{
+				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint})
+				{
 					$cinf{wbuffer} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{wbuffer};
 					$cinf{file_added} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{file_added};
 					$cinf{file_removed} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{file_removed};
@@ -8953,17 +8978,21 @@ $drawn_graphs{checkpointdistance_graph}
 					$cainf{sync_longest} = $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{sync_longest}
 						if ($per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{sync_longest} > $cainf{sync_longest});
 				}
-				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{warning}) {
+				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{warning})
+				{
 					$cinf{warning} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{warning};
 					$cinf{warning_seconds} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{warning_seconds};
 				}
-				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{distance} || $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{estimate}) {
+				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{distance}
+					|| $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{estimate})
+				{
 					$dinf{distance}{sum} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{distance};
 					$dinf{estimate}{sum} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{estimate};
 					$dinf{distance}{count} += $per_minute_info{$curdb}{$d}{$h}{$m}{checkpoint}{distance_count};
 				}
 			}
-			if (scalar keys %cinf) {
+			if (scalar keys %cinf)
+			{
 				$buffers .= "<td>" . &comma_numbers($cinf{wbuffer}) .
 					"</td><td>" . &comma_numbers($cinf{write}) . 's' .
 					"</td><td>" . &comma_numbers($cinf{sync}) . 's' .
@@ -8976,22 +9005,28 @@ $drawn_graphs{checkpointdistance_graph}
 					"</td><td>" . &comma_numbers($cainf{sync_longest}) . 's' .
 					"</td><td>" . &comma_numbers($cainf{sync_avg}) . 's' .
 					"</td></tr>";
-			} else {
+			}
+			else
+			{
 				$buffers .= "<td>0</td><td>0s</td><td>0s</td><td>0s</td></tr>";
 				$files .= "<td>0</td><td>0</td><td>0</td><td>0</td><td>0s</td><td>0s</td></tr>";
 			}
-			if (exists $cinf{warning}) {
+			if (exists $cinf{warning})
+			{
 				$warnings .= "<td>" . &comma_numbers($cinf{warning}) . "</td><td>" .
 					&comma_numbers(sprintf( "%.2f", ($cinf{warning_seconds} || 0) / ($cinf{warning} || 1))) .
 					 "s</td></tr>";
-			} else {
+			}
+			else {
 				$warnings .= "<td>0</td><td>0s</td></tr>";
 			}
-			if (exists $dinf{distance} || $dinf{estimate}) {
+			if (exists $dinf{distance} || $dinf{estimate})
+			{
 				$distance .= "<td>" . &comma_numbers(sprintf( "%.2f", $dinf{distance}{sum}/($dinf{distance}{count}||1))) . " kB</td><td>" .
 					&comma_numbers(sprintf( "%.2f", $dinf{estimate}{sum}/($dinf{distance}{count}||1))) .
 					 " kB</td></tr>";
-			} else {
+			}
+			else {
 				$distance .= "<td>0</td><td>0</td></tr>";
 			}
 		}
@@ -9083,6 +9118,102 @@ $drawn_graphs{checkpointdistance_graph}
 };
 
 }
+
+sub print_checkpoint_cause
+{
+	my $curdb = shift;
+
+	my %infos = ();
+	my $total_count   = 0;
+	my $chkp_info = '';
+	my @main_checkpoint = ('unknown',0);
+	foreach my $c (sort {
+			$checkpoint_info{starting}{$b} <=> $checkpoint_info{starting}{$a}
+		} keys %{$checkpoint_info{starting}})
+	{
+		$chkp_info .= "<tr><td>$c</td><td>" . &comma_numbers($checkpoint_info{starting}{$c}) . "</td></tr>";
+		$total_count += $checkpoint_info{starting}{$c};
+		if ($main_checkpoint[1] < $checkpoint_info{starting}{$c})
+		{
+			$main_checkpoint[0] = $c;
+			$main_checkpoint[1] = $checkpoint_info{starting}{$c};
+		}
+	}
+	$chkp_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count) . "</td></tr>";
+
+	if ($graph)
+	{
+		my @small = ();
+		foreach my $c (sort keys %{$checkpoint_info{starting}})
+		{
+			if ((($checkpoint_info{starting}{$c} * 100) / ($total_count||1)) > $pie_percentage_limit) {
+				$infos{$c} = $checkpoint_info{starting}{$c} || 0;
+			}
+			else
+			{
+				$infos{"Sum checkpoints cause < $pie_percentage_limit%"} += $checkpoint_info{starting}{$c} || 0;
+				push(@small, $c);
+			}
+		}
+		if ($#small == 0)
+		{
+			$infos{$small[0]} = $infos{"Sum checkpoints cause < $pie_percentage_limit%"};
+			delete $infos{"Sum checkpoints cause < $pie_percentage_limit%"};
+		}
+	}
+	$drawn_graphs{checkpointcause_graph} = &jqplot_piegraph($graphid++, 'graph_checkpointcause', 'Checkpoint causes', %infos);
+	$total_count = &comma_numbers($total_count);
+	my $database = '';
+	if ($main_checkpoint[0] =~ s/^([^\.]+)\.//) {
+		$database = $1;
+	}
+
+	$chkp_info = qq{<tr><td colspan="2">$NODATA</td></tr>} if (!$total_count);
+
+	print $fh qq{
+	<div class="analysis-item row" id="checkpoints-cause">
+		<h2 class="col-md-12"><i class="glyphicon icon-table"></i> Checkpoint causes</h2>
+		<div class="col-md-3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_checkpoint[0] ($main_checkpoint[1])</span> <span class="figure-label">Main checkpoint cause</span></li>
+					<li><span class="figure">$total_count checkpoints</span> <span class="figure-label">Total</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="col-md-9">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#checkpoints-cause-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#checkpoints-cause-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="checkpoints-cause-graph">
+						$drawn_graphs{checkpointcause_graph}
+					</div>
+					<div class="tab-pane" id="checkpoints-cause-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Cause</th>
+									<th>Number of checkpoints</th>
+								</tr>
+							</thead>
+							<tbody>
+							$chkp_info
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of checkpoints per table -->
+};
+	delete $drawn_graphs{checkpointcause_graph};
+
+}
+
 
 sub print_temporary_file
 {
@@ -9347,28 +9478,37 @@ sub print_analyze_per_table
 	my $total_count   = 0;
 	my $analyze_info = '';
 	my @main_analyze = ('unknown',0);
-	foreach my $t (sort {$autoanalyze_info{$curdb}{tables}{$b}{analyzes} <=> $autoanalyze_info{$curdb}{tables}{$a}{analyzes}} keys %{$autoanalyze_info{$curdb}{tables}}) {
+	foreach my $t (sort {
+			$autoanalyze_info{$curdb}{tables}{$b}{analyzes} <=> $autoanalyze_info{$curdb}{tables}{$a}{analyzes}
+		} keys %{$autoanalyze_info{$curdb}{tables}})
+	{
 		$analyze_info .= "<tr><td>$t</td><td>" . $autoanalyze_info{$curdb}{tables}{$t}{analyzes} .
 			"</td></tr>";
 		$total_count += $autoanalyze_info{$curdb}{tables}{$t}{analyzes};
-		if ($main_analyze[1] < $autoanalyze_info{$curdb}{tables}{$t}{analyzes}) {
+		if ($main_analyze[1] < $autoanalyze_info{$curdb}{tables}{$t}{analyzes})
+		{
 			$main_analyze[0] = $t;
 			$main_analyze[1] = $autoanalyze_info{$curdb}{tables}{$t}{analyzes};
 		}
 	}
 	$analyze_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_count) . "</td></tr>";
 
-	if ($graph) {
+	if ($graph)
+	{
 		my @small = ();
-		foreach my $d (sort keys %{$autoanalyze_info{$curdb}{tables}}) {
+		foreach my $d (sort keys %{$autoanalyze_info{$curdb}{tables}})
+		{
 			if ((($autoanalyze_info{$curdb}{tables}{$d}{analyzes} * 100) / ($total_count||1)) > $pie_percentage_limit) {
 				$infos{$d} = $autoanalyze_info{$curdb}{tables}{$d}{analyzes} || 0;
-			} else {
+			}
+			else
+			{
 				$infos{"Sum analyzes < $pie_percentage_limit%"} += $autoanalyze_info{$curdb}{tables}{$d}{analyzes} || 0;
 				push(@small, $d);
 			}
 		}
-		if ($#small == 0) {
+		if ($#small == 0)
+		{
 			$infos{$small[0]} = $infos{"Sum analyzes < $pie_percentage_limit%"};
 			delete $infos{"Sum analyzes < $pie_percentage_limit%"};
 		}
@@ -12458,6 +12598,7 @@ sub dump_as_html
 		<li class="slide" id="checkpoints-slide" style="display:none;">
 	};
 			&print_checkpoint($curdb);
+			&print_checkpoint_cause($curdb);
 		}
 
 		if (!$disable_temporary && !$pgbouncer_only) {
@@ -13488,7 +13629,6 @@ sub load_stats
 	my %_bind_info = %{$stats{bind_info}};
 
 	### overall_stat ###
-
 	# Those a used to update the progress bar and are not related to any database
 	$overall_stat{'queries_number'} += $_overall_stat{'queries_number'};
 	$overall_stat{'errors_number'} += $_overall_stat{'errors_number'};
@@ -13502,7 +13642,8 @@ sub load_stats
 	foreach my $curdb (keys %_overall_stat)
 	{
 		next if (grep(/^$curdb$/, 'queries_number', 'errors_number', 'queries_number', 'errors_number', 'nlines'));
-		if ($_overall_stat{$curdb}{'first_log_ts'}) {
+		if ($_overall_stat{$curdb}{'first_log_ts'})
+		{
 			$overall_stat{$curdb}{'first_log_ts'} = $_overall_stat{$curdb}{'first_log_ts'}
 				if (!$overall_stat{$curdb}{'first_log_ts'} ||
 					($overall_stat{$curdb}{'first_log_ts'} gt $_overall_stat{$curdb}{'first_log_ts'}));
@@ -13517,7 +13658,8 @@ sub load_stats
 		$pgb_overall_stat{$curdb}{'queries_number'} += $_pgb_overall_stat{$curdb}{'queries_number'};
 		$pgb_overall_stat{$curdb}{'errors_number'} += $_pgb_overall_stat{$curdb}{'errors_number'};
 
-		if ($_overall_stat{$curdb}{'first_query_ts'}) {
+		if ($_overall_stat{$curdb}{'first_query_ts'})
+		{
 			$overall_stat{$curdb}{'first_query_ts'} = $_overall_stat{$curdb}{'first_query_ts'}
 				if (!$overall_stat{$curdb}{'first_query_ts'} ||
 					($overall_stat{$curdb}{'first_query_ts'} gt $_overall_stat{$curdb}{'first_query_ts'}));
@@ -13531,20 +13673,24 @@ sub load_stats
 		{
 			# Backward compatibility
 			$overall_stat{$curdb}{'queries_duration'}{'execute'} += $_overall_stat{$curdb}{'queries_duration'};
-		} else {
+		}
+		else
+		{
 			$overall_stat{$curdb}{'queries_duration'}{'execute'} += $_overall_stat{$curdb}{'queries_duration'}{'execute'};
 			$overall_stat{$curdb}{'queries_duration'}{'prepare'} += $_overall_stat{$curdb}{'queries_duration'}{'prepare'};
 			$overall_stat{$curdb}{'queries_duration'}{'bind'} += $_overall_stat{$curdb}{'queries_duration'}{'bind'};
 		}
 
-		foreach my $a (@SQL_ACTION) {
+		foreach my $a (@SQL_ACTION)
+		{
 			$overall_stat{$curdb}{lc($a)} += $_overall_stat{$curdb}{lc($a)}
-			if exists $_overall_stat{$curdb}{lc($a)};
+				if exists $_overall_stat{$curdb}{lc($a)};
 			$overall_stat{$curdb}{lc($a)} += $_overall_stat{$curdb}{$a}
-			if exists $_overall_stat{$curdb}{$a};
+				if exists $_overall_stat{$curdb}{$a};
 		}
 
-		foreach my $k (keys %{$_overall_stat{$curdb}{peak}}) {
+		foreach my $k (keys %{$_overall_stat{$curdb}{peak}})
+		{
 			$overall_stat{$curdb}{peak}{$k}{query} += $_overall_stat{$curdb}{peak}{$k}{query};
 			$overall_stat{$curdb}{peak}{$k}{select} += $_overall_stat{$curdb}{peak}{$k}{select};
 			$overall_stat{$curdb}{peak}{$k}{write} += $_overall_stat{$curdb}{peak}{$k}{write};
@@ -13576,7 +13722,8 @@ sub load_stats
 		if ($_overall_checkpoint{checkpoint_write} > $overall_checkpoint{checkpoint_write});
 	$overall_checkpoint{checkpoint_sync} = $_overall_checkpoint{checkpoint_sync}
 		if ($_overall_checkpoint{checkpoint_sync} > $overall_checkpoint{checkpoint_sync});
-	foreach my $k (keys %{$_overall_checkpoint{peak}}) {
+	foreach my $k (keys %{$_overall_checkpoint{peak}})
+	{
 		$overall_checkpoint{peak}{$k}{checkpoint_wbuffer} += $_overall_checkpoint{peak}{$k}{checkpoint_wbuffer};
 		$overall_checkpoint{peak}{$k}{walfile_usage} += $_overall_checkpoint{peak}{$k}{walfile_usage};
 		$overall_checkpoint{peak}{$k}{distance} += $_overall_checkpoint{peak}{$k}{distance};
@@ -13584,7 +13731,8 @@ sub load_stats
 	}
 
 	### pgbouncer related overall stats ###
-	foreach my $k (keys %{$_pgb_overall_stat{peak}}) {
+	foreach my $k (keys %{$_pgb_overall_stat{peak}})
+	{
 		$pgb_overall_stat{peak}{$k}{connection} += $_pgb_overall_stat{peak}{$k}{connection};
 		$pgb_overall_stat{peak}{$k}{session} += $_pgb_overall_stat{peak}{$k}{session};
 		$pgb_overall_stat{peak}{$k}{t_req} += $_pgb_overall_stat{peak}{$k}{t_req};
@@ -13599,7 +13747,6 @@ sub load_stats
 	$pgb_overall_stat{histogram}{session_total} += $_pgb_overall_stat{histogram}{session_total};
 
 	### Logs level ###
-
 	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT))
 	{
 		foreach my $curdb (keys %_logs_type)
@@ -13609,7 +13756,6 @@ sub load_stats
 	}
 
 	### Errors code ###
-
 	foreach my $curdb (keys %_errors_code)
 	{
 		foreach my $c (keys %{$_errors_code{$curdb}}) {
@@ -13618,7 +13764,6 @@ sub load_stats
 	}
 
 	### database_info ###
-
 	foreach my $curdb (keys %_database_info)
 	{
 		foreach my $db (keys %{$_database_info{$curdb}}) {
@@ -13629,7 +13774,6 @@ sub load_stats
 	}
 
 	### application_info ###
-
 	foreach my $curdb (keys %_application_info)
 	{
 		foreach my $app (keys %{$_application_info{$curdb}}) {
@@ -13640,7 +13784,6 @@ sub load_stats
 	}
 
 	### user_info ###
-
 	foreach my $curdb (keys %_user_info)
 	{
 		foreach my $u (keys %{$_user_info{$curdb}}) {
@@ -13651,7 +13794,6 @@ sub load_stats
 	}
 
 	### host_info ###
-
 	foreach my $curdb (keys %_host_info)
 	{
 		foreach my $h (keys %{$_host_info{$curdb}}) {
@@ -13663,7 +13805,6 @@ sub load_stats
 
 
 	### connection_info ###
-
 	foreach my $curdb (keys %_connection_info)
 	{
 		foreach my $db (keys %{ $_connection_info{$curdb}{database} }) {
@@ -13702,18 +13843,19 @@ sub load_stats
 	}
 
 	### pgbouncer connection_info ###
-
 	foreach my $db (keys %{ $_pgb_connection_info{database} }) {
 		$pgb_connection_info{database}{$db} += $_pgb_connection_info{database}{$db};
 	}
 
-	foreach my $db (keys %{ $_pgb_connection_info{database_user} }) {
+	foreach my $db (keys %{ $_pgb_connection_info{database_user} })
+	{
 		foreach my $user (keys %{ $_pgb_connection_info{database_user}{$db} }) {
 			$pgb_connection_info{database_user}{$db}{$user} += $_pgb_connection_info{database_user}{$db}{$user};
 		}
 	}
 
-	foreach my $db (keys %{ $_pgb_connection_info{database_host} }) {
+	foreach my $db (keys %{ $_pgb_connection_info{database_host} })
+	{
 		foreach my $user (keys %{ $_pgb_connection_info{database_host}{$db} }) {
 			$pgb_connection_info{database_host}{$db}{$user} += $_pgb_connection_info{database_host}{$db}{$user};
 		}
@@ -13729,33 +13871,36 @@ sub load_stats
 
 	$pgb_connection_info{count} += $_pgb_connection_info{count};
 
-	foreach my $day (keys %{ $_pgb_connection_info{chronos} }) {
+	foreach my $day (keys %{ $_pgb_connection_info{chronos} })
+	{
 		foreach my $hour (keys %{ $_pgb_connection_info{chronos}{$day} }) {
 			$pgb_connection_info{chronos}{$day}{$hour}{count} += $_pgb_connection_info{chronos}{$day}{$hour}{count}
 		}
 	}
 
 	### log_files ###
-
 	foreach my $f (@_log_files) {
 		push(@log_files, $f) if (!grep(m#^\Q$f\E$#, @_log_files));
 	}
 
 	### error_info ###
-
 	foreach my $curdb (keys %_error_info)
 	{
-		foreach my $q (keys %{$_error_info{$curdb}}) {
+		foreach my $q (keys %{$_error_info{$curdb}})
+		{
 			$error_info{$curdb}{$q}{count} += $_error_info{$curdb}{$q}{count};
-			foreach my $day (keys %{ $_error_info{$curdb}{$q}{chronos} }) {
-				foreach my $hour (keys %{$_error_info{$curdb}{$q}{chronos}{$day}}) {
+			foreach my $day (keys %{ $_error_info{$curdb}{$q}{chronos} })
+			{
+				foreach my $hour (keys %{$_error_info{$curdb}{$q}{chronos}{$day}})
+				{
 					$error_info{$curdb}{$q}{chronos}{$day}{$hour}{count} += $_error_info{$curdb}{$q}{chronos}{$day}{$hour}{count};
 					foreach my $min (keys %{$_error_info{$curdb}{$q}{chronos}{$day}{$hour}{min}}) {
 						$error_info{$curdb}{$q}{chronos}{$day}{$hour}{min}{$min} += $_error_info{$curdb}{$q}{chronos}{$day}{$hour}{min}{$min};
 					}
 				}
 			}
-			for (my $i = 0; $i <= $#{$_error_info{$curdb}{$q}{date}}; $i++) {
+			for (my $i = 0; $i <= $#{$_error_info{$curdb}{$q}{date}}; $i++)
+			{
 				&set_top_error_sample( $curdb, $q,
 										$_error_info{$curdb}{$q}{date}[$i],
 										$_error_info{$curdb}{$q}{error}[$i],
@@ -13774,19 +13919,21 @@ sub load_stats
 	}
 
 	### pgbouncer error_info ###
-
 	foreach my $q (keys %_pgb_error_info)
 	{
 		$pgb_error_info{$q}{count} += $_pgb_error_info{$q}{count};
-		foreach my $day (keys %{ $_pgb_error_info{$q}{chronos} }) {
-			foreach my $hour (keys %{$_pgb_error_info{$q}{chronos}{$day}}) {
+		foreach my $day (keys %{ $_pgb_error_info{$q}{chronos} })
+		{
+			foreach my $hour (keys %{$_pgb_error_info{$q}{chronos}{$day}})
+			{
 				$pgb_error_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{count};
 				foreach my $min (keys %{$_pgb_error_info{$q}{chronos}{$day}{$hour}{min}}) {
 					$pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_error_info{$q}{chronos}{$day}{$hour}{min}{$min};
 				}
 			}
 		}
-		for (my $i = 0; $i <= $#{$_pgb_error_info{$q}{date}}; $i++) {
+		for (my $i = 0; $i <= $#{$_pgb_error_info{$q}{date}}; $i++)
+		{
 			&pgb_set_top_error_sample($q,
 									$_pgb_error_info{$q}{date}[$i],
 									$_pgb_error_info{$q}{error}[$i],
@@ -13798,11 +13945,13 @@ sub load_stats
 	}
 
 	### pgbouncer pool_info ###
-
-	foreach my $q (keys %_pgb_pool_info) {
+	foreach my $q (keys %_pgb_pool_info)
+	{
 		$pgb_pool_info{$q}{count} += $_pgb_pool_info{$q}{count};
-		foreach my $day (keys %{ $_pgb_pool_info{$q}{chronos} }) {
-			foreach my $hour (keys %{$_pgb_pool_info{$q}{chronos}{$day}}) {
+		foreach my $day (keys %{ $_pgb_pool_info{$q}{chronos} })
+		{
+			foreach my $hour (keys %{$_pgb_pool_info{$q}{chronos}{$day}})
+			{
 				$pgb_pool_info{$q}{chronos}{$day}{$hour}{count} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{count};
 				foreach my $min (keys %{$_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}}) {
 					$pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min} += $_pgb_pool_info{$q}{chronos}{$day}{$hour}{min}{$min};
@@ -13812,11 +13961,14 @@ sub load_stats
 	}
 
 	### per_minute_info ###
-
-	foreach my $curdb (keys %_per_minute_info) {
-		foreach my $day (keys %{$_per_minute_info{$curdb}}) {
-			foreach my $hour (keys %{ $_per_minute_info{$curdb}{$day} }) {
-				foreach my $min (keys %{ $_per_minute_info{$curdb}{$day}{$hour} }) {
+	foreach my $curdb (keys %_per_minute_info)
+	{
+		foreach my $day (keys %{$_per_minute_info{$curdb}})
+		{
+			foreach my $hour (keys %{ $_per_minute_info{$curdb}{$day} })
+			{
+				foreach my $min (keys %{ $_per_minute_info{$curdb}{$day}{$hour} })
+				{
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{count} +=
 						($_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{count} || 0);
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{session}{count} +=
@@ -13827,33 +13979,40 @@ sub load_stats
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} > $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min}));
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} < $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max}));
 
-					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second} }) {
+					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second} })
+					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second}{$sec} +=
 							($_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second}{$sec} || 0);
 					}
-					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{session}{second} }) {
+					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{session}{second} })
+					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{session}{second}{$sec} +=
 							($_per_minute_info{$curdb}{$day}{$hour}{$min}{session}{second}{$sec} || 0);
 					}
-					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{second} }) {
+					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{second} })
+					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{second}{$sec} +=
 							($_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{second}{$sec} || 0);
 					}
-					foreach my $action (@SQL_ACTION) {
+					foreach my $action (@SQL_ACTION)
+					{
 						next if (!exists $_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)});
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{count} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{count} || 0);
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{duration} += ($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{duration} || 0);
-						foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second} }) {
+						foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second} })
+						{
 							$per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second}{$sec} +=
 								($_per_minute_info{$curdb}{$day}{$hour}{$min}{lc($action)}{second}{$sec} || 0);
 						}
 					}
-					foreach my $k ('prepare', 'bind','execute') {
+					foreach my $k ('prepare', 'bind','execute')
+					{
 						if (exists $_per_minute_info{$curdb}{$day}{$hour}{$min}{$k}) {
 							$per_minute_info{$curdb}{$day}{$hour}{$min}{$k} += $_per_minute_info{$curdb}{$day}{$hour}{$min}{$k};
 						}
 					}
-					foreach my $log (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{log_level} }) {
+					foreach my $log (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{log_level} })
+					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{log_level}{$log} +=
 							($_per_minute_info{$curdb}{$day}{$hour}{$min}{log_level}{$log} || 0);
 					}
@@ -13890,10 +14049,12 @@ sub load_stats
 	}
 
 	### pgbouncer per_minute_info ###
-
-	foreach my $day (keys %_pgb_per_minute_info) {
-		foreach my $hour (keys %{ $_pgb_per_minute_info{$day} }) {
-			foreach my $min (keys %{ $_pgb_per_minute_info{$day}{$hour} }) {
+	foreach my $day (keys %_pgb_per_minute_info)
+	{
+		foreach my $hour (keys %{ $_pgb_per_minute_info{$day} })
+		{
+			foreach my $min (keys %{ $_pgb_per_minute_info{$day}{$hour} })
+			{
 				$pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} +=
 					($_pgb_per_minute_info{$day}{$hour}{$min}{connection}{count} || 0);
 				$pgb_per_minute_info{$day}{$hour}{$min}{session}{count} +=
@@ -13911,14 +14072,16 @@ sub load_stats
 	}
 
 	### lock_info ###
-
 	foreach my $curdb (keys %_lock_info)
 	{
-		foreach my $lock (keys %{$_lock_info{$curdb}}) {
+		foreach my $lock (keys %{$_lock_info{$curdb}})
+		{
 			$lock_info{$curdb}{$lock}{count} += $_lock_info{$curdb}{$lock}{count};
 
-			foreach my $day (keys %{ $_lock_info{$curdb}{chronos} }) {
-				foreach my $hour (keys %{ $_lock_info{$curdb}{chronos}{$day} }) {
+			foreach my $day (keys %{ $_lock_info{$curdb}{chronos} })
+			{
+				foreach my $hour (keys %{ $_lock_info{$curdb}{chronos}{$day} })
+				{
 					$lock_info{$curdb}{chronos}{$day}{$hour}{count} += $_lock_info{$curdb}{chronos}{$day}{$hour}{count};
 					$lock_info{$curdb}{chronos}{$day}{$hour}{duration} += $_lock_info{$curdb}{chronos}{$day}{$hour}{duration};
 				}
@@ -13926,7 +14089,8 @@ sub load_stats
 
 			$lock_info{$curdb}{$lock}{duration} += $_lock_info{$curdb}{$lock}{duration};
 
-			foreach my $type (keys %{$_lock_info{$curdb}{$lock}}) {
+			foreach my $type (keys %{$_lock_info{$curdb}{$lock}})
+			{
 				next if $type =~ /^(count|chronos|duration)$/;
 
 				$lock_info{$curdb}{$lock}{$type}{count} += $_lock_info{$curdb}{$lock}{$type}{count};
@@ -13936,15 +14100,15 @@ sub load_stats
 	}
 
 	### nlines ###
-
 	$nlines += $_nlines;
 
 	### normalyzed_info ###
-
-	foreach my $curdb (keys %_normalyzed_info) {
-		foreach my $stmt (keys %{$_normalyzed_info{$curdb}}) {
-
-			foreach my $dt (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}} ) {
+	foreach my $curdb (keys %_normalyzed_info)
+	{
+		foreach my $stmt (keys %{$_normalyzed_info{$curdb}})
+		{
+			foreach my $dt (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}} )
+			{
 				foreach my $k (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}{$dt}} ) {
 					$normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k};
 				}
@@ -13952,7 +14116,8 @@ sub load_stats
 
 			# Keep only the top N samples
 			my $i = 1;
-			foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$stmt}{samples}}) {
+			foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$stmt}{samples}})
+			{
 				if ($i > $sample) {
 					delete $normalyzed_info{$curdb}{$stmt}{samples}{$k};
 				}
@@ -13969,17 +14134,21 @@ sub load_stats
 				$normalyzed_info{$curdb}{$stmt}{max} = $_normalyzed_info{$curdb}{$stmt}{max};
 			}
 
-			foreach my $day (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}} ) {
-				foreach my $hour (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}} ) {
+			foreach my $day (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}} )
+			{
+				foreach my $hour (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}} )
+				{
 					$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
 						$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
 					$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
 						$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
-					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} ) {
+					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} )
+					{
 						$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
 							$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
 					}
-					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} )
+					{
 						$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
 							$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
 					}
@@ -13988,7 +14157,8 @@ sub load_stats
 
 			$normalyzed_info{$curdb}{$stmt}{duration} += $_normalyzed_info{$curdb}{$stmt}{duration};
 
-			if (exists $_normalyzed_info{$curdb}{$stmt}{locks}) {
+			if (exists $_normalyzed_info{$curdb}{$stmt}{locks})
+			{
 				$normalyzed_info{$curdb}{$stmt}{locks}{count} += $_normalyzed_info{$curdb}{$stmt}{locks}{count};
 				$normalyzed_info{$curdb}{$stmt}{locks}{wait} += $_normalyzed_info{$curdb}{$stmt}{locks}{wait};
 				if (!exists $normalyzed_info{$curdb}{$stmt}{locks}{minwait} || ($normalyzed_info{$curdb}{$stmt}{locks}{minwait} > $_normalyzed_info{$stmt}{locks}{minwait})) {
@@ -13999,7 +14169,8 @@ sub load_stats
 				}
 			}
 
-			if (exists $_normalyzed_info{$curdb}{$stmt}{tempfiles}) {
+			if (exists $_normalyzed_info{$curdb}{$stmt}{tempfiles})
+			{
 				$normalyzed_info{$curdb}{$stmt}{tempfiles}{count} += $_normalyzed_info{$curdb}{$stmt}{tempfiles}{count};
 				$normalyzed_info{$curdb}{$stmt}{tempfiles}{size} += $_normalyzed_info{$curdb}{$stmt}{tempfiles}{size};
 				if (!exists $normalyzed_info{$curdb}{$stmt}{tempfiles}{minsize} || ($normalyzed_info{$curdb}{$stmt}{tempfiles}{minsize} > $_normalyzed_info{$curdb}{$stmt}{tempfiles}{minsize})) {
@@ -14014,12 +14185,14 @@ sub load_stats
 				$normalyzed_info{$curdb}{$stmt}{cancelled}{count} += $_normalyzed_info{$curdb}{$stmt}{cancelled}{count};
 			}
 
-			foreach my $u (keys %{$_normalyzed_info{$curdb}{$stmt}{users}} ) {
+			foreach my $u (keys %{$_normalyzed_info{$curdb}{$stmt}{users}} )
+			{
 				foreach my $k (keys %{$_normalyzed_info{$curdb}{$stmt}{users}{$u}} ) {
 					$normalyzed_info{$curdb}{$stmt}{users}{$u}{$k} += $_normalyzed_info{$curdb}{$stmt}{users}{$u}{$k};
 				}
 			}
-			foreach my $u (keys %{$_normalyzed_info{$curdb}{$stmt}{apps}} ) {
+			foreach my $u (keys %{$_normalyzed_info{$curdb}{$stmt}{apps}} )
+			{
 				foreach my $k (keys %{$_normalyzed_info{$curdb}{$stmt}{apps}{$u}} ) {
 					$normalyzed_info{$curdb}{$stmt}{apps}{$u}{$k} += $_normalyzed_info{$curdb}{$stmt}{apps}{$u}{$k};
 				}
@@ -14028,7 +14201,6 @@ sub load_stats
 	}
 
 	### session_info ###
-
 	foreach my $curdb (keys %_session_info)
 	{
 		foreach my $db (keys %{ $_session_info{$curdb}{database}})
@@ -14070,36 +14242,39 @@ sub load_stats
 	}
 
 	### pgbouncer session_info ###
-
-	foreach my $db (keys %{ $_pgb_session_info{database}}) {
+	foreach my $db (keys %{ $_pgb_session_info{database}})
+	{
 		$pgb_session_info{database}{$db}{count} += $_pgb_session_info{database}{$db}{count};
 		$pgb_session_info{database}{$db}{duration} += $_pgb_session_info{database}{$db}{duration};
 	}
 
 	$pgb_session_info{count} += $_pgb_session_info{count};
 
-	foreach my $day (keys %{ $_pgb_session_info{chronos}}) {
-		foreach my $hour (keys %{ $_pgb_session_info{chronos}{$day}}) {
+	foreach my $day (keys %{ $_pgb_session_info{chronos}})
+	{
+		foreach my $hour (keys %{ $_pgb_session_info{chronos}{$day}})
+		{
 			$pgb_session_info{chronos}{$day}{$hour}{count} += $_pgb_session_info{chronos}{$day}{$hour}{count};
 			$pgb_session_info{chronos}{$day}{$hour}{duration} += $_pgb_session_info{chronos}{$day}{$hour}{duration};
 		}
 	}
 
-	foreach my $user (keys %{ $_pgb_session_info{user}}) {
+	foreach my $user (keys %{ $_pgb_session_info{user}})
+	{
 		$pgb_session_info{user}{$user}{count}    += $_pgb_session_info{user}{$user}{count};
 		$pgb_session_info{user}{$user}{duration} += $_pgb_session_info{user}{$user}{duration};
 	}
 
 	$pgb_session_info{duration} += $_pgb_session_info{duration};
 
-	foreach my $host (keys %{ $_pgb_session_info{host}}) {
+	foreach my $host (keys %{ $_pgb_session_info{host}})
+	{
 		$pgb_session_info{host}{$host}{count}    += $_pgb_session_info{host}{$host}{count};
 		$pgb_session_info{host}{$host}{duration} += $_pgb_session_info{host}{$host}{duration};
 	}
 
 
 	### tempfile_info ###
-
 	foreach my $curdb (keys %_tempfile_info)
 	{
 		$tempfile_info{$curdb}{count} += $_tempfile_info{$curdb}{count}
@@ -14116,7 +14291,8 @@ sub load_stats
 	{
 		my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} (@{$top_slowest{$curdb}}, @{$_top_slowest{$curdb}});
 		@{$top_slowest{$curdb}} = ();
-		for (my $i = 0; $i <= $#tmp_top_slowest; $i++) {
+		for (my $i = 0; $i <= $#tmp_top_slowest; $i++)
+		{
 			push(@{$top_slowest{$curdb}}, $tmp_top_slowest[$i]);
 			last if ($i == $end_top);
 		}
@@ -14127,7 +14303,8 @@ sub load_stats
 	{
 		my @tmp_top_locked_info = sort {$b->[0] <=> $a->[0]} (@{$top_locked_info{$curdb}}, @{$_top_locked_info{$curdb}});
 		@{$top_locked_info{$curdb}} = ();
-		for (my $i = 0; $i <= $#tmp_top_locked_info; $i++) {
+		for (my $i = 0; $i <= $#tmp_top_locked_info; $i++)
+		{
 			push(@{$top_locked_info{$curdb}}, $tmp_top_locked_info[$i]);
 			last if ($i == $end_top);
 		}
@@ -14138,13 +14315,17 @@ sub load_stats
 	{
 		my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} (@{$top_tempfile_info{$curdb}}, @{$_top_tempfile_info{$curdb}});
 		@{$top_tempfile_info{$curdb}} = ();
-		for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++) {
+		for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++)
+		{
 			push(@{$top_tempfile_info{$curdb}}, $tmp_top_tempfile_info[$i]);
 			last if ($i == $end_top);
 		}
 	}
 
 	### checkpoint_info ###
+	foreach my $c (keys %{ $_checkpoint_info{starting} }) {
+		$checkpoint_info{starting}{$c} += $_checkpoint_info{starting}{$c};
+	}
 	$checkpoint_info{file_removed} += $_checkpoint_info{file_removed};
 	$checkpoint_info{sync} += $_checkpoint_info{sync};
 	$checkpoint_info{wbuffer} += $_checkpoint_info{wbuffer};
@@ -14158,23 +14339,25 @@ sub load_stats
 	$checkpoint_info{warning_seconds} += $_checkpoint_info{warning_seconds};
 
 	#### Autovacuum info ####
-
 	foreach my $curdb (keys %_autovacuum_info)
 	{
 		$autovacuum_info{$curdb}{count} += $_autovacuum_info{$curdb}{count};
 
-		foreach my $day (keys %{ $_autovacuum_info{$curdb}{chronos} }) {
+		foreach my $day (keys %{ $_autovacuum_info{$curdb}{chronos} })
+		{
 			foreach my $hour (keys %{ $_autovacuum_info{$curdb}{chronos}{$day} }) {
 				$autovacuum_info{$curdb}{chronos}{$day}{$hour}{count} += $_autovacuum_info{$curdb}{chronos}{$day}{$hour}{count};
 			}
 		}
-		foreach my $table (keys %{ $_autovacuum_info{$curdb}{tables} }) {
+		foreach my $table (keys %{ $_autovacuum_info{$curdb}{tables} })
+		{
 			$autovacuum_info{$curdb}{tables}{$table}{vacuums} += $_autovacuum_info{$curdb}{tables}{$table}{vacuums};
 			$autovacuum_info{$curdb}{tables}{$table}{idxscans} += $_autovacuum_info{$curdb}{tables}{$table}{idxscans};
 			$autovacuum_info{$curdb}{tables}{$table}{tuples}{removed} += $_autovacuum_info{$curdb}{tables}{$table}{tuples}{removed};
 			$autovacuum_info{$curdb}{tables}{$table}{pages}{removed} += $_autovacuum_info{$curdb}{tables}{$table}{pages}{removed};
 		}
-		if ($_autovacuum_info{$curdb}{peak}{system_usage}{elapsed} > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed}) {
+		if ($_autovacuum_info{$curdb}{peak}{system_usage}{elapsed} > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
+		{
 			$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $_autovacuum_info{$curdb}{peak}{system_usage}{elapsed};
 			$autovacuum_info{$curdb}{peak}{system_usage}{table} = $_autovacuum_info{$curdb}{peak}{system_usage}{table};
 			$autovacuum_info{$curdb}{peak}{system_usage}{date} = $_autovacuum_info{$curdb}{peak}{system_usage}{date};
@@ -14182,12 +14365,12 @@ sub load_stats
 	}
 
 	#### Autoanalyze info ####
-
 	foreach my $curdb (keys %_autoanalyze_info)
 	{
 		$autoanalyze_info{$curdb}{count} += $_autoanalyze_info{$curdb}{count};
 
-		foreach my $day (keys %{ $_autoanalyze_info{$curdb}{chronos} }) {
+		foreach my $day (keys %{ $_autoanalyze_info{$curdb}{chronos} })
+		{
 			foreach my $hour (keys %{ $_autoanalyze_info{$curdb}{chronos}{$day} }) {
 				$autoanalyze_info{$curdb}{chronos}{$day}{$hour}{count} += $_autoanalyze_info{$curdb}{chronos}{$day}{$hour}{count};
 			}
@@ -14195,7 +14378,8 @@ sub load_stats
 		foreach my $table (keys %{ $_autoanalyze_info{$curdb}{tables} }) {
 			$autoanalyze_info{$curdb}{tables}{$table}{analyzes} += $_autoanalyze_info{$curdb}{tables}{$table}{analyzes};
 		}
-		if ($_autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed}) {
+		if ($_autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed})
+		{
 			$autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} = $_autoanalyze_info{$curdb}{peak}{system_usage}{elapsed};
 			$autoanalyze_info{$curdb}{peak}{system_usage}{table} = $_autoanalyze_info{$curdb}{peak}{system_usage}{table};
 			$autoanalyze_info{$curdb}{peak}{system_usage}{date} = $_autoanalyze_info{$curdb}{peak}{system_usage}{date};
@@ -14203,11 +14387,12 @@ sub load_stats
 	}
 
 	### prepare_info ###
-
-	foreach my $curdb (keys %_prepare_info) {
-		foreach my $stmt (keys %{$_prepare_info{$curdb}}) {
-
-			foreach my $dt (keys %{$_prepare_info{$curdb}{$stmt}{samples}} ) {
+	foreach my $curdb (keys %_prepare_info)
+	{
+		foreach my $stmt (keys %{$_prepare_info{$curdb}})
+		{
+			foreach my $dt (keys %{$_prepare_info{$curdb}{$stmt}{samples}} )
+			{
 				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{samples}{$dt}} ) {
 					$prepare_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_prepare_info{$curdb}{$stmt}{samples}{$dt}{$k};
 				}
@@ -14215,7 +14400,8 @@ sub load_stats
 
 			# Keep only the top N samples
 			my $i = 1;
-			foreach my $k (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$stmt}{samples}}) {
+			foreach my $k (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$stmt}{samples}})
+			{
 				if ($i > $sample) {
 					delete $prepare_info{$curdb}{$stmt}{samples}{$k};
 				}
@@ -14232,17 +14418,21 @@ sub load_stats
 				$prepare_info{$curdb}{$stmt}{max} = $_prepare_info{$curdb}{$stmt}{max};
 			}
 
-			foreach my $day (keys %{$_prepare_info{$curdb}{$stmt}{chronos}} ) {
-				foreach my $hour (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}} ) {
+			foreach my $day (keys %{$_prepare_info{$curdb}{$stmt}{chronos}} )
+			{
+				foreach my $hour (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}} )
+				{
 					$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
 						$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
 					$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
 						$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
-					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} ) {
+					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} )
+					{
 						$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
 							$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
 					}
-					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+					foreach my $min (keys %{$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} )
+					{
 						$prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
 							$_prepare_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
 					}
@@ -14251,7 +14441,8 @@ sub load_stats
 
 			$prepare_info{$curdb}{$stmt}{duration} += $_prepare_info{$curdb}{$stmt}{duration};
 
-			if (exists $_prepare_info{$curdb}{$stmt}{locks}) {
+			if (exists $_prepare_info{$curdb}{$stmt}{locks})
+			{
 				$prepare_info{$curdb}{$stmt}{locks}{count} += $_prepare_info{$curdb}{$stmt}{locks}{count};
 				$prepare_info{$curdb}{$stmt}{locks}{wait} += $_prepare_info{$curdb}{$stmt}{locks}{wait};
 				if (!exists $prepare_info{$curdb}{$stmt}{locks}{minwait} || ($prepare_info{$curdb}{$stmt}{locks}{minwait} > $_prepare_info{$stmt}{locks}{minwait})) {
@@ -14262,7 +14453,8 @@ sub load_stats
 				}
 			}
 
-			if (exists $_prepare_info{$curdb}{$stmt}{tempfiles}) {
+			if (exists $_prepare_info{$curdb}{$stmt}{tempfiles})
+			{
 				$prepare_info{$curdb}{$stmt}{tempfiles}{count} += $_prepare_info{$curdb}{$stmt}{tempfiles}{count};
 				$prepare_info{$curdb}{$stmt}{tempfiles}{size} += $_prepare_info{$curdb}{$stmt}{tempfiles}{size};
 				if (!exists $prepare_info{$curdb}{$stmt}{tempfiles}{minsize} || ($prepare_info{$curdb}{$stmt}{tempfiles}{minsize} > $_prepare_info{$curdb}{$stmt}{tempfiles}{minsize})) {
@@ -14277,12 +14469,14 @@ sub load_stats
 				$prepare_info{$curdb}{$stmt}{cancelled}{count} += $_prepare_info{$curdb}{$stmt}{cancelled}{count};
 			}
 
-			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{users}} ) {
+			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{users}} )
+			{
 				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{users}{$u}} ) {
 					$prepare_info{$curdb}{$stmt}{users}{$u}{$k} += $_prepare_info{$curdb}{$stmt}{users}{$u}{$k};
 				}
 			}
-			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{apps}} ) {
+			foreach my $u (keys %{$_prepare_info{$curdb}{$stmt}{apps}} )
+			{
 				foreach my $k (keys %{$_prepare_info{$curdb}{$stmt}{apps}{$u}} ) {
 					$prepare_info{$curdb}{$stmt}{apps}{$u}{$k} += $_prepare_info{$curdb}{$stmt}{apps}{$u}{$k};
 				}
@@ -14291,11 +14485,13 @@ sub load_stats
 	}
 
 	### bind_info ###
+	foreach my $curdb (keys %_bind_info)
+	{
+		foreach my $stmt (keys %{$_bind_info{$curdb}})
+		{
 
-	foreach my $curdb (keys %_bind_info) {
-		foreach my $stmt (keys %{$_bind_info{$curdb}}) {
-
-			foreach my $dt (keys %{$_bind_info{$curdb}{$stmt}{samples}} ) {
+			foreach my $dt (keys %{$_bind_info{$curdb}{$stmt}{samples}} )
+			{
 				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{samples}{$dt}} ) {
 					$bind_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_bind_info{$curdb}{$stmt}{samples}{$dt}{$k};
 				}
@@ -14303,7 +14499,8 @@ sub load_stats
 
 			# Keep only the top N samples
 			my $i = 1;
-			foreach my $k (sort {$b <=> $a} keys %{$bind_info{$curdb}{$stmt}{samples}}) {
+			foreach my $k (sort {$b <=> $a} keys %{$bind_info{$curdb}{$stmt}{samples}})
+			{
 				if ($i > $sample) {
 					delete $bind_info{$curdb}{$stmt}{samples}{$k};
 				}
@@ -14320,17 +14517,21 @@ sub load_stats
 				$bind_info{$curdb}{$stmt}{max} = $_bind_info{$curdb}{$stmt}{max};
 			}
 
-			foreach my $day (keys %{$_bind_info{$curdb}{$stmt}{chronos}} ) {
-				foreach my $hour (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}} ) {
+			foreach my $day (keys %{$_bind_info{$curdb}{$stmt}{chronos}} )
+			{
+				foreach my $hour (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}} )
+				{
 					$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
 						$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
 					$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
 						$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
-					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} ) {
+					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} )
+					{
 						$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
 							$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
 					}
-					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} ) {
+					foreach my $min (keys %{$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} )
+					{
 						$bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
 							$_bind_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
 					}
@@ -14339,7 +14540,8 @@ sub load_stats
 
 			$bind_info{$curdb}{$stmt}{duration} += $_bind_info{$curdb}{$stmt}{duration};
 
-			if (exists $_bind_info{$curdb}{$stmt}{locks}) {
+			if (exists $_bind_info{$curdb}{$stmt}{locks})
+			{
 				$bind_info{$curdb}{$stmt}{locks}{count} += $_bind_info{$curdb}{$stmt}{locks}{count};
 				$bind_info{$curdb}{$stmt}{locks}{wait} += $_bind_info{$curdb}{$stmt}{locks}{wait};
 				if (!exists $bind_info{$curdb}{$stmt}{locks}{minwait} || ($bind_info{$curdb}{$stmt}{locks}{minwait} > $_bind_info{$stmt}{locks}{minwait})) {
@@ -14350,7 +14552,8 @@ sub load_stats
 				}
 			}
 
-			if (exists $_bind_info{$curdb}{$stmt}{tempfiles}) {
+			if (exists $_bind_info{$curdb}{$stmt}{tempfiles})
+			{
 				$bind_info{$curdb}{$stmt}{tempfiles}{count} += $_bind_info{$curdb}{$stmt}{tempfiles}{count};
 				$bind_info{$curdb}{$stmt}{tempfiles}{size} += $_bind_info{$curdb}{$stmt}{tempfiles}{size};
 				if (!exists $bind_info{$curdb}{$stmt}{tempfiles}{minsize} || ($bind_info{$curdb}{$stmt}{tempfiles}{minsize} > $_bind_info{$curdb}{$stmt}{tempfiles}{minsize})) {
@@ -14365,12 +14568,14 @@ sub load_stats
 				$bind_info{$curdb}{$stmt}{cancelled}{count} += $_bind_info{$curdb}{$stmt}{cancelled}{count};
 			}
 
-			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{users}} ) {
+			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{users}} )
+			{
 				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{users}{$u}} ) {
 					$bind_info{$curdb}{$stmt}{users}{$u}{$k} += $_bind_info{$curdb}{$stmt}{users}{$u}{$k};
 				}
 			}
-			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{apps}} ) {
+			foreach my $u (keys %{$_bind_info{$curdb}{$stmt}{apps}} )
+			{
 				foreach my $k (keys %{$_bind_info{$curdb}{$stmt}{apps}{$u}} ) {
 					$bind_info{$curdb}{$stmt}{apps}{$u}{$k} += $_bind_info{$curdb}{$stmt}{apps}{$u}{$k};
 				}
@@ -15218,7 +15423,8 @@ sub parse_query
 			$overall_checkpoint{checkpoint_sync} = $7;
 		}
 
-		if ($prefix_vars{'t_query'} =~ /sync files=(\d+), longest=([0-9\.]+) s, average=([0-9\.]+) s/) {
+		if ($prefix_vars{'t_query'} =~ /sync files=(\d+), longest=([0-9\.]+) s, average=([0-9\.]+) s/)
+		{
 			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_files} += $1;
 			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_longest} = $2
 				if ($2 > $per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{sync_longest});
@@ -15226,7 +15432,8 @@ sub parse_query
 		}
 
 		# 9.6: LOG: checkpoint complete: wrote 0 buffers (0.0%); 0 transaction log file(s) added, 1 removed, 0 recycled; write=0.016 s, sync=0.000 s, total=0.054 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=14744 kB
-		if ($prefix_vars{'t_query'} =~ /; distance=(\d+) kB, estimate=(\d+) kB/) {
+		if ($prefix_vars{'t_query'} =~ /; distance=(\d+) kB, estimate=(\d+) kB/)
+		{
 			$checkpoint_info{distance}    += $1;
 			$checkpoint_info{estimate}    += $2;
 			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{distance} += $1;
@@ -15243,6 +15450,14 @@ sub parse_query
 			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{distance} += $1;
 			$overall_checkpoint{'peak'}{$cur_last_log_timestamp}{estimate} += $2;
 		}
+		return;
+	}
+
+	# Store starting reason
+	if ($is_log_level
+		&& $prefix_vars{'t_query'} =~ /point starting: (.*)/)
+	{
+		$checkpoint_info{starting}{$1}++;
 		return;
 	}
 
@@ -15305,6 +15520,14 @@ sub parse_query
 			$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{checkpoint}{estimate} += $2;
 		}
 		return;
+	}
+
+	# Store starting reason
+	if ($is_log_level
+		&& $prefix_vars{'t_query'} =~ /point starting: (.*)/)
+	{
+		$checkpoint_info{starting}{$1}++;
+		return 
 	}
 
 	# Look at bind/execute parameters if any
@@ -15468,10 +15691,12 @@ sub parse_query
 				return;
 			}
 		}
+	}
 	# Log line that could not be parsed
-	} elsif ($is_log_level) {
+	elsif ($is_log_level)
+	{
 		if ($prefix_vars{'t_query'} !~
-/incomplete startup packet|connection|receive|unexpected EOF|checkpoint starting:|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+/incomplete startup packet|connection|receive|unexpected EOF|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
 			#&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
