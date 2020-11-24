@@ -8177,9 +8177,10 @@ sub print_user_session
 	my @main_user = ('unknown',0);
 	foreach my $u (sort keys %{$session_info{$curdb}{user}})
 	{
-		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($pgb_session_info{user}{$u}{count}) .
-				   "</td><td>" . &convert_time($pgb_session_info{user}{$u}{duration}) . "</td><td>" .
-				   &convert_time($pgb_session_info{user}{$u}{duration} / $pgb_session_info{user}{$u}{count}) .
+		$session_info{user}{$u}{count} ||= 1;
+		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($session_info{user}{$u}{count}) .
+				   "</td><td>" . &convert_time($session_info{user}{$u}{duration}) . "</td><td>" .
+				   &convert_time($session_info{user}{$u}{duration} / $session_info{user}{$u}{count}) .
 				   "</td></tr>";
 		$total_count += $session_info{$curdb}{user}{$u}{count};
 		if ($main_user[1] < $session_info{$curdb}{user}{$u}{count}) {
