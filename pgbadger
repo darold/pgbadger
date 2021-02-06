@@ -4811,58 +4811,73 @@ sub normalize_query
 
 sub anonymized_string
 {
-    my $self = shift;
-    my ( $before, $original, $after, $cache ) = @_;
+	my ( $before, $original, $after, $cache ) = @_;
 
-    # Prevent dates from being anonymized
-    return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
-    return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
+	# Prevent dates from being anonymized
+	return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
+	return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
 
-    # Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
-    return $original if $original =~ m{
-        \A
-        (?:FM|FX|TM)?
-        (?:
-            HH | HH12 | HH24
-            | MI
-            | SS
-            | MS
-            | US
-            | SSSS
-            | AM | A\.M\. | am | a\.m\.
-            | PM | P\.M\. | pm | p\.m\.
-            | Y,YYY | YYYY | YYY | YY | Y
-            | IYYY | IYY | IY | I
-            | BC | B\.C\. | bc | b\.c\.
-            | AD | A\.D\. | ad | a\.d\.
-            | MONTH | Month | month | MON | Mon | mon | MM
-            | DAY | Day | day | DY | Dy | dy | DDD | DD | D
-            | W | WW | IW
-            | CC
-            | J
-            | Q
-            | RM | rm
-            | TZ | tz
-            | [\s/:-]
-        )+
-        (?:TH|th|SP)?
-        \z
-    };
+	# Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
+	return $original if $original =~ m{
+		\A
+		(?:FM|FX|TM)?
+		(?:
+		HH | HH12 | HH24
+		| MI
+		| SS
+		| MS
+		| US
+		| SSSS
+		| AM | A\.M\. | am | a\.m\.
+		| PM | P\.M\. | pm | p\.m\.
+		| Y,YYY | YYYY | YYY | YY | Y
+		| IYYY | IYY | IY | I
+		| BC | B\.C\. | bc | b\.c\.
+		| AD | A\.D\. | ad | a\.d\.
+		| MONTH | Month | month | MON | Mon | mon | MM
+		| DAY | Day | day | DY | Dy | dy | DDD | DD | D
+		| W | WW | IW
+		| CC
+		| J
+		| Q
+		| RM | rm
+		| TZ | tz
+		| [\s/:-]
+		)+
+		(?:TH|th|SP)?
+		\z
+	};
 
-    # Prevent interval from being anonymized
-    return $original if ($before && ($before =~ /interval/i));
-    return $original if ($after && ($after =~ /^\)*::interval/i));
+	# Prevent interval from being anonymized
+	return $original if ($before && ($before =~ /interval/i));
+	return $original if ($after && ($after =~ /^\)*::interval/i));
 
-    # Range of characters to use in anonymized strings
-    my @chars = ( 'A' .. 'Z', 0 .. 9, 'a' .. 'z', '-', '_', '.' );
+	# Range of characters to use in anonymized strings
+	my @chars = ( 'A' .. 'Z', 0 .. 9, 'a' .. 'z', '-', '_', '.' );
 
-    unless ( $cache->{ $original } )
-    {
-        # Actual anonymized version generation
-        $cache->{ $original } = join( '', map { $chars[ rand @chars ] } 1 .. 10 );
-    }
+	unless ( $cache->{ $original } )
+	{
+		# Actual anonymized version generation
+		$cache->{ $original } = join( '', map { $chars[ rand @chars ] } 1 .. 10 );
+	}
 
-    return $cache->{ $original };
+	return $cache->{ $original };
+}
+
+sub anonymized_number
+{
+	my ( $original, $cache ) = @_;
+
+	# Range of number to use in anonymized strings
+	my @numbers = ( 0 .. 9 );
+
+	unless ( $cache->{ $original } )
+	{
+		# Actual anonymized version generation
+		$cache->{ $original } = join( '', map { $numbers[ rand @numbers ] } 1 .. 4 );
+	}
+
+	return $cache->{ $original };
 }
 
 # Anonymize litteral in SQL queries by replacing parameters with fake values
@@ -4891,6 +4906,10 @@ sub anonymize_query
 		}{$1 . "'" . anonymized_string($1, $2, $3, $anonymization_cache) . "'" . ($3||'')}xeg;
 
 	$orig_query =~ s/\$EMPTYSTRING\$/''/gs;
+
+	# obfuscate numbers too
+	$anonymization_cache = {};
+	$orig_query =~ s{\b(\d+)\b}{ anonymized_number($1, $anonymization_cache) }xeg;
 
 	return $orig_query;
 }
