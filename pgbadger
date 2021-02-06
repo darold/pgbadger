@@ -3642,7 +3642,8 @@ sub process_file
 					&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_dbname'});
 
 					# Update current timestamp with the timezone wanted
-					if ($log_timezone) {
+					if ($log_timezone)
+					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
 						$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 						$prefix_vars{'t_timestamp'} =
@@ -3650,13 +3651,14 @@ sub process_file
 					}
 
 					# Check if the log line should be excluded from the report
-					if (&validate_log_line($prefix_vars{'t_pid'})) {
-
+					if (&validate_log_line($prefix_vars{'t_pid'}))
+					{
 						# Parse the query now
 						&parse_query($fmt);
 
 						# The information can be saved immediately with csvlog
-						if (exists $cur_info{$prefix_vars{'t_pid'}}) {
+						if (exists $cur_info{$prefix_vars{'t_pid'}})
+						{
 							&store_queries($prefix_vars{'t_pid'});
 							delete $cur_info{$prefix_vars{'t_pid'}};
 						}
@@ -4807,29 +4809,61 @@ sub normalize_query
 	return $orig_query;
 }
 
-sub generate_anonymized_string
+sub anonymized_string
 {
-	my ($original, $cache, $before) = @_;
+    my $self = shift;
+    my ( $before, $original, $after, $cache ) = @_;
 
-	# Prevent dates from being anonymized
-	return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
-	return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
-	# Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
-	return $original if $original =~ m{\A(?:FM|FX|TM)?(?:HH|HH12|HH24|MI|SS|MS|US|SSSS|AM|A\.M\.|PM|P\.M\.|am|a\.m\.|pm|p\.m\.|Y,YYY|YYYY|YYY|YY|IYYY|IYY|IY|BC|B\.C\.|AD|A\.D\.|bc|b\.c\.|ad|a\.d\.|MONTH|Month|month|MON|Mon|mon|MM|DAY|Day|day|DY|Dy|dy|DDD|DD|WW|IW|CC|RM|rm|TZ|tz|[\s\/\-:])+(?:TH|th|SP)?$};
-	return $original if ($original =~ m{^[IDYWJQ]$} && $before =~ /to_(char|date|number|timestamp)/i);
-	# Prevent interval from being anonymized
-	return $original if $before =~ /interval/i;
+    # Prevent dates from being anonymized
+    return $original if $original =~ m{\A\d\d\d\d[/:-]\d\d[/:-]\d\d\z};
+    return $original if $original =~ m{\A\d\d[/:-]\d\d[/:-]\d\d\d\d\z};
 
-	# Range of characters to use in anonymized strings
-	my @chars = ('A'..'Z', 0..9, 'a'..'z', '-', '_', '.');
+    # Prevent dates format like DD/MM/YYYY HH24:MI:SS from being anonymized
+    return $original if $original =~ m{
+        \A
+        (?:FM|FX|TM)?
+        (?:
+            HH | HH12 | HH24
+            | MI
+            | SS
+            | MS
+            | US
+            | SSSS
+            | AM | A\.M\. | am | a\.m\.
+            | PM | P\.M\. | pm | p\.m\.
+            | Y,YYY | YYYY | YYY | YY | Y
+            | IYYY | IYY | IY | I
+            | BC | B\.C\. | bc | b\.c\.
+            | AD | A\.D\. | ad | a\.d\.
+            | MONTH | Month | month | MON | Mon | mon | MM
+            | DAY | Day | day | DY | Dy | dy | DDD | DD | D
+            | W | WW | IW
+            | CC
+            | J
+            | Q
+            | RM | rm
+            | TZ | tz
+            | [\s/:-]
+        )+
+        (?:TH|th|SP)?
+        \z
+    };
 
-	unless ($cache->{$original}) {
-		# Actual anonymized version generation
-		$cache->{$original} = join('', map { $chars[rand @chars] } 1..10 );
-	}
-	return $cache->{$original};
+    # Prevent interval from being anonymized
+    return $original if ($before && ($before =~ /interval/i));
+    return $original if ($after && ($after =~ /^\)*::interval/i));
+
+    # Range of characters to use in anonymized strings
+    my @chars = ( 'A' .. 'Z', 0 .. 9, 'a' .. 'z', '-', '_', '.' );
+
+    unless ( $cache->{ $original } )
+    {
+        # Actual anonymized version generation
+        $cache->{ $original } = join( '', map { $chars[ rand @chars ] } 1 .. 10 );
+    }
+
+    return $cache->{ $original };
 }
-
 
 # Anonymize litteral in SQL queries by replacing parameters with fake values
 sub anonymize_query
@@ -4847,10 +4881,16 @@ sub anonymize_query
 
 	# Clean query
 	$orig_query =~ s/\\'//g;
-	$orig_query =~ s/('')+//g;
+	$orig_query =~ s/('')+/\$EMPTYSTRING\$/g;
 
 	# Anonymize each values
-	$orig_query =~ s/([^\s]+[\s\(]*)'([^']*)'/"$1'".generate_anonymized_string($2, $anonymization_cache, $1)."'"/eg;
+	$orig_query =~ s{
+		([^\s\']+[\s\(]*)       # before
+		'([^']*)'               # original
+		([\)]*::\w+)?           # after
+		}{$1 . "'" . anonymized_string($1, $2, $3, $anonymization_cache) . "'" . ($3||'')}xeg;
+
+	$orig_query =~ s/\$EMPTYSTRING\$/''/gs;
 
 	return $orig_query;
 }
@@ -5070,14 +5110,10 @@ sub set_top_error_sample
 	$errors_code{$curdb}{$sqlstate}++ if ($sqlstate);
 
 	# Stop when we have our number of samples
-	if (!exists $error_info{$curdb}{$q}{date} || ($#{$error_info{$curdb}{$q}{date}}+1 < $sample)) {
-		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$curdb}{$q}{error}})) ) {
-			if ($anonymize) {
-				$context = &anonymize_query($context);
-				$statement = &anonymize_query($statement);
-				$detail = &anonymize_query($detail);
-			}
-
+	if (!exists $error_info{$curdb}{$q}{date} || ($#{$error_info{$curdb}{$q}{date}}+1 < $sample))
+	{
+		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$curdb}{$q}{error}})) )
+		{
 			push(@{$error_info{$curdb}{$q}{date}},      $date);
 			push(@{$error_info{$curdb}{$q}{detail}},    $detail);
 			push(@{$error_info{$curdb}{$q}{context}},   $context);
@@ -15108,8 +15144,23 @@ sub parse_query
 		delete $last_execute_stmt{$p} if ($p > $t_pid);
 	}
 
+	####
+	# Anonymize query if requested by the user
+	####
+	if ($anonymize && exists $prefix_vars{'t_query'} && $prefix_vars{'t_query'}) {
+		$prefix_vars{'t_query'} = &anonymize_query($prefix_vars{'t_query'});
+	}
+	if ($anonymize && exists $prefix_vars{'t_statement'} && $prefix_vars{'t_statement'}) {
+		$prefix_vars{'t_statement'} = &anonymize_query($prefix_vars{'t_statement'});
+	}
+	if ($anonymize && exists $prefix_vars{'t_detail'} && $prefix_vars{'t_detail'}) {
+		$prefix_vars{'t_detail'} = &anonymize_query($prefix_vars{'t_detail'});
+	}
+
+	####
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
+	####
 	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
 		if (&change_log_level($prefix_vars{'t_query'})) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
@@ -16171,11 +16222,6 @@ sub store_queries
 		return 1;
 	}
 
-	# Anonymize query if requested by the user
-	if ($anonymize && exists $cur_info{$t_pid}{query}) {
-		$cur_info{$t_pid}{query} = &anonymize_query($cur_info{$t_pid}{query});
-	}
-
 	# Cleanup and pre-normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^\s+//s;
 	$cur_info{$t_pid}{query} =~ s/[\s;]+$//s;
@@ -16706,12 +16752,6 @@ sub store_temporary_and_lock_infos
 		# Add a semi-colon at end of the query
 		$cur_temp_info{$t_pid}{query} .= ';' if ($cur_temp_info{$t_pid}{query} !~ /;\s*$/s);
 
-		# Anonymize query if requested by the user
-		if ($anonymize)
-		{
-			$cur_temp_info{$t_pid}{query} = &anonymize_query($cur_temp_info{$t_pid}{query});
-		}
-
 		# Truncate the query if requested by the user
 		$cur_temp_info{$t_pid}{query} = substr($cur_temp_info{$t_pid}{query}, 0, $maxlength) . '[...]'
 			if (($maxlength > 0) && (length($cur_temp_info{$t_pid}{query}) > $maxlength));
@@ -16762,11 +16802,6 @@ sub store_temporary_and_lock_infos
 		# Add a semi-colon at end of the query
 		$cur_lock_info{$t_pid}{query} .= ';' if ($cur_lock_info{$t_pid}{query} !~ /;\s*$/s);
 
-		# Anonymize query if requested by the user
-		if ($anonymize) {
-			$cur_lock_info{$t_pid}{query} = &anonymize_query($cur_lock_info{$t_pid}{query});
-		}
-
 		# Truncate the query if requested by the user
 		$cur_lock_info{$t_pid}{query} = substr($cur_lock_info{$t_pid}{query}, 0, $maxlength) . '[...]'
 			if (($maxlength > 0) && (length($cur_lock_info{$t_pid}{query}) > $maxlength));
@@ -16811,11 +16846,6 @@ sub store_temporary_and_lock_infos
 
 		# Add a semi-colon at end of the query
 		$cur_cancel_info{$t_pid}{query} .= ';' if ($cur_cancel_info{$t_pid}{query} !~ /;\s*$/s);
-
-		# Anonymize query if requested by the user
-		if ($anonymize) {
-			$cur_cancel_info{$t_pid}{query} = &anonymize_query($cur_cancel_info{$t_pid}{query});
-		}
 
 		# Truncate the query if requested by the user
 		$cur_cancel_info{$t_pid}{query} = substr($cur_cancel_info{$t_pid}{query}, 0, $maxlength) . '[...]'
