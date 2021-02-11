@@ -3705,8 +3705,8 @@ sub process_file
 				$lfile->seek(0, 0);
 			}
 		}
-		while (my $line = <$lfile>) {
-
+		while (my $line = <$lfile>)
+		{
 			# We received a signal
 			last if ($terminate);
 
@@ -3776,15 +3776,14 @@ sub process_file
 					# Check if the log line should be excluded from the report
 					if (&validate_log_line($prefix_vars{'t_pid'}))
 					{
+						# The information can be saved when we are switching to a new main message
+						if ($cur_pid && exists $cur_info{$cur_pid} && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/))
+						{
+							&store_queries($cur_pid);
+							delete $cur_info{$cur_pid};
+						}
 						# Parse the query now
 						&parse_query($fmt);
-
-						# The information can be saved immediately with jsonlog
-						if (exists $cur_info{$prefix_vars{'t_pid'}})
-						{
-							&store_queries($prefix_vars{'t_pid'});
-							delete $cur_info{$prefix_vars{'t_pid'}};
-						}
 					}
 				}
 				else
