@@ -4885,7 +4885,7 @@ sub anonymize_query
 {
 	my $orig_query = shift;
 
-	return if (!$orig_query);
+	return if (!$orig_query || !$anonymize);
 
 	# Variable to hold anonymized versions, so we can provide the same value
 	# for the same input, within single query.
@@ -4907,9 +4907,9 @@ sub anonymize_query
 
 	$orig_query =~ s/\$EMPTYSTRING\$/''/gs;
 
-	# obfuscate numbers too
+	# obfuscate numbers too if this is not parameter indices ($1 ...)
 	$anonymization_cache = {};
-	$orig_query =~ s{\b(\d+)\b}{ anonymized_number($1, $anonymization_cache) }xeg;
+	$orig_query =~ s{([^\$])\b(\d+)\b}{ $1 . anonymized_number($1, $anonymization_cache) }xeg;
 
 	return $orig_query;
 }
@@ -5522,7 +5522,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
-				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$j++;
 			}
 		}
@@ -5542,7 +5542,7 @@ Report not supported by text format
 			$db .= ", app: $top_locked_info{$curdb}[$i]->[6]" if ($top_locked_info{$curdb}[$i]->[6]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &convert_time($top_locked_info{$curdb}[$i]->[0]),
-			"  $ttl$db - ", $top_locked_info{$curdb}[$i]->[2], "\n";
+			"  $ttl$db - ", &anonymize_query($top_locked_info{$curdb}[$i]->[2]), "\n";
 			print $fh "--\n";
 		}
 		print $fh "\n";
@@ -5571,7 +5571,7 @@ Report not supported by text format
 			" - ", &comma_numbers($top_temporary[$i]->[3]),
 			"/", &comma_numbers($top_temporary[$i]->[4]), "/",
 			&comma_numbers(sprintf("%.2f", $top_temporary[$i]->[2] / $top_temporary[$i]->[1])),
-			" - ", $top_temporary[$i]->[0], "\n";
+			" - ", &anonymize_query($top_temporary[$i]->[0]), "\n";
 			print $fh "--\n";
 			my $k = $top_temporary[$i]->[0];
 			if (scalar keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
@@ -5585,7 +5585,7 @@ Report not supported by text format
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 					$db =~ s/^, / - /;
-					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 					$j++;
 				}
 			}
@@ -5608,7 +5608,7 @@ Report not supported by text format
 			$db .= ", info: $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &comma_numbers($top_tempfile_info{$curdb}[$i]->[0]),
-			" - $ttl$db - ", $top_tempfile_info{$curdb}[$i]->[2], "\n";
+			" - $ttl$db - ", &anonymize_query($top_tempfile_info{$curdb}[$i]->[2]), "\n";
 		}
 		print $fh "\n";
 	}
@@ -5645,7 +5645,7 @@ Report not supported by text format
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 					$db =~ s/^, / - /;
-					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 					$j++;
 				}
 			}
@@ -5667,7 +5667,7 @@ Report not supported by text format
 			$db .= ", app: $top_cancelled_info{$curdb}[$i]->[6]" if ($top_cancelled_info{$curdb}[$i]->[6]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &comma_numbers($top_cancelled_info{$curdb}[$i]->[0]),
-			" - $ttl$db - ", $top_cancelled_info{$curdb}[$i]->[2], "\n";
+			" - $ttl$db - ", &anonymize_query($top_cancelled_info{$curdb}[$i]->[2]), "\n";
 		}
 		print $fh "\n";
 	}
@@ -5684,7 +5684,7 @@ Report not supported by text format
 			$db .= ", app: $top_slowest{$curdb}[$i]->[6]" if ($top_slowest{$curdb}[$i]->[6]);
 			$db .= ", bind query: yes" if ($top_slowest{$curdb}[$i]->[7]);
 			$db =~ s/^, //;
-			print $fh $i + 1, ") " . &convert_time($top_slowest{$curdb}[$i]->[0]) . "$db - $top_slowest{$curdb}[$i]->[2]\n";
+			print $fh $i + 1, ") " . &convert_time($top_slowest{$curdb}[$i]->[0]) . "$db - " . &anonymize_query($top_slowest{$curdb}[$i]->[2]) . "\n";
 			print $fh "--\n";
 		}
 
@@ -5701,6 +5701,7 @@ Report not supported by text format
 					last;
 				}
 			}
+			$q = &anonymize_query($q);
 			$normalyzed_info{$curdb}{$k}{average} = $normalyzed_info{$curdb}{$k}{duration} / $normalyzed_info{$curdb}{$k}{count};
 			print $fh "$idx) "
 				. &convert_time($normalyzed_info{$curdb}{$k}{duration}) . " - "
@@ -5720,7 +5721,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
-				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$j++;
 			}
 			$idx++;
@@ -5741,6 +5742,7 @@ Report not supported by text format
 					last;
 				}
 			}
+			$q = &anonymize_query($q);
 			print $fh "$idx) "
 				. &comma_numbers($normalyzed_info{$curdb}{$k}{count}) . " - "
 				. &convert_time($normalyzed_info{$curdb}{$k}{duration}) . " - "
@@ -5759,7 +5761,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
-				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$i++;
 			}
 			$idx++;
@@ -5780,6 +5782,7 @@ Report not supported by text format
 					last;
 				}
 			}
+			$q = &anonymize_query($q);
 			print $fh "$idx) "
 				. &convert_time($normalyzed_info{$curdb}{$k}{min}) . "/"
 				. &convert_time($normalyzed_info{$curdb}{$k}{max}) . "/"
@@ -5798,7 +5801,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{yes});
 				$db =~ s/^, / - /;
-				print $fh "\tExample $i: ", &convert_time($d), "$db - ", $normalyzed_info{$curdb}{$k}{samples}{$d}{query}, "\n";
+				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$i++;
 			}
 			$idx++;
@@ -5903,7 +5906,6 @@ Report not supported by text format
 
 sub dump_error_as_text
 {
-
 	my $curdb = shift;
 
 	# Global information
@@ -5985,21 +5987,25 @@ sub show_error_as_text
 
 	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
 	my $idx = 1;
-	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}}) {
+	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}})
+	{
 		next if (!$error_info{$curdb}{$k}{count});
 		last if ($idx > $top);
 		last if (!$error_info{$curdb}{$k}{count});
 
 		my ($msg, $ret) = &revert_log_level($k);
 
-		if ($error_info{$curdb}{$k}{count} > 1) {
+		if ($error_info{$curdb}{$k}{count} > 1)
+		{
 			print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
-			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++) {
+			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++)
+			{
 				last if ($i == $sample);
 				($error_info{$curdb}{$k}{error}[$i], $ret) = &revert_log_level($error_info{$k}{error}[$i]);
-				if ($msg && ($logs_type{$curdb}{ERROR} > 0)) {
+				if ($msg && ($logs_type{$curdb}{ERROR} > 0))
+				{
 					$logs_type{$curdb}{ERROR}--;
 					$logs_type{$curdb}{LOG}++;
 				}
@@ -6007,26 +6013,32 @@ sub show_error_as_text
 				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[$i]\n"       if ($error_info{$k}{detail}[$i]);
 				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[$i]\n"     if ($error_info{$k}{context}[$i]);
 				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[$i]\n"	   if ($error_info{$k}{hint}[$i]);
-				print $fh "\t\tStatement: $error_info{$curdb}{$k}{statement}[$i]\n" if ($error_info{$k}{statement}[$i]);
+				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[$i]), "\n" if ($error_info{$k}{statement}[$i]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[$i]\n" if ($error_info{$k}{db}[$i]);
 				$j++;
 			}
-		} elsif ($error_info{$curdb}{$k}{error}[0]) {
+		}
+		elsif ($error_info{$curdb}{$k}{error}[0])
+		{
 			($error_info{$curdb}{$k}{error}[0], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
-			if ($msg && ($logs_type{$curdb}{ERROR} > 0)) {
+			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
+			{
 				$logs_type{$curdb}{ERROR}--;
 				$logs_type{$curdb}{LOG}++;
 			}
-			if ($sample) {
+			if ($sample)
+			{
 				print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $error_info{$curdb}{$k}{error}[0]\n";
 				print $fh "--\n";
 				print $fh "\t- Date: $error_info{$curdb}{$k}{date}[0]\n";
 				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[0]\n"       if ($error_info{$curdb}{$k}{detail}[0]);
 				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[0]\n"     if ($error_info{$curdb}{$k}{context}[0]);
 				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[0]\n"	   if ($error_info{$curdb}{$k}{hint}[0]);
-				print $fh "\t\tStatement: $error_info{$curdb}{$k}{statement}[0]\n" if ($error_info{$curdb}{$k}{statement}[0]);
+				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[0]), "\n" if ($error_info{$curdb}{$k}{statement}[0]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[0]\n" if ($error_info{$curdb}{$k}{db}[0]);
-			} else {
+			}
+			else
+			{
 				print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $msg\n";
 				print $fh "--\n";
 			}
@@ -6034,7 +6046,8 @@ sub show_error_as_text
 		$idx++;
 	}
 
-	if (scalar keys %{$logs_type{$curdb}} > 0) {
+	if (scalar keys %{$logs_type{$curdb}} > 0)
+	{
 		print $fh "\n- Logs per type ---------------------------------------------\n\n";
 
 		my $total_logs = 0;
@@ -6042,13 +6055,15 @@ sub show_error_as_text
 			$total_logs += $logs_type{$curdb}{$d};
 		}
 		print $fh "Logs type	Count	Percentage\n";
-		foreach my $d (sort keys %{$logs_type{$curdb}}) {
+		foreach my $d (sort keys %{$logs_type{$curdb}})
+		{
 			next if (!$logs_type{$curdb}{$d});
 			print $fh "$d\t\t", &comma_numbers($logs_type{$curdb}{$d}), "\t", sprintf("%0.2f", ($logs_type{$curdb}{$d} * 100) / $total_logs), "%\n";
 		}
 	}
 
-	if (scalar keys %{$errors_code{$curdb}} > 0) {
+	if (scalar keys %{$errors_code{$curdb}} > 0)
+	{
 		print $fh "\n- Logs per type ---------------------------------------------\n\n";
 
 		my $total_logs = 0;
@@ -6056,7 +6071,8 @@ sub show_error_as_text
 			$total_logs += $errors_code{$curdb}{$d};
 		}
 		print $fh "Errors class			code	Count	Percentage\n";
-		foreach my $d (sort keys %{$errors_code{$curdb}}) {
+		foreach my $d (sort keys %{$errors_code{$curdb}})
+		{
 			next if (!$errors_code{$curdb}{$d});
 			print $fh "$CLASS_ERROR_CODE{$d}\t$d\t\t", &comma_numbers($errors_code{$curdb}{$d}), "\t", sprintf("%0.2f", ($errors_code{$curdb}{$d} * 100) / $total_logs), "%\n";
 		}
@@ -6070,15 +6086,18 @@ sub show_pgb_error_as_text
 
 	print $fh "\n- Most frequent events (N) ---------------------------------------------\n\n";
 	my $idx = 1;
-	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
+	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info)
+	{
 		next if (!$pgb_error_info{$k}{count});
 		last if ($idx > $top);
 		my $msg = $k;
-		if ($pgb_error_info{$k}{count} > 1) {
+		if ($pgb_error_info{$k}{count} > 1)
+		{
 			print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $msg\n";
 			print $fh "--\n";
 			my $j = 1;
-			for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++) {
+			for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++)
+			{
 				last if ($i == $sample);
 				print $fh "\t- Example $j: $pgb_error_info{$k}{date}[$i] - $pgb_error_info{$k}{error}[$i]\n";
 				print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[$i]\n" if ($pgb_error_info{$k}{db}[$i]);
@@ -6086,15 +6105,20 @@ sub show_pgb_error_as_text
 				print $fh "\t\tClient: $pgb_error_info{$k}{remote}[$i]\n" if ($pgb_error_info{$k}{remote}[$i]);
 				$j++;
 			}
-		} else {
-			if ($sample) {
+		}
+		else
+		{
+			if ($sample)
+			{
 				print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $pgb_error_info{$k}{error}[0]\n";
 				print $fh "--\n";
 				print $fh "\t- Date: $pgb_error_info{$k}{date}[0]\n";
 				print $fh "\t\tDatabase: $pgb_error_info{$k}{db}[0]\n" if ($pgb_error_info{$k}{db}[0]);
 				print $fh "\t\tUser: $pgb_error_info{$k}{user}[0]\n" if ($pgb_error_info{$k}{user}[0]);
 				print $fh "\t\tClient: $pgb_error_info{$k}{remote}[0]\n" if ($pgb_error_info{$k}{remote}[0]);
-			} else {
+			}
+			else
+			{
 				print $fh "$idx) " . &comma_numbers($pgb_error_info{$k}{count}) . " - $msg\n";
 				print $fh "--\n";
 			}
@@ -10871,8 +10895,10 @@ sub print_lock_queries_report
 	my $curdb = shift;
 
 	my @top_locked_queries = ();
-	foreach my $h (keys %{$normalyzed_info{$curdb}}) {
-		if (exists($normalyzed_info{$curdb}{$h}{locks})) {
+	foreach my $h (keys %{$normalyzed_info{$curdb}})
+	{
+		if (exists($normalyzed_info{$curdb}{$h}{locks}))
+		{
 			push (@top_locked_queries, [$h, $normalyzed_info{$curdb}{$h}{locks}{count}, $normalyzed_info{$curdb}{$h}{locks}{wait},
 			$normalyzed_info{$curdb}{$h}{locks}{minwait}, $normalyzed_info{$curdb}{$h}{locks}{maxwait}]);
 		}
@@ -10900,13 +10926,14 @@ sub print_lock_queries_report
 };
 
 	my $rank = 1;
-	for (my $i = 0 ; $i <= $#top_locked_queries ; $i++) {
+	for (my $i = 0 ; $i <= $#top_locked_queries ; $i++)
+	{
 		my $count = &comma_numbers($top_locked_queries[$i]->[1]);
 		my $total_time = &convert_time($top_locked_queries[$i]->[2]);
 		my $min_time = &convert_time($top_locked_queries[$i]->[3]);
 		my $max_time = &convert_time($top_locked_queries[$i]->[4]);
 		my $avg_time = &convert_time($top_locked_queries[$i]->[2] / ($top_locked_queries[$i]->[1] || 1));
-		my $query = &highlight_code($top_locked_queries[$i]->[0]);
+		my $query = &highlight_code(&anonymize_query($top_locked_queries[$i]->[0]));
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($top_locked_queries[$i]->[0]) if ($enable_checksum);
 		my $example = qq{<p><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#queries-most-frequent-waiting-examples-rank-$rank">Examples</button></p>};
@@ -10927,11 +10954,13 @@ sub print_lock_queries_report
 			<div id="queries-most-frequent-waiting-examples-rank-$rank" class="collapse">
 				<dl>
 };
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{samples}})
+		{
 			my $idx = 1;
-			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+			foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}})
+			{
 				last if ($idx > $sample);
-				$query = &highlight_code($normalyzed_info{$curdb}{$k}{samples}{$d}{query});
+				$query = &highlight_code(&anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}));
 				$md5 = '';
 				$md5 = 'md5: ' . md5_hex($normalyzed_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 				my $details = "<b>Date:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{date}\n";
@@ -10996,8 +11025,9 @@ sub print_lock_queries_report
 };
 
 	$rank = 1;
-	for (my $i = 0 ; $i <= $#{$top_locked_info{$curdb}} ; $i++) {
-		my $query = &highlight_code($top_locked_info{$curdb}[$i]->[2]);
+	for (my $i = 0 ; $i <= $#{$top_locked_info{$curdb}} ; $i++)
+	{
+		my $query = &highlight_code(&anonymize_query($top_locked_info{$curdb}[$i]->[2]));
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($top_locked_info{$curdb}[$i]->[2]) if ($enable_checksum);
 		my $details = "[ <b>Date:</b> " . ($top_locked_info{$curdb}[$i]->[1] || '');
@@ -11037,15 +11067,18 @@ sub print_tempfile_report
 	my $curdb = shift;
 
 	my @top_temporary = ();
-	foreach my $h (keys %{$normalyzed_info{$curdb}}) {
-		if (exists($normalyzed_info{$curdb}{$h}{tempfiles})) {
+	foreach my $h (keys %{$normalyzed_info{$curdb}})
+	{
+		if (exists($normalyzed_info{$curdb}{$h}{tempfiles}))
+		{
 			push (@top_temporary, [$h, $normalyzed_info{$curdb}{$h}{tempfiles}{count}, $normalyzed_info{$curdb}{$h}{tempfiles}{size},
 			$normalyzed_info{$curdb}{$h}{tempfiles}{minsize}, $normalyzed_info{$curdb}{$h}{tempfiles}{maxsize}]);
 		}
 	}
 
 	# Queries generating the most temporary files (N)
-	if ($#top_temporary >= 0) {
+	if ($#top_temporary >= 0)
+	{
 		@top_temporary = sort { $b->[1] <=> $a->[1] } @top_temporary;
 		print $fh qq{
 		<div class="analysis-item row" id="queries-generating-most-temporary-files">
@@ -11066,13 +11099,14 @@ sub print_tempfile_report
 				<tbody>
 };
 		my $rank = 1;
-		for (my $i = 0 ; $i <= $#top_temporary ; $i++) {
+		for (my $i = 0 ; $i <= $#top_temporary ; $i++)
+		{
 			my $count = &comma_numbers($top_temporary[$i]->[1]);
 			my $total_size = &pretty_print_size($top_temporary[$i]->[2]);
 			my $min_size = &pretty_print_size($top_temporary[$i]->[3]);
 			my $max_size = &pretty_print_size($top_temporary[$i]->[4]);
 			my $avg_size = &pretty_print_size($top_temporary[$i]->[2] / ($top_temporary[$i]->[1] || 1));
-			my $query = &highlight_code($top_temporary[$i]->[0]);
+			my $query = &highlight_code(&anonymize_query($top_temporary[$i]->[0]));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($top_temporary[$i]->[0]) if ($enable_checksum);
 			my $example = qq{<p><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#queries-generating-most-temporary-files-examples-rank-$rank">Examples</button></p>};
@@ -11093,11 +11127,13 @@ sub print_tempfile_report
 				<div id="queries-generating-most-temporary-files-examples-rank-$rank" class="collapse">
 					<dl>
 };
-			if (scalar keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+			if (scalar keys %{$normalyzed_info{$curdb}{$k}{samples}})
+			{
 				my $idx = 1;
-				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+				foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}})
+				{
 					last if ($idx > $sample);
-					$query = &highlight_code($normalyzed_info{$curdb}{$k}{samples}{$d}{query});
+					$query = &highlight_code(&anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}));
 					my $md5 = '';
 					$md5 = 'md5: ' . md5_hex($normalyzed_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 					my $details = "<b>Date:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{date} . "\n";
@@ -11139,7 +11175,8 @@ sub print_tempfile_report
 	}
 
 	# Top queries generating the largest temporary files
-	if ($#{$top_tempfile_info{$curdb}} >= 0) {
+	if ($#{$top_tempfile_info{$curdb}} >= 0)
+	{
 		@{$top_tempfile_info{$curdb}} = sort {$b->[0] <=> $a->[0]} @{$top_tempfile_info{$curdb}};
 		my $largest = &comma_numbers($top_temporary[0]->[0]);
 		print $fh qq{
@@ -11157,7 +11194,8 @@ sub print_tempfile_report
 				<tbody>
 };
 		my $rank = 1;
-		for (my $i = 0 ; $i <= $#{$top_tempfile_info{$curdb}} ; $i++) {
+		for (my $i = 0 ; $i <= $#{$top_tempfile_info{$curdb}} ; $i++)
+		{
 			my $size = &pretty_print_size($top_tempfile_info{$curdb}[$i]->[0]);
 			my $details = "[ <b>Date:</b> $top_tempfile_info{$curdb}[$i]->[1]";
 			$details .= " - <b>Database:</b> $top_tempfile_info{$curdb}[$i]->[3]" if ($top_tempfile_info{$curdb}[$i]->[3]);
@@ -11166,7 +11204,7 @@ sub print_tempfile_report
 			$details .= " - <b>Application:</b> $top_tempfile_info{$curdb}[$i]->[6]" if ($top_tempfile_info{$curdb}[$i]->[6]);
 			$details .= " ]";
 			$details .= "\n<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
-			my $query = &highlight_code($top_tempfile_info{$curdb}[$i]->[2]);
+			my $query = &highlight_code(&anonymize_query($top_tempfile_info{$curdb}[$i]->[2]));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($top_tempfile_info{$curdb}[$i]->[2]) if ($enable_checksum);
 			print $fh qq{
@@ -11189,7 +11227,6 @@ sub print_tempfile_report
 };
 		@{$top_tempfile_info{$curdb}} = ();
 	}
-
 }
 
 sub print_cancelled_report
@@ -11440,7 +11477,8 @@ sub print_slowest_individual_queries
 };
 
 	my $idx = 1;
-	for (my $i = 0 ; $i <= $#{$top_slowest{$curdb}} ; $i++) {
+	for (my $i = 0 ; $i <= $#{$top_slowest{$curdb}} ; $i++)
+	{
 		my $rank = $i + 1;
 		my $duration = &convert_time($top_slowest{$curdb}[$i]->[0]);
 		my $date = $top_slowest{$curdb}[$i]->[1] || '';
@@ -11455,7 +11493,7 @@ sub print_slowest_individual_queries
 		if ($top_slowest{$curdb}[$i]->[8]) {
 			$explain = &display_plan("query-d-explain-$rank-$idx", $top_slowest{$curdb}[$i]->[8]);
 		}
-		my $query = &highlight_code($top_slowest{$curdb}[$i]->[2]);
+		my $query = &highlight_code(&anonymize_query($top_slowest{$curdb}[$i]->[2]));
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($top_slowest{$curdb}[$i]->[2]) if ($enable_checksum);
 		print $fh qq{
@@ -11508,7 +11546,8 @@ sub print_time_consuming
 };
 	my $rank = 1;
 	my $found = 0;
-	foreach my $k (sort {$normalyzed_info{$curdb}{$b}{duration} <=> $normalyzed_info{$curdb}{$a}{duration}} keys %{$normalyzed_info{$curdb}}) {
+	foreach my $k (sort {$normalyzed_info{$curdb}{$b}{duration} <=> $normalyzed_info{$curdb}{$a}{duration}} keys %{$normalyzed_info{$curdb}})
+	{
 		next if (!$normalyzed_info{$curdb}{$k}{count} || !exists $normalyzed_info{$curdb}{$k}{duration});
 		last if ($rank > $top);
 		$found++;
@@ -11525,14 +11564,16 @@ sub print_time_consuming
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}})
+		{
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
 			my $dd = $3;
 			my $mo = $2 -1 ;
 			my $y = $1 - 1900;
-			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -11543,13 +11584,16 @@ sub print_time_consuming
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
@@ -11561,8 +11605,10 @@ sub print_time_consuming
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			foreach my $rd (@histo_avgs) {
+		foreach my $h ("00" .. "23")
+		{
+			foreach my $rd (@histo_avgs)
+			{
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
 			}
@@ -11619,13 +11665,15 @@ sub print_time_consuming
 						</div><!-- end of details collapse -->
 	<p> <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-queries-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="time-consuming-queries-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}}) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}})
+			{
 				if ($normalyzed_info{$curdb}{$k}{users}{$u}{duration} > 0) {
 					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{users}{$u}{duration});
@@ -11644,14 +11692,17 @@ sub print_time_consuming
 };
 		}
 
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="time-consuming-queries-app-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}}) {
-				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}})
+			{
+				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$curdb}{$k}{apps}{$u}{count}";
@@ -11675,7 +11726,8 @@ sub print_time_consuming
 };
 
 		my $idx = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}})
+		{
 			last if ($idx > $sample);
 			my $details = "<b>Date:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{date}\n";
 			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
@@ -11688,7 +11740,7 @@ sub print_time_consuming
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-e-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
 			}
-			$query = &highlight_code($normalyzed_info{$curdb}{$k}{samples}{$d}{query});
+			$query = &highlight_code(&anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 			print $fh qq{
@@ -11748,7 +11800,8 @@ sub print_most_frequent
 	foreach my $k (sort {
 			$normalyzed_info{$curdb}{$b}{count} <=> $normalyzed_info{$curdb}{$a}{count}
 				or $normalyzed_info{$curdb}{$b}{duration} <=> $normalyzed_info{$curdb}{$a}{duration}
-		} keys %{$normalyzed_info{$curdb}}) {
+		} keys %{$normalyzed_info{$curdb}})
+	{
 		next if (!$normalyzed_info{$curdb}{$k}{count});
 		last if ($rank > $top);
 		$normalyzed_info{$curdb}{$k}{average} = $normalyzed_info{$curdb}{$k}{duration} / $normalyzed_info{$curdb}{$k}{count};
@@ -11764,14 +11817,16 @@ sub print_most_frequent
 		my %hourly_duration = ();
 		my $days = 0;
 		my $details = '';
-		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}})
+		{
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
 			my $dd = $3;
 			my $mo = $2 - 1;
 			my $y = $1 - 1900;
-			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -11782,13 +11837,16 @@ sub print_most_frequent
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
@@ -11800,8 +11858,10 @@ sub print_most_frequent
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			foreach my $rd (@histo_avgs) {
+		foreach my $h ("00" .. "23")
+		{
+			foreach my $rd (@histo_avgs)
+			{
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
 			}
@@ -11859,14 +11919,17 @@ sub print_most_frequent
 						</div><!-- end of details collapse -->
 	<p><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#most-frequent-queries-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="most-frequent-queries-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}}) {
-				if ($normalyzed_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}})
+			{
+				if ($normalyzed_info{$curdb}{$k}{users}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$curdb}{$k}{users}{$u}{count}";
@@ -11883,14 +11946,17 @@ sub print_most_frequent
 						<!-- end of user involved collapse -->
 };
 		}
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="most-frequent-queries-app-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}}) {
-				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}})
+			{
+				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$curdb}{$k}{apps}{$u}{count}";
@@ -11915,7 +11981,8 @@ sub print_most_frequent
 };
 
 		my $idx = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}})
+		{
 			last if ($idx > $sample);
 			my $details = "<b>Date:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{date}\n";
 			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
@@ -11928,7 +11995,7 @@ sub print_most_frequent
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-f-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
 			}
-			$query = &highlight_code($normalyzed_info{$curdb}{$k}{samples}{$d}{query});
+			$query = &highlight_code(&anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 			print $fh qq{
@@ -11986,7 +12053,8 @@ sub print_slowest_queries
 };
 	my $rank = 1;
 	my $found = 0;
-	foreach my $k (sort {$normalyzed_info{$curdb}{$b}{average} <=> $normalyzed_info{$curdb}{$a}{average}} keys %{$normalyzed_info{$curdb}}) {
+	foreach my $k (sort {$normalyzed_info{$curdb}{$b}{average} <=> $normalyzed_info{$curdb}{$a}{average}} keys %{$normalyzed_info{$curdb}})
+	{
 		next if (!$k || !$normalyzed_info{$curdb}{$k}{count} || !exists $normalyzed_info{$curdb}{$k}{duration});
 		last if ($rank > $top);
 		$found++;
@@ -12003,7 +12071,8 @@ sub print_slowest_queries
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}})
+		{
 			my $c = 1;
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
@@ -12011,7 +12080,8 @@ sub print_slowest_queries
 			my $dd = $3;
 			my $mo = $2 - 1;
 			my $y = $1 - 1900;
-			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -12022,13 +12092,16 @@ sub print_slowest_queries
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$ht:$rd"} += ($normalyzed_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
@@ -12040,8 +12113,10 @@ sub print_slowest_queries
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			foreach my $rd (@histo_avgs) {
+		foreach my $h ("00" .. "23")
+		{
+			foreach my $rd (@histo_avgs)
+			{
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
 			}
@@ -12099,14 +12174,17 @@ sub print_slowest_queries
 						</div><!-- end of details collapse -->
 	<p><button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#normalized-slowest-queries-examples-rank-$rank">Examples</button> $users_involved</p>
 };
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{users}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="normalized-slowest-queries-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}}) {
-				if ($normalyzed_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{users}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{users}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{users}})
+			{
+				if ($normalyzed_info{$curdb}{$k}{users}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$curdb}{$k}{users}{$u}{count}";
@@ -12123,14 +12201,17 @@ sub print_slowest_queries
 						<!-- end of user involved collapse -->
 };
 		}
-		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0) {
+		if (scalar keys %{$normalyzed_info{$curdb}{$k}{apps}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="normalized-slowest-queries-app-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}}) {
-				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+			foreach my $u (sort {$normalyzed_info{$curdb}{$k}{apps}{$b}{duration} <=> $normalyzed_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$normalyzed_info{$curdb}{$k}{apps}})
+			{
+				if ($normalyzed_info{$curdb}{$k}{apps}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($normalyzed_info{$curdb}{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $normalyzed_info{$curdb}{$k}{apps}{$u}{count}";
@@ -12155,7 +12236,8 @@ sub print_slowest_queries
 };
 
 		my $idx = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}}) {
+		foreach my $d (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$k}{samples}})
+		{
 			last if ($idx > $sample);
 			my $details = "<b>Date:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{date}\n";
 			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
@@ -12168,7 +12250,7 @@ sub print_slowest_queries
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-g-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
 			}
-			$query = &highlight_code($normalyzed_info{$curdb}{$k}{samples}{$d}{query});
+			$query = &highlight_code(&anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($normalyzed_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 			print $fh qq{
@@ -12226,7 +12308,8 @@ sub print_prepare_consuming
 };
 	my $rank = 1;
 	my $found = 0;
-	foreach my $k (sort {$prepare_info{$curdb}{$b}{duration} <=> $prepare_info{$curdb}{$a}{duration}} keys %{$prepare_info{$curdb}}) {
+	foreach my $k (sort {$prepare_info{$curdb}{$b}{duration} <=> $prepare_info{$curdb}{$a}{duration}} keys %{$prepare_info{$curdb}})
+	{
 		next if (!$prepare_info{$curdb}{$k}{count} || !exists $prepare_info{$curdb}{$k}{duration});
 		last if ($rank > $top);
 		$found++;
@@ -12236,21 +12319,23 @@ sub print_prepare_consuming
 		my $min = &convert_time($prepare_info{$curdb}{$k}{min});
 		my $max = &convert_time($prepare_info{$curdb}{$k}{max});
 		my $avg = &convert_time($prepare_info{$curdb}{$k}{average});
-		my $query = &highlight_code($k);
+		my $query = &highlight_code(&anonymize_query($k));
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
 		my $details = '';
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$prepare_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$prepare_info{$curdb}{$k}{chronos}})
+		{
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
 			my $dd = $3;
 			my $mo = $2 -1 ;
 			my $y = $1 - 1900;
-			foreach my $h (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -12261,13 +12346,16 @@ sub print_prepare_consuming
 					&convert_time($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$ht:$rd"} += ($prepare_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
@@ -12279,8 +12367,10 @@ sub print_prepare_consuming
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			foreach my $rd (@histo_avgs) {
+		foreach my $h ("00" .. "23")
+		{
+			foreach my $rd (@histo_avgs)
+			{
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
 			}
@@ -12337,14 +12427,17 @@ sub print_prepare_consuming
 						</div><!-- end of details collapse -->
 	<p> <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-prepare-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
-		if (scalar keys %{$prepare_info{$curdb}{$k}{users}} > 0) {
+		if (scalar keys %{$prepare_info{$curdb}{$k}{users}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$prepare_info{$curdb}{$k}{users}{$b}{duration} <=> $prepare_info{$curdb}{$k}{users}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{users}}) {
-				if ($prepare_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+			foreach my $u (sort {$prepare_info{$curdb}{$k}{users}{$b}{duration} <=> $prepare_info{$curdb}{$k}{users}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{users}})
+			{
+				if ($prepare_info{$curdb}{$k}{users}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($prepare_info{$curdb}{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $prepare_info{$curdb}{$k}{users}{$u}{count}";
@@ -12362,14 +12455,17 @@ sub print_prepare_consuming
 };
 		}
 
-		if (scalar keys %{$prepare_info{$curdb}{$k}{apps}} > 0) {
+		if (scalar keys %{$prepare_info{$curdb}{$k}{apps}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="time-consuming-prepare-app-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$prepare_info{$curdb}{$k}{apps}{$b}{duration} <=> $prepare_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{apps}}) {
-				if ($prepare_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+			foreach my $u (sort {$prepare_info{$curdb}{$k}{apps}{$b}{duration} <=> $prepare_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{apps}})
+			{
+				if ($prepare_info{$curdb}{$k}{apps}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($prepare_info{$curdb}{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $prepare_info{$curdb}{$k}{apps}{$u}{count}";
@@ -12393,7 +12489,8 @@ sub print_prepare_consuming
 };
 
 		my $idx = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$k}{samples}}) {
+		foreach my $d (sort {$b <=> $a} keys %{$prepare_info{$curdb}{$k}{samples}})
+		{
 			last if ($idx > $sample);
 			my $details = "<b>Date:</b> $prepare_info{$curdb}{$k}{samples}{$d}{date}\n";
 			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
@@ -12402,7 +12499,7 @@ sub print_prepare_consuming
 			$details .= "<b>Remote:</b> $prepare_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $prepare_info{$curdb}{$k}{samples}{$d}{app}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{app});
 			$details .= "<b>parameters:</b> $prepare_info{$curdb}{$k}{samples}{$d}{params}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{params});
-			$query = &highlight_code($prepare_info{$curdb}{$k}{samples}{$d}{query});
+			$query = &highlight_code(&anonymize_query($prepare_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($prepare_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 			print $fh qq{
@@ -12459,7 +12556,8 @@ sub print_bind_consuming
 };
 	my $rank = 1;
 	my $found = 0;
-	foreach my $k (sort {$bind_info{$curdb}{$b}{duration} <=> $bind_info{$curdb}{$a}{duration}} keys %{$bind_info{$curdb}}) {
+	foreach my $k (sort {$bind_info{$curdb}{$b}{duration} <=> $bind_info{$curdb}{$a}{duration}} keys %{$bind_info{$curdb}})
+	{
 		next if (!$bind_info{$curdb}{$k}{count} || !exists $bind_info{$curdb}{$k}{duration});
 		last if ($rank > $top);
 		$found++;
@@ -12469,21 +12567,23 @@ sub print_bind_consuming
 		my $min = &convert_time($bind_info{$curdb}{$k}{min});
 		my $max = &convert_time($bind_info{$curdb}{$k}{max});
 		my $avg = &convert_time($bind_info{$curdb}{$k}{average});
-		my $query = &highlight_code($k);
+		my $query = &highlight_code(&anonymize_query($k));
 		my $md5 = '';
 		$md5 = 'md5: ' . md5_hex($k) if ($enable_checksum);
 		my $details = '';
 		my %hourly_count = ();
 		my %hourly_duration = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$bind_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$bind_info{$curdb}{$k}{chronos}})
+		{
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
 			my $zday = "$abbr_month{$2} $3";
 			my $dd = $3;
 			my $mo = $2 -1 ;
 			my $y = $1 - 1900;
-			foreach my $h (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -12494,13 +12594,16 @@ sub print_bind_consuming
 					&convert_time($bind_info{$curdb}{$k}{chronos}{$d}{$h}{duration}) . "</td><td>" .
 					&convert_time($bind_info{$curdb}{$k}{chronos}{$d}{$h}{average}) .  "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$bind_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $bind_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 					$hourly_duration{"$ht:$rd"} += ($bind_info{$curdb}{$k}{chronos}{$d}{$h}{min_duration}{$m} || 0);
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) .   "</td><td>" .
@@ -12512,8 +12615,10 @@ sub print_bind_consuming
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
-			foreach my $rd (@histo_avgs) {
+		foreach my $h ("00" .. "23")
+		{
+			foreach my $rd (@histo_avgs)
+			{
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 				$graph_data{duration} .= "['$h:$rd'," . (int($hourly_duration{"$h:$rd"} / ($hourly_count{"$h:$rd"} || 1)) || 0) . "],";
 			}
@@ -12570,14 +12675,17 @@ sub print_bind_consuming
 						</div><!-- end of details collapse -->
 	<p> <button type="button" class="btn btn-default btn-xs" data-toggle="collapse" data-target="#time-consuming-bind-examples-rank-$rank">Examples</button> $users_involved $apps_involved</p>
 };
-		if (scalar keys %{$bind_info{$curdb}{$k}{users}} > 0) {
+		if (scalar keys %{$bind_info{$curdb}{$k}{users}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
 						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$bind_info{$curdb}{$k}{users}{$b}{duration} <=> $bind_info{$curdb}{$k}{users}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{users}}) {
-				if ($bind_info{$curdb}{$k}{users}{$u}{duration} > 0) {
+			foreach my $u (sort {$bind_info{$curdb}{$k}{users}{$b}{duration} <=> $bind_info{$curdb}{$k}{users}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{users}})
+			{
+				if ($bind_info{$curdb}{$k}{users}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>User:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($bind_info{$curdb}{$k}{users}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $bind_info{$curdb}{$k}{users}{$u}{count}";
@@ -12595,14 +12703,17 @@ sub print_bind_consuming
 };
 		}
 
-		if (scalar keys %{$bind_info{$curdb}{$k}{apps}} > 0) {
+		if (scalar keys %{$bind_info{$curdb}{$k}{apps}} > 0)
+		{
 			print $fh qq{
 						<!-- Involved apps list collapse -->
 						<div id="time-consuming-bind-app-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
-			foreach my $u (sort {$bind_info{$curdb}{$k}{apps}{$b}{duration} <=> $bind_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{apps}}) {
-				if ($bind_info{$curdb}{$k}{apps}{$u}{duration} > 0) {
+			foreach my $u (sort {$bind_info{$curdb}{$k}{apps}{$b}{duration} <=> $bind_info{$curdb}{$k}{apps}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{apps}})
+			{
+				if ($bind_info{$curdb}{$k}{apps}{$u}{duration} > 0)
+				{
 					my $details = "[ <b>Application:</b> $u";
 					$details .= " - <b>Total duration:</b> ".&convert_time($bind_info{$curdb}{$k}{apps}{$u}{duration});
 					$details .= " - <b>Times executed:</b> $bind_info{$curdb}{$k}{apps}{$u}{count}";
@@ -12626,7 +12737,8 @@ sub print_bind_consuming
 };
 
 		my $idx = 1;
-		foreach my $d (sort {$b <=> $a} keys %{$bind_info{$curdb}{$k}{samples}}) {
+		foreach my $d (sort {$b <=> $a} keys %{$bind_info{$curdb}{$k}{samples}})
+		{
 			last if ($idx > $sample);
 			my $details = "<b>Date:</b> $bind_info{$curdb}{$k}{samples}{$d}{date}\n";
 			$details .= "<b>Duration:</b> " . &convert_time($d) . "\n";
@@ -12635,7 +12747,7 @@ sub print_bind_consuming
 			$details .= "<b>Remote:</b> $bind_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $bind_info{$curdb}{$k}{samples}{$d}{app}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{app});
 			$details .= "<b>parameters:</b> $bind_info{$curdb}{$k}{samples}{$d}{params}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{params});
-			$query = &highlight_code($bind_info{$curdb}{$k}{samples}{$d}{query});
+			$query = &highlight_code(&anonymize_query($bind_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($bind_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
 			print $fh qq{
@@ -12678,7 +12790,8 @@ sub dump_as_html
 	&html_header($uri, $curdb);
 
 	# Set graphs limits
-	if ($overall_stat{$curdb}{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/) {
+	if ($overall_stat{$curdb}{'first_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/)
+	{
 		my ($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s);
 		if (!$log_timezone) {
 			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
@@ -12689,7 +12802,8 @@ sub dump_as_html
 		$t_min += ($timezone*1000);
 		$t_min -= ($avg_minutes * 60000);
 	}
-	if ($overall_stat{$curdb}{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/) {
+	if ($overall_stat{$curdb}{'last_log_ts'} =~ /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/)
+	{
 		my ($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s);
 		if (!$log_timezone) {
 			($t_y, $t_mo, $t_d, $t_h, $t_mi, $t_s) = ($1, $2, $3, $4, $5, $6);
@@ -12701,9 +12815,10 @@ sub dump_as_html
 		$t_max += ($avg_minutes * 60000);
 	}
 
-	if (!$error_only) {
-
-		if (!$pgbouncer_only) {
+	if (!$error_only)
+	{
+		if (!$pgbouncer_only)
+		{
 			# Overall statistics
 			print $fh qq{
 	<li class="slide active-slide" id="overview-slide">
@@ -12711,8 +12826,8 @@ sub dump_as_html
 			&print_overall_statistics($curdb);
 		}
 
-		if (!$disable_hourly && !$pgbouncer_only) {
-
+		if (!$disable_hourly && !$pgbouncer_only)
+		{
 			# Build graphs based on hourly stat
 			&compute_query_graphs($curdb);
 
@@ -12724,7 +12839,8 @@ sub dump_as_html
 
 		}
 
-		if (!$disable_connection && !$pgbouncer_only) {
+		if (!$disable_connection && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="connections-slide" style="display:none;">
@@ -12744,7 +12860,8 @@ sub dump_as_html
 
 
 		# Show session per database statistics
-		if (!$disable_session && !$pgbouncer_only) {
+		if (!$disable_session && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="sessions-slide" style="display:none;">
@@ -12765,7 +12882,6 @@ sub dump_as_html
 			&print_app_session($curdb);
 		}
 
-
 		# Display checkpoint and temporary files report
 		if (!$disable_checkpoint && !$pgbouncer_only && (!$report_per_database || $curdb eq $DBALL)) {
 			print $fh qq{
@@ -12776,7 +12892,8 @@ sub dump_as_html
 			&print_checkpoint_cause($curdb);
 		}
 
-		if (!$disable_temporary && !$pgbouncer_only) {
+		if (!$disable_temporary && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="tempfiles-slide" style="display:none;">
@@ -12788,7 +12905,8 @@ sub dump_as_html
 			&print_tempfile_report($curdb);
 		}
 
-		if (!$disable_autovacuum && !$pgbouncer_only) {
+		if (!$disable_autovacuum && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="vacuums-slide" style="display:none;">
@@ -12798,7 +12916,8 @@ sub dump_as_html
 
 		}
 
-		if (!$disable_lock && !$pgbouncer_only) {
+		if (!$disable_lock && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="locks-slide" style="display:none;">
@@ -12810,13 +12929,15 @@ sub dump_as_html
 			&print_lock_queries_report($curdb);
 		}
 
-		if (!$disable_query && !$pgbouncer_only) {
+		if (!$disable_query && !$pgbouncer_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="queries-slide" style="display:none;">
 };
 			# INSERT/DELETE/UPDATE/SELECT repartition
-			if (!$disable_type) {
+			if (!$disable_type)
+			{
 				&print_query_type($curdb);
 
 				# Show requests per database
@@ -12863,12 +12984,11 @@ sub dump_as_html
 
 			# Show bind that took up the most time
 			&print_bind_consuming($curdb);
-
 		}
 
 		# Show pgbouncer sessions and connections statistics
-		if (exists $pgb_overall_stat{peak} && (!$report_per_database || $curdb eq $DBALL)) {
-
+		if (exists $pgb_overall_stat{peak} && (!$report_per_database || $curdb eq $DBALL))
+		{
 			# Build pgbouncer graph based on hourly stats
 			&compute_pgbouncer_graphs();
 
@@ -12914,9 +13034,10 @@ sub dump_as_html
 	}
 
 	# Show errors report
-	if (!$disable_error) {
-
-		if (!$error_only) {
+	if (!$disable_error)
+	{
+		if (!$error_only)
+		{
 			print $fh qq{
 		</li>
 		<li class="slide" id="events-slide" style="display:none;">
@@ -13165,14 +13286,16 @@ sub print_error_code
 	my $ret = 0;
 
 	my $total_logs = 0;
-	foreach my $d (sort keys %{$errors_code{$curdb}}) {
+	foreach my $d (sort keys %{$errors_code{$curdb}})
+	{
 		$total_logs += $errors_code{$curdb}{$d};
 		$d =~ /^(..)/;
 		$class_error{$1} += $errors_code{$curdb}{$d};
 	}
 
 	my $errorclass_info = '';
-	foreach my $d (sort keys %class_error) {
+	foreach my $d (sort keys %class_error)
+	{
 		next if (!$class_error{$d});
 		$errorclass_info .= "<tr><td>$CLASS_ERROR_CODE{$d}</td><td>$d</td><td>" . &comma_numbers($class_error{$d}) .
 			"</td><td>" . sprintf("%0.2f", ($class_error{$d} * 100) / ($total_logs||1)) . "%</td></tr>";
@@ -13180,19 +13303,24 @@ sub print_error_code
 	my %graph_data = ();
 	my %max_events = ();
 	my $most_present = '';
-	if ($graph) {
+	if ($graph)
+	{
 		my @small = ();
-		foreach my $d (sort { $class_error{$b} <=> $class_error{$a} } keys %class_error) {
+		foreach my $d (sort { $class_error{$b} <=> $class_error{$a} } keys %class_error)
+		{
 			$most_present = $CLASS_ERROR_CODE{$d} if (!$most_present);
 			if ((($class_error{$d} * 100) / ($total_logs || 1)) > $pie_percentage_limit) {
 				$infos{$CLASS_ERROR_CODE{$d}} = $class_error{$d} || 0;
-			} else {
+			}
+			else
+			{
 				$infos{"Sum error classes < $pie_percentage_limit%"} += $class_error{$d} || 0;
 				push(@small, $CLASS_ERROR_CODE{$d});
 			}
 		}
 
-		if ($#small == 0) {
+		if ($#small == 0)
+		{
 			$infos{$small[0]} = $infos{"Sum error classes < $pie_percentage_limit%"};
 			delete $infos{"Sum error classes < $pie_percentage_limit%"};
 		}
@@ -13251,7 +13379,6 @@ sub print_error_code
 	}
 
 	delete $drawn_graphs{errorclass_graph};
-
 }
 
 
@@ -13261,7 +13388,8 @@ sub show_error_as_html
 
 	my $main_error = 0;
 	my $total = 0;
-	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}}) {
+	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}})
+	{
 		next if (!$error_info{$curdb}{$k}{count});
 		$main_error = &comma_numbers($error_info{$curdb}{$k}{count}) if (!$main_error);
 		$total += $error_info{$curdb}{$k}{count};
@@ -13292,7 +13420,8 @@ sub show_error_as_html
 				<tbody>
 };
 	my $rank = 1;
-	foreach my $k (sort { $error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count} } keys %{$error_info{$curdb}}) {
+	foreach my $k (sort { $error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count} } keys %{$error_info{$curdb}})
+	{
 		next if (!$error_info{$curdb}{$k}{count});
 		my $count = &comma_numbers($error_info{$curdb}{$k}{count});
 		my ($msg, $ret) = &revert_log_level($k);
@@ -13311,7 +13440,8 @@ sub show_error_as_html
 		my $details = '';
 		my %hourly_count = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$error_info{$curdb}{$k}{chronos}}) {
+		foreach my $d (sort keys %{$error_info{$curdb}{$k}{chronos}})
+		{
 			my $c = 1;
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
@@ -13319,19 +13449,23 @@ sub show_error_as_html
 			my $y = $1 - 1900;
 			my $mo = $2 - 1;
 			my $dd = $3;
-			foreach my $h (sort keys %{$error_info{$curdb}{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$error_info{$curdb}{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
 				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
 					&comma_numbers($error_info{$curdb}{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$error_info{$curdb}{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$error_info{$curdb}{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $error_info{$curdb}{$k}{chronos}{$d}{$h}{min}{$m};
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
@@ -13341,7 +13475,8 @@ sub show_error_as_html
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
+		foreach my $h ("00" .. "23")
+		{
 			foreach my $rd (@histo_avgs) {
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 			}
@@ -13393,7 +13528,8 @@ sub show_error_as_html
 							<dl>
 };
 
-		for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++) {
+		for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++)
+		{
 			last if (($sample > 0) && ($i == $sample));
 			# Escape HTML code in error message
 			my $message = &escape_html($error_info{$curdb}{$k}{error}[$i]);
@@ -13409,9 +13545,10 @@ sub show_error_as_html
 				$info .= "<b>Hint:</b> " . &escape_html($error_info{$curdb}{$k}{hint}[$i]) . "<br/>";
 			}
 			if ($error_info{$curdb}{$k}{statement}[$i]) {
-				$info .= "<b>Statement:</b> " . &escape_html($error_info{$curdb}{$k}{statement}[$i]) . "<br/>";
+				$info .= "<b>Statement:</b> " . &escape_html(&anonymize_query($error_info{$curdb}{$k}{statement}[$i])) . "<br/>";
 			}
-			if ($error_info{$curdb}{$k}{db}[$i]) {
+			if ($error_info{$curdb}{$k}{db}[$i])
+			{
 				$details .= "<b>Database:</b> $error_info{$curdb}{$k}{db}[$i]\n";
 				$details .= "<b>Application:</b> $error_info{$curdb}{$k}{app}[$i]\n";
 				$details .= "<b>User:</b> $error_info{$curdb}{$k}{user}[$i]\n";
@@ -13488,7 +13625,8 @@ sub show_pgb_error_as_html
 				<tbody>
 };
 	my $rank = 1;
-	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info) {
+	foreach my $k (sort {$pgb_error_info{$b}{count} <=> $pgb_error_info{$a}{count}} keys %pgb_error_info)
+	{
 		next if (!$pgb_error_info{$k}{count});
 		my $count = &comma_numbers($pgb_error_info{$k}{count});
 		my $msg = $k;
@@ -13505,7 +13643,8 @@ sub show_pgb_error_as_html
 		my $details = '';
 		my %hourly_count = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$pgb_error_info{$k}{chronos}}) {
+		foreach my $d (sort keys %{$pgb_error_info{$k}{chronos}})
+		{
 			my $c = 1;
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
@@ -13513,7 +13652,8 @@ sub show_pgb_error_as_html
 			my $y = $1 - 1900;
 			my $mo = $2 - 1;
 			my $dd = $3;
-			foreach my $h (sort keys %{$pgb_error_info{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$pgb_error_info{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
@@ -13524,8 +13664,10 @@ sub show_pgb_error_as_html
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $pgb_error_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
@@ -13535,7 +13677,8 @@ sub show_pgb_error_as_html
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
+		foreach my $h ("00" .. "23")
+		{
 			foreach my $rd (@histo_avgs) {
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 			}
@@ -13586,7 +13729,8 @@ sub show_pgb_error_as_html
 							<dl>
 };
 
-		for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++) {
+		for (my $i = 0 ; $i <= $#{$pgb_error_info{$k}{date}} ; $i++)
+		{
 			last if (($sample > 0) && ($i == $sample));
 			# Escape HTML code in error message
 			my $message = &escape_html($pgb_error_info{$k}{error}[$i]);
@@ -13628,8 +13772,10 @@ sub show_pgb_reserved_pool
 	my $main_pool = '';
 	my $main_pool_val = 0;
 	my $total = 0;
-	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info) {
-		if (!$main_pool || ($pgb_pool_info{$k}{count} > $pgb_pool_info{$main_pool}{count})) {
+	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info)
+	{
+		if (!$main_pool || ($pgb_pool_info{$k}{count} > $pgb_pool_info{$main_pool}{count}))
+		{
 			$main_pool = $k;
 			$main_pool_val = &comma_numbers($pgb_pool_info{$k}{count});
 		}
@@ -13662,13 +13808,15 @@ sub show_pgb_reserved_pool
 				<tbody>
 };
 	my $rank = 1;
-	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info) {
+	foreach my $k (sort {$pgb_pool_info{$b}{count} <=> $pgb_pool_info{$a}{count}} keys %pgb_pool_info)
+	{
 		next if (!$pgb_pool_info{$k}{count});
 		my $count = &comma_numbers($pgb_pool_info{$k}{count});
 		my $details = '';
 		my %hourly_count = ();
 		my $days = 0;
-		foreach my $d (sort keys %{$pgb_pool_info{$k}{chronos}}) {
+		foreach my $d (sort keys %{$pgb_pool_info{$k}{chronos}})
+		{
 			my $c = 1;
 			$d =~ /^(\d{4})(\d{2})(\d{2})$/;
 			$days++;
@@ -13676,19 +13824,23 @@ sub show_pgb_reserved_pool
 			my $y = $1 - 1900;
 			my $mo = $2 - 1;
 			my $dd = $3;
-			foreach my $h (sort keys %{$pgb_pool_info{$k}{chronos}{$d}}) {
+			foreach my $h (sort keys %{$pgb_pool_info{$k}{chronos}{$d}})
+			{
 				my $t = timegm_nocheck(0, 0, $h, $dd, $mo, $y);
 				$t += $timezone;
 				my $ht = sprintf("%02d", (localtime($t))[2]);
 				$details .= "<tr><td>$zday</td><td>$ht</td><td>" .
 					&comma_numbers($pgb_pool_info{$k}{chronos}{$d}{$h}{count}) . "</td></tr>";
 				$zday = "";
-				foreach my $m (sort keys %{$pgb_pool_info{$k}{chronos}{$d}{$h}{min}}) {
+				foreach my $m (sort keys %{$pgb_pool_info{$k}{chronos}{$d}{$h}{min}})
+				{
 					my $rd = &average_per_minutes($m, $histo_avg_minutes);
 					$hourly_count{"$ht:$rd"} += $pgb_pool_info{$k}{chronos}{$d}{$h}{min}{$m};
 				}
-				if ($#histo_avgs > 0) {
-					foreach my $rd (@histo_avgs) {
+				if ($#histo_avgs > 0)
+				{
+					foreach my $rd (@histo_avgs)
+					{
 						next if (!exists $hourly_count{"$ht:$rd"});
 						$details .= "<tr><td>$zday</td><td style=\"text-align: right\">$ht:$rd</td><td>" .
 							&comma_numbers($hourly_count{"$ht:$rd"}) . "</td></tr>";
@@ -13698,7 +13850,8 @@ sub show_pgb_reserved_pool
 		}
 		# Set graph dataset
 		my %graph_data = ();
-		foreach my $h ("00" .. "23") {
+		foreach my $h ("00" .. "23")
+		{
 			foreach my $rd (@histo_avgs) {
 				$graph_data{count} .= "['$h:$rd'," . ($hourly_count{"$h:$rd"} || 0) . "],";
 			}
@@ -15161,19 +15314,6 @@ sub parse_query
 	# Delete old bind query temporary storage
 	foreach my $p (keys %last_execute_stmt) {
 		delete $last_execute_stmt{$p} if ($p > $t_pid);
-	}
-
-	####
-	# Anonymize query if requested by the user
-	####
-	if ($anonymize && exists $prefix_vars{'t_query'} && $prefix_vars{'t_query'}) {
-		$prefix_vars{'t_query'} = &anonymize_query($prefix_vars{'t_query'});
-	}
-	if ($anonymize && exists $prefix_vars{'t_statement'} && $prefix_vars{'t_statement'}) {
-		$prefix_vars{'t_statement'} = &anonymize_query($prefix_vars{'t_statement'});
-	}
-	if ($anonymize && exists $prefix_vars{'t_detail'} && $prefix_vars{'t_detail'}) {
-		$prefix_vars{'t_detail'} = &anonymize_query($prefix_vars{'t_detail'});
 	}
 
 	####
