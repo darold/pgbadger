@@ -3665,12 +3665,16 @@ sub process_file
 					}
 				}
 			}
-			if (!$csv->eof()) {
+
+			if (!$csv->eof())
+			{
 				warn "WARNING: cannot use CSV on $logfile, " . $csv->error_diag() . " at line " . ($nlines+1), "\n";
 				print STDERR "DETAIL: " . $csv->error_input(), "\n" if ($csv->error_input());
 				print STDERR "reset CSV parser\n";
 				$csv->SetDiag(0);
-			} else {
+			}
+			else
+			{
 				$cursize = $totalsize;
 			}
 		}
@@ -3735,6 +3739,7 @@ sub process_file
 
 				$cur_pid = $prefix_vars{'t_pid'} if ($prefix_vars{'t_pid'});
 
+				$prefix_vars{'t_query'} =~ s/^\\t//;
 				# Collect orphaned lines of multiline queries
 				if (!$prefix_vars{'t_loglevel'} && $cur_pid)
 				{
@@ -3742,61 +3747,73 @@ sub process_file
 					next if ($line =~ /\bLOG:  /);
 
 					# Parse orphan lines to append information to the right place
-					&parse_orphan_line($cur_pid, $line);
+					&parse_orphan_line($cur_pid, $prefix_vars{'t_query'});
 				}
+				elsif ($cur_pid)
+				{
+					# Skip unwanted lines
+					my $res = &skip_unwanted_line();
+					next if ($res == 1);
 
-				# Skip unwanted lines
-				my $res = &skip_unwanted_line();
-				next if ($res == 1);
+					# Jump to the last line parsed if required
+					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
-				# Jump to the last line parsed if required
-				next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					# We have reach previous incremental position (or we not in increment mode)
+					$goon = 1;
 
-				# We have reach previous incremental position (or we not in increment mode)
-				$goon = 1;
+					# Store the current timestamp of the log line
+					&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_dbname'});
 
-				# Store the current timestamp of the log line
-				&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_dbname'});
+					# Update current timestamp with the timezone wanted
+					if ($log_timezone)
+					{
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
+						$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+						$prefix_vars{'t_timestamp'} =
+							"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
+					}
 
-				# Update current timestamp with the timezone wanted
-				if ($log_timezone) {
-					($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
-					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
-					$prefix_vars{'t_timestamp'} =
-						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
-				}
+					# Check if the log line should be excluded from the report
+					if (&validate_log_line($prefix_vars{'t_pid'}))
+					{
+						# Parse the query now
+						&parse_query($fmt);
 
-				# Check if the log line should be excluded from the report
-				if (&validate_log_line($prefix_vars{'t_pid'})) {
-
-					# Parse the query now
-					&parse_query($fmt);
-
-					# The information can be saved immediately with jsonlog
-					if (exists $cur_info{$prefix_vars{'t_pid'}}) {
-						&store_queries($prefix_vars{'t_pid'});
-						delete $cur_info{$prefix_vars{'t_pid'}};
+						# The information can be saved immediately with jsonlog
+						if (exists $cur_info{$prefix_vars{'t_pid'}})
+						{
+							&store_queries($prefix_vars{'t_pid'});
+							delete $cur_info{$prefix_vars{'t_pid'}};
+						}
 					}
 				}
-
+				else
+				{
+					&logmsg('DEBUG', "Unknown $fmt line format: $line");
+				}
+			}
 			# Parse syslog lines
-			} elsif ($is_syslog) {
-
+			elsif ($is_syslog)
+			{
 				@matches = ($line =~ $compiled_prefix);
 
 				my $q_match = 0;
-				if ($#matches < 0 && $q_prefix) {
+				if ($#matches < 0 && $q_prefix)
+				{
 					@matches = ($line =~ $q_prefix);
 					$q_match = 1;
 				}
 
-				if ($#matches >= 0) {
-
-					if (!$q_match) {
+				if ($#matches >= 0)
+				{
+					if (!$q_match)
+					{
 						for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 							$prefix_vars{$prefix_params[$i]} = $matches[$i];
 						}
-					} else {
+					}
+					else
+					{
 						for (my $i = 0 ; $i <= $#prefix_q_params ; $i++) {
 							$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
 						}
@@ -3810,7 +3827,8 @@ sub process_file
 
 					# Standard syslog format does not have year information, months are
 					# three letters and days are not always with 2 digits.
-					if ($prefix_vars{'t_month'} !~ /\d/) {
+					if ($prefix_vars{'t_month'} !~ /\d/)
+					{
 						$prefix_vars{'t_year'}  = $gyear;
 						$prefix_vars{'t_day'}   = sprintf("%02d", $prefix_vars{'t_day'});
 						$prefix_vars{'t_month'} = $month_abbr{$prefix_vars{'t_month'}};
@@ -3823,7 +3841,8 @@ sub process_file
 					$prefix_vars{'t_timestamp'} =
 						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
 
-					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
+					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'})
+					{
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
 						# Remove the port part
 						$prefix_vars{'t_client'} =~ s/\(.*//;
@@ -3832,7 +3851,8 @@ sub process_file
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
 					next if ($res == 1);
-					if ($res == -1) {
+					if ($res == -1)
+					{
 						&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count, $fmt);
 						$getout = 2;
 						last;
@@ -3849,7 +3869,8 @@ sub process_file
 					&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_dbname'});
 
 					# Update current timestamp with the timezone wanted
-					if ($log_timezone) {
+					if ($log_timezone)
+					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
 						$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 						$prefix_vars{'t_timestamp'} =
@@ -3862,10 +3883,11 @@ sub process_file
 					}
 
 					# Check if the log line should be excluded from the report
-					if (&validate_log_line($prefix_vars{'t_pid'})) {
-
+					if (&validate_log_line($prefix_vars{'t_pid'}))
+					{
 						# The information can be saved when we are switching to a new main message
-						if ($cur_pid && exists $cur_info{$cur_pid} && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)) {
+						if ($cur_pid && exists $cur_info{$cur_pid} && ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/))
+						{
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid} if (!$log_duration || ($cur_info{$cur_pid}{duration} ne '' && $cur_info{$cur_pid}{query} ne ''));
 						}
@@ -3876,8 +3898,9 @@ sub process_file
 						$cur_pid = $prefix_vars{'t_pid'};
 					}
 
-				} elsif ($goon && ($line =~ $other_syslog_line)) {
-
+				}
+				elsif ($goon && ($line =~ $other_syslog_line))
+				{
 					$cur_pid = $8;
 					my $t_query = $10;
 					if ($fmt eq 'logplex' && not exists $cur_info{$cur_pid}{cur_db}) {
@@ -3891,16 +3914,19 @@ sub process_file
 					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $t_query);
 
+				}
 				# Collect orphaned lines of multiline queries
-				} elsif ($cur_pid) {
-
+				elsif ($cur_pid)
+				{
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
 					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $line);
 
-				} else {
+				}
+				else
+				{
 					&logmsg('DEBUG', "Unknown $fmt line format: $line");
 				}
 
@@ -4264,9 +4290,12 @@ sub parse_jsonlog_input
 		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv);
 	}
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
+	# Try to extract the pid information
 	if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
 		$infos{'t_pid'} = $1;
 	} elsif ($str =~ m/"textPayload":"\[(\d+)\]:/) {
+		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"textPayload":"\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s*\[(\d+)\]:/) {
 		$infos{'t_pid'} = $1;
 	} elsif ($str =~ m/"textPayload":"(.*)","timestamp":"/) {
 		$infos{'t_query'} = unescape_jsonlog($1);
@@ -4885,7 +4914,7 @@ sub anonymize_query
 {
 	my $orig_query = shift;
 
-	return if (!$orig_query || !$anonymize);
+	return $orig_query if (!$orig_query || !$anonymize);
 
 	# Variable to hold anonymized versions, so we can provide the same value
 	# for the same input, within single query.
@@ -5003,7 +5032,8 @@ sub set_top_tempfile_info
 
 	my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} @{$top_tempfile_info{$curdb}};
 	@{$top_tempfile_info{$curdb}} = ();
-	for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++) {
+	for (my $i = 0; $i <= $#tmp_top_tempfile_info; $i++)
+	{
 		push(@{$top_tempfile_info{$curdb}}, $tmp_top_tempfile_info[$i]);
 		last if ($i == $end_top);
 	}
@@ -9325,38 +9355,46 @@ sub print_temporary_file
 
 	# checkpoint
 	my %graph_data = ();
-	if ($graph) {
-		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	if ($graph)
+	{
+		foreach my $tm (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+		{
 			$tm =~ /(\d{4})(\d{2})(\d{2})/;
 			my $y  = $1 - 1900;
 			my $mo = $2 - 1;
 			my $d  = $3;
-			foreach my $h ("00" .. "23") {
+			foreach my $h ("00" .. "23")
+			{
 				next if (!exists $per_minute_info{$curdb}{$tm}{$h});
 				my %chk_dataavg = ();
 				my %t_dataavg = ();
 				my %v_dataavg = ();
-				foreach my $m ("00" .. "59") {
+				foreach my $m ("00" .. "59")
+				{
 					next if (!exists $per_minute_info{$curdb}{$tm}{$h}{$m});
 					my $rd = &average_per_minutes($m, $avg_minutes);
-					if ($tempfile_info{$curdb}{count}) {
+					if ($tempfile_info{$curdb}{count})
+					{
 						$t_dataavg{size}{"$rd"} = 0 if (!exists $t_dataavg{size}{"$rd"});
 						$t_dataavg{count}{"$rd"} = 0 if (!exists $t_dataavg{count}{"$rd"});
-						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{'tempfile'}) {
+						if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{'tempfile'})
+						{
 							$t_dataavg{size}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{'tempfile'}{size} || 0);
 							$t_dataavg{count}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{'tempfile'}{count} || 0);
 						}
 					}
 				}
 
-				foreach my $rd (@avgs) {
+				foreach my $rd (@avgs)
+				{
 					my $t = timegm_nocheck(0, $rd, $h, $d, $mo, $y) * 1000;
 					$t += ($timezone*1000);
 
 					next if ($t < $t_min);
 					last if ($t > $t_max);
 
-					if (exists $t_dataavg{size}) {
+					if (exists $t_dataavg{size})
+					{
 						$graph_data{size} .= "[$t, " . ($t_dataavg{size}{"$rd"} || 0) . "],";
 						$graph_data{count} .= "[$t, " . ($t_dataavg{count}{"$rd"} || 0) . "],";
 					}
@@ -9382,7 +9420,8 @@ sub print_temporary_file
 
 	my $tempfile_size_peak = 0;
 	my $tempfile_size_peak_date = '';
-	foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{tempfile_size} <=> $overall_stat{$curdb}{'peak'}{$a}{tempfile_size}} keys %{$overall_stat{$curdb}{'peak'}}) {
+	foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{tempfile_size} <=> $overall_stat{$curdb}{'peak'}{$a}{tempfile_size}} keys %{$overall_stat{$curdb}{'peak'}})
+	{
 		$tempfile_size_peak = &pretty_print_size($overall_stat{$curdb}{'peak'}{$_}{tempfile_size});
 		$tempfile_size_peak_date = $_ if ($tempfile_size_peak);
 		last;
@@ -9410,7 +9449,8 @@ $drawn_graphs{temporarydata_graph}
 
 	my $tempfile_count_peak = 0;
 	my $tempfile_count_peak_date = '';
-	foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{tempfile_count} <=> $overall_stat{$curdb}{'peak'}{$a}{tempfile_count}} keys %{$overall_stat{$curdb}{'peak'}}) {
+	foreach (sort {$overall_stat{$curdb}{'peak'}{$b}{tempfile_count} <=> $overall_stat{$curdb}{'peak'}{$a}{tempfile_count}} keys %{$overall_stat{$curdb}{'peak'}})
+	{
 		$tempfile_count_peak = &comma_numbers($overall_stat{$curdb}{'peak'}{$_}{tempfile_count});
 		$tempfile_count_peak_date = $_ if ($tempfile_count_peak);
 		last;
@@ -9435,25 +9475,32 @@ $drawn_graphs{temporaryfile_graph}
 	delete $drawn_graphs{temporaryfile_graph};
 
 	my $tempfiles_activity = '';
-	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}}) {
+	foreach my $d (sort {$a <=> $b} keys %{$per_minute_info{$curdb}})
+	{
 		$d =~ /^\d{4}(\d{2})(\d{2})$/;
 		my $zday = "$abbr_month{$1} $2";
-		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}}) {
+		foreach my $h (sort {$a <=> $b} keys %{$per_minute_info{$curdb}{$d}})
+		{
 			$tempfiles_activity .= "<tr><td>$zday</td><td>$h</td>";
 			$zday = "";
 			my %tinf = ();
-			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}}) {
-				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{'tempfile'}) {
+			foreach my $m (keys %{$per_minute_info{$curdb}{$d}{$h}})
+			{
+				if (exists $per_minute_info{$curdb}{$d}{$h}{$m}{'tempfile'})
+				{
 					$tinf{size} += $per_minute_info{$curdb}{$d}{$h}{$m}{'tempfile'}{size};
 					$tinf{count} += $per_minute_info{$curdb}{$d}{$h}{$m}{'tempfile'}{count};
 				}
 			}
-			if (scalar keys %tinf) {
+			if (scalar keys %tinf)
+			{
 				my $temp_average = &pretty_print_size(sprintf("%.2f", $tinf{size} / $tinf{count}));
 				$tempfiles_activity .=  "<td>" . &comma_numbers($tinf{count}) .
 							"</td><td>" . &pretty_print_size($tinf{size}) . "</td>" .
 							"</td><td>$temp_average</td>";
-			} else {
+			}
+			else
+			{
 				$tempfiles_activity .= "<td>0</td><td>0</td><td>0</td>";
 			}
 		}
@@ -16358,18 +16405,21 @@ sub store_queries
 	# In dump all queries mode we just print the query to output file
 	if ($dump_all_queries && $cur_info{$t_pid}{loglevel} eq 'LOG')
 	{
-
 		# Replace bind parameters values in the query if any
-		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/)) {
+		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
+		{
 			my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
 			shift(@t_res);
 			for (my $i = 0 ; $i < $#t_res ; $i += 2) {
 				$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
 			}
-		} else {
+		}
+		else
+		{
 			# parameters from EXECUTE statements
 			my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
-			for (my $i = 0 ; $i <= $#t_res ; $i++) {
+			for (my $i = 0 ; $i <= $#t_res ; $i++)
+			{
 				my $num = $i + 1;
 				$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
 			}
@@ -16386,8 +16436,8 @@ sub store_queries
 	$cur_info{$t_pid}{query} =~ s/[\s;]+$//s;
 
 	# Just store normalized query when --normalized-only is used
-	if ($dump_normalized_only && $cur_info{$t_pid}{query}) {
-
+	if ($dump_normalized_only && $cur_info{$t_pid}{query})
+	{
 		# Add a semi-colon at end of the query
 		$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 
@@ -16401,16 +16451,20 @@ sub store_queries
 	}
 
 	# Replace bind parameters values in the query if any
-	if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/)) {
+	if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
+	{
 		my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
 		shift(@t_res);
 		for (my $i = 0 ; $i < $#t_res ; $i += 2) {
 			$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
 		}
-	} else {
+	}
+	else
+	{
 		# parameters from EXECUTE statements
 		my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
-		for (my $i = 0 ; $i <= $#t_res ; $i++) {
+		for (my $i = 0 ; $i <= $#t_res ; $i++)
+		{
 			my $num = $i + 1;
 			$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
 		}
