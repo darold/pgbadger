@@ -85,9 +85,9 @@ footer {
 
 #global-stats .tab-content li {
 	display: block;
-	width:14%; /*160/960*/
+	width:12%; /*160/960*/
 	float:left;
-	margin-left: 3%;
+	margin-left: 2.5%;
 }
 
 #global-stats .tab-content li.first {
