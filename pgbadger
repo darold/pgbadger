@@ -12554,7 +12554,7 @@ sub print_prepare_consuming
 			$details .= "<b>User:</b> $prepare_info{$curdb}{$k}{samples}{$d}{user}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $prepare_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $prepare_info{$curdb}{$k}{samples}{$d}{app}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{app});
-			$details .= "<b>parameters:</b> $prepare_info{$curdb}{$k}{samples}{$d}{params}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{params});
+			$details .= "<b>parameters:</b> ". &anonymize_query($prepare_info{$curdb}{$k}{samples}{$d}{params}) . "\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{params});
 			$query = &highlight_code(&anonymize_query($prepare_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($prepare_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
@@ -12802,7 +12802,7 @@ sub print_bind_consuming
 			$details .= "<b>User:</b> $bind_info{$curdb}{$k}{samples}{$d}{user}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $bind_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $bind_info{$curdb}{$k}{samples}{$d}{app}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{app});
-			$details .= "<b>parameters:</b> $bind_info{$curdb}{$k}{samples}{$d}{params}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{params});
+			$details .= "<b>parameters:</b> " . &anonymize_query($bind_info{$curdb}{$k}{samples}{$d}{params}) . "\n" if ($bind_info{$curdb}{$k}{samples}{$d}{params});
 			$query = &highlight_code(&anonymize_query($bind_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($bind_info{$curdb}{$k}{samples}{$d}{query}) if ($enable_checksum);
