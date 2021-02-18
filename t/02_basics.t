@@ -1,8 +1,9 @@
-use Test::Simple tests => 13;
+use Test::Simple tests => 16;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
 my $SYSLOG = 't/fixtures/pg-syslog.1.bz2';
 my $BIN = 't/fixtures/light.postgres.bin';
+my $ANON = 't/fixtures/anonymize.log';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 
@@ -56,6 +57,37 @@ ok( $? == 0 && ($ret eq '7'), "French encoding");
 $ret = `grep "камень & почка" /tmp/report$$.txt | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret eq '7'), "Cyrillic encoding");
+
+`rm /tmp/report$$.txt`;
+
+# Test CSV and anonymization only if Text::CSV_XS is installed
+`perl -MText::CSV_XS -e 1 2>/dev/null`;
+if ($? == 0)
+{
+	$ret = `perl pgbadger -m 1000 -q -f csv --anonymize -o /tmp/report$$.txt $ANON`;
+	$ret = `grep "11111111" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #1");
+	$ret = `grep "'r','p','v','f','m'" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #2");
+	$ret = `grep "x255044" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #3");
+}
+else
+{
+	$ret = `perl pgbadger -q -f csv --anonymize -o /tmp/report$$.txt $SYSLOG`;
+	$ret = `grep "aid = 62643" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #1");
+	$ret = `grep "tid = 1;" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #2");
+	$ret = `grep "8, 1, 27361, 529, CURRENT_TIMESTAMP" /tmp/report$$.txt | wc -l`;
+	chomp($ret);
+	ok( $? == 0 && ($ret eq '0'), "Anonymization #3");
+}
 
 # Remove files generated during the tests
 `rm -f out.html`;
