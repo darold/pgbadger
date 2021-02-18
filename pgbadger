@@ -11405,7 +11405,7 @@ sub print_cancelled_report
 			$details .= " - <b>Application:</b> $top_cancelled_info{$curdb}[$i]->[6]" if ($top_cancelled_info{$curdb}[$i]->[6]);
 			$details .= " - <b>Bind yes:</b> yes" if ($top_cancelled_info{$curdb}[$i]->[7]);
 			$details .= " ]";
-			my $query = &highlight_code($top_cancelled_info{$curdb}[$i]->[2]);
+			my $query = &highlight_code(&anonymize_query($top_cancelled_info{$curdb}[$i]->[2]));
 			my $md5 = '';
 			$md5 = 'md5: ' . md5_hex($top_cancelled_info{$curdb}[$i]->[2]) if ($enable_checksum);
 			print $fh qq{
@@ -16527,17 +16527,18 @@ sub store_queries
 		}
 
 		# Truncate the query if requested by the user
-		$cur_info{$t_pid}{query} = substr($cur_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_info{$t_pid}{query}) > $maxlength));
-
+		if ($maxlength > 0) {
+			&maxlen_truncate($cur_info{$t_pid}{query});
+		}
 	}
 
 	# We only process stored object with query here
 	if ($cur_info{$t_pid}{statement})
 	{
 		# Truncate the statement if requested by the user
-		$cur_info{$t_pid}{statement} = substr($cur_info{$t_pid}{statement}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_info{$t_pid}{statement}) > $maxlength));
+		if ($maxlength > 0) {
+			&maxlen_truncate($cur_info{$t_pid}{statement});
+		}
 	}
 
 	my $cur_day_str = "$cur_info{$t_pid}{year}$cur_info{$t_pid}{month}$cur_info{$t_pid}{day}";
@@ -16975,8 +16976,9 @@ sub store_temporary_and_lock_infos
 		$cur_temp_info{$t_pid}{query} .= ';' if ($cur_temp_info{$t_pid}{query} !~ /;\s*$/s);
 
 		# Truncate the query if requested by the user
-		$cur_temp_info{$t_pid}{query} = substr($cur_temp_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_temp_info{$t_pid}{query}) > $maxlength));
+		if ($maxlength > 0) {
+			&maxlen_truncate($cur_temp_info{$t_pid}{query});
+		}
 
 		# Normalize query
 		my $normalized = &normalize_query($cur_temp_info{$t_pid}{query});
@@ -17025,8 +17027,9 @@ sub store_temporary_and_lock_infos
 		$cur_lock_info{$t_pid}{query} .= ';' if ($cur_lock_info{$t_pid}{query} !~ /;\s*$/s);
 
 		# Truncate the query if requested by the user
-		$cur_lock_info{$t_pid}{query} = substr($cur_lock_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_lock_info{$t_pid}{query}) > $maxlength));
+		if ($maxlength > 0) {
+			&maxlen_truncate($cur_lock_info{$t_pid}{query});
+		}
 
 		# Normalize query
 		my $normalized = &normalize_query($cur_lock_info{$t_pid}{query});
@@ -17070,8 +17073,9 @@ sub store_temporary_and_lock_infos
 		$cur_cancel_info{$t_pid}{query} .= ';' if ($cur_cancel_info{$t_pid}{query} !~ /;\s*$/s);
 
 		# Truncate the query if requested by the user
-		$cur_cancel_info{$t_pid}{query} = substr($cur_cancel_info{$t_pid}{query}, 0, $maxlength) . '[...]'
-			if (($maxlength > 0) && (length($cur_cancel_info{$t_pid}{query}) > $maxlength));
+		if ($maxlength > 0) {
+			&maxlen_truncate($cur_cancel_info{$t_pid}{query});
+		}
 
 		# Normalize query
 		my $normalized = &normalize_query($cur_cancel_info{$t_pid}{query});
@@ -18483,6 +18487,15 @@ sub set_timezone
 	}
 }
 
+sub maxlen_truncate
+{
+	if ($maxlength && length($_[0]) > $maxlength)
+	{
+		$_[0] = substr($_[0], 0, $maxlength);
+		$_[0] =~ s/((?:[,\(=\~]|LIKE)\s*'[^']*)$/$1'/is if ($anonymize);
+		$_[0] .= '[...]';
+	}
+}
 
 # Inclusion of Perl package pgFormatter::Beautify.
 {
