@@ -1,3 +1,30 @@
+2021-02-18 - v11.5
+
+This release of pgBadger fix some issues reported by users since
+past three months as well as some improvements:
+
+  * Add report about sessions idle time, computed using:
+        "total sessions time - total queries time / number of sessions
+    This require that log_connection and log disconnection have been
+    enabled and that log_min_duration_statement = 0 (all queries logged)
+    to have a reliable value. This can help to know how much idle time
+    is lost, and if a pooler transaction mode would be useful.
+    This report is available in the "Sessions" tab of "Global Stats"
+    and in the "Sessions" tab of "General Activity" reports (per hour).
+  * Add anonymization of numeric values, replaced by 4 random digits.
+  * Update SQL beautifier based on pgFormatter 5.0.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix parsing of cloudsql multi-line statement. Thanks to Jon Young for the report. 
+  - Add regression test for anonymization.
+  - Fix anonymization broken by maxlength truncate. Thanks to artl for the report.
+  - Add anonymization of parameter in time consuming prepare and bind reports. Thanks to arlt for the report.
+  - Add support to microseconds in logplex log line prefix. Thanks to Ross Gardiner for the report.
+  - Add report about sessions idle time. Thanks to Guillaume Lelarge for the feature request.
+  - Complete patch to support multi-line in jsonlog format.
+
+
 2020-11-24 - v11.4
 
 This release of pgBadger fix some issues reported by users since
