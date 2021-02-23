@@ -3048,17 +3048,24 @@ sub write_resources
 	$major_version =~ s/\..*//;
 
 	my $rscdir = $html_outdir || $outdir;
-	while (my $l = <DATA>) {
-		if ($l =~ /^WRFILE: ([^\s]+)/) {
+	while (my $l = <DATA>)
+	{
+		last if ($l =~ /^__END__$/);
+		if ($l =~ /^WRFILE: ([^\s]+)/)
+		{
 			$file = $1;
-			if (!$extra_files) {
+			if (!$extra_files)
+			{
 				if ($#contents > 0) {
 					push(@contents, $endfile);
 				}
-				if ($file =~ /\.css$/i) {
+				if ($file =~ /\.css$/i)
+				{
 					push(@contents, "<style type=\"text/css\">\n");
 					$endfile = "</style>";
-				} elsif ($file =~ /\.js$/i) {
+				}
+				elsif ($file =~ /\.js$/i)
+				{
 					push(@contents, "<script type=\"text/javascript\">\n");
 					$endfile = "</script>";
 				}
@@ -3075,7 +3082,8 @@ sub write_resources
 				if (!-e "$rscdir/$major_version") {
 					mkdir("$rscdir/$major_version");
 				}
-				if (!-e "$rscdir/$major_version/$file") {
+				if (!-e "$rscdir/$major_version/$file")
+				{
 					$rscfh = new IO::File ">$rscdir/$major_version/$file";
 					localdie("FATAL: can't write file $rscdir/$major_version/$file\n") if (not defined $rscfh);
 				}
