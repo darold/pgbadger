@@ -1,4 +1,4 @@
-use Test::Simple tests => 12;
+use Test::Simple tests => 19;
 use JSON::XS;
 
 my $json = new JSON::XS;
@@ -7,6 +7,7 @@ my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
 my $HLOG = 't/fixtures/logplex.gz';
 my $RDSLOG = 't/fixtures/rds.log.bz2';
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
+my $TIMELOG = 't/fixtures/begin_end.log';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
 
@@ -54,3 +55,30 @@ ok( $json_ref->{connection_info}{postgres}{database_user}{cloudsqladmin}{cloudsq
 
 `rm -f $OUT`;
 
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --begin "09:00:00" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 4', "Generate report from begin time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --end "20:30:00" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 6', "Generate report from end time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --begin "09:00:00" --end "20:30:00" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 2', "Generate report from begin->end time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --end "2021-02-15 20:30:00" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 7', "Generate report from full log before with end time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --end "2021-02-14 20:30:00" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 3', "Generate report from single day before with end time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --include-time "2021-02-14 2[01]:.*" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 2', "Generate report from include time");
+
+$ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --exclude-time "2021-02-14 2[01]:.*" | grep '^Total number of sessions:'`;
+chomp($ret);
+ok( $? == 0 && $ret eq 'Total number of sessions: 6', "Generate report from exclude time");

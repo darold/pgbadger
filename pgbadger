@@ -979,39 +979,49 @@ if ($#include_query >= 0) {
 }
 
 # Check start/end date time
-if ($from) {
-    if ( $from =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+if ($from)
+{
+    if ( $from =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/)
+    {
         # only time, trick around the date part
         my $fractional_seconds = $4 || "0";
         $from_hour = "$1:$2:$3.$fractional_seconds";
         &logmsg('DEBUG', "Setting begin time to [$from_hour]" );
     }
-    elsif( $from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/ ) {
+    elsif( $from =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/ )
+    {
         my $fractional_seconds = $7 || "0";
         $from = "$1-$2-$3 $4:$5:$6.$fractional_seconds";
         &logmsg('DEBUG', "Setting begin datetime to [$from]" );
-    } else {
-        localdie("FATAL: bad format for begin datetime/time, should be yyyy-mm-dd hh:mm:ss.l+tz or hh:mm:ss.l+tz\n");      
+    }
+    else
+    {
+        localdie("FATAL: bad format for begin datetime/time, should be yyyy-mm-dd hh:mm:ss.l+tz or hh:mm:ss.l+tz\n");
     }
 }
 
-if ($to) {
-    if ( $to =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+if ($to)
+{
+    if ( $to =~ /^(\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/)
+    {
         # only time, trick around the date part
         my $fractional_seconds = $4 || "0";
         $to_hour = "$1:$2:$3.$fractional_seconds";
         &logmsg('DEBUG', "Setting end time to [$to_hour]" );
     }
-    elsif( $to =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/) {
+    elsif( $to =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([.]\d+([+-]\d+)?)?$/)
+    {
         my $fractional_seconds = $7 || "0";
         $to = "$1-$2-$3 $4:$5:$6.$fractional_seconds";
         &logmsg('DEBUG', "Setting end time to [$to]" );
-    } else {
+    }
+    else
+    {
         localdie("FATAL: bad format for ending datetime, should be yyyy-mm-dd hh:mm:ss.l+tz or hh:mm:ss.l+tz\n");
     }
 }
 if ($from && $to && ($from gt $to)) {
-	localdie("FATAL: begin date is after end time!\n") ;
+	localdie("FATAL: begin date is after end date!\n") ;
 }
 
 # Stores the last parsed line from log file to allow incremental parsing
@@ -18345,13 +18355,22 @@ sub localdie
 	exit 1;
 }
 
+####
+# Skip unwanted lines
+# Return 1 when the line must be excluded
+# Return 1 if we are after the end timestamp
+# Return 0 if this is a wanted line
+####
 sub skip_unwanted_line
 {
-	# Skip unwanted lines
-	if ($#exclude_time >= 0) {
+	# do not report lines which are not at the specific times
+	if ($#exclude_time >= 0)
+	{
 		my $found = 0;
-		foreach (@exclude_time) {
-			if ($prefix_vars{'t_timestamp'} =~ /$_/) {
+		foreach (@exclude_time)
+		{
+			if ($prefix_vars{'t_timestamp'} =~ /$_/)
+			{
 				$found = 1;
 				last;
 			}
@@ -18359,28 +18378,34 @@ sub skip_unwanted_line
 		return 1 if ($found);
 	}
 
-	if ($#include_time >= 0) {
+	# Only reports lines that are at the specific times
+	if ($#include_time >= 0)
+	{
 		my $found = 0;
-		foreach (@include_time) {
-			if ($prefix_vars{'t_timestamp'} !~ /$_/) {
+		foreach (@include_time)
+		{
+			if ($prefix_vars{'t_timestamp'} !~ /$_/)
+			{
 				$found = 1;
 				last;
 			}
-    }
-    return 1 if ( $found );
-  }
+		}
+		return 1 if ( $found );
+	}
 
-  # check begin or end time without the date
-  # and extract the hour here, late, to get the timezone
-  # already applied
-  if ( $from_hour || $to_hour ){
-      return  1 if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
-      return -1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
-  }
+	# check begin or end time without the date
+	# and extract the hour here, late, to get the timezone
+	# already applied
+	if ( $from_hour || $to_hour )
+	{
+		return 1 if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
+		return 1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
+	}
 
-  # check against date/timestamp
- 	return  1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-  return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
+	# check against date/timestamp
+	return  1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+	return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
+
 	return 0;
 }
 

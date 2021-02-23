@@ -1,0 +1,24 @@
+2021-02-14 01:34:02 CET [30291]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-14 01:34:02 CET [30291]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-14 01:34:02 CET [30291]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.007 user=postgres database=template1 host=[local]
+2021-02-14 08:00:02 CET [28538]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-14 08:00:02 CET [28538]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-14 08:00:02 CET [28538]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.007 user=postgres database=template1 host=[local]
+2021-02-14 20:29:52 CET [3202]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-14 20:29:52 CET [3202]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-14 20:29:52 CET [3202]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.017 user=postgres database=template1 host=[local]
+2021-02-14 21:48:40 CET [22313]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-14 21:48:40 CET [22313]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-14 21:48:40 CET [22313]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.007 user=postgres database=template1 host=[local]
+2021-02-15 01:20:04 CET [1974]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-15 01:20:05 CET [1974]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-15 01:20:05 CET [1974]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.008 user=postgres database=template1 host=[local]
+2021-02-15 08:07:45 CET [12772]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-15 08:07:45 CET [12772]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-15 08:07:45 CET [12772]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.004 user=postgres database=template1 host=[local]
+2021-02-15 20:29:06 CET [23197]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-15 20:29:06 CET [23197]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-15 20:29:06 CET [23197]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.007 user=postgres database=template1 host=[local]
+2021-02-15 21:02:06 CET [13032]: db=[unknown],user=[unknown],app=[unknown],client=[local] LOG:  connection received: host=[local]
+2021-02-15 21:02:06 CET [13032]: db=template1,user=postgres,app=[unknown],client=[local] LOG:  connection authorized: user=postgres database=template1 application_name=psql
+2021-02-15 21:02:06 CET [13032]: db=template1,user=postgres,app=psql,client=[local] LOG:  disconnection: session time: 0:00:00.007 user=postgres database=template1 host=[local]
