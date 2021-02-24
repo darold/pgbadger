@@ -18174,8 +18174,8 @@ sub get_day_of_week
 		$weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
 	} else {
 		# Start on monday = 1
-		$weekDay = POSIX::strftime("%u", 1,1,1,$day,--$month,$year-1900);
-		$weekDay--;
+		$weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
+		$weekDay = (($weekDay+7)-1) % 7;
 	}
 
 	return $weekDay;
