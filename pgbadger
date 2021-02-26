@@ -17907,6 +17907,8 @@ sub get_log_file
 
 	my $lfile = undef;
 
+	$LOG_EOL_TYPE = 'LF';
+
 	return $lfile if ($totalsize == 0);
 
 	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
@@ -17968,7 +17970,7 @@ sub get_log_file
 		{
 			if ($logf ne '-')
 			{
-				$LOG_EOL_TYPE = &get_oel_type($logf);
+				$LOG_EOL_TYPE = &get_eol_type($logf);
 				open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
 			}
 			else
@@ -18580,7 +18582,7 @@ sub get_eol_length
 # Return the type of EOL of a file: Mac (CR), Windows (CRLF), Linux (LF)
 # Assume LF by default
 ####
-sub get_oel_type
+sub get_eol_type
 {
 	my $file = shift;
 	if (open(my $in, '<', $file))
