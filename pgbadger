@@ -76,6 +76,7 @@ my $PID_DIR = $TMP_DIR;
 my $PID_FILE = undef;
 my %DBLIST = ();
 my $DBALL = 'postgres';
+my $LOG_EOL_TYPE = 'LF';
 
 # Factor used to estimate the total size of compressed file
 # when real size can not be obtained (bz2 or remote files)
@@ -3400,8 +3401,8 @@ sub process_file
 			last if ($terminate);
 
 			# Get current size/offset in the log file
-			$cursize += length($line);
-			$current_offset += length($line);
+			$cursize += length($line) + (&get_eol_length() - 1);
+			$current_offset += length($line) + (&get_eol_length() - 1);
 
 			# Replace CR/LF by LF
 			$line =~ s/\r//;
@@ -3566,11 +3567,9 @@ sub process_file
 			$pgb_last_line{current_pos} = $current_offset;
 		}
 	}
-
 	# Parse PostgreSQL log file with CSV format
 	elsif ($fmt eq 'csv')
 	{
-
 		if ($queue_size > 1 || $job_per_file > 1) {
 			&logmsg('WARNING', "parallel processing is disabled with csv format.");
 		}
@@ -3607,8 +3606,8 @@ sub process_file
 				next if ( ($row->[11] !~ $parse_regex)  || ($row->[11] eq 'LOCATION'));
 
 				# Extract the date
-				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/) {
-
+				if ($row->[0] =~ m/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/)
+				{
 					$prefix_vars{'t_year'} = $1;
 					$prefix_vars{'t_month'} = $2;
 					$prefix_vars{'t_day'} = $3;
@@ -3705,7 +3704,6 @@ sub process_file
 	# Format is not CSV and in incremental mode we are not at end of the file
 	else
 	{
-
 		my $cur_pid = '';
 		my @matches = ();
 		my $goon = ($incremental) ? 1 : 0;
@@ -3729,15 +3727,15 @@ sub process_file
 			last if ($terminate);
 
 			# Get current size/offset in the log file
-			$cursize += length($line);
-			$current_offset += length($line);
+			$cursize += length($line) + (&get_eol_length() - 1);
+			$current_offset += length($line) + (&get_eol_length() - 1);
 
 			# Replace CR/LF by LF
 			$line =~ s/\r//;
 
 			# Start to exclude from parsing any desired lines
-			if ($has_exclusion >= 0) {
-
+			if ($has_exclusion >= 0)
+			{
 				# Log line matches the excluded regex
 				map { next if ($line =~ /$_/is); } @exclude_line;
 			}
@@ -4087,7 +4085,8 @@ sub process_file
 	close $lfile;
 
 	# Inform the parent that it should stop parsing other files
-	if ($terminate) {
+	if ($terminate)
+	{
 		if ($^O !~ /MSWin32|dos/i) {
 			kill('USR2', $parent_pid);
 		} else {
@@ -4097,7 +4096,8 @@ sub process_file
 	}
 
 	# Get stats from all pending temporary storage
-	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
+	foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info)
+	{
 		# Stores last query information
 		&store_queries($pid, 1);
 	}
@@ -17918,54 +17918,72 @@ sub get_log_file
 	chomp($logf);
 
 	# Open and return a file handle to parse the log
-	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) ) {
+	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) )
+	{
 		# For journalctl command we need to use a pipe as file handle
 		if (!$remote_host) {
 			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of command: $logf. $!\n");
-		} else {
-			if (!$sample_only) {
+		}
+		else
+		{
+			if (!$sample_only)
+			{
 				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"$logf\" |");
 				# Open a pipe to remote journalctl program
 				open($lfile, '-|', "$remote_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$logf\". $!\n");
-			} else {
+			}
+			else
+			{
 				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"'$logf' -n 100\" |");
 				# Open a pipe to remote journalctl program
 				open($lfile, '-|', "$remote_command \"'$logf' -n 100\"") || localdie("FATAL: cannot read from pipe to $remote_command \"'$logf' -n 100\". $!\n");
 			}
 		}
 	}
-
 	elsif ( $log_command && ($logf =~ m/\Q$log_command\E/) )
 	{
 		# For custom command we need to use a pipe as file handle
 		if (!$remote_host) {
 			open($lfile, '-|', $logf) || localdie("FATAL: cannot read output of command: $logf. $!\n");
-		} else {
-			if (!$sample_only) {
+		}
+		else
+		{
+			if (!$sample_only)
+			{
 				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"$logf\" |");
 				# Open a pipe to remote custom program
 				open($lfile, '-|', "$remote_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$logf\". $!\n");
-			} else {
+			}
+			else
+			{
 				&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"'$logf' -n 100\" |");
 				# Open a pipe to remote custom program
 				open($lfile, '-|', "$remote_command \"'$logf' -n 100\"") || localdie("FATAL: cannot read from pipe to $remote_command \"'$logf' -n 100\". $!\n");
 			}
 		}
 	}
-
 	elsif (!$iscompressed)
 	{
-
-		if (!$remote_host && !$http_download && !$ssh_download) {
-			if ($logf ne '-') {
+		if (!$remote_host && !$http_download && !$ssh_download)
+		{
+			if ($logf ne '-')
+			{
+				$LOG_EOL_TYPE = &get_oel_type($logf);
 				open($lfile, '<', $logf) || localdie("FATAL: cannot read log file $logf. $!\n");
-			} else {
+			}
+			else
+			{
 				 $lfile = *STDIN;
 			}
-		} else {
-			if (!$sample_only) {
-				if (!$http_download) {
-					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+		}
+		else
+		{
+			if (!$sample_only)
+			{
+				if (!$http_download)
+				{
+					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i)
+					{
 						my $host_info = $1;
 						my $file = $2;
 						if ($host_info =~ s/:(\d+)$//) {
@@ -17975,20 +17993,25 @@ sub get_log_file
 						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat '$file'\" |");
 						# Open a pipe to cat program
 						open($lfile, '-|', "$ssh $host_info \"cat '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat '$file'\". $!\n");
-					} else {
+					}
+					else
+					{
 						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \" cat '$logf'\" |");
 						# Open a pipe to cat program
 						open($lfile, '-|', "$remote_command \"cat '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"cat '$logf'\". $!\n");
 					}
-				} else {
+				}
+				else
+				{
 					&logmsg('DEBUG', "Retrieving log entries using command: $curl_command --data-binary \"$logf\" |");
 					# Open a pipe to GET program
 					open($lfile, '-|', "$curl_command \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary \"$logf\". $!\n");
 				}
-
-			} elsif (!$http_download) {
-
-				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+			}
+			elsif (!$http_download)
+			{
+				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i)
+				{
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
@@ -17998,26 +18021,29 @@ sub get_log_file
 					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 '$file'\" |");
 					# Open a pipe to cat program
 					open($lfile, '-|', "$ssh $host_info \"tail -n 100 '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
-				} else {
+				}
+				else
+				{
 					&logmsg('DEBUG', "Retrieving log sample using command: $remote_command \"tail -n 100 '$logf'\" |");
 					# Open a pipe to cat program
 					open($lfile, '-|', "$remote_command \"tail -n 100 '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
 				}
-
-			} else {
-
+			}
+			else
+			{
 				&logmsg('DEBUG', "Retrieving log sample using command: $curl_command --data-binary --max-filesize 102400 \"$logf\" |");
 				# Open a pipe to GET program
 				open($lfile, '-|', "$curl_command --data-binary --max-filesize 102400 \"$logf\"") || localdie("FATAL: cannot read from pipe to $curl_command --data-binary --max-filesize 102400 \"$logf\". $!\n");
 
 			}
 		}
-
-	} else {
-
+	}
+	else
+	{
 		my $uncompress = $zcat;
 		my $sample_cmd = 'zgrep';
-		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/)) {
+		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/))
+		{
 			$uncompress = $bzcat;
 			$sample_cmd = 'bzgrep';
 		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
@@ -18027,21 +18053,26 @@ sub get_log_file
 		} elsif (($logf =~ /\.zst/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $zstdcat;
 		}
-		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
+		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/))
+		{
 			$uncompress = $xzcat;
 			$sample_cmd = 'xzgrep';
 		}
 
-		if (!$remote_host && !$http_download && !$ssh_download) {
-
+		if (!$remote_host && !$http_download && !$ssh_download)
+		{
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
 			# Open a pipe to zcat program for compressed log
 			open($lfile, '-|', "$uncompress \"$logf\"") || localdie("FATAL: cannot read from pipe to $uncompress \"$logf\". $!\n");
-
-		} else {
-			if (!$sample_only) {
-				if (!$http_download) {
-					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+		}
+		else
+		{
+			if (!$sample_only)
+			{
+				if (!$http_download)
+				{
+					if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i)
+					{
 						my $host_info = $1;
 						my $file = $2;
 						my $ssh = $ssh_command || 'ssh';
@@ -18051,20 +18082,25 @@ sub get_log_file
 						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 						# Open a pipe to zcat program for compressed log
 						open($lfile, '-|', "$ssh $host_info \"$uncompress '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
-					} else {
+					}
+					else
+					{
 						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress '$logf'\"");
 						# Open a pipe to zcat program for compressed log
 						open($lfile, '-|', "$remote_command \"$uncompress '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
 					}
-				} else {
+				}
+				else
+				{
 					&logmsg('DEBUG', "Retrieving log entries using command: $curl_command \"$logf\" | $uncompress |");
 					# Open a pipe to GET program
 					open($lfile, '-|', "$curl_command \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command \"$logf\". $!\n");
 				}
-
-			} elsif (!$http_download) {
-
-				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i) {
+			}
+			elsif (!$http_download)
+			{
+				if ($ssh_download && $logf =~ m#^ssh://([^\/]+)/(.*)#i)
+				{
 					my $host_info = $1;
 					my $file = $2;
 					my $ssh = $ssh_command || 'ssh';
@@ -18074,12 +18110,16 @@ sub get_log_file
 					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 					# Open a pipe to zcat program for compressed log
 					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' '$file'\". $!\n");
-				} else {
+				}
+				else
+				{
 					&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress '$logf'\"");
 					# Open a pipe to zcat program for compressed log
 					open($lfile, '-|', "$remote_command \"$sample_cmd -m 100 '[1234567890]' '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$sample_cmd -m 100 '' '$logf'\". $!\n");
 				}
-			} else {
+			}
+			else
+			{
 				# Open a pipe to GET program
 				open($lfile, '-|', "$curl_command --max-filesize 102400 \"$logf\" | $uncompress") || localdie("FATAL: cannot read from pipe to $curl_command --max-filesize 102400 \"$logf\" | $uncompress . $!\n");
 			}
@@ -18528,6 +18568,52 @@ sub maxlen_truncate
 		$_[0] =~ s/((?:[,\(=\~]|LIKE)\s*'[^']*)$/$1'/is if ($anonymize);
 		$_[0] .= '[...]';
 	}
+}
+
+# return 1 or 2 following the EOL type (CR, LF or CRLF)
+sub get_eol_length
+{
+	return length($LOG_EOL_TYPE)/2;
+}
+
+####
+# Return the type of EOL of a file: Mac (CR), Windows (CRLF), Linux (LF)
+# Assume LF by default
+####
+sub get_oel_type
+{
+	my $file = shift;
+	if (open(my $in, '<', $file))
+	{
+		binmode($in);  ## (added as an update)
+		my ( $cr, $lf, $crlf ) = ( 0 ) x 3;
+		my $c = '';
+		while ( read($in, $c, 65536, 1) )
+		{
+			$lf += $c=~ tr/\x0A/\x0A/;
+			$cr += $c =~ tr/\x0D/\x0D/;
+			$crlf += $c =~ s/\x0D\x0A/xx/g ;
+			$c = chop;
+			$cr-- if ( $c eq "\x0D" );  # a final CR or LF will get counted
+			$lf-- if ( $c eq "\x0A" );  #   again on the next iteration
+		}
+		close($in);
+		$cr++ if ( $c eq "\x0D" );
+		$lf++ if ( $c eq "\x0A" );
+
+		if ($lf && !$cr) {
+			return 'LF';
+		} elsif ($cr && !$lf) {
+			return 'CR';
+		} elsif ($crlf) {
+			return 'CRLF';
+		}
+	}
+	else
+	{
+		print "WARNING: can't read file $file, $!\n";
+	}
+	return 'LF';
 }
 
 # Inclusion of Perl package pgFormatter::Beautify.
