@@ -16453,6 +16453,7 @@ sub store_queries
 		}
 		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
 		print $fh "# Query #", $query_numbering++, "\n" if ($query_numbering);
+		$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 		print $fh "$cur_info{$t_pid}{query}\n";
 		$overall_stat{'queries_number'}++;
 		return 1;
