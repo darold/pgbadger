@@ -406,7 +406,7 @@ my $num_sep = ',';
 $num_sep = ' ' if ($n =~ /,/);
 
 # Set iso datetime pattern
-my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+my $time_pattern = qr/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/;
 
 # Inform the parent that it should stop iterate on parsing other files
 sub stop_parsing
