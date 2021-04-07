@@ -4830,7 +4830,7 @@ sub normalize_query
 	$orig_query =~ s/\?(\?)+/\?/gs;
 
 	# Remove NULL parameters
-	$orig_query =~ s/=\s*NULL/= \?/gs;
+	$orig_query =~ s/=\s*null/= \?/gs;
 
 	# Remove numbers
 	$orig_query =~ s/([^a-z0-9_\$\-])-?\d+/$1\?/gs;
@@ -4851,6 +4851,15 @@ sub normalize_query
 	$orig_query =~ s/\bdeclare\s+[^"\s]+\s+cursor/declare "..." cursor/gs;
 	$orig_query =~ s/\b(fetch\s+next\s+from)\s+[^\s]+/$1 "..."/gs;
 	$orig_query =~ s/\b(deallocate|close)\s+[^"\s]+/$1 "..."/gs;
+
+	# Remove any leading whitespace
+	$orig_query =~ s/^\s+//;
+
+	# Remove any trailing whitespace
+	$orig_query =~ s/\s+$//;
+
+	# Remove any whitespace before a semicolon
+	$orig_query =~ s/\s+;/;/;
 
 	return $orig_query;
 }
