@@ -4409,9 +4409,13 @@ sub parse_orphan_line
 		}
 	}
 	# stores bind parameters if parameter syntax is detected
-	elsif ( $cur_info{$cur_pid}{parameters} && (($line =~ /[,\s]*\$(\d+)\s=\s/) || ($line =~ /^'[^']*'$/)) )
+	elsif ( $cur_info{$cur_pid}{parameters})
 	{
-		$cur_info{$cur_pid}{parameters} .= " $line" if (!$error_only);
+		if (!$error_only)
+		{
+			$cur_info{$cur_pid}{parameters} .= ' '  if ($cur_info{$cur_pid}{parameters} =~ /=$/);
+			$cur_info{$cur_pid}{parameters} .= "$line";
+		}
 	}
 	# stores explain plan lines
 	elsif (exists $cur_plan_info{$cur_pid}{plan})
@@ -4439,6 +4443,9 @@ sub parse_orphan_line
 		# Append to the error statement if one is defined
 		if (exists $cur_info{$cur_pid}{statement}) {
 			$cur_info{$cur_pid}{statement} .= "\n" . $line if (!$nomultiline);
+		# Append to the bind parameters if one is defined
+		} elsif (exists $cur_info{$cur_pid}{parameters}) {
+			$cur_info{$cur_pid}{parameters} .= $line if (!$error_only);
 		# Append to the error context if one is defined
 		} elsif (exists $cur_info{$cur_pid}{context}) {
 			$cur_info{$cur_pid}{context} .= "\n" . $line;
