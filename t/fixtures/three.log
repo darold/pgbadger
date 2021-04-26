@@ -1,0 +1,7 @@
+2021-04-26 11:48:51.669 UTC [230216]: user=bar,db=bardb,app=[unknown],client=172.26.0.2 LOG:  duration: 86.305 ms  statement: SELECT relnamespace::regnamespace as schemaname,
+	       relname as relname,
+	       pg_total_relation_size(oid) bytes
+	  FROM pg_class
+	 WHERE relkind = 'r';
+2021-04-26 11:49:56.303 UTC [120936]: user=foo,db=bardb,app=[unknown],client=10.10.1.21 LOG:  duration: 184.291 ms  bind <unnamed>: SELECT a, b As C FROM public._tab WHERE d = $1 AND a <= $2 AND e IS NULL ORDER BY a DESC LIMIT 1
+2021-04-26 11:49:56.303 UTC [120936]: user=foo,db=bardb,app=[unknown],client=10.10.1.21 DETAIL:  parameters: $1 = '63487', $2 = '2021-04-26 11:30:00'
