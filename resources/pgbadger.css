@@ -184,7 +184,7 @@ footer {
 	height: 400px;
 }
 
-@media (min-width:969px) {
+@media (min-width:750px) {
 	#show-hide-menu {
 		position: absolute;
 		left: -9999px;
@@ -195,7 +195,7 @@ footer {
 	}
 }
 
-@media (max-width:968px) {
+@media (max-width:749px) {
 	#show-hide-menu {
 		position: inherit;
 	}
