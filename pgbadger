@@ -1857,6 +1857,7 @@ if ($dump_all_queries)
 # Read the list of database we have proceeded in all child process
 if ($report_per_database)
 {
+	%DBLIST = ();
 	if (open(my $out, '<', "$tmp_dblist"))
 	{
 		my @data = <$out>;
@@ -1864,7 +1865,9 @@ if ($report_per_database)
 		{
 			chomp($tmp);
 			my %dblist = split(/;/, $tmp);
-			foreach my $d (keys %dblist) {
+			foreach my $d (keys %dblist)
+			{
+				next if ($#dbname >= 0 and !grep(/^$d$/i, @dbname));
 				$DBLIST{$d} = 1;
 				$overall_stat{nlines}{$d} += $dblist{$d};
 			}
@@ -1882,8 +1885,7 @@ if ( !$incremental && ($#given_log_files >= 0) )
 {
 	foreach my $db (sort keys %DBLIST)
 	{
-		next if (!$db);
-
+		next if (!$db || ($#dbname >= 0 && !grep(/^$db$/i, @dbname)));
 		# Some message have been temporary stored as ERROR but
 		# they are LOG, restore them to the right log level.
 		&restore_log_type_count($db);
@@ -2751,16 +2753,20 @@ sub build_incremental_reports
 		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
+			next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
 			# set path and create subdirectories
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
-			if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#) {
+			if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#)
+			{
 				mkdir("$tmp_dir/$1") if (!-d "$tmp_dir/$1");
 				mkdir("$tmp_dir/$1/$2") if (!-d "$tmp_dir/$1/$2");
 				mkdir("$tmp_dir/$1/$2/$3") if (!-d "$tmp_dir/$1/$2/$3");
-			} else {
+			}
+			else
+			{
 				&logmsg('ERROR', "invalid path: $bpath, can not create subdirectories.");
 			}
 
@@ -2794,13 +2800,15 @@ sub build_incremental_reports
 
 			$destdir = $binpath || $outdir;
 			# Load all data gathered by all the differents processes
-			if (-e "$destdir/$bpath") {
+			if (-e "$destdir/$bpath")
+			{
 				unless(opendir(DIR, "$destdir/$bpath")) {
 					localdie("FATAL: can't opendir $destdir/$bpath: $!\n");
 				}
 				my @mfiles = grep { !/^\./ && ($_ =~ /\.bin$/) } readdir(DIR);
 				closedir DIR;
-				foreach my $f (@mfiles) {
+				foreach my $f (@mfiles)
+				{
 					my $fht = new IO::File;
 					$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
 					&load_stats($fht);
@@ -2815,12 +2823,14 @@ sub build_incremental_reports
 		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
+			next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML weekly report into $tmp_dir/$wdir/...");
 			mkdir("$tmp_dir") if (!-d "$tmp_dir");
 			my $path = $tmp_dir;
-			foreach my $d (split('/', $wdir)) {
+			foreach my $d (split('/', $wdir))
+			{
 				mkdir("$path/$d") if (!-d "$path/$d");
 				$path .= "/$d";
 			}
@@ -2914,6 +2924,7 @@ sub build_global_index
 
 	foreach my $db (@dbs)
 	{
+		next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 		my $tmp_dir = "$dest_dir/$db";
 		$tmp_dir = $dest_dir if (!$report_per_database);
 		&logmsg('DEBUG', "writing global index into $tmp_dir/index.html");
@@ -2994,7 +3005,8 @@ sub build_global_index
 			my @ymonths = grep { /^\d{2}$/ } readdir(DIR);
 			closedir DIR;
 			my $i = 1;
-			foreach my $m (sort {$a <=> $b } @ymonths) {
+			foreach my $m (sort {$a <=> $b } @ymonths)
+			{
 				print $fh "<td><span>", &get_calendar($db, $y, $m), "</span></td>\n";
 				print $fh "</tr>\n<tr>\n" if ( ($i%4) == 0 );
 				$i++;
@@ -18554,9 +18566,9 @@ sub set_output_extension
 	$of ||= 'out.' . $ext;
 
 	# Append the current database name to the output file.
-	$of = $db . '_' . $of if ($report_per_database && $db ne $DBALL && $of ne '-');
+	$of = $db . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
 
-	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild);
+	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild && !$report_per_database);
 
 	return ($of, $ext);
 }
