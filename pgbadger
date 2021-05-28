@@ -1885,7 +1885,8 @@ if ( !$incremental && ($#given_log_files >= 0) )
 {
 	foreach my $db (sort keys %DBLIST)
 	{
-		next if (!$db || ($#dbname >= 0 && !grep(/^$db$/i, @dbname)));
+		next if (!$db);
+
 		# Some message have been temporary stored as ERROR but
 		# they are LOG, restore them to the right log level.
 		&restore_log_type_count($db);
