@@ -4379,6 +4379,8 @@ sub parse_orphan_line
 	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db}) {
 		$curdb = set_current_db($t_dbname);
 	} else {
+		return if ($#dbname >= 0 && $cur_info{$cur_pid}{cur_db}
+			&& !grep(/^$cur_info{$cur_pid}{cur_db}$/, @dbname));
 		$curdb = $cur_info{$cur_pid}{cur_db};
 	}
 	if (!$report_per_database) {
