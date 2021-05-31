@@ -4028,7 +4028,8 @@ sub process_file
 					# Skip unwanted lines
 					my $res = &skip_unwanted_line();
 					next if ($res == 1);
-					if ($res == -1) {
+					if ($res == -1)
+					{
 						&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count, $fmt);
 						$getout = 2;
 						last;
@@ -18484,12 +18485,14 @@ sub skip_unwanted_line
 	if ( $from_hour || $to_hour )
 	{
 		return 1 if ( $from_hour && ( $from_hour gt $prefix_vars{'t_time'} ) );
-		return 1 if ( $to_hour   && ( $to_hour   lt $prefix_vars{'t_time'} ) );
+		return 1 if ( $to_hour   && ( $to_hour lt $prefix_vars{'t_time'} ) );
 	}
-
-	# check against date/timestamp
-	return  1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
-	return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
+	else
+	{
+		# check against date/timestamp
+		return  1 if ($from && ($from gt $prefix_vars{'t_timestamp'}));
+		return -1 if ($to   && ($to   lt $prefix_vars{'t_timestamp'}));
+	}
 
 	return 0;
 }
