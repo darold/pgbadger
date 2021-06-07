@@ -18503,7 +18503,7 @@ sub change_timezone
 
 	my $t = timegm_nocheck($s, $mi, $h, $d, $mo-1, $y-1900);
 	$t += $log_timezone;
-	($s, $mi, $h, $d, $mo, $y) = localtime($t);
+	($s, $mi, $h, $d, $mo, $y) = gmtime($t);
 
 	return ($y+1900, sprintf("%02d", ++$mo), sprintf("%02d", $d), sprintf("%02d", $h), sprintf("%02d", $mi), sprintf("%02d", $s));
 }

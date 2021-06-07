@@ -1,0 +1,2 @@
+2021-05-27 17:00:00 UTC:10.1.91.65:user@my_db:[24743]:LOG: duration: 0.054 ms statement: SELECT * FROM t1;
+2021-05-27 17:46:39 UTC:10.1.17.194:user@my_db:[19003]:LOG: duration: 0.060 ms statement: UPDATE t1 SET c1=1;

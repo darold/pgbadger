@@ -1,4 +1,4 @@
-use Test::Simple tests => 19;
+use Test::Simple tests => 20;
 use JSON::XS;
 
 my $json = new JSON::XS;
@@ -82,3 +82,7 @@ ok( $? == 0 && $ret eq 'Total number of sessions: 2', "Generate report from incl
 $ret = `perl pgbadger -q -p "%t [%p]: db=%d,user=%u,app=%a,client=%h " -o - $TIMELOG --exclude-time "2021-02-14 2[01]:.*" | grep '^Total number of sessions:'`;
 chomp($ret);
 ok( $? == 0 && $ret eq 'Total number of sessions: 6', "Generate report from exclude time");
+
+$ret = `perl pgbadger -q --log-timezone +5 -p "%t:%h:%u@%d:[%p]:" -o - t/fixtures/pg-timezones.log`;
+chomp($ret);
+ok( $? == 0 && $ret =~ m{Log start from 2021-05-27 12:00:00 to 2021-05-27 12:46:39} , "Correct first and last query timestamps on timezone adjusted log");
