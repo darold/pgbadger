@@ -191,6 +191,9 @@ Options:
     --dump-all-queries     : dump all queries found in the log file replacing
                              bind parameters are included in the queries at
 			     their respective placeholders position.
+    --keep-comments        : do not remove comments from normalized queries. It
+                             can be useful if you want to distinguish between
+			     same normalized queries.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -318,6 +321,7 @@ To create a cumulative report over a month use command:
 this will add a link to the month name into the calendar view in
 incremental reports to look at report for month 2019 May.
 Use -E or --explode if the reports were built using this option.
+
 
 =head1 DESCRIPTION
 

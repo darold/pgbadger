@@ -364,6 +364,7 @@ my $log_command             = '';
 my $wide_char               = 0;
 my $noweekreport            = 0;
 my $query_numbering         = 0;
+my $keep_comments           = 0;
 
 my $NUMPROGRESS = 10;
 my @DIMENSIONS  = (800, 300);
@@ -555,7 +556,8 @@ my $result = GetOptions(
 	'explain-url=s'            => \$EXPLAIN_URL,
 	'tempdir=s'                => \$TMP_DIR,
 	'no-process-info!'         => \$disable_process_title,
-	'dump-all-queries!'        => \$dump_all_queries
+	'dump-all-queries!'        => \$dump_all_queries,
+	'keep-comments!'           => \$keep_comments
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -2190,6 +2192,9 @@ Options:
     --dump-all-queries     : dump all queries found in the log file replacing
                              bind parameters are included in the queries at
 			     their respective placeholders position.
+    --keep-comments        : do not remove comments from normalized queries. It
+                             can be useful if you want to distinguish between
+			     same normalized queries.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -4823,7 +4828,9 @@ sub normalize_query
 	return if (!$orig_query);
 
 	# Remove comments
-	$orig_query =~ s/\/\*(.*?)\*\///gs;
+	if (!$keep_comments) {
+		$orig_query =~ s/\/\*(.*?)\*\///gs;
+	}
 
 	# Keep case on object name between doublequote
 	my %objnames = ();
@@ -4973,7 +4980,9 @@ sub anonymize_query
 	my $anonymization_cache = {};
 
 	# Remove comments
-	$orig_query =~ s/\/\*(.*?)\*\///gs;
+	if (!$keep_comments) {
+		$orig_query =~ s/\/\*(.*?)\*\///gs;
+	}
 
 	# Clean query
 	$orig_query =~ s/\\'//g;
@@ -11637,7 +11646,7 @@ sub print_time_consuming
 
 	print $fh qq{
 		<div class="analysis-item row" id="time-consuming-queries">
-			<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Time consuming queries</h2>
+			<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Time consuming queries (N)</h2>
                         <div class="col-md-12">
                                 <table class="table table-striped" id="time-consuming-queries-table">
                                 <thead>
