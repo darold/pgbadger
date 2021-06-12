@@ -208,6 +208,9 @@ Options:
     --dump-all-queries     : dump all queries found in the log file replacing
                              bind parameters are included in the queries at
                              their respective placeholders position.
+    --keep-comments        : do not remove comments from normalized queries. It
+                             can be useful if you want to distinguish between
+                             same normalized queries.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -338,9 +341,9 @@ Use -E or --explode if the reports were built using this option.
 
 ### DESCRIPTION
 
-pgBadger is a PostgreSQL log analyzer built for speed with fully reports
-from your PostgreSQL log file. It's a single and small Perl script that
-outperforms any other PostgreSQL log analyzer.
+pgBadger is a PostgreSQL log analyzer built for speed providing fully
+detailed reports based on your PostgreSQL log files. It's a small standalone
+Perl script that outperforms any other PostgreSQL log analyzer.
 
 It is written in pure Perl and uses a JavaScript library (flotr2) to draw
 graphs so that you don't need to install any additional Perl modules or
@@ -609,7 +612,7 @@ pgBadger will then proceed as follow:
                 each process will terminate when the parser reach the end offset
                 of its chunk
                 each process write stats into a binary temporary file
-           wait for all children has terminated
+            wait for all children processes to terminate
         All binary temporary files generated will then be read and loaded into
         memory to build the html output.
 
@@ -625,14 +628,14 @@ option -J N instead. With 200 log files of 10MB each the use of the -J option
 starts being really interesting with 8 Cores. Using this method you will be
 sure not to lose any queries in the reports.
 
-He are a benchmark done on a server with 8 CPUs and a single file of 9.5GB.
+Here is a benchmark done on a server with 8 CPUs and a single file of 9.5GB.
 
          Option |  1 CPU  | 2 CPU | 4 CPU | 8 CPU
         --------+---------+-------+-------+------
            -j   | 1h41m18 | 50m25 | 25m39 | 15m58
            -J   | 1h41m18 | 54m28 | 41m16 | 34m45
 
-With 200 log files of 10MB each and a total of 2GB the results are slightly
+With 200 log files of 10MB each, so 2GB in total, the results are slightly
 different:
 
          Option | 1 CPU | 2 CPU | 4 CPU | 8 CPU
@@ -692,7 +695,7 @@ if the reports were built using this option.
 
 #### Monthly reports
 
-By default pgBadger in incremental mode only compute daily and weekly reports.
+By default pgBadger in incremental mode only computes daily and weekly reports.
 If you want monthly cumulative reports you will have to use a separate command
 to specify the report to build. For example to build a report for August 2019:
 
