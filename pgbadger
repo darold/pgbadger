@@ -51,6 +51,7 @@ use FileHandle;
 use Socket;
 use constant EBCDIC => "\t" ne "\011";
 use Encode qw(encode decode);
+use open ':locale';
 
 $VERSION = '11.5';
 
