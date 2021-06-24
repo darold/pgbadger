@@ -16528,7 +16528,7 @@ sub store_queries
 		my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
 		shift(@t_res);
 		for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-			$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/s;
+			$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/gs;
 		}
 	}
 	else
@@ -16538,7 +16538,7 @@ sub store_queries
 		for (my $i = 0 ; $i <= $#t_res ; $i++)
 		{
 			my $num = $i + 1;
-			$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
+			$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/gs;
 		}
 	}
 
