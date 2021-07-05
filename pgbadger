@@ -349,6 +349,7 @@ my $opt_timezone            = 0;
 my $pgbouncer_only          = 0;
 my $rebuild                 = 0;
 my $week_start_monday       = 0;
+my $iso_week_number         = 0;
 my $use_sessionid_as_pid    = 0;
 my $dump_normalized_only    = 0;
 my $log_timezone            = 0;
@@ -546,6 +547,7 @@ my $result = GetOptions(
 	'rebuild!'		   => \$rebuild,
 	'pgbouncer-only!'	   => \$pgbouncer_only,
 	'start-monday!'	           => \$week_start_monday,
+	'iso-week-number!'	   => \$iso_week_number,
 	'normalized-only!'	   => \$dump_normalized_only,
 	'log-timezone=i'	   => \$opt_log_timezone,
 	'prettify-json!'	   => \$json_prettify,
@@ -1412,20 +1414,32 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 				my @rmdays = ();
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
 				closedir DIR;
-				foreach my $d (sort { $a <=> $b } @ddays) {
+				foreach my $d (sort { $a <=> $b } @ddays)
+				{
 					my $weekNumber = '';
-					if (!$week_start_monday) {
-						$weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-					} else {
-						$weekNumber = sprintf("%02d", POSIX::strftime("%W", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					if (!$iso_week_number)
+					{
+						if (!$week_start_monday) {
+							$weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+						} else {
+							$weekNumber = sprintf("%02d", POSIX::strftime("%W", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+						}
 					}
-					if ($#obsolete_weeks >= 0) {
-						if (grep(/^$y$weekNumber$/, @obsolete_weeks)) {
+					else
+					{
+						$weekNumber = sprintf("%02d", POSIX::strftime("%V", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
+					}
+					if ($#obsolete_weeks >= 0)
+					{
+						if (grep(/^$y$weekNumber$/, @obsolete_weeks))
+						{
 							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
 							&cleanup_directory("$outdir/$y/$m/$d", 1);
 							push(@rmdays, $d);
 						}
-					} else {
+					}
+					else
+					{
 						# Remove obsolete days when we are in binary mode
 						# with noreport - there's no week-N directory
 						my $diff_day = $retention * 7 * 86400;
@@ -2167,7 +2181,11 @@ Options:
                              output directories where there's binary data files.
     --pgbouncer-only       : only show PgBouncer related menu in the header.
     --start-monday	   : in incremental mode, calendar's weeks start on
-			     sunday. Use this option to start on monday.
+			     a sunday. Use this option to start on a monday.
+    --iso-week-number      : in incremental mode, calendar's weeks start on a
+			     monday and respect the ISO 8601 week number, range
+			     01 to 53, where week 1 is the first week that has
+			     at least 4 days in the new year.
     --normalized-only      : only dump all normalized query to out.txt
     --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
 			     that must be used to adjust date/time read from
@@ -18239,13 +18257,20 @@ sub get_week_number
 		return -1;
 	}
 	my $weekNumber = '';
-	if (!$week_start_monday) {
-		$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $month - 1, $year - 1900);
-	} else {
-		$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $month - 1, $year - 1900);
+	if (!$iso_week_number)
+	{
+		if (!$week_start_monday) {
+			$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $month - 1, $year - 1900);
+		} else {
+			$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $month - 1, $year - 1900);
+		}
+	}
+	else
+	{
+		$weekNumber = POSIX::strftime("%V", 1, 1, 1, $day, $month - 1, $year - 1900);
 	}
 
-	return sprintf("%02d", $weekNumber+1);
+	return sprintf("%02d", (!$iso_week_number) ? $weekNumber+1 : $weekNumber);
 }
 
 # Returns day number of the week of a given days
@@ -18256,7 +18281,7 @@ sub get_day_of_week
 #       %w     The day of the week as a decimal, range 0 to 6, Sunday being 0.
 
 	my $weekDay = '';
-	if (!$week_start_monday) {
+	if (!$week_start_monday && !$iso_week_number) {
 		# Start on sunday = 0
 		$weekDay = POSIX::strftime("%w", 1,1,1,$day,--$month,$year-1900);
 	} else {
@@ -18290,25 +18315,46 @@ sub get_wdays_per_month
 		push(@months, $year . sprintf("%02d", $month + 1));
 	}
 
-	foreach my $d (@months) {
+	foreach my $d (@months)
+	{
 		$d =~ /^(\d{4})(\d{2})$/;
 		my $y = $1;
 		my $m = $2;
-		foreach my $day ("01" .. "31") {
+		foreach my $day ("01" .. "31")
+		{
 			# Check if the date is valid first
 			my $datefmt = POSIX::strftime("%Y-%m-%d", 1, 1, 1, $day, $m - 1, $y - 1900);
 			if ($datefmt ne "$y-$m-$day") {
 				next;
 			}
 			my $weekNumber = '';
-			if (!$week_start_monday) {
-				$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $m - 1, $y - 1900);
-			} else {
-				$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
+			if (!$iso_week_number)
+			{
+				if (!$week_start_monday) {
+					$weekNumber = POSIX::strftime("%U", 1, 1, 1, $day, $m - 1, $y - 1900);
+				} else {
+					$weekNumber = POSIX::strftime("%W", 1, 1, 1, $day, $m - 1, $y - 1900);
+				}
 			}
-			if ( ($weekNumber == $wn) || ( ($weekNumber eq '00') && (($wn == 1) || ($wn >= 52)) ) ) {
-				push(@retdays, "$year-$m-$day");
-				return @retdays if ($#retdays == 6);
+			else
+			{
+				$weekNumber = POSIX::strftime("%V", 1, 1, 1, $day, $m - 1, $y - 1900);
+			}
+			if (!$iso_week_number)
+			{
+				if ( ($weekNumber == $wn) || ( ($weekNumber eq '00') && (($wn == 1) || ($wn >= 52)) ) )
+				{
+					push(@retdays, "$year-$m-$day");
+					return @retdays if ($#retdays == 6);
+				}
+			}
+			else
+			{
+				if ( ($weekNumber == $wn) || ( ($weekNumber eq '01') && (($wn == 1) || ($wn >= 53)) ) )
+				{
+					push(@retdays, "$year-$m-$day");
+					return @retdays if ($#retdays == 6);
+				}
 			}
 			next if ($weekNumber > $wn);
 		}
@@ -18332,7 +18378,7 @@ sub get_calendar
 	my $str = "<table class=\"table table-striped table-hover table-condensed\">\n";
 	my @wday = qw(Su Mo Tu We Th Fr Sa);
 	my @std_day = qw(Su Mo Tu We Th Fr Sa);
-	if ($week_start_monday) {
+	if ($week_start_monday || $iso_week_number) {
 		@wday = qw(Mo Tu We Th Fr Sa Su);
 		@std_day = qw(Mo Tu We Th Fr Sa Su);
 	}

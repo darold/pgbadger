@@ -164,7 +164,11 @@ SYNOPSIS
                                  output directories where there's binary data files.
         --pgbouncer-only       : only show PgBouncer related menu in the header.
         --start-monday         : in incremental mode, calendar's weeks start on
-                                 sunday. Use this option to start on monday.
+                                 a sunday. Use this option to start on a monday.
+        --iso-week-number      : in incremental mode, calendar's weeks start on a
+                                 monday and respect the ISO 8601 week number, range
+                                 01 to 53, where week 1 is the first week that has
+                                 at least 4 days in the new year.
         --normalized-only      : only dump all normalized query to out.txt
         --log-timezone +/-XX   : Set the number of hours from GMT of the timezone
                                  that must be used to adjust date/time read from

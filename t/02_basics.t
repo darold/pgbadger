@@ -1,4 +1,4 @@
-use Test::Simple tests => 16;
+use Test::Simple tests => 17;
 
 my $LOG = 't/fixtures/light.postgres.log.bz2';
 my $SYSLOG = 't/fixtures/pg-syslog.1.bz2';
@@ -6,6 +6,7 @@ my $BIN = 't/fixtures/light.postgres.bin';
 my $ANON = 't/fixtures/anonymize.log';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
+my $WEEKDAYLOG = 't/fixtures/weeknumber.log';
 
 my $ret = `perl pgbadger --help`;
 ok( $? == 0, "Inline help");
@@ -89,6 +90,12 @@ else
 	ok( $? == 0 && ($ret eq '0'), "Anonymization #3");
 }
 
+my $incr_outdir = "/tmp/pgbadger_data_tmp";
+mkdir($incr_outdir);
+$ret = `perl pgbadger -q --iso-week-number -X -I -O $incr_outdir -f csv $WEEKDAYLOG && ls $incr_outdir/2021/ | grep -E '(week-27|week-53)' | wc -l`;
+chomp($ret);
+
+ok( $? == 0 && $ret eq '2');
 # Remove files generated during the tests
 `rm -f out.html`;
 `rm -r $JSON`;
@@ -98,5 +105,5 @@ else
 `rm t/ret.json`;
 `rm /tmp/report$$.txt`;
 `rm /tmp/stmt_type.out`;
-
+`rm -rf $incr_outdir`;
 
