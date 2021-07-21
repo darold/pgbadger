@@ -3319,6 +3319,9 @@ sub set_current_db
 {
 	my $dbn = shift;
 
+	# Don't collect stats on database if it is excluded
+	return $dbn if (grep(/^$dbn$/i, @exclude_db));
+
 	if (!$report_per_database || !$dbn || $dbn eq '[unknown]')
 	{
 		$overall_stat{nlines}{$DBALL}++;
