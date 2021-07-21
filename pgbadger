@@ -1899,80 +1899,44 @@ if ($report_per_database)
 
 if ( !$incremental && ($#given_log_files >= 0) )
 {
+	my $chld_running = 0;
 	foreach my $db (sort keys %DBLIST)
 	{
 		next if (!$db);
 
-		# Some message have been temporary stored as ERROR but
-		# they are LOG, restore them to the right log level.
-		&restore_log_type_count($db);
-
-		foreach $outfile (@outfiles)
+		if ($^O =~ /MSWin32|dos/i || $parallel_process <= 1) {
+			&gen_database_report($db);
+		}
+		else
 		{
-			($current_out_file, $extens) = &set_output_extension($outfile, $extension, $db);
-
-			$extens = $dft_extens if ($current_out_file eq '-' && $dft_extens);
-
-			if ($report_per_database)
+			while ($chld_running >= $parallel_process)
 			{
-				&logmsg('LOG', "Ok, generating $extens report for database $db...");
+				my $kid = waitpid(-1, WNOHANG);
+				if ($kid > 0)
+				{
+					$chld_running--;
+					delete $RUNNING_PIDS{$kid};
+				}
+				sleep(1);
 			}
-			else
+			spawn sub
 			{
-				&logmsg('LOG', "Ok, generating $extens report...");
-			}
+				&gen_database_report($db);
 
-			if ($extens ne 'tsung')
-			{
-				$fh = new IO::File ">$current_out_file";
-				if (not defined $fh)
-				{
-					localdie("FATAL: can't write to $current_out_file, $!\n");
-				}
-				if (($extens eq 'text') || ($extens eq 'txt'))
-				{
-					if ($error_only)
-					{
-						&dump_error_as_text($db);
-					}
-					else
-					{
-						&dump_as_text($db);
-					}
-				}
-				elsif ($extens eq 'json')
-				{
-					if ($error_only)
-					{
-						&dump_error_as_json($db);
-					}
-					else
-					{
-						&dump_as_json($db);
-					}
-				}
-				elsif ($extens eq 'binary')
-				{
-					&dump_as_binary($fh, $db);
-				}
-				else
-				{
-					&dump_as_html('.', $db);
-				}
-				$fh->close;
-			}
-			else
-			{
+			};
+			$chld_running++;
+		}
+	}
 
-				# Open filehandle
-				$fh = new IO::File ">>$current_out_file";
-				if (not defined $fh)
-				{
-					localdie("FATAL: can't write to $current_out_file, $!\n");
-				}
-				print $fh "</sessions>\n</tsung>\n";
-				$fh->close();
+	if ($^O !~ /MSWin32|dos/i && $parallel_process > 1)
+	{
+		while (scalar keys %RUNNING_PIDS > $progress)
+		{
+			my $kid = waitpid(-1, WNOHANG);
+			if ($kid > 0) {
+				delete $RUNNING_PIDS{$kid};
 			}
+			sleep(1);
 		}
 	}
 }
@@ -2346,6 +2310,83 @@ Use -E or --explode if the reports were built using this option.
 # to not break POD documentation at make time.
 
 	exit 0;
+}
+
+sub gen_database_report
+{
+	my $db = shift;
+
+	# Some message have been temporary stored as ERROR but
+	# they are LOG, restore them to the right log level.
+	&restore_log_type_count($db);
+
+	foreach $outfile (@outfiles)
+	{
+		($current_out_file, $extens) = &set_output_extension($outfile, $extension, $db);
+
+		$extens = $dft_extens if ($current_out_file eq '-' && $dft_extens);
+
+		if ($report_per_database)
+		{
+			&logmsg('LOG', "Ok, generating $extens report for database $db...");
+		}
+		else
+		{
+			&logmsg('LOG', "Ok, generating $extens report...");
+		}
+
+		if ($extens ne 'tsung')
+		{
+			$fh = new IO::File ">$current_out_file";
+			if (not defined $fh)
+			{
+				localdie("FATAL: can't write to $current_out_file, $!\n");
+			}
+			if (($extens eq 'text') || ($extens eq 'txt'))
+			{
+				if ($error_only)
+				{
+					&dump_error_as_text($db);
+				}
+				else
+				{
+					&dump_as_text($db);
+				}
+			}
+			elsif ($extens eq 'json')
+			{
+				if ($error_only)
+				{
+					&dump_error_as_json($db);
+				}
+				else
+				{
+					&dump_as_json($db);
+				}
+			}
+			elsif ($extens eq 'binary')
+			{
+				&dump_as_binary($fh, $db);
+			}
+			else
+			{
+				&dump_as_html('.', $db);
+			}
+			$fh->close;
+		}
+		else
+		{
+
+			# Open filehandle
+			$fh = new IO::File ">>$current_out_file";
+			if (not defined $fh)
+			{
+				localdie("FATAL: can't write to $current_out_file, $!\n");
+			}
+			print $fh "</sessions>\n</tsung>\n";
+			$fh->close();
+		}
+	}
 }
 
 ####
@@ -2800,6 +2841,7 @@ sub build_incremental_reports
 			}
 			&dump_as_html('../../..', $db);
 			$fh->close;
+
 		}
 	}
 
