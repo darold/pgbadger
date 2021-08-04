@@ -17789,6 +17789,7 @@ sub build_log_line_prefix_regex
 		'%r' => [('t_hostport',     '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?[\(\d\)]*')],     # remote host and port
 		'%h' => [('t_client',       '([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?')],	      # remote host
 		'%p' => [('t_pid',	  '(\d+)')],							# process ID
+		'%Q' => [('t_queryid',	  '(\d+)')],							# Query ID
 		'%n' => [('t_epoch',    '(\d{10}\.\d{3})')],      # timestamp as Unix epoch
 		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})[Z]*(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
 		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
