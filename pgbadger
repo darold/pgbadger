@@ -4680,12 +4680,15 @@ sub detect_new_log_line
 			close($lfile);
 			return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
 		}
+		elsif ($saved_date eq $prefix_vars{'t_timestamp'})
+		{
+			next;
+		}
 		else
 		{
 			$more_lines++;
 			last;
 		}
-
 	}
 
 	return ($more_lines, "more line after the saved position");
@@ -4731,6 +4734,9 @@ sub check_file_changed
 		# Case of file with same size
 		elsif ($saved_pos == $totalsize)
 		{
+			# A log line can not be greater than 8192 so rewind to
+			# previous line, we don't care if we rewind more line
+			# before as if this is the same log they are in the past
 			if ($saved_pos > 8192)
 			{
 				$lfile->seek($saved_pos - 8192, 0);
