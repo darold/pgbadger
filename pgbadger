@@ -11389,7 +11389,9 @@ sub print_tempfile_report
 					$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 					$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
-					$details .= "<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
+					if (exists $top_tempfile_info{$curdb} && $#{$top_tempfile_info{$curdb}} >= $i) {
+						$details .= "<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
+					}
 					print $fh qq{
 						<dt>
 						<div id="query-c-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
@@ -11397,8 +11399,7 @@ sub print_tempfile_report
 						<pre>$details</pre>
 						</dt>
 };
-				$idx++
-
+					$idx++
 				}
 				print $fh qq{
 					</dl>
