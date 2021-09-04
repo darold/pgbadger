@@ -1,3 +1,93 @@
+2021-09-04 - v11.6
+
+This release of pgBadger fix some issues reported by users since past
+seven months as well as some improvements:
+
+  * Add detection of Query Id in log_line_prefix new in PG14. Thanks to
+    Florent Jardin for the report.
+  * Add advanced regression tests with db exclusion and the explode
+    feature. Thanks to MigOps Inc for the patch.
+  * Apply multiprocess to report generation when --explode is used.
+    Thanks to MigOps Inc for the patch and Thomas Leclaire for the
+    feature request.
+  * Add --iso-week-number in incremental mode, calendar's weeks start
+    on a Monday and respect the ISO 8601 week number, range 01 to 53,
+    where week 1 is the first week that has at least 4 days in the new
+    year. Thanks to Alex Muntada for the feature request.
+  * Add command line option --keep-comments to not remove comments from
+    normalized queries. It can be useful if you want to distinguish
+    between same normalized queries. Thanks to Stefan Corneliu Petrea
+    for the feature request.
+  * Skip INFO lines introduced in PostgreSQL log file by third parties
+    software. Thanks to David Piscitelli for the report.
+  * Add compatibility with PostgresPro log file including rows number
+    and size in bytes following the statement duration. Thanks to
+    panatamann for the report.
+  * Parse times with T's to allow using the timestamps from journalctl.
+    Thanks to Graham Christensen for the patch.
+  * Improve Windows port. Thanks to Bertrand Bourgier for the patches.
+
+Important note:
+
+  * Expect that --iso-week-number will be the default in next major
+    release and that --start-monday option will be removed as the week
+    will always start a Monday. The possibility to have week reports
+    start a Sunday will be removed to simplify the code.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix duplicate of warning message:
+      "database ... must be vacuumed within ... transactions".
+    Thank to Christophe Courtois for the report.
+  - Fix use of uninitialized variable. Thanks to phiresky for the report.
+  - Improve query id detection, it can be negative, as well as read it
+    from csvlog.
+  - Fix case where last file in incremental mode is always parsed even if
+    it was already done. Thanks to  Thomas Leclaire for the report.
+  - Update syslog format regex to handle where session line indicator
+    only contains one int vs two ints separated by dash. Thanks to
+    Timothy Alexander for the patch.
+  - Fix --exclude-db option to create anyway the related report with json
+    log. Thanks to MigOps Inc for the patch and Thomas Leclaire for the
+    report.
+  - Add regression test about Storable buggy version.
+  - Fix use of uninitialized value in substitution iterator in incremental
+    mode during the week report generation. Thanks to Thomas Leclaire,
+    Michael Vitale, Sumeet Shukla and Stefan Corneliu Petrea for the report.
+  - Add 'g' option to replace all bind parameters. Thanks to Nicolas Lutic
+    and Sebastien Lardiere for the patch.
+  - Documentation improvements. Thanks to Stefan Petrea for the patch.
+  - Fixes change log time zone calculation. Thanks to Stefan Petrea for
+    the patch.
+  - Fix log filter by begin/end time.
+  - Fix wrong association of orphan lines for multi-line queries with a
+    filter on database. Thanks to Abhishek Mehta for the report.
+  - Fix reports in incremental mode when --dbname parameter is partially
+    ignored with "explode" option (-E). Thanks to lrevest for the report.
+  - Update javascript resources.
+  - Fix display of menu before switching to hamburger mode when screen is
+    reduced. Thanks to Guillaume Lelarge for the report.
+  - Fix bind parameters values over multiple lines in the log that were
+    not well supported.
+  - Apply same fix for previous patch than in pgFormatter.
+  - Fix an other use of uninitialized value in substitution iterator from
+    pgFormatter code. Thanks to Christophe Courtois for the report.
+  - Fix query normalization. Thanks to Jeffrey Beale for the patch.
+  - Be sure that all statements end with a semicolon when --dump-all-queries
+    is used. Thanks to Christian for the report.
+  - Fix typo and init of EOL type with multiple log files.
+  - Add auto detection of EOL type to fix LAST_PARSED offset when OEL is on
+    2 bytes (Windows case). Thanks to Bertrand Bourgier for the patch.
+  - Fix get_day_of_week() port on Windows where strftime %u is not supported.
+    Thanks to Bertrand Bourgier for the patch.
+  - Fix Windows port that call pl2bat.bat perl utility to create a corrupted
+    pgbadger.bat du to the way __DATA__ was read in pgbadger. Thanks to
+    Bertrand Bourgier for the patch.
+  - Fix begin/end time filter and add regression test for timestamp filters.
+    Thanks to Alexis Lahouze and plmayekar for the report.
+  - Fix use of uninitialized value in pattern match introduced by pgFormatter
+    update. Thanks to arlt for the report.
+
 2021-02-18 - v11.5
 
 This release of pgBadger fix some issues reported by users since
