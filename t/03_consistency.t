@@ -1,4 +1,4 @@
-use Test::Simple tests => 20;
+use Test::Simple tests => 21;
 use JSON::XS;
 
 my $json = new JSON::XS;
@@ -38,6 +38,11 @@ $ret = `perl pgbadger -q -o $OUT $HLOG`;
 ok( $? == 0, "Generate json report for heroku log file");
 $json_ref = $json->decode(`cat $OUT`);
 ok( $json_ref->{database_info}{postgres}{GREEN}{"cte|duration"} eq "21761.546", "Consistent CTE duration");
+
+# check logplex multiline and new format
+$ret = `grep -E "WHERE missions.checker_id = " out.json | wc -l`;
+chomp($ret);
+ok( $ret == 1, "logplex multiline and new format");
 
 `rm -f $OUT`;
 

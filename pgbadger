@@ -2649,13 +2649,13 @@ sub set_parser_regex
 		       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 
 		       $llp =
-				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+'
+				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+'
 			       . $llp
 			       . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
 		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 		       push(@prefix_params, 't_loglevel', 't_query');
-		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[postgres\.\d+\]:\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s+(.*)/;
+		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.\d+\][:]?\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s+(.*)/;
 		}
 		elsif ($fmt =~ /^rds$/)
 		{
@@ -2711,10 +2711,10 @@ sub set_parser_regex
 	{
 	       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 	       $compiled_prefix =
-			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
-	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+app\[(postgres)\.(\d+)\]:\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
+	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[(postgres)\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
 	}
 	elsif ($fmt eq 'rds')
 	{
@@ -3931,7 +3931,6 @@ sub process_file
 					@matches = ($line =~ $q_prefix);
 					$q_match = 1;
 				}
-
 				if ($#matches >= 0)
 				{
 					if (!$q_match)
@@ -17552,7 +17551,7 @@ sub search_log_format
 
 	}
 	elsif ($line =~
-		 /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+app\[postgres\.(\d+)\]:\s+\[[^\]]+\]\s+\[(\d+)\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
+		 /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[[^\]]+\]\s+\[(\d+)\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/
 	  )
 	{
 	       $fmt = 'logplex';
