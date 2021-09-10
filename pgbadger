@@ -1776,7 +1776,12 @@ foreach my $f (@tempfiles)
 	next if (!-e "$f->[1]" || -z "$f->[1]");
 	my $fht = new IO::File;
 	$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
-	&load_stats($fht);
+	if (!load_stats($fht))
+	{
+		$fht->close();
+		next;
+
+	}
 	$fht->close();
 }
 
@@ -2810,7 +2815,12 @@ sub build_incremental_reports
 			{
 				my $fht = new IO::File;
 				$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
-				&load_stats($fht);
+				if (!load_stats($fht))
+				{
+					$fht->close();
+					next;
+
+				}
 				$fht->close();
 			}
 		}
@@ -2877,7 +2887,12 @@ sub build_incremental_reports
 				{
 					my $fht = new IO::File;
 					$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
-					&load_stats($fht);
+					if (!load_stats($fht))
+					{
+						$fht->close();
+						next;
+
+					}
 					$fht->close();
 					foreach my $db (sort keys %{$overall_stat{nlines}}) {
 						$DBLIST{$db} = 1;
@@ -2943,7 +2958,11 @@ sub build_month_reports
 		foreach my $f (@mfiles) {
 			my $fht = new IO::File;
 			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
-			&load_stats($fht);
+			if (!load_stats($fht))
+			{
+				$fht->close();
+				next;
+			}
 			$fht->close();
 			foreach my $db (sort keys %{$overall_stat{nlines}}) {
 				$DBLIST{$db} = 1;
@@ -3808,7 +3827,7 @@ sub process_file
 	}
 	elsif ($fmt eq 'binary')
 	{
-		&load_stats($lfile);
+		return $getout if (!load_stats($lfile));
 		$pipe->print("$totalsize 0 0 $fmt\n") if (defined $pipe);
 	}
 	# Format is not CSV and in incremental mode we are not at end of the file
@@ -14165,7 +14184,7 @@ sub load_stats
 	if (!exists $stats{version})
 	{
 		warn("can not load incompatible binary data, binary file is from version < 4.0.\n");
-		return;
+		return 0;
 	}
 	my %_overall_stat = %{$stats{overall_stat}};
 	my %_pgb_overall_stat = %{$stats{pgb_overall_stat}};
@@ -15169,7 +15188,7 @@ sub load_stats
 		}
 	}
 
-	return;
+	return 1;
 }
 
 # Function used to dump all relevant objects in memory to a single binary file
