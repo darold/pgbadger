@@ -1898,7 +1898,7 @@ if ($report_per_database)
 	}
 	else
 	{
-		&logmsg('ERROR', "can't save last parsed line into $tmp_last_parsed, $!");
+		&logmsg('ERROR', "can't read list of database from file $tmp_dblist, $!");
 	}
 }
 
