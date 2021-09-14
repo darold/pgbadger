@@ -1776,12 +1776,7 @@ foreach my $f (@tempfiles)
 	next if (!-e "$f->[1]" || -z "$f->[1]");
 	my $fht = new IO::File;
 	$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
-	if (!load_stats($fht))
-	{
-		$fht->close();
-		next;
-
-	}
+	load_stats($fht);
 	$fht->close();
 }
 
@@ -2815,12 +2810,7 @@ sub build_incremental_reports
 			{
 				my $fht = new IO::File;
 				$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
-				if (!load_stats($fht))
-				{
-					$fht->close();
-					next;
-
-				}
+				load_stats($fht);
 				$fht->close();
 			}
 		}
@@ -2828,7 +2818,7 @@ sub build_incremental_reports
 		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
-			next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
+			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
@@ -2887,16 +2877,8 @@ sub build_incremental_reports
 				{
 					my $fht = new IO::File;
 					$fht->open("< $destdir/$bpath/$f") or localdie("FATAL: can't open file $destdir/$bpath/$f, $!\n");
-					if (!load_stats($fht))
-					{
-						$fht->close();
-						next;
-
-					}
+					load_stats($fht);
 					$fht->close();
-					foreach my $db (sort keys %{$overall_stat{nlines}}) {
-						$DBLIST{$db} = 1;
-					}
 				}
 			}
 		}
@@ -2904,7 +2886,7 @@ sub build_incremental_reports
 		$destdir = $html_outdir || $outdir;
 		foreach my $db (sort keys %DBLIST)
 		{
-			next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
+			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
 			&logmsg('LOG', "Ok, generating HTML weekly report into $tmp_dir/$wdir/...");
@@ -2958,15 +2940,8 @@ sub build_month_reports
 		foreach my $f (@mfiles) {
 			my $fht = new IO::File;
 			$fht->open("< $outdir/$bpath/$f") or localdie("FATAL: can't open file $outdir/$bpath/$f, $!\n");
-			if (!load_stats($fht))
-			{
-				$fht->close();
-				next;
-			}
+			load_stats($fht);
 			$fht->close();
-			foreach my $db (sort keys %{$overall_stat{nlines}}) {
-				$DBLIST{$db} = 1;
-			}
 		}
 	}
 
@@ -3009,7 +2984,7 @@ sub build_global_index
 
 	foreach my $db (@dbs)
 	{
-		next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
+		#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 		my $tmp_dir = "$dest_dir/$db";
 		$tmp_dir = $dest_dir if (!$report_per_database);
 		&logmsg('DEBUG', "writing global index into $tmp_dir/index.html");
@@ -15185,6 +15160,13 @@ sub load_stats
 					$bind_info{$curdb}{$stmt}{apps}{$u}{$k} += $_bind_info{$curdb}{$stmt}{apps}{$u}{$k};
 				}
 			}
+		}
+	}
+
+	if (exists $overall_stat{nlines})
+	{
+		foreach my $db (sort keys %{$overall_stat{nlines}}) {
+			$DBLIST{$db} = 1;
 		}
 	}
 
