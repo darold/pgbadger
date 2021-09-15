@@ -4607,6 +4607,11 @@ sub parse_orphan_line
 		# After all append to the query if one is defined
 		} elsif (exists $cur_info{$cur_pid}{query}) {
 			$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
+		# Associate to bind|prepare query now that& we collect it too
+		} elsif (exists $cur_bind_info{$cur_pid}{'bind'}) {
+			$cur_bind_info{$cur_pid}{'bind'}{'query'} .= "\n" . $line;
+		} elsif (exists $cur_bind_info{$cur_pid}{'prepare'}) {
+			$cur_bind_info{$cur_pid}{'prepare'}{'query'} .= "\n" . $line;
 		}
 	}
 }
