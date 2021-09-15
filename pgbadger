@@ -4062,12 +4062,16 @@ sub process_file
 					$q_match = 1;
 				}
 
-				if ($#matches >= 0) {
-					if (!$q_match) {
+				if ($#matches >= 0)
+				{
+					if (!$q_match)
+					{
 						for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
 							$prefix_vars{$prefix_params[$i]} = $matches[$i];
 						}
-					} else {
+					}
+					else
+					{
 						for (my $i = 0 ; $i <= $#prefix_q_params ; $i++) {
 							$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
 						}
@@ -4082,12 +4086,16 @@ sub process_file
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
-					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'}) {
+					}
+					elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'})
+					{
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
 						if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
 							$prefix_vars{'t_timestamp'} .= $1;
 						}
-					} elsif ($prefix_vars{'t_timestamp'} =~ /^\d{10}(\.\d{3})$/) {
+					}
+					elsif ($prefix_vars{'t_timestamp'} =~ /^\d{10}(\.\d{3})$/)
+					{
 						my $ms = $1;
 						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
 						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
@@ -4098,14 +4106,17 @@ sub process_file
 					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
 							$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
-					} elsif ($prefix_vars{'t_year'}) {
+					}
+					elsif ($prefix_vars{'t_year'})
+					{
 						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 					}
 					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 					# Skip this line if there is no timestamp
 					next if (!$prefix_vars{'t_timestamp'} || $prefix_vars{'t_timestamp'} eq '-- ::');
 
-					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'}) {
+					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'})
+					{
 						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
 						# Remove the port part
 						$prefix_vars{'t_client'} =~ s/\(.*//;
@@ -4136,7 +4147,8 @@ sub process_file
 					&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'}, $prefix_vars{'t_dbname'});
 
 					# Update current timestamp with the timezone wanted
-					if ($log_timezone) {
+					if ($log_timezone)
+					{
 						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = change_timezone($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'}, $prefix_vars{'t_min'}, $prefix_vars{'t_sec'});
 						$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
 						$prefix_vars{'t_timestamp'} =
@@ -4167,16 +4179,18 @@ sub process_file
 						$cur_pid = $prefix_vars{'t_pid'};
 					}
 
+				}
 				# Collect additional query information
-				} elsif ($goon && $cur_pid) {
-
+				elsif ($goon && $cur_pid)
+				{
 					# Some log line may be written by applications
 					next if ($line =~ /\bLOG:  /);
 
 					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $line);
-
-				} elsif ($goon) {
+				}
+				elsif ($goon)
+				{
 
 					# unknown format
 					&logmsg('DEBUG', "Unknown $fmt log line format: $line");
@@ -4498,11 +4512,9 @@ sub parse_orphan_line
 	my ($cur_pid, $line, $t_dbname) = @_;
 
 	my $curdb = undef;
-	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db}) {
+	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db} || !$cur_info{$cur_pid}{cur_db}) {
 		$curdb = set_current_db($t_dbname);
 	} else {
-		return if ($#dbname >= 0 && $cur_info{$cur_pid}{cur_db}
-			&& !grep(/^$cur_info{$cur_pid}{cur_db}$/, @dbname));
 		$curdb = $cur_info{$cur_pid}{cur_db};
 	}
 	if (!$report_per_database) {
