@@ -4961,7 +4961,7 @@ sub normalize_query
 
 	return if (!$orig_query);
 
-	# Remove comments
+	# Remove comments /* ... */
 	if (!$keep_comments) {
 		$orig_query =~ s/\/\*(.*?)\*\///gs;
 	}
@@ -4980,6 +4980,16 @@ sub normalize_query
 	while ($orig_query =~ s/\%\%objname(\d+)\%\%/$objnames{$1}/gs) {};
 	%objnames = ();
 
+	# Remove string content
+	$orig_query =~ s/\\'//gs;
+	$orig_query =~ s/'[^']*'/\?/gs;
+	$orig_query =~ s/\?(\?)+/\?/gs;
+
+	# Remove comments starting with --
+	if (!$keep_comments) {
+		$orig_query =~ s/\s*--[^\n]+[\n]/\n/gs;
+	}
+
 	# Remove extra space, new line and tab characters by a single space
 	$orig_query =~ s/\s+/ /gs;
 
@@ -4990,11 +5000,6 @@ sub normalize_query
 
 	# Normalise alias with quote
 	$orig_query =~ s/AS\s+"([^"]+)"/'AS "' . remove_alias($1) . '"'/eigs;
-
-	# Remove string content
-	$orig_query =~ s/\\'//gs;
-	$orig_query =~ s/'[^']*'/\?/gs;
-	$orig_query =~ s/\?(\?)+/\?/gs;
 
 	# Remove NULL parameters
 	$orig_query =~ s/=\s*null/= \?/gs;
@@ -17663,8 +17668,11 @@ sub progress_bar
 			($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}),
 			$file
 		);
-	} else {
-		if ($total) {
+	}
+	else
+	{
+		if ($total)
+		{
 			sprintf(
 				"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), $lbl: %d, events: %d\r",
 				$char x $nchars . '>',
@@ -17672,7 +17680,9 @@ sub progress_bar
 				($queries || ($overall_stat{'queries_number'}+$pgb_overall_stat{'queries_number'})),
 				($errors  || ($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'}))
 			);
-		} else {
+		}
+		else
+		{
 			$char = '+';
 			sprintf(
 				"[%s] Parsed %d bytes, $lbl: %d, events: %d\r",
