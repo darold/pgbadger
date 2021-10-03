@@ -3389,7 +3389,7 @@ sub update_progress_bar
 		if ($progress && ($nlines % $NUMPROGRESS) == 0)
 		{
 			$pipe->print("$$cursize " .
-				($overall_stat{'queries_number'} + $pgb_overall_stat{'errors_number'}) .
+				($overall_stat{'queries_number'} + $pgb_overall_stat{'errors_number'} - $$old_queries_count) .
 				" " .
 				($overall_stat{'errors_number'} + $pgb_overall_stat{'errors_number'} - $$old_errors_count) .
 				" $fmt\n");
