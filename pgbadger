@@ -2569,10 +2569,10 @@ sub set_file_list
 				my($filename, $dirs, $suffix) = fileparse($file);
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
 				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
-				$dirs = '' if ( $filename ne '' ); #ls returns relative paths for an directory but absolute ones for a file or filename pattern 
+				$dirs = '' if ( $filename ne '' ); #ls returns relative paths for an directory but absolute ones for a file or filename pattern
 				foreach my $f (@rfiles)
 				{
-					$host_info =~ s/-p (\d+) (.*)/$2:$1/; 
+					$host_info =~ s/-p (\d+) (.*)/$2:$1/;
 					push(@lfiles, "ssh://$host_info/$dirs$f$fmt");
 				}
 			}
@@ -4561,7 +4561,9 @@ sub parse_jsonlog_input
 	}
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
 	# Try to extract the pid information
-	if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
+  if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
+		$infos{'t_pid'} = $1;
+	} elsif ($str =~ m/"pid":([0-9]+)/) {
 		$infos{'t_pid'} = $1;
 	} elsif ($str =~ m/"textPayload":"\[(\d+)\]:/) {
 		$infos{'t_pid'} = $1;
@@ -7190,7 +7192,7 @@ sub print_general_activity
 					</thead>
 					<tbody>$queries
 					</tbody>
-				</table>							
+				</table>
 			</div>
 			<div class="tab-pane" id="general-activity-select-queries">
 				<table class="table table-striped table-hover table-condensed">
@@ -9523,7 +9525,7 @@ $drawn_graphs{checkpointdistance_graph}
 					</thead>
 					<tbody>$buffers
 					</tbody>
-				</table>							
+				</table>
 			</div>
 			<div class="tab-pane" id="checkpoint-activity-files">
 				<table class="table table-striped table-hover table-condensed">
@@ -16033,7 +16035,7 @@ sub parse_query
 	   )
 	{
 		return if ($disable_autovacuum);
-		
+
 		$cur_info{$t_pid}{vacuum} = $3;
 
 		my $idxscan = $4;
@@ -16269,7 +16271,7 @@ sub parse_query
 		&& $prefix_vars{'t_query'} =~ /point starting: (.*)/)
 	{
 		$checkpoint_info{starting}{$1}++;
-		return 
+		return
 	}
 
 	# Look at bind/execute parameters if any
@@ -17147,7 +17149,7 @@ sub store_queries
 									);
 			}
 		}
-		
+
 		if (exists $cur_bind_info{$t_pid})
 		{
 
@@ -19297,7 +19299,7 @@ sub query
 		{
                     my $code_sep = quotemeta($1);
 		    foreach my $k (@{ $self->{ 'keywords' } }) {
-			    last if ($code_sep =~ s/\b$k$//i); 
+			    last if ($code_sep =~ s/\b$k$//i);
 		    }
 		    next if (!$code_sep);
                     if ($tmp_str =~ /\s+$code_sep[\s;]+/)
@@ -19317,7 +19319,7 @@ sub query
 
     # Store values of code that must not be changed following the given placeholder
     if ($self->{ 'placeholder' }) {
-	if (!$self->{ 'multiline' }) 
+	if (!$self->{ 'multiline' })
 	{
 		while ( $self->{ 'query' } =~ s/($self->{ 'placeholder' })/PLACEHOLDER${i}PLACEHOLDER/)
 		{
@@ -19388,7 +19390,7 @@ sub content
     $self->{ 'content' } =~ s/BSLHPGF/\\\\/g;
     # Replace any PGFBSLHQ by \'
     $self->{ 'content' } =~ s/PGFBSLHQ/\\'/g;
-    # Replace any $PGFDLM$ by code delimiter ' 
+    # Replace any $PGFDLM$ by code delimiter '
     $self->{ 'content' } =~ s/\$PGFDLM\$/'/g;
 
     # Replace any PGFESCQ1 by ''
@@ -19781,7 +19783,7 @@ sub beautify
 		$self->_add_token($token, $last);
 		$last = $self->_set_last($token, $last);
 		next;
-	
+
 	}
 	# COPY block
         if ( $token =~ /^COPY\s+[^\s]+\s+\(/i )
@@ -19817,7 +19819,7 @@ sub beautify
                 $self->{ '_is_in_function' }++;
 	    # try to detect if this is a user function
 	    } elsif (!$self->{ '_is_in_function' } and !$self->{ '_is_in_create' }
-			    and !$self->_is_comment($token) and length($token) > 2 # lazy exclusion of operators/comma 
+			    and !$self->_is_comment($token) and length($token) > 2 # lazy exclusion of operators/comma
 			    and $last !~ /^(?:AS|RECURSIVE|WITH|OPERATOR|INTO|TYPE|VIEW)/i
 			    and !$self->_is_keyword($token, $self->_next_token(), $last))
 	    {
@@ -19976,7 +19978,7 @@ sub beautify
 	{
             $self->{ '_is_in_filter' } = 1 if (uc($token) eq 'FILTER');
 	    $self->{ '_is_in_grouping' } = 1 if ($token =~ /^(GROUPING|ROLLUP)$/i);
-        } 
+        }
         elsif ( uc($token) eq 'PASSING' and defined $self->_next_token && uc($self->_next_token) eq 'BY')
 	{
             $self->{ '_has_order_by' } = 1;
@@ -19990,7 +19992,7 @@ sub beautify
 	elsif ( uc($token) eq 'OVERLAPS' )
 	{
 		$self->{ '_is_in_overlaps' } = 1;
-        } 
+        }
 
         ####
         # Set the current kind of statement parsed
@@ -20155,7 +20157,7 @@ sub beautify
 	        push( @{ $self->{ '_begin_level' } }, ($#{ $self->{ '_begin_level' } } < 0) ? 0 : $self->{ '_level' } );
 	    }
 	}
-    
+
         ####
         # Mark statements that use string_agg() or group_concat() function
         # as statement that can have an ORDER BY clause inside the call to
@@ -20579,7 +20581,7 @@ sub beautify
                 );
                 $add_nl = 1 if ($self->{ '_current_sql_stmt' } ne 'INSERT'
 			    and !$self->{ '_is_in_function' }
-			    and (defined $self->_next_token 
+			    and (defined $self->_next_token
 				    and $self->_next_token =~ /^(SELECT|WITH)$/i)
 		    		    and $self->{ '_tokens' }[1] !~ /^(ORDINALITY|FUNCTION)$/i
 			    and ($self->{ '_is_in_create' } or $last ne ')' and $last ne ']')
@@ -20612,7 +20614,7 @@ sub beautify
                 $self->{ '_has_order_by' } = 0;
 		$self->{ '_is_in_policy' } = 0;
                 $self->{ '_is_in_aggregate' } = 0;
-            } 
+            }
             $self->_add_token( $token );
             # Do not go further if this is the last token
             if (not defined $self->_next_token) {
@@ -21046,7 +21048,7 @@ sub beautify
         }
 
         elsif ( $self->{ '_current_sql_stmt' } !~ /^(GRANT|REVOKE)$/
-			and uc($token) eq 'INSERT' 
+			and uc($token) eq 'INSERT'
 			and $self->{ '_is_in_policy' } && $self->{ 'format_type' })
 	{
                 $self->_add_token( $token );
@@ -21330,7 +21332,7 @@ sub beautify
 	    {
                 $self->_new_line($token,$last);
                 $self->_over($token,$last) if (!$self->{ '_is_in_join' });
-            } 
+            }
             $self->_add_token( $token );
         }
 
@@ -21444,7 +21446,7 @@ sub beautify
 
         elsif ($token =~ /^\\\S/)
 	{
-	    # treat everything starting with a \ and at least one character as psql meta command. 
+	    # treat everything starting with a \ and at least one character as psql meta command.
             $self->_add_token( $token );
             $self->_new_line($token,$last) if ($token ne "\\\\" and defined $self->_next_token and $self->_next_token ne "\\\\");
         }
@@ -21659,8 +21661,8 @@ sub _add_token
 	{
 	    if ($token ne ')'
                                             && defined($last_token)
-                                            && $last_token ne '::' 
-                                            && $last_token ne '[' 
+                                            && $last_token ne '::'
+                                            && $last_token ne '['
 					    && ($token ne '(' || !$self->_is_function( $last_token ) || $self->{ '_is_in_type' })
                 )
             {
@@ -21668,7 +21670,7 @@ sub _add_token
 		if ( ($token !~ /PGFESCQ[12]/ or $last_token !~ /'$/)
 				and ($last_token !~ /PGFESCQ[12]/ or $token !~ /^'/)
 		)
-	        {	
+	        {
                     $self->{ 'content' } .= $sp if ($token !~ /^['"].*['"]$/ or $last_token ne ':');
 	        }
 	    }
@@ -22531,7 +22533,7 @@ sub set_dicts
     # First load it all as "my" variables, to make it simpler to modify/map/grep/add
     # Afterwards, when everything is ready, put it in $self->{'dict'}->{...}
 
-    my @pg_keywords = map { uc } qw( 
+    my @pg_keywords = map { uc } qw(
         ADD AFTER AGGREGATE ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC ASYMMETRIC AUTHORIZATION ATTACH AUTO_INCREMENT
         BACKWARD BEFORE BEGIN BERNOULLI BETWEEN BINARY BOTH BY CACHE CASCADE CASE CAST CHECK CHECKPOINT CLOSE CLUSTER
 	COLLATE COLLATION COLUMN COMMENT COMMIT COMMITTED CONCURRENTLY CONFLICT CONSTRAINT CONSTRAINT CONTINUE COPY
@@ -22711,7 +22713,7 @@ sub set_dicts
 	has_any_column_privilege has_column_privilege has_database_privilege has_foreign_data_wrapper_privilege
 	has_function_privilege has_language_privilege has_schema_privilege has_sequence_privilege has_server_privilege
 	has_table_privilege has_tablespace_privilege has_type_privilege hash_aclitem hash_array hash_numeric hash_range
-	hashbeginscan hashbpchar hashbuild hashbuildempty hashbulkdelete hashchar hashcostestimate hash_aclitem_extended 
+	hashbeginscan hashbpchar hashbuild hashbuildempty hashbulkdelete hashchar hashcostestimate hash_aclitem_extended
         hashendscan hashenum hashfloat4 hashfloat8 hashgetbitmap hashgettuple hashinet hashinsert hashint2
 	hashint2extended hashint2vector hashint4 hashint4extended hashint8 hashint8extended hashmacaddr
 	hashfloat4extended hashfloat8extended hashcharextended hashoidextended hashnameextended hashmarkpos
@@ -22755,7 +22757,7 @@ sub set_dicts
         intervaltypmodout intinterval isclosed isempty ishorizontal iso8859_1_to_utf8 iso8859_to_utf8
         iso_to_koi8r iso_to_mic iso_to_win1251 iso_to_win866 isopen isparallel isperp
         isvertical johab_to_utf8 json_agg jsonb_agg json_array_elements jsonb_array_elements
-	json_array_elements_text jsonb_array_elements_text json_to_tsvector jsonb_insert 
+	json_array_elements_text jsonb_array_elements_text json_to_tsvector jsonb_insert
         json_array_length jsonb_array_length json_build_array json_build_object json_each jsonb_each json_each_text
         jsonb_each_text json_extract_path jsonb_extract_path json_extract_path_text jsonb_extract_path_text json_in
 	json_object json_object_agg jsonb_object_agg json_object_keys jsonb_object_keys json_out json_populate_record
@@ -22995,7 +22997,7 @@ sub _remove_dynamic_code
         }
     }
 
-    # Replace any COMMENT constant between single quote 
+    # Replace any COMMENT constant between single quote
     while ($$str =~ s/IS\s+('(?:.*?)')\s*;/IS TEXTVALUE$idx;/s)
     {
         $self->{dynamic_code}{$idx} = $1;
