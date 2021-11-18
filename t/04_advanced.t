@@ -1,4 +1,4 @@
-use Test::Simple tests => 5;
+use Test::Simple tests => 6;
 
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $SYSLOG1 = 't/fixtures/pg-syslog.1.bz2';
@@ -34,7 +34,13 @@ $ret = `perl pgbadger -q --exclude-db cloudsqladmin --explode $GCPLOG && ls *.ht
 chomp($ret);
 ok( $? == 0 && ($ret == 2), "Test database exclusion with jsonlog");
 
+$ret = `perl pgbadger --disable-type --disable-session --disable-connection --disable-lock --disable-checkpoint --disable-autovacuum --prefix "%m [%p] %u@%d,%a,%h " -o out.txt t/fixtures/tempfile_only.log -q`;
+$ret = `grep "Example.*SELECT" out.txt | wc -l`;
+chomp($ret);
+ok( $? == 0 && ($ret == 1), "Test log_temp_files only");
+
 # Remove files generated during the tests
 `rm -f *.html`;
+`rm -f out.txt`;
 `rm -rf $incr_outdir`;
 

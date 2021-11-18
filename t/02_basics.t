@@ -59,6 +59,7 @@ $ret = `grep "камень & почка" /tmp/report$$.txt | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret eq '7'), "Cyrillic encoding");
 
+`cp /tmp/report$$.txt titi.txt`;
 `rm /tmp/report$$.txt`;
 
 # Test CSV and anonymization only if Text::CSV_XS is installed

@@ -2776,9 +2776,8 @@ sub set_parser_regex
 	elsif ($fmt eq 'stderr')
 	{
 		$compiled_prefix =
-	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
-
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(?:\[\d+\-\d+\])?\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_timestamp', 't_pid', 't_logprefix', 't_loglevel', 't_query');
 	}
 	elsif ($fmt eq 'default')
 	{
@@ -15850,7 +15849,12 @@ sub parse_query
 	# Save previous temporary file information with same pid to not overwrite it
 	if ($prefix_vars{'t_loglevel'} =~ $main_log_regex)
 	{
-		if (($prefix_vars{'t_query'} !~ /temporary file: path .*, size \d+/)
+		if ($prefix_vars{'t_query'} !~ /temporary file: path .*, size \d+/
+			&& exists $cur_temp_info{$t_pid})
+		{
+			&store_temporary_and_lock_infos($t_pid);
+		# When only log_temp_files is enabled
+		} elsif ($prefix_vars{'t_query'} =~ /temporary file: path .*, size \d+/
 			&& exists $cur_temp_info{$t_pid})
 		{
 			&store_temporary_and_lock_infos($t_pid);
