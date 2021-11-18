@@ -5110,7 +5110,7 @@ sub logmsg
 {
 	my ($level, $str) = @_;
 
-	return if ($quiet && ($level ne 'FATAL'));
+	return if ($quiet && !$debug && ($level ne 'FATAL'));
 	return if (!$debug && ($level eq 'DEBUG'));
 
 	if ($level =~ /(\d+)/) {
