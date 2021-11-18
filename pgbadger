@@ -17718,6 +17718,11 @@ sub search_log_format
 	{
 		$fmt = 'jsonlog';
 	}
+	# cloudsql lines
+	elsif ($line =~ /"textPayload":\s*"(?:\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s+\[(\d+)\]:.*)",$/)
+	{
+		$fmt = 'jsonlog';
+	}
 	# Are pgbouncer syslog lines ?
 	elsif ($line =~
 /^[A-Z][a-z]{2}\s+\d+ \d+:\d+:\d+( [^\s]+)? [^\s]+ [^\s\[]+\[\d+\]: (?:.\-0x[0-9a-f\.]+|Stats):/
