@@ -4626,6 +4626,7 @@ sub parse_jsonlog_input
 		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv);
 	}
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
+
 	# Try to extract the pid information
 	if ($str =~ m/"pid":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_pid'} = $1;
@@ -4633,12 +4634,13 @@ sub parse_jsonlog_input
 		$infos{'t_pid'} = $1;
 	} elsif ($str =~ m/"textPayload":\s*"\[(\d+)\]:/) {
 		$infos{'t_pid'} = $1;
-	} elsif ($str =~ m/"textPayload":\s*"(\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s+\[(\d+)\]:.*)",$/) {
+	} elsif ($str =~ m/"textPayload":\s*"(\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s+\[(\d+)\]:.*)",(?:"timestamp":.*)?$/) {
 		$infos{'t_pid'} = $2;
 		$infos{'t_textPayload'} = $1;
 	} elsif ($str =~ m/"textPayload":\s*"(.*)","timestamp":"/) {
 		$infos{'t_query'} = unescape_jsonlog($1);
 	}
+
 	if ($str =~ m/"error_severity":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_loglevel'} = $1;
 	} elsif ($str =~ m/user=[^\s]* ([^:]+):\s{1,2}(.*)","timestamp":"/) {
