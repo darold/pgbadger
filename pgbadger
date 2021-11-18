@@ -2609,7 +2609,8 @@ sub set_parser_regex
 	@prefix_params = ();
 	@prefix_q_params = ();
 
-	if ($fmt eq 'pgbouncer') {
+	if ($fmt eq 'pgbouncer')
+	{
 		$pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)(?:\(\d+\))??[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
@@ -2619,8 +2620,9 @@ sub set_parser_regex
 		$pgbouncer_log_parse3 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? (\d+) ([^\s]+) ([^:]+: .*)/;
 		@pgb_prefix_parse3 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
 
-	} elsif ($fmt eq 'pgbouncer1') {
-
+	}
+	elsif ($fmt eq 'pgbouncer1')
+	{
 		$pgbouncer_log_format = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 
@@ -2631,8 +2633,9 @@ sub set_parser_regex
 		$pgbouncer_log_parse3 = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]: ([^:]+: .*)/;
 		@pgb_prefix_parse3 = ('t_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_query');
 
-	} elsif ($fmt eq 'pgbouncer2') {
-
+	}
+	elsif ($fmt eq 'pgbouncer2')
+	{
 		$pgbouncer_log_format = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)?(?:\(\d+\))?[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 
@@ -2642,7 +2645,9 @@ sub set_parser_regex
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
 		$pgbouncer_log_parse3 = qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]: ([^:]+: .*)/;
 		@pgb_prefix_parse3 = ('t_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_query');
-	} elsif ($fmt eq 'pgbouncer3') {
+	}
+	elsif ($fmt eq 'pgbouncer3')
+	{
 		$pgbouncer_log_format = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) (.\-0x[0-9a-f\.]*): ([0-9a-zA-Z\_\[\]\-\.]*)\/([0-9a-zA-Z\_\[\]\-\.]*)\@([a-zA-Z0-9\-\.]+|\[local\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F:]+)(?:\(\d+\))??[:\d]* (.*)/;
 		@pgb_prefix_params = ('t_timestamp', 't_pid', 't_loglevel', 't_session_id', 't_dbname', 't_dbuser', 't_client', 't_query');
 		$pgbouncer_log_parse1 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) (.\-0x[0-9a-f\.]+|[Ss]tats): (.*)/;
@@ -2651,11 +2656,9 @@ sub set_parser_regex
 		@pgb_prefix_parse2 = ('t_dbname', 't_dbuser', 't_client', 't_query');
 		$pgbouncer_log_parse3 = qr/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})? \[(\d+)\] ([^\s]+) ([^:]+: .*)/;
 		@pgb_prefix_parse3 = ('t_timestamp', 't_pid', 't_loglevel', 't_query');
-
 	}
 	elsif ($log_line_prefix)
 	{
-
 		# Build parameters name that will be extracted from the prefix regexp
 		my %res = &build_log_line_prefix_regex($log_line_prefix);
 		my $llp = $res{'llp'};
@@ -2719,35 +2722,30 @@ sub set_parser_regex
 		       $compiled_prefix = qr/$llp/;
 		       @prefix_params = ('t_timestamp', 't_dbname', 't_dbuser', 't_pid', 't_loglevel', 't_query');
 		}
-		elsif ($fmt eq 'stderr' || $fmt eq 'default')
+		elsif ($fmt eq 'stderr' || $fmt eq 'default' || $fmt eq 'jsonlog')
 		{
-			$fmt = 'stderr';
+			$fmt = 'stderr' if ($fmt ne 'jsonlog');
 			$llp = '^' . $llp . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
 			push(@prefix_params, 't_loglevel', 't_query');
 		}
-
 	}
 	elsif ($fmt eq 'syslog')
 	{
-
 		$compiled_prefix =
 	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*)/;
-
 	}
 	elsif ($fmt eq 'syslog2')
 	{
-
 		$fmt = 'syslog';
 		$compiled_prefix =
 	qr/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)(?:\-\d+)?\])?\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(\d+-\d+)-(\d+)T(\d+):(\d+):(\d+)(?:.[^\s]+)?\s([^\s]+)\s(?:[^\s]+\s)?(?:[^\s]+\s)?([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?(?:\s\[(\d+)(?:\-\d+)?\])?\s*(.*)/;
-
 	}
 	elsif ($fmt eq 'logplex')
 	{
@@ -2775,11 +2773,8 @@ sub set_parser_regex
 			 qr/^'(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)Z [^\s]+ \[ db=(.*?) user=(.*?) pid=(\d+) userid=\d+ xid=(?:.*?) \]' (LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_dbname', 't_dbuser', 't_pid', 't_loglevel', 't_query');
 	}
-
-
 	elsif ($fmt eq 'stderr')
 	{
-
 		$compiled_prefix =
 	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\]:\s\[(\d+)\-\d+\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_timestamp', 't_pid', 't_session_line', 't_logprefix', 't_loglevel', 't_query');
@@ -2787,7 +2782,6 @@ sub set_parser_regex
 	}
 	elsif ($fmt eq 'default')
 	{
-
 		$fmt = 'stderr';
 		$compiled_prefix =
 	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
@@ -3961,6 +3955,78 @@ sub process_file
 			{
 				%prefix_vars = parse_jsonlog_input($line);
 
+				if (exists $prefix_vars{'t_textPayload'})
+				{
+					@matches = ($prefix_vars{'t_textPayload'} =~ $compiled_prefix);
+					my $q_match = 0;
+					if ($#matches < 0 && $q_prefix)
+					{
+						@matches = ($prefix_vars{'t_textPayload'} =~ $q_prefix);
+						$q_match = 1;
+					}
+					if ($#matches >= 0)
+					{
+						if (!$q_match)
+						{
+							for (my $i = 0 ; $i <= $#prefix_params ; $i++) {
+								$prefix_vars{$prefix_params[$i]} = $matches[$i];
+							}
+						}
+						else
+						{
+							for (my $i = 0 ; $i <= $#prefix_q_params ; $i++) {
+								$prefix_vars{$prefix_q_params[$i]} = $matches[$i];
+							}
+						}
+					}
+					delete $prefix_vars{'t_textPayload'};
+
+					$prefix_vars{'t_pid'} = $prefix_vars{'t_session_id'} if ($use_sessionid_as_pid);
+
+					# Skip location information
+					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
+
+					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
+						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
+					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
+						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_session_timestamp'};
+					}
+					elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_epoch'})
+					{
+						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_epoch'}));
+						if ($prefix_vars{'t_epoch'} =~ /^\d{10}(\.\d{3})$/) {
+							$prefix_vars{'t_timestamp'} .= $1;
+						}
+					}
+					elsif ($prefix_vars{'t_timestamp'} =~ /^\d{10}(\.\d{3})$/)
+					{
+						my $ms = $1;
+						$prefix_vars{'t_epoch'} = $prefix_vars{'t_timestamp'};
+						$prefix_vars{'t_timestamp'} = strftime("%Y-%m-%d %H:%M:%S", CORE::localtime($prefix_vars{'t_timestamp'}));
+						 $prefix_vars{'t_timestamp'} .= $ms;
+					}
+
+					if ($prefix_vars{'t_timestamp'})
+					{
+						($prefix_vars{'t_year'}, $prefix_vars{'t_month'}, $prefix_vars{'t_day'}, $prefix_vars{'t_hour'},
+							$prefix_vars{'t_min'}, $prefix_vars{'t_sec'}) = ($prefix_vars{'t_timestamp'} =~ $time_pattern);
+					}
+					elsif ($prefix_vars{'t_year'})
+					{
+						$prefix_vars{'t_timestamp'} = "$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+					}
+					$prefix_vars{'t_time'} = "$prefix_vars{'t_hour'}:$prefix_vars{'t_min'}:$prefix_vars{'t_sec'}";
+					# Skip this line if there is no timestamp
+					next if (!$prefix_vars{'t_timestamp'} || $prefix_vars{'t_timestamp'} eq '-- ::');
+
+					if ($prefix_vars{'t_hostport'} && !$prefix_vars{'t_client'})
+					{
+						$prefix_vars{'t_client'} = $prefix_vars{'t_hostport'};
+						# Remove the port part
+						$prefix_vars{'t_client'} =~ s/\(.*//;
+					}
+				}
+
 				$cur_pid = $prefix_vars{'t_pid'} if ($prefix_vars{'t_pid'});
 
 				$prefix_vars{'t_query'} =~ s/^\\t//;
@@ -4524,8 +4590,8 @@ sub parse_jsonlog_input
 
 
 	# Extract the date
-	if ($str =~ m/[\{,]"timestamp":"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/) {
-
+	if ($str =~ m/[\{,]"timestamp":\s*"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/)
+	{
 		$infos{'t_year'} = $1;
 		$infos{'t_month'} = $2;
 		$infos{'t_day'} = $3;
@@ -4539,70 +4605,72 @@ sub parse_jsonlog_input
 	}
 
 	# Set query parameters as global variables
-	if ($str =~ m/"user":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"user":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbuser'}  = $1;
 	} elsif ($str =~ m/,user=([\s]*) /) {
 		$infos{'t_dbuser'}  = $1;
 	}
-	if ($str =~ m/"dbname":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"dbname":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbname'}  = $1;
 	} elsif ($str =~ m/ db=([^,]*),/) {
 		$infos{'t_dbname'}  = $1;
 	}
-	if ($str =~ m/"application_name":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"application_name":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_appname'} = $1;
-	} elsif ($str =~ m/"project_id":"([^"])"/) {
+	} elsif ($str =~ m/"project_id":\s*"([^"])"/) {
 		$infos{'t_appname'} = $1;
 	}
-	if ($str =~ m/"remote_host":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"remote_host":\s*"(.*?)"(?:,"|\})/)
+	{
 		$infos{'t_client'}  = $1;
 		$infos{'t_client'}  =~ s/:.*//;
 		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv);
 	}
 	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
 	# Try to extract the pid information
-  if ($str =~ m/"pid":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"pid":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_pid'} = $1;
-	} elsif ($str =~ m/"pid":([0-9]+)/) {
+	} elsif ($str =~ m/"pid":\s*([0-9]+)/) {
 		$infos{'t_pid'} = $1;
-	} elsif ($str =~ m/"textPayload":"\[(\d+)\]:/) {
+	} elsif ($str =~ m/"textPayload":\s*"\[(\d+)\]:/) {
 		$infos{'t_pid'} = $1;
-	} elsif ($str =~ m/"textPayload":"\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s*\[(\d+)\]:/) {
-		$infos{'t_pid'} = $1;
-	} elsif ($str =~ m/"textPayload":"(.*)","timestamp":"/) {
+	} elsif ($str =~ m/"textPayload":\s*"(\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s+\[(\d+)\]:.*)",$/) {
+		$infos{'t_pid'} = $2;
+		$infos{'t_textPayload'} = $1;
+	} elsif ($str =~ m/"textPayload":\s*"(.*)","timestamp":"/) {
 		$infos{'t_query'} = unescape_jsonlog($1);
 	}
-	if ($str =~ m/"error_severity":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"error_severity":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_loglevel'} = $1;
 	} elsif ($str =~ m/user=[^\s]* ([^:]+):\s{1,2}(.*)","timestamp":"/) {
 		$infos{'t_loglevel'} = $1;
 		$infos{'t_query'} = unescape_jsonlog($2);
 	}
-	if ($str =~ m/"state_code":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"state_code":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_sqlstate'} = $1;
 	}
-	if ($str =~ m/"message":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"message":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_query'} = unescape_jsonlog($1);
-	} elsif ($str =~ m/"statement":"(.*?)"(?:,"|\})/) {
+	} elsif ($str =~ m/"statement":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_query'} = unescape_jsonlog($1);
 	}
 
 	# Set ERROR additional information
-	if ($str =~ m/"(?:detail_log|detail)":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"(?:detail_log|detail)":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_detail'} = unescape_jsonlog($1);
 	}
-	if ($str =~ m/"hint":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"hint":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_hint'} = unescape_jsonlog($1);
 	}
-	if ($str =~ m/"context":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"context":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_context'} = unescape_jsonlog($1);
 	}
-	if ($str =~ m/"(?:statement|internal_query)":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"(?:statement|internal_query)":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_statement'} = unescape_jsonlog($1);
 	}
 
 	# Backend type information
-	if ($str =~ m/"backend_type":"(.*?)"(?:,"|\})/) {
+	if ($str =~ m/"backend_type":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_backend_type'} = $1;
 	}
 
@@ -5114,7 +5182,7 @@ sub normalize_query
 
 	# remove temporary identifier between double quote
 	my %identifiers = ();
-	my $i = 0;
+	$i = 0;
 	while ($orig_query =~ s/"([^"]+)"/\%sqlident$i\%/) {
 		$identifiers{$i} = $1;
 		$i++;
@@ -17531,6 +17599,9 @@ sub autodetect_format
 		&logmsg('DEBUG', "Autodetected log format '$1' from URI '$file'");
 		return $1;
 	}
+
+	# the format have been forced at command line
+	return $format if ($format);
 
 	if (!$remote_host && !$http_download && !$ssh_download)
 	{
