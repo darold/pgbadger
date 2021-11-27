@@ -367,6 +367,7 @@ my $wide_char               = 0;
 my $noweekreport            = 0;
 my $query_numbering         = 0;
 my $keep_comments           = 0;
+my $no_progessbar           = 0;
 
 my $NUMPROGRESS = 10;
 my @DIMENSIONS  = (800, 300);
@@ -561,7 +562,8 @@ my $result = GetOptions(
 	'tempdir=s'                => \$TMP_DIR,
 	'no-process-info!'         => \$disable_process_title,
 	'dump-all-queries!'        => \$dump_all_queries,
-	'keep-comments!'           => \$keep_comments
+	'keep-comments!'           => \$keep_comments,
+	'no-progressbar!'          => \$no_progessbar
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -722,7 +724,7 @@ if ($journalctl_cmd) {
 }
 
 # Quiet mode is forced with progress bar
-$progress = 0 if ($quiet);
+$progress = 0 if ($quiet || $no_progessbar);
 
 # Set the default number minutes for queries and connections average
 $avg_minutes ||= 5;
@@ -2219,6 +2221,7 @@ Options:
     --keep-comments        : do not remove comments from normalized queries. It
                              can be useful if you want to distinguish between
 			     same normalized queries.
+    --no-progressbar       : disable progressbar.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use the -r or --remote-host to set the host ip address or hostname. There's also
@@ -3370,6 +3373,8 @@ sub update_progress_bar
 {
 	my ($tmpoutfile, $nlines, $stop_offset, $totalsize, $cursize, $old_queries_count, $old_errors_count, $fmt) = @_;
 
+	return if (!$progress);
+
 	if (!$tmpoutfile || not defined $pipe)
 	{
 		if ($progress && (($nlines % $NUMPROGRESS) == 0)) {
@@ -4075,7 +4080,7 @@ sub process_file
 						&parse_query($fmt);
 					}
 				}
-				else
+				elsif ($fmt ne 'jsonlog' && $line !~ /textpayload/i)
 				{
 					&logmsg('DEBUG', "Unknown $fmt line format: $line");
 				}
@@ -17840,6 +17845,8 @@ sub search_log_format
 sub progress_bar
 {
 	my ($got, $total, $width, $char, $queries, $errors, $fmt) = @_;
+
+	return if (!$progress);
 
         my ($package, $filename, $line) = caller;
 	$width ||= 25;

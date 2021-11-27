@@ -199,6 +199,7 @@ SYNOPSIS
         --keep-comments        : do not remove comments from normalized queries. It
                                  can be useful if you want to distinguish between
                                  same normalized queries.
+        --no-progressbar       : disable progressbar.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use the -r or --remote-host to set the host ip address or
