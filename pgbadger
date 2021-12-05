@@ -1353,7 +1353,9 @@ if (!$noclean && $outdir &&
 	# Get the week number following the date
 	my $wn = &get_week_number($last_year, $last_month, $last_day);
 	# Get the days of the current week where binary files must be preserved
-	my @wdays = &get_wdays_per_month($wn - 1, "$last_year-$last_month");
+	my $getwnb = $wn;
+	$getwnb-- if (!$iso_week_number);
+	my @wdays = &get_wdays_per_month($getwnb, "$last_year-$last_month");
 	# Find obsolete dir days that shoud be cleaned
 	unless(opendir(DIR, "$outdir")) {
 		localdie("FATAL: can't opendir $outdir: $!\n");
@@ -2889,7 +2891,9 @@ sub build_incremental_reports
 		&init_stats_vars();
 
 		# Get all days of the current week
-		my @wdays = &get_wdays_per_month($wn - 1, $weeks_directories{$wn}{dir});
+		my $getwnb = $wn;
+		$getwnb-- if (!$iso_week_number);
+		my @wdays = &get_wdays_per_month($getwnb, $weeks_directories{$wn}{dir});
 		my $binpath = '';
 		$binpath = $weeks_directories{$wn}{prefix} if (defined $weeks_directories{$wn}{prefix});
 		my $wdir = '';
