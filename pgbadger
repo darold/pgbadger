@@ -8883,7 +8883,8 @@ sub print_host_session
 	my $c	   = 0;
 	my $sess_host_info = '';
 	my @main_host = ('unknown',0);
-	foreach my $h (sort keys %{$session_info{$curdb}{host}}) {
+	foreach my $h (sort keys %{$session_info{$curdb}{host}})
+	{
 		$sess_host_info .= "<tr><td>$h</td><td>" . &comma_numbers($session_info{$curdb}{host}{$h}{count}) .
 				   "</td><td>" . &convert_time($session_info{$curdb}{host}{$h}{duration}) . "</td><td>" .
 				   &convert_time($session_info{$curdb}{host}{$h}{duration} / $session_info{$curdb}{host}{$h}{count}) .
@@ -8894,7 +8895,8 @@ sub print_host_session
 			$main_host[1] = $session_info{$curdb}{host}{$h}{count};
 		}
 	}
-	if ($graph) {
+	if ($graph)
+	{
 		my @small = ();
 		foreach my $d (sort keys %{$session_info{$curdb}{host}}) {
 			if ((($session_info{$curdb}{host}{$d}{count} * 100) / ($total_count||1)) > $pie_percentage_limit) {
@@ -8909,7 +8911,7 @@ sub print_host_session
 			delete $infos{"Sum sessions < $pie_percentage_limit%"};
 		}
 	}
-	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Connections per host', %infos);
+	$drawn_graphs{hostsessions_graph} = &jqplot_piegraph($graphid++, 'graph_hostsessions', 'Sessions per host', %infos);
 	$sess_host_info = qq{<tr><td colspan="4">$NODATA</td></tr>} if (!$total_count);
 	$total_count = &comma_numbers($total_count);
 	print $fh qq{
