@@ -34,10 +34,10 @@ $ret = `perl pgbadger -q --exclude-db cloudsqladmin --explode $GCPLOG && ls *.ht
 chomp($ret);
 ok( $? == 0 && ($ret == 2), "Test database exclusion with jsonlog");
 
-$ret = `perl pgbadger --disable-type --disable-session --disable-connection --disable-lock --disable-checkpoint --disable-autovacuum --prefix "%m [%p] %u@%d,%a,%h " -o out.txt t/fixtures/tempfile_only.log -q`;
+$ret = `perl pgbadger --disable-type --disable-session --disable-connection --disable-lock --disable-checkpoint --disable-autovacuum --disable-query -o out.txt t/fixtures/tempfile_only.log.gz -q`;
 $ret = `grep "Example.*SELECT" out.txt | wc -l`;
 chomp($ret);
-ok( $? == 0 && ($ret == 1), "Test log_temp_files only");
+ok( $? == 0 && ($ret == 9), "Test log_temp_files only");
 
 # Remove files generated during the tests
 `rm -f *.html`;
