@@ -1143,7 +1143,7 @@ if ($incremental)
 		localdie("FATAL: output HTML directory $html_outdir does not exists.\n");
 	}
 	# Set default last parsed file in incremental mode
-	if (!$last_parsed)
+	if (!$last_parsed && $incremental)
 	{
 		$last_parsed = $outdir . '/LAST_PARSED';
 	}
@@ -1317,6 +1317,7 @@ if ($last_parsed && -e $last_parsed)
 				$saved_last_line{current_pos} = $current_pos;
 				$saved_last_line{orig} = $orig;
 			}
+			&logmsg('DEBUG', "Found log offset " . ($saved_last_line{current_pos} || $pgb_saved_last_line{current_pos}) . " in file $last_parsed");
 		}
 		# Those two log format must be read from start of the file
 		if ( ($format eq 'binary') || ($format eq 'csv') )
@@ -1344,7 +1345,8 @@ if (!$noclean && $outdir &&
 	my $last_month = '';
 	my $last_day   = '';
 	# Search the current week following the last parse date
-	if ( ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) || ($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ) {
+	if ( ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) || ($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) )
+	{
 		$last_year  = $1;
 		$last_month = $2;
 		$last_day   = $3;
@@ -1399,16 +1401,17 @@ if (!$noclean && $outdir &&
 }
 
 # Clear storage when a retention is specified in incremental mode
-if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) ) {
-
+if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) )
+{
 	if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
-				($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
-
+				($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /))
+	{
 		# Search the current week following the last parse date
 		my $limit = $1;
 		my $wn = &get_week_number($1, $2, $3);
 		# Case of year overlap
-		if (($wn - $retention) < 1) {
+		if (($wn - $retention) < 1)
+		{
 			# Rewind to previous year
 			$limit--;
 			# Get number of last week of previous year, can be 52 or 53
@@ -1527,7 +1530,7 @@ foreach my $logfile ( @given_log_files )
 }
 
 # Verify that the file has not changed for incremental move
-if ($incremental && !$remote_host)
+if (($incremental || $last_parsed) && !$remote_host)
 {
 	my @tmpfilelist = ();
 	# Removed files that have already been parsed during previous runs
@@ -1612,7 +1615,7 @@ if ($incremental && !$remote_host)
 my $pipe = undef;
 
 # Seeking to an old log position is not possible outside incremental mode
-if (!$last_parsed) {
+if (!$last_parsed || !exists $saved_last_line{current_pos}) {
 	$saved_last_line{current_pos} = 0;
 	$pgb_saved_last_line{current_pos} = 0;
 }
@@ -1826,22 +1829,30 @@ foreach my $f (@tempfiles)
 # Get last line parsed from all process
 if ($last_parsed)
 {
-	if (open(my $in, '<', $tmp_last_parsed) ) {
-		while (my $line = <$in>) {
+	&logmsg('DEBUG', "Reading temporary last parsed line from $tmp_last_parsed");
+	if (open(my $in, '<', $tmp_last_parsed) )
+	{
+		while (my $line = <$in>)
+		{
 			chomp($line);
 			$line =~ s/\r//;
 			my ($d, $p, $l, @o) = split(/\t/, $line);
-			if ($d ne 'pgbouncer') {
-				if (!$last_line{datetime} || ($d gt $last_line{datetime})) {
+			if ($d ne 'pgbouncer')
+			{
+				if (!$last_line{datetime} || ($d gt $last_line{datetime}))
+				{
 					$last_line{datetime} = $d;
 					$last_line{orig} = $l;
 					$last_line{current_pos} = $p;
 				}
-			} else {
+			}
+			else
+			{
 				$d = $p;
 				$p = $l;
 				$l = join("\t", @o);
-				if (!$pgb_last_line{datetime} || ($d gt $pgb_last_line{datetime})) {
+				if (!$pgb_last_line{datetime} || ($d gt $pgb_last_line{datetime}))
+				{
 					$pgb_last_line{datetime} = $d;
 					$pgb_last_line{orig} = $l;
 					$pgb_last_line{current_pos} = $p;
@@ -1857,6 +1868,7 @@ if ($last_parsed)
 if ($last_parsed && ($last_line{datetime} || $pgb_last_line{datetime})
 	&& ($last_line{orig} || $pgb_last_line{orig}) )
 {
+	&logmsg('DEBUG', "Saving last parsed line into $last_parsed");
 	if (open(my $out, '>', $last_parsed))
 	{
 		if ($last_line{datetime})
@@ -3676,7 +3688,7 @@ sub process_file
 				}
 
 				# Jump to the last line parsed if required
-				next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+				next if (($incremental || $last_parsed) && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 				# Store the current timestamp of the log line
 				&store_current_timestamp($prefix_vars{'t_timestamp'}, $prefix_vars{'t_pid'});
@@ -3840,7 +3852,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, join(',', @$row)));
+					next if (($incremental || $last_parsed) && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, join(',', @$row)));
 
 					# Set query parameters as global variables
 					$prefix_vars{'t_dbuser'}  = $row->[1] || '';
@@ -4054,7 +4066,7 @@ sub process_file
 					next if ($res == 1);
 
 					# Jump to the last line parsed if required
-					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					next if (($incremental || $last_parsed) && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 					# We have reach previous incremental position (or we not in increment mode)
 					$goon = 1;
@@ -4155,7 +4167,7 @@ sub process_file
 					}
 
 					# Jump to the last line parsed if required
-					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					next if (($incremental || $last_parsed) && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 					# We have reach previous incremental position (or we not in increment mode)
 					$goon = 1;
 
@@ -4311,7 +4323,7 @@ sub process_file
 						last;
 					}
 					# Jump to the last line parsed if required
-					next if ($incremental && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
+					next if (($incremental || $last_parsed) && !&check_incremental_position($fmt, $prefix_vars{'t_timestamp'}, $line));
 
 					# We have reach previous incremental position (or we not in increment mode)
 					$goon = 1;
@@ -4374,7 +4386,9 @@ sub process_file
 			last if (($stop_offset > 0) && ($current_offset >= $stop_offset));
 		}
 
-		if ($goon && $last_parsed) {
+		if ($goon && $last_parsed)
+		{
+			&logmsg('DEBUG', "setting current position in log to $current_offset");
 			$last_line{current_pos} = $current_offset;
 		}
 	}
@@ -4503,14 +4517,19 @@ sub process_file
 	}
 
 	# Save last line into temporary file
-	if ($last_parsed && (scalar keys %last_line || scalar keys %pgb_last_line)) {
-		if (open(my $out, '>>', "$tmp_last_parsed")) {
+	if ($last_parsed && (scalar keys %last_line || scalar keys %pgb_last_line))
+	{
+		if (open(my $out, '>>', "$tmp_last_parsed"))
+		{
 			flock($out, 2) || return $getout;
-			if ($fmt =~ /pgbouncer/) {
+			if ($fmt =~ /pgbouncer/)
+			{
 				$pgb_last_line{current_pos} ||= 0;
 				&logmsg('DEBUG', "Saving pgbouncer last parsed line into $tmp_last_parsed ($pgb_last_line{datetime}\t$pgb_last_line{current_pos})");
 				print $out "pgbouncer\t$pgb_last_line{datetime}\t$pgb_last_line{current_pos}\t$pgb_last_line{orig}\n";
-			} else {
+			}
+			else
+			{
 				$last_line{current_pos} ||= 0;
 				&logmsg('DEBUG', "Saving last parsed line into $tmp_last_parsed ($last_line{datetime}\t$last_line{current_pos})");
 				print $out "$last_line{datetime}\t$last_line{current_pos}\t$last_line{orig}\n";
@@ -5025,8 +5044,10 @@ sub check_incremental_position
 {
 	my ($fmt, $cur_date, $line) = @_;
 
-	if ($last_parsed && ($fmt !~ /pgbouncer/)) {
-		if ($saved_last_line{datetime}) {
+	if ($last_parsed && ($fmt !~ /pgbouncer/))
+	{
+		if ($saved_last_line{datetime})
+		{
 			if ($cur_date lt $saved_last_line{datetime}) {
 				return 0;
 			} elsif (!$last_line{datetime} && ($cur_date eq $saved_last_line{datetime})) {
@@ -5035,8 +5056,11 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
-	} elsif ($last_parsed) {
-		if ($pgb_saved_last_line{datetime}) {
+	} 
+	elsif ($last_parsed)
+	{
+		if ($pgb_saved_last_line{datetime})
+		{
 			if ($cur_date lt $pgb_saved_last_line{datetime}) {
 				return 0;
 			} elsif (!$pgb_last_line{datetime} && ($cur_date eq $pgb_saved_last_line{datetime})) {
@@ -5048,14 +5072,16 @@ sub check_incremental_position
 	}
 
 	# In incremental mode data are saved to disk per day
-	if ($incremental) {
+	if ($incremental)
+	{
 		$cur_date =~ s/\s.*$//;
 		# Check if the current day has changed, if so save data
 		$incr_date = $cur_date if (!$incr_date);
-		if ($cur_date gt $incr_date) {
-
+		if ($cur_date gt $incr_date)
+		{
 			# Get stats from all pending temporary storage
-			foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info) {
+			foreach my $pid (sort {$cur_info{$a}{date} <=> $cur_info{$b}{date}} keys %cur_info)
+			{
 				# Stores last queries information
 				&store_queries($pid, 1);
 			}
@@ -5072,25 +5098,30 @@ sub check_incremental_position
 				&store_temporary_and_lock_infos($pid);
 			}
 			# Stores tsung sessions
-			if ($extens eq 'tsung') {
+			if ($extens eq 'tsung')
+			{
 				foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
 					&store_tsung_session($pid);
 				}
 			}
 
 			# set path and create subdirectories
-			if ($incr_date =~ /^(\d+)-(\d+)-(\d+)/) {
+			if ($incr_date =~ /^(\d+)-(\d+)-(\d+)/)
+			{
 				mkdir("$outdir/$1") if (!-d "$outdir/$1");
 				mkdir("$outdir/$1/$2") if (!-d "$outdir/$1/$2");
 				mkdir("$outdir/$1/$2/$3") if (!-d "$outdir/$1/$2/$3");
-			} else {
+			}
+			else
+			{
 				&logmsg('ERROR', "invalid incremental date: $incr_date, can not create subdirectories.");
 			}
 			my $bpath = $incr_date;
 			$bpath =~ s/\-/\//g;
 
 			# Mark this directory as needing a reindex
-			if (open(my $out, '>>' , "$last_parsed.tmp")) {
+			if (open(my $out, '>>' , "$last_parsed.tmp"))
+			{
 				flock($out, 2) || return 1;
 				print $out "$incr_date\n";
 				close($out);
@@ -18569,10 +18600,13 @@ sub split_logfile
 	}
 	my $i = 1;
 	my $lfile = &get_log_file($logf, $totalsize); # Get file handle to the file
-	if (defined $lfile) {
-		while ($i < $queue_size) {
+	if (defined $lfile)
+	{
+		while ($i < $queue_size)
+		{
 			my $pos = int(($totalsize/$queue_size) * $i);
-			if ($pos > $chunks[0]) {
+			if ($pos > $chunks[0])
+			{
 				$lfile->seek($pos, 0);
 				# Move the offset to the BEGINNING of each line, because
 				# the logic in process_file requires so

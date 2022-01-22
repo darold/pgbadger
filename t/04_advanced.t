@@ -1,4 +1,4 @@
-use Test::Simple tests => 6;
+use Test::Simple tests => 9;
 
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $SYSLOG1 = 't/fixtures/pg-syslog.1.bz2';
@@ -6,6 +6,7 @@ my $SYSLOG2 = 't/fixtures/pg-syslog.1.bz2';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 
+`rm t/cluster1_day_*.bin t/file_cluster1 2>/dev/null`;
 `rm *.html 2>/dev/null`;
 my $ret = `perl pgbadger -q --exclude-db=pgbench --explode $SYSLOG1 && ls *.html`;
 chomp($ret);
@@ -39,8 +40,22 @@ $ret = `grep "Example.*SELECT" out.txt | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret == 9), "Test log_temp_files only");
 
+$ret = `perl pgbadger --last-parsed t/file_cluster1 -o t/cluster1_day_1.bin t/fixtures/tempfile_only.log.gz -q`;
+$ret = `md5sum t/file_cluster1 | awk '{print \$1}'`;
+chomp($ret);
+ok( $? == 0 && ($ret eq "7faeb101abf32de3bc4e14fcf525e005" ), "Test last parse file without incremental mode");
+
+$ret = `perl pgbadger --last-parsed t/file_cluster1 -o t/cluster1_day_2.bin t/fixtures/tempfile_only.log.gz -q`;
+$ret = `ls -la t/cluster1_day_2.bin | awk '{print \$4}'`;
+chomp($ret);
+ok( $? == 0 && ($ret < 4000), "Second pass on last parse file without incremental mode");
+$ret = `md5sum t/file_cluster1 | awk '{print \$1}'`;
+chomp($ret);
+ok( $? == 0 && ($ret eq "7faeb101abf32de3bc4e14fcf525e005" ), "Last parse file must not have changed");
+
 # Remove files generated during the tests
 `rm -f *.html`;
 `rm -f out.txt`;
 `rm -rf $incr_outdir`;
+`rm t/cluster1_day_*.bin t/file_cluster1`;
 
