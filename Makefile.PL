@@ -46,6 +46,8 @@ ifneq ("$(USE_MARKDOWN)", "")
 	sed -i '1s/^/### TABLE OF CONTENTS\n\n/' $@.md
 	echo >> $@.md
 	pod2markdown $^ | sed 's/^## /#### /' | sed 's/^# /### /' >> $@.md
+else
+    $(warning You must install pod2markdown to generate README.md from doc/pgBadger.pod)
 endif
 
 .INTERMEDIATE: doc/synopsis.pod
