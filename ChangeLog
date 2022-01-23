@@ -1,3 +1,58 @@
+2022-01-23 - v11.7
+
+This release of pgBadger fix some issues reported by users since past
+five months as well as some improvements:
+
+* Add new option --no-progressbar option to not display it but keep the
+  other outputs.
+* Add new option --day-report that can be used to rebuild an HTML report
+  over the specified day. Like option --month-report but only for a day.
+  It requires the incremental output directories and the presence of all
+  necessary binary data files. The value is date in format: YYYY-MM-DD
+* Improve parsing of Heroku logplex and cloudsql json logs.
+
+Here is the complete list of changes and acknowledgments:
+
+- Update contribution guidelines and Makefile.PL to improve consistency,
+  clarity, and dependencies. Thanks to diffuse for the patch.
+- Fix use of last parse file (--last-parsed) with binary mode. Thanks to
+  wibrt for the report.
+- Add regression test for --last-parsed use and fix regression test on
+  report for temporary files only.
+- Fix title for session per host graph. Thanks to Norbert Bede for the
+  report.
+- Fix week number when computing weeks reports when --iso-week-number
+  and --incremental options was enabled. Thanks to hansgv for the report.
+- Add --no-progressbar option to not display it and keep the other outputs.
+  Thanks to seidlmic for the feature request.
+- Prevent too much unknown format line prints in debug mode for multi-line
+  jsonlog.
+- Fix parsing of single line cloudsql json log. Thanks to Thomas Leclaire
+  for the report.
+- Fix temporary files summary with log_temp_files only.
+- Print debug message with -v even if -q or --quiet is used.
+- Fix autodetection of jsonlog file.
+- Fix parsing of cloudsql log file. Thanks to Luc Lamarle for the report.
+- Fixes pid extraction in parse_json_input. Thanks to Francois Scala for
+  the patch.
+- Add new option --day-report with value as date in format: YYYY-MM-DD
+  that can be used to rebuild an HTML report over the specified day.
+  Thanks to Thomas Leclaire for the feature request.
+- Fix query counter in progress bar. Thanks to Guillaume Lelarge for the
+  report.
+- Fix incomplete queries stored for top bind and prepare reports.
+- Fix normalization of object identifier, in some case the numbers was
+  replaced by a ?.
+- Fix unformatted normalized queries when there is a comment at beginning.
+- Fix multi-line in stderr format when --dbname is used. Thanks to
+  Guillaume Lelarge for the report.
+- Fix not generated reports in incremental mode when --dbname is used.
+  Thanks to Dudley Perkins for the report.
+- Do not die anymore if a binary file is not compatible, switch to next
+  file. Thanks to Thomas Leclaire for the suggestion.
+- Fix Heroku logplex format change in pgbadger parser. Thanks to François
+  Pietka for the report.
+
 2021-09-04 - v11.6
 
 This release of pgBadger fix some issues reported by users since past
