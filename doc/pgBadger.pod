@@ -258,7 +258,7 @@ Reporting errors every week by cron job:
 
 Generate report every week using incremental behavior:
 
-    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` -o /var/reports/pg_errors-`date +\%F`.html -l /var/reports/pgbadger_incremental_file.dat
+    0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` -o /var/reports/pg_report-`date +\%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
 This supposes that your log file and HTML report are also rotated every week.
 
