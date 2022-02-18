@@ -300,6 +300,7 @@ my $quiet                   = 0;
 my $progress                = 1;
 my $error_only              = 0;
 my @exclude_query           = ();
+my @exclude_queryid         = ();
 my @exclude_time            = ();
 my @include_time            = ();
 my $exclude_file            = '';
@@ -510,6 +511,7 @@ my $result = GetOptions(
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
+	"exclude-queryid=s"        => \@exclude_queryid,
 	"exclude-file=s"           => \$exclude_file,
 	"exclude-db=s"             => \@exclude_db,
 	"exclude-client=s"         => \@exclude_client,
@@ -15646,6 +15648,13 @@ sub compute_arg_list
 	@exclude_client = ();
 	push(@exclude_client, @tmp);
 
+	@tmp = ();
+	foreach my $v (@exclude_queryid) {
+		push(@tmp, split(/,/, $v));
+	}
+	@exclude_queryid = ();
+	push(@exclude_queryid, @tmp);
+
 }
 
 sub validate_log_line
@@ -15765,6 +15774,16 @@ sub validate_log_line
 	{
 		# Log line matches the excluded dbclient
 		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_client))
+		{
+			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+			return 0;
+		}
+	}
+	if ($#exclude_queryid >= 0)
+	{
+		# Log line matches the excluded queryid
+		if ($prefix_vars{'t_queryid'} && grep(/^$prefix_vars{'t_queryid'}$/i, @exclude_queryid))
 		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
