@@ -280,7 +280,7 @@ my @dbappname               = ();
 my @exclude_user            = ();
 my @exclude_appname         = ();
 my @exclude_db              = ();
-my @exclude_client        = ();
+my @exclude_client          = ();
 my @exclude_line            = ();
 my $ident                   = '';
 my $top                     = 0;
@@ -5056,7 +5056,7 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
-	} 
+	}
 	elsif ($last_parsed)
 	{
 		if ($pgb_saved_last_line{datetime})
