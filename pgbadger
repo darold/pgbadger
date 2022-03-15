@@ -6421,6 +6421,7 @@ sub change_log_level
 	return 1 if ($msg =~ /using stale statistics/);
 	return 1 if ($msg =~ /replication command:/);
 	return 1 if ($msg =~ /still waiting for/);
+	return 1 if ($msg =~ /server process.*was terminated by signal/);
 
 	return 0;
 }
@@ -6437,6 +6438,7 @@ sub revert_log_level
 	return ($msg, 1) if ($msg =~ s/ERROR:  (using stale statistics)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (received replication command:)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (.*still waiting for)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (server process.*was terminated by signal)/LOG:  $1/);
 
 	return ($msg, 0);
 }
