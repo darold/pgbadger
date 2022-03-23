@@ -5029,7 +5029,7 @@ sub check_file_changed
 		if (!$more_lines)
 		{
 			close($lfile);
-			return (0, "there no new lines in this file");
+			return (0, "there are no new lines in this file");
 		}
 	}
 	close($lfile);
@@ -5056,7 +5056,7 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
-	} 
+	}
 	elsif ($last_parsed)
 	{
 		if ($pgb_saved_last_line{datetime})
