@@ -2586,6 +2586,8 @@ sub set_file_list
 				if ($host_info =~ s/:(\d+)$//) {
 					$host_info = "-p $1 $host_info";
 				}
+				$ssh .= " -i $ssh_identity" if ($ssh_identity);
+				$ssh .= " $ssh_options" if ($ssh_options);
 				my($filename, $dirs, $suffix) = fileparse($file);
 				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
 				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
@@ -18314,6 +18316,8 @@ sub get_file_size
 			if ($host_info =~ s/:(\d+)$//) {
 				$host_info = "-p $1 $host_info";
 			}
+			$ssh .= " -i $ssh_identity" if ($ssh_identity);
+			$ssh .= " $ssh_options" if ($ssh_options);
 			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l '$file'\" | awk '{print \$5}'");
 			$totalsize = `$ssh $host_info "ls -l '$file'" | awk '{print \$5}'`;
 			chomp($totalsize);
@@ -18373,6 +18377,8 @@ sub get_file_size
 			if ($host_info =~ s/:(\d+)$//) {
 				$host_info = "-p $1 $host_info";
 			}
+			$ssh .= " -i $ssh_identity" if ($ssh_identity);
+			$ssh .= " $ssh_options" if ($ssh_options);
 			$cmd_file_size =~ s/\%f/$file/g;
 			$cmd_file_size =~ s/\$/\\\$/g;
 			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"$cmd_file_size\"");
@@ -18512,6 +18518,8 @@ sub get_log_file
 							$host_info = "-p $1 $host_info";
 						}
 						my $ssh = $ssh_command || 'ssh';
+						$ssh .= " -i $ssh_identity" if ($ssh_identity);
+						$ssh .= " $ssh_options" if ($ssh_options);
 						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat '$file'\" |");
 						# Open a pipe to cat program
 						open($lfile, '-|', "$ssh $host_info \"cat '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat '$file'\". $!\n");
@@ -18540,6 +18548,8 @@ sub get_log_file
 					if ($host_info =~ s/:(\d+)$//) {
 						$host_info = "-p $1 $host_info";
 					}
+					$ssh .= " -i $ssh_identity" if ($ssh_identity);
+					$ssh .= " $ssh_options" if ($ssh_options);
 					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 '$file'\" |");
 					# Open a pipe to cat program
 					open($lfile, '-|', "$ssh $host_info \"tail -n 100 '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
@@ -18601,6 +18611,8 @@ sub get_log_file
 						if ($host_info =~ s/:(\d+)$//) {
 							$host_info = "-p $1 $host_info";
 						}
+						$ssh .= " -i $ssh_identity" if ($ssh_identity);
+						$ssh .= " $ssh_options" if ($ssh_options);
 						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 						# Open a pipe to zcat program for compressed log
 						open($lfile, '-|', "$ssh $host_info \"$uncompress '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
@@ -18629,6 +18641,8 @@ sub get_log_file
 					if ($host_info =~ s/:(\d+)$//) {
 						$host_info = "-p $1 $host_info";
 					}
+					$ssh .= " -i $ssh_identity" if ($ssh_identity);
+					$ssh .= " $ssh_options" if ($ssh_options);
 					&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
 					# Open a pipe to zcat program for compressed log
 					open($lfile, '-|', "$ssh $host_info \"$sample_cmd -m 100 '[1234567890]' '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$sample_cmd -m 100 '' '$file'\". $!\n");
