@@ -15667,7 +15667,8 @@ sub validate_log_line
 
 	# Set details about connection if prefix doesn't included them
 	# and log_connection is enabled
-	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
+	if ($prefix_vars{'t_loglevel'} eq 'LOG')
+	{
 		if ( !$prefix_vars{'t_client'} && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/) ) {
 			$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
 			return 1;
@@ -16115,8 +16116,8 @@ sub parse_query
 
 		return if ($disable_connection);
 
-		my $usr = $1;
-		my $db  = 'unknown';
+		my $usr = $current_sessions{$prefix_vars{'t_pid'}}{user} || '';
+		my $db  = $current_sessions{$prefix_vars{'t_pid'}}{database} || 'unknown';
 		my $host  = '';
 		if ($prefix_vars{'t_query'} =~ / database=([^\s]+)/) {
 			$db = $1;
