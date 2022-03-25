@@ -5032,7 +5032,7 @@ sub check_file_changed
 		if (!$more_lines)
 		{
 			close($lfile);
-			return (0, "there no new lines in this file");
+			return (0, "there are no new lines in this file");
 		}
 	}
 	close($lfile);
