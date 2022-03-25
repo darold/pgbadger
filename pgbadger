@@ -280,7 +280,7 @@ my @dbappname               = ();
 my @exclude_user            = ();
 my @exclude_appname         = ();
 my @exclude_db              = ();
-my @exclude_client        = ();
+my @exclude_client          = ();
 my @exclude_line            = ();
 my $ident                   = '';
 my $top                     = 0;
@@ -300,6 +300,7 @@ my $quiet                   = 0;
 my $progress                = 1;
 my $error_only              = 0;
 my @exclude_query           = ();
+my @exclude_queryid         = ();
 my @exclude_time            = ();
 my @include_time            = ();
 my $exclude_file            = '';
@@ -510,6 +511,7 @@ my $result = GetOptions(
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
+	"exclude-queryid=s"        => \@exclude_queryid,
 	"exclude-file=s"           => \$exclude_file,
 	"exclude-db=s"             => \@exclude_db,
 	"exclude-client=s"         => \@exclude_client,
@@ -927,6 +929,7 @@ my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote|ip|host|connection_source)=([^,\(]*)/;
 my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
+my $regex_prefix_queryid = qr/(?:queryid)=([^,]*)/;
 my $regex_prefix_sqlstate = qr/(?:error_code|state|state_code)=([^,]*)/;
 my $regex_prefix_backendtype = qr/(?:backend_type|btype)=([^,]*)/;
 
@@ -5056,7 +5059,7 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
-	} 
+	}
 	elsif ($last_parsed)
 	{
 		if ($pgb_saved_last_line{datetime})
@@ -5454,9 +5457,9 @@ sub convert_time
 # Stores the top N queries generating the biggest temporary file
 sub set_top_tempfile_info
 {
-	my ($curdb, $q, $sz, $date, $db, $user, $remote, $app, $info) = @_;
+	my ($curdb, $q, $sz, $date, $db, $user, $remote, $app, $info, $queryid) = @_;
 
-	push(@{$top_tempfile_info{$curdb}}, [($sz, $date, $q, $db, $user, $remote, $app, $info)]);
+	push(@{$top_tempfile_info{$curdb}}, [($sz, $date, $q, $db, $user, $remote, $app, $info, $queryid)]);
 
 	my @tmp_top_tempfile_info = sort {$b->[0] <=> $a->[0]} @{$top_tempfile_info{$curdb}};
 	@{$top_tempfile_info{$curdb}} = ();
@@ -5470,18 +5473,19 @@ sub set_top_tempfile_info
 # Stores top N slowest sample queries
 sub set_top_prepare_bind_sample
 {
-	my ($type, $q, $dt, $t, $param, $db, $user, $remote, $app) = @_;
+	my ($type, $q, $dt, $t, $param, $db, $user, $remote, $app, $queryid) = @_;
 
 	return if ($sample <= 0);
 
 	if ($type eq 'prepare') {
-		$prepare_info{$db}{$q}{samples}{$dt}{query}  = $q;
-		$prepare_info{$db}{$q}{samples}{$dt}{date}   = $t;
-		$prepare_info{$db}{$q}{samples}{$dt}{db}     = $db;
-		$prepare_info{$db}{$q}{samples}{$dt}{user}   = $user;
-		$prepare_info{$db}{$q}{samples}{$dt}{remote} = $remote;
-		$prepare_info{$db}{$q}{samples}{$dt}{app}    = $app;
-		$prepare_info{$db}{$q}{samples}{$dt}{params} = $param;
+		$prepare_info{$db}{$q}{samples}{$dt}{query}     = $q;
+		$prepare_info{$db}{$q}{samples}{$dt}{date}      = $t;
+		$prepare_info{$db}{$q}{samples}{$dt}{db}        = $db;
+		$prepare_info{$db}{$q}{samples}{$dt}{user}      = $user;
+		$prepare_info{$db}{$q}{samples}{$dt}{remote}    = $remote;
+		$prepare_info{$db}{$q}{samples}{$dt}{app}       = $app;
+		$prepare_info{$db}{$q}{samples}{$dt}{queryid}   = $queryid;
+		$prepare_info{$db}{$q}{samples}{$dt}{params}    = $param;
 		my $i = 1;
 		foreach my $k (sort {$b <=> $a} keys %{$prepare_info{$db}{$q}{samples}}) {
 			if ($i > $sample) {
@@ -5492,13 +5496,14 @@ sub set_top_prepare_bind_sample
 	}
 
 	if ($type eq 'bind') {
-		$bind_info{$db}{$q}{samples}{$dt}{query}  = $q;
-		$bind_info{$db}{$q}{samples}{$dt}{date}   = $t;
-		$bind_info{$db}{$q}{samples}{$dt}{db}     = $db;
-		$bind_info{$db}{$q}{samples}{$dt}{user}   = $user;
-		$bind_info{$db}{$q}{samples}{$dt}{remote} = $remote;
-		$bind_info{$db}{$q}{samples}{$dt}{app}    = $app;
-		$bind_info{$db}{$q}{samples}{$dt}{params} = $param;
+		$bind_info{$db}{$q}{samples}{$dt}{query}        = $q;
+		$bind_info{$db}{$q}{samples}{$dt}{date}         = $t;
+		$bind_info{$db}{$q}{samples}{$dt}{db}           = $db;
+		$bind_info{$db}{$q}{samples}{$dt}{user}         = $user;
+		$bind_info{$db}{$q}{samples}{$dt}{remote}       = $remote;
+		$bind_info{$db}{$q}{samples}{$dt}{app}          = $app;
+		$bind_info{$db}{$q}{samples}{$dt}{queryid}      = $queryid;
+		$bind_info{$db}{$q}{samples}{$dt}{params}       = $param;
 		my $i = 1;
 		foreach my $k (sort {$b <=> $a} keys %{$bind_info{$db}{$q}{samples}}) {
 			if ($i > $sample) {
@@ -5512,9 +5517,9 @@ sub set_top_prepare_bind_sample
 # Stores the top N queries cancelled
 sub set_top_cancelled_info
 {
-	my ($curdb, $q, $sz, $date, $db, $user, $remote, $app) = @_;
+	my ($curdb, $q, $sz, $date, $db, $user, $remote, $app, $queryid) = @_;
 
-	push(@{$top_cancelled_info{$curdb}}, [($sz, $date, $q, $db, $user, $remote, $app)]);
+	push(@{$top_cancelled_info{$curdb}}, [($sz, $date, $q, $db, $user, $remote, $app, $queryid)]);
 
 	my @tmp_top_cancelled_info = sort {$b->[0] <=> $a->[0]} @{$top_cancelled_info{$curdb}};
 	@{$top_cancelled_info{$curdb}} = ();
@@ -5527,9 +5532,9 @@ sub set_top_cancelled_info
 # Stores the top N queries waiting the most
 sub set_top_locked_info
 {
-	my ($curdb, $q, $dt, $date, $db, $user, $remote, $app) = @_;
+	my ($curdb, $q, $dt, $date, $db, $user, $remote, $app, $queryid) = @_;
 
-	push(@{$top_locked_info{$curdb}}, [($dt, $date, $q, $db, $user, $remote, $app)]);
+	push(@{$top_locked_info{$curdb}}, [($dt, $date, $q, $db, $user, $remote, $app, $queryid)]);
 
 	my @tmp_top_locked_info = sort {$b->[0] <=> $a->[0]} @{$top_locked_info{$curdb}};
 	@{$top_locked_info{$curdb}} = ();
@@ -5542,9 +5547,9 @@ sub set_top_locked_info
 # Stores the top N slowest queries
 sub set_top_slowest
 {
-	my ($curdb, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
+	my ($curdb, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan, $queryid) = @_;
 
-	push(@{$top_slowest{$curdb}}, [($dt, $date, $q, $db, $user, $remote, $app, $bind, $plan)]);
+	push(@{$top_slowest{$curdb}}, [($dt, $date, $q, $db, $user, $remote, $app, $bind, $plan, $queryid)]);
 
 	my @tmp_top_slowest = sort {$b->[0] <=> $a->[0]} @{$top_slowest{$curdb}};
 	@{$top_slowest{$curdb}} = ();
@@ -5557,18 +5562,19 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($curdb, $norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan) = @_;
+	my ($curdb, $norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan, $queryid) = @_;
 
 	return if (!$norm || !$q || $sample <= 0);
 
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{query}  = $q;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{date}   = $date;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{db}     = $db;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{user}   = $user;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{remote} = $remote;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{app}    = $app;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{bind}   = $bind;
-	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{plan}   = $plan;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{query}	= $q;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{date}	= $date;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{db}	= $db;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{user}	= $user;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{remote}	= $remote;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{app}	= $app;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{bind}	= $bind;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{plan}	= $plan;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{queryid}	= $queryid;
 
 	my $i = 1;
 	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$norm}{samples}}) {
@@ -5582,7 +5588,7 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($curdb, $q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote, $sqlstate) = @_;
+	my ($curdb, $q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote, $sqlstate, $queryid) = @_;
 
 	$errors_code{$curdb}{$sqlstate}++ if ($sqlstate);
 
@@ -5602,6 +5608,7 @@ sub set_top_error_sample
 			push(@{$error_info{$curdb}{$q}{app}},       $app);
 			push(@{$error_info{$curdb}{$q}{remote}},    $remote);
 			push(@{$error_info{$curdb}{$q}{sqlstate}},  $sqlstate);
+			push(@{$error_info{$curdb}{$q}{queryid}},   $queryid);
 		}
 	}
 }
@@ -5982,6 +5989,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6002,6 +6010,7 @@ Report not supported by text format
 			$db .= ", user: $top_locked_info{$curdb}[$i]->[4]" if ($top_locked_info{$curdb}[$i]->[4]);
 			$db .= ", remote: $top_locked_info{$curdb}[$i]->[5]" if ($top_locked_info{$curdb}[$i]->[5]);
 			$db .= ", app: $top_locked_info{$curdb}[$i]->[6]" if ($top_locked_info{$curdb}[$i]->[6]);
+			$db .= ", queryid: $top_locked_info{$curdb}[$i]->[7]" if ($top_locked_info{$curdb}[$i]->[7]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &convert_time($top_locked_info{$curdb}[$i]->[0]),
 			"  $ttl$db - ", &anonymize_query($top_locked_info{$curdb}[$i]->[2]), "\n";
@@ -6045,6 +6054,7 @@ Report not supported by text format
 					$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+					$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 					$db =~ s/^, / - /;
 					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6068,6 +6078,7 @@ Report not supported by text format
 			$db .= ", remote: $top_tempfile_info{$curdb}[$i]->[5]" if ($top_tempfile_info{$curdb}[$i]->[5]);
 			$db .= ", app: $top_tempfile_info{$curdb}[$i]->[6]" if ($top_tempfile_info{$curdb}[$i]->[6]);
 			$db .= ", info: $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
+			$db .= ", queryid: $top_tempfile_info{$curdb}[$i]->[8]" if ($top_tempfile_info{$curdb}[$i]->[8]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &comma_numbers($top_tempfile_info{$curdb}[$i]->[0]),
 			" - $ttl$db - ", &anonymize_query($top_tempfile_info{$curdb}[$i]->[2]), "\n";
@@ -6105,6 +6116,7 @@ Report not supported by text format
 					$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 					$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+					$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 					$db =~ s/^, / - /;
 					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6127,6 +6139,7 @@ Report not supported by text format
 			$db .= ", user: $top_cancelled_info{$curdb}[$i]->[4]" if ($top_cancelled_info{$curdb}[$i]->[4]);
 			$db .= ", remote: $top_cancelled_info{$curdb}[$i]->[5]" if ($top_cancelled_info{$curdb}[$i]->[5]);
 			$db .= ", app: $top_cancelled_info{$curdb}[$i]->[6]" if ($top_cancelled_info{$curdb}[$i]->[6]);
+			$db .= ", queryid: $top_cancelled_info{$curdb}[$i]->[7]" if ($top_cancelled_info{$curdb}[$i]->[7]);
 			$db =~ s/^, / - /;
 			print $fh ($i + 1), ")   ", &comma_numbers($top_cancelled_info{$curdb}[$i]->[0]),
 			" - $ttl$db - ", &anonymize_query($top_cancelled_info{$curdb}[$i]->[2]), "\n";
@@ -6144,6 +6157,7 @@ Report not supported by text format
 			$db .= ", user: $top_slowest{$curdb}[$i]->[4]" if ($top_slowest{$curdb}[$i]->[4]);
 			$db .= ", remote: $top_slowest{$curdb}[$i]->[5]" if ($top_slowest{$curdb}[$i]->[5]);
 			$db .= ", app: $top_slowest{$curdb}[$i]->[6]" if ($top_slowest{$curdb}[$i]->[6]);
+			$db .= ", queryid: $top_slowest{$curdb}[$i]->[9]" if ($top_slowest{$curdb}[$i]->[9]);
 			$db .= ", bind query: yes" if ($top_slowest{$curdb}[$i]->[7]);
 			$db =~ s/^, //;
 			print $fh $i + 1, ") " . &convert_time($top_slowest{$curdb}[$i]->[0]) . "$db - " . &anonymize_query($top_slowest{$curdb}[$i]->[2]) . "\n";
@@ -6181,6 +6195,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6221,6 +6236,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6261,6 +6277,7 @@ Report not supported by text format
 				$db .= ", user: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 				$db .= ", remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{yes});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
@@ -6478,6 +6495,7 @@ sub show_error_as_text
 				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[$i]\n"     if ($error_info{$k}{context}[$i]);
 				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[$i]\n"	   if ($error_info{$k}{hint}[$i]);
 				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[$i]), "\n" if ($error_info{$k}{statement}[$i]);
+				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[$i]\n" if ($error_info{$k}{queryid}[$i]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[$i]\n" if ($error_info{$k}{db}[$i]);
 				$j++;
 			}
@@ -6499,6 +6517,7 @@ sub show_error_as_text
 				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[0]\n"     if ($error_info{$curdb}{$k}{context}[0]);
 				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[0]\n"	   if ($error_info{$curdb}{$k}{hint}[0]);
 				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[0]), "\n" if ($error_info{$curdb}{$k}{statement}[0]);
+				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[0]\n" if ($error_info{$curdb}{$k}{queryid}[0]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[0]\n" if ($error_info{$curdb}{$k}{db}[0]);
 			}
 			else
@@ -11458,6 +11477,7 @@ sub print_lock_queries_report
 				$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 				$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 				$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+				$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 				my $explain = '';
 				if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
@@ -11524,7 +11544,8 @@ sub print_lock_queries_report
 		$details .= " - <b>User:</b> $top_locked_info{$curdb}[$i]->[4]" if ($top_locked_info{$curdb}[$i]->[4]);
 		$details .= " - <b>Remote:</b> $top_locked_info{$curdb}[$i]->[5]" if ($top_locked_info{$curdb}[$i]->[5]);
 		$details .= " - <b>Application:</b> $top_locked_info{$curdb}[$i]->[6]" if ($top_locked_info{$curdb}[$i]->[6]);
-		$details .= " - <b>Bind query:</b> yes" if ($top_locked_info{$curdb}[$i]->[7]);
+		$details .= " - <b>Queryid:</b> $top_locked_info{$curdb}[$i]->[7]" if ($top_locked_info{$curdb}[$i]->[7]);
+		$details .= " - <b>Bind query:</b> yes" if ($top_locked_info{$curdb}[$i]->[8]);
 		$details .= " ]";
 		my $time = &convert_time($top_locked_info{$curdb}[$i]->[0]);
 		print $fh qq{
@@ -11631,6 +11652,7 @@ sub print_tempfile_report
 					$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 					$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+					$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					if (exists $top_tempfile_info{$curdb} && $#{$top_tempfile_info{$curdb}} >= $i) {
 						$details .= "<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
 					}
@@ -11692,6 +11714,7 @@ sub print_tempfile_report
 			$details .= " - <b>User:</b> $top_tempfile_info{$curdb}[$i]->[4]" if ($top_tempfile_info{$curdb}[$i]->[4]);
 			$details .= " - <b>Remote:</b> $top_tempfile_info{$curdb}[$i]->[5]" if ($top_tempfile_info{$curdb}[$i]->[5]);
 			$details .= " - <b>Application:</b> $top_tempfile_info{$curdb}[$i]->[6]" if ($top_tempfile_info{$curdb}[$i]->[6]);
+			$details .= " - <b>Queryid:</b> $top_tempfile_info{$curdb}[$i]->[8]" if ($top_tempfile_info{$curdb}[$i]->[8]);
 			$details .= " ]";
 			$details .= "\n<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
 			my $query = &highlight_code(&anonymize_query($top_tempfile_info{$curdb}[$i]->[2]));
@@ -11779,6 +11802,7 @@ sub print_cancelled_report
 					$details .= "User: $normalyzed_info{$curdb}{$k}{samples}{$d}{user}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 					$details .= "Remote: $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$details .= "Application: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+					$details .= "Queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 					print $fh qq{
 						<dt>
@@ -11837,7 +11861,8 @@ sub print_cancelled_report
 			$details .= " - <b>User:</b> $top_cancelled_info{$curdb}[$i]->[4]" if ($top_cancelled_info{$curdb}[$i]->[4]);
 			$details .= " - <b>Remote:</b> $top_cancelled_info{$curdb}[$i]->[5]" if ($top_cancelled_info{$curdb}[$i]->[5]);
 			$details .= " - <b>Application:</b> $top_cancelled_info{$curdb}[$i]->[6]" if ($top_cancelled_info{$curdb}[$i]->[6]);
-			$details .= " - <b>Bind yes:</b> yes" if ($top_cancelled_info{$curdb}[$i]->[7]);
+			$details .= " - <b>Queryid:</b> $top_cancelled_info{$curdb}[$i]->[7]" if ($top_cancelled_info{$curdb}[$i]->[7]);
+			$details .= " - <b>Bind yes:</b> yes" if ($top_cancelled_info{$curdb}[$i]->[8]);
 			$details .= " ]";
 			my $query = &highlight_code(&anonymize_query($top_cancelled_info{$curdb}[$i]->[2]));
 			my $md5 = '';
@@ -11977,6 +12002,7 @@ sub print_slowest_individual_queries
 		$details .= " - <b>User:</b> $top_slowest{$curdb}[$i]->[4]" if ($top_slowest{$curdb}[$i]->[4]);
 		$details .= " - <b>Remote:</b> $top_slowest{$curdb}[$i]->[5]" if ($top_slowest{$curdb}[$i]->[5]);
 		$details .= " - <b>Application:</b> $top_slowest{$curdb}[$i]->[6]" if ($top_slowest{$curdb}[$i]->[6]);
+		$details .= " - <b>Queryid:</b> $top_slowest{$curdb}[$i]->[9]" if ($top_slowest{$curdb}[$i]->[9]);
 		$details .= " - <b>Bind query:</b> yes" if ($top_slowest{$curdb}[$i]->[7]);
 		$details .= " ]";
 		my $explain = '';
@@ -12225,6 +12251,7 @@ sub print_time_consuming
 			$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
@@ -12480,6 +12507,7 @@ sub print_most_frequent
 			$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
@@ -12735,6 +12763,7 @@ sub print_slowest_queries
 			$details .= "<b>User:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{user}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
@@ -12988,6 +13017,7 @@ sub print_prepare_consuming
 			$details .= "<b>User:</b> $prepare_info{$curdb}{$k}{samples}{$d}{user}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $prepare_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $prepare_info{$curdb}{$k}{samples}{$d}{app}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>Queryid:</b> $prepare_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>parameters:</b> ". &anonymize_query($prepare_info{$curdb}{$k}{samples}{$d}{params}) . "\n" if ($prepare_info{$curdb}{$k}{samples}{$d}{params});
 			$query = &highlight_code(&anonymize_query($prepare_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
@@ -13236,6 +13266,7 @@ sub print_bind_consuming
 			$details .= "<b>User:</b> $bind_info{$curdb}{$k}{samples}{$d}{user}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{user});
 			$details .= "<b>Remote:</b> $bind_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{remote});
 			$details .= "<b>Application:</b> $bind_info{$curdb}{$k}{samples}{$d}{app}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{app});
+			$details .= "<b>Queryid:</b> $bind_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($bind_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>parameters:</b> " . &anonymize_query($bind_info{$curdb}{$k}{samples}{$d}{params}) . "\n" if ($bind_info{$curdb}{$k}{samples}{$d}{params});
 			$query = &highlight_code(&anonymize_query($bind_info{$curdb}{$k}{samples}{$d}{query}));
 			my $md5 = '';
@@ -14041,6 +14072,7 @@ sub show_error_as_html
 			{
 				$details .= "<b>Database:</b> $error_info{$curdb}{$k}{db}[$i]\n";
 				$details .= "<b>Application:</b> $error_info{$curdb}{$k}{app}[$i]\n";
+				$details .= "<b>Queryid:</b> $error_info{$curdb}{$k}{queryid}[$i]\n" if ($error_info{$curdb}{$k}{queryid}[$i]);
 				$details .= "<b>User:</b> $error_info{$curdb}{$k}{user}[$i]\n";
 				$details .= "<b>Remote:</b> $error_info{$curdb}{$k}{remote}[$i]\n";
 				$details .= "<b>Code:</b> $error_info{$curdb}{$k}{sqlstate}[$i]\n" if ($error_info{$curdb}{$k}{sqlstate}[$i]);
@@ -14730,7 +14762,8 @@ sub load_stats
 										$_error_info{$curdb}{$q}{user}[$i],
 										$_error_info{$curdb}{$q}{app}[$i],
 										$_error_info{$curdb}{$q}{remote}[$i],
-										$_error_info{$curdb}{$q}{sqlstate}[$i]
+										$_error_info{$curdb}{$q}{sqlstate}[$i],
+										$_error_info{$curdb}{$q}{queryid}[$i]
 										);
 			}
 		}
@@ -15617,6 +15650,13 @@ sub compute_arg_list
 	@exclude_client = ();
 	push(@exclude_client, @tmp);
 
+	@tmp = ();
+	foreach my $v (@exclude_queryid) {
+		push(@tmp, split(/,/, $v));
+	}
+	@exclude_queryid = ();
+	push(@exclude_queryid, @tmp);
+
 }
 
 sub validate_log_line
@@ -15742,6 +15782,16 @@ sub validate_log_line
 			return 0;
 		}
 	}
+	if ($#exclude_queryid >= 0)
+	{
+		# Log line matches the excluded queryid
+		if ($prefix_vars{'t_queryid'} && grep(/^$prefix_vars{'t_queryid'}$/i, @exclude_queryid))
+		{
+			delete $current_sessions{$prefix_vars{'t_pid'}};
+			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+			return 0;
+		}
+	}
 	return 1;
 }
 
@@ -15771,6 +15821,11 @@ sub parse_log_prefix
 		# Search for application name
 		if ($t_logprefix =~ $regex_prefix_dbappname) {
 			$prefix_vars{'t_appname'} = $1;
+		}
+
+		# Search for queryid
+		if ($t_logprefix =~ $regex_prefix_queryid) {
+				$prefix_vars{'t_queryid'} = $1;
 		}
 
 		# Search for sql state code
@@ -15942,6 +15997,7 @@ sub parse_query
 			$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_lock_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
 			$cur_lock_info{$t_pid}{cur_db}    = $curdb;
 			return;
 		}
@@ -15954,6 +16010,7 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_cancel_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_cancel_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
 			$cur_cancel_info{$t_pid}{cur_db}    = $curdb;
 			return;
 		}
@@ -15988,6 +16045,7 @@ sub parse_query
 			$cur_lock_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'};
 			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
+			$cur_lock_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
 			$cur_lock_info{$t_pid}{cur_db}    = $curdb;
 		}
 		return;
@@ -16022,6 +16080,7 @@ sub parse_query
 			$cur_temp_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} || '';
 			$cur_temp_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_temp_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} || '';
+			$cur_temp_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'} || '';
 			$cur_temp_info{$t_pid}{cur_db}    = $curdb;
 		}
 		return;
@@ -16772,6 +16831,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'} if (!$cur_info{$t_pid}{timestamp});
 	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'} if (!$cur_info{$t_pid}{ident});
 	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'} if (!$cur_info{$t_pid}{query});
+	$cur_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'} if (!$cur_info{$t_pid}{queryid});
 	$cur_info{$t_pid}{duration}  = $prefix_vars{'t_duration'} if (!$cur_info{$t_pid}{duration});
 	$cur_info{$t_pid}{pid}       = $prefix_vars{'t_pid'} if (!$cur_info{$t_pid}{pid});
 	$cur_info{$t_pid}{session}   = $prefix_vars{'t_session_line'} if (!$cur_info{$t_pid}{session});
@@ -17026,6 +17086,7 @@ sub store_queries
 									$cur_info{$t_pid}{dbappname},
 									$cur_info{$t_pid}{dbclient},
 									$cur_info{$t_pid}{sqlstate},
+									$cur_info{$t_pid}{queryid},
 			);
 		}
 
@@ -17223,7 +17284,8 @@ sub store_queries
 										$cur_info{$t_pid}{dbclient},
 										$cur_info{$t_pid}{dbappname},
 										$cur_info{$t_pid}{bind},
-										$cur_info{$t_pid}{plan}
+										$cur_info{$t_pid}{plan},
+										$cur_info{$t_pid}{queryid}
 									);
 
 				# store normalized query total duration
@@ -17263,7 +17325,8 @@ sub store_queries
 										$cur_info{$t_pid}{dbclient},
 										$cur_info{$t_pid}{dbappname},
 										$cur_info{$t_pid}{bind},
-										$cur_info{$t_pid}{plan}
+										$cur_info{$t_pid}{plan},
+										$cur_info{$t_pid}{queryid}
 									);
 			}
 		}
@@ -17330,7 +17393,8 @@ sub store_queries
 									$cur_info{$t_pid}{'dbname'},
 									$cur_info{$t_pid}{'dbuser'},
 									$cur_info{$t_pid}{'dbclient'},
-									$cur_info{$t_pid}{'dbappname'}
+									$cur_info{$t_pid}{'dbappname'},
+									$cur_info{$t_pid}{'queryid'}
 							);
 			}
 
@@ -17393,7 +17457,8 @@ sub store_queries
 									$cur_info{$t_pid}{'dbname'},
 									$cur_info{$t_pid}{'dbuser'},
 									$cur_info{$t_pid}{'dbclient'},
-									$cur_info{$t_pid}{'dbappname'}
+									$cur_info{$t_pid}{'dbappname'},
+									$cur_info{$t_pid}{'queryid'}
 							);
 			}
 			delete $cur_bind_info{$t_pid};
@@ -17449,7 +17514,8 @@ sub store_temporary_and_lock_infos
 									$cur_temp_info{$t_pid}{dbuser},
 									$cur_temp_info{$t_pid}{dbclient},
 									$cur_temp_info{$t_pid}{dbappname},
-									$cur_temp_info{$t_pid}{info});
+									$cur_temp_info{$t_pid}{info},
+									$cur_temp_info{$t_pid}{queryid});
 
 		# Check if we don't have sample for this query (occurs when log_min_duration_statement doesn't logged the query)
 		if (!exists $normalyzed_info{$cur_temp_info{$t_pid}{cur_db}}{$normalized}{samples})
@@ -17461,7 +17527,10 @@ sub store_temporary_and_lock_infos
 									$cur_temp_info{$t_pid}{dbname},
 									$cur_temp_info{$t_pid}{dbuser},
 									$cur_temp_info{$t_pid}{dbclient},
-									$cur_temp_info{$t_pid}{dbappname});
+									$cur_temp_info{$t_pid}{dbappname},
+									$cur_temp_info{$t_pid}{bind},
+									$cur_temp_info{$t_pid}{plan},
+									$cur_temp_info{$t_pid}{queryid});
 		}
 		delete $cur_temp_info{$t_pid};
 	}
@@ -17496,7 +17565,8 @@ sub store_temporary_and_lock_infos
 									$cur_lock_info{$t_pid}{dbname},
 									$cur_lock_info{$t_pid}{dbuser},
 									$cur_lock_info{$t_pid}{dbclient},
-									$cur_lock_info{$t_pid}{dbappname});
+									$cur_lock_info{$t_pid}{dbappname},
+									$cur_lock_info{$t_pid}{queryid});
 
 		# Check if we don't have sample for this query (occurs when log_min_duration_statement doesn't logged the query)
 		if (!exists $normalyzed_info{$cur_lock_info{$t_pid}{cur_db}}{$normalized}{samples}) {
@@ -17507,7 +17577,10 @@ sub store_temporary_and_lock_infos
 									$cur_lock_info{$t_pid}{dbname},
 									$cur_lock_info{$t_pid}{dbuser},
 									$cur_lock_info{$t_pid}{dbclient},
-									$cur_lock_info{$t_pid}{dbappname});
+									$cur_lock_info{$t_pid}{dbappname},
+									$cur_lock_info{$t_pid}{bind},
+									$cur_lock_info{$t_pid}{plan},
+									$cur_lock_info{$t_pid}{queryid});
 		}
 		delete $cur_lock_info{$t_pid};
 	}
@@ -17535,7 +17608,8 @@ sub store_temporary_and_lock_infos
 									$cur_cancel_info{$t_pid}{dbname},
 									$cur_cancel_info{$t_pid}{dbuser},
 									$cur_cancel_info{$t_pid}{dbclient},
-									$cur_cancel_info{$t_pid}{dbappname}
+									$cur_cancel_info{$t_pid}{dbappname},
+									$cur_cancel_info{$t_pid}{queryid}
 								);
 
 		delete $cur_cancel_info{$t_pid};
@@ -18146,12 +18220,12 @@ sub build_log_line_prefix_regex
 	if ($llp =~ s/(.*)\%q(.*)/$1$2/) {
 		$q_prefix =  $1;
 	}
-	while ($llp =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
+	while ($llp =~ s/(\%[audrhpQntmlscvxieb])/$regex_map{"$1"}->[1]/) {
 		push(@$param_list, $regex_map{"$1"}->[0]);
 	}
 	my $q_prefix_param = [];
 		if ($q_prefix) {
-		while ($q_prefix =~ s/(\%[audrhpntmlscvxie])/$regex_map{"$1"}->[1]/) {
+		while ($q_prefix =~ s/(\%[audrhpQntmlscvxieb])/$regex_map{"$1"}->[1]/) {
 			push(@$q_prefix_param, $regex_map{"$1"}->[0]);
 		}
 		push(@$q_prefix_param, 't_loglevel', 't_query');
