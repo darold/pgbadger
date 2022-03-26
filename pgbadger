@@ -4980,7 +4980,9 @@ sub check_file_changed
 	# Incremental mode is not possible for the moment with http download
 	return 1 if ($file =~ /^(http[s]*:|[s]*ftp:)/);
 
-	my $lfile = &get_log_file($file, $totalsize);
+	my $ssh_download   = ($file =~ /^ssh:/i) ? 1 : 0;
+
+	my $lfile = &get_log_file($file, $totalsize, $remote_host || $ssh_download);
 	return if (!defined $lfile);
 
 	# Compressed files do not allow seeking
@@ -17752,7 +17754,7 @@ sub autodetect_format
 	elsif (!$http_download && !$log_command && !$journalctl_cmd)
 	{
 		# try to detect syslogs, stderr, csv, jsonlog or pgbouncer format
-		my $tfile = &get_log_file($file, $totalsize, $remote_host);
+		my $tfile = &get_log_file($file, $totalsize, $remote_host || $ssh_download);
 		if (defined $tfile)
 		{
 			while (my $line = <$tfile>)
@@ -17964,7 +17966,7 @@ sub progress_bar
 
 	return if (!$progress);
 
-        my ($package, $filename, $line) = caller;
+	#my ($package, $filename, $line) = caller;
 	$width ||= 25;
 	$char  ||= '=';
 

@@ -41,7 +41,7 @@ ok( $? == 0 && $ret > 0, "Light log from STDIN");
 $ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > t/ret.json`;
 my $ret2 = `stat --printf='%s' t/ret.json $TEXT $JSON`;
 chomp($ret);
-ok( $? == 0 && $ret2 eq '13478015985134780', "Multiple output format '$ret2' = '13478015985134780'");
+ok( $? == 0 && $ret2 eq '13511215985135112', "Multiple output format '$ret2' = '13511215985135112'");
 
 $ret = `perl pgbadger -q -o - $SYSLOG`;
 ok( $? == 0 && (length($ret) >= 24060), "syslog report to stdout");
