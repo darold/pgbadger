@@ -2358,7 +2358,7 @@ but pgBadger can parse both format.
 
 To create a cumulative report over a month use command:
 
-    pgbadger --month-report 2919-05 /path/to/incremantal/reports/
+    pgbadger --month-report 2919-05 /path/to/incremental/reports/
 
 this will add a link to the month name into the calendar view in
 incremental reports to look at report for month 2019 May.
@@ -5056,7 +5056,7 @@ sub check_incremental_position
 		}
 		$last_line{datetime} = $cur_date;
 		$last_line{orig}     = $line;
-	} 
+	}
 	elsif ($last_parsed)
 	{
 		if ($pgb_saved_last_line{datetime})

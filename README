@@ -326,7 +326,7 @@ SYNOPSIS
 
     To create a cumulative report over a month use command:
 
-        pgbadger --month-report 2919-05 /path/to/incremantal/reports/
+        pgbadger --month-report 2919-05 /path/to/incremental/reports/
 
     this will add a link to the month name into the calendar view in
     incremental reports to look at report for month 2019 May. Use -E or
