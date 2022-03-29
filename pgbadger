@@ -3530,13 +3530,14 @@ sub process_file
 	if (($logfile ne '-') && ($fmt ne 'binary') && ($fmt ne 'csv') && !$http_download)
 	{
 		if ($start_offset && !$chunk_pos) {
-			my ($retcode, $msg) = check_file_changed($logfile, $file_size{$logfile}, $fmt, ($fmt =~ /pgbouncer/) ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 1);
-			if ($retcode) {
+			my ($retcode, $msg) = check_file_changed($logfile, $file_size{$logfile}, $fmt, ($fmt =~ /pgbouncer/) ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 0);
+			if ($retcode <= 0)
+			{
 				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile, $msg");
-				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stoppping offset is " . ($stop_offset || $totalsize));
+				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stopping offset is " . ($stop_offset || $totalsize));
 				$start_offset = 0;
 			} else {
-				&logmsg('DEBUG', "This log might not be parsed: $logfile, $msg");
+				#	&logmsg('DEBUG', "This log might not be parsed: $logfile, $msg");
 			}
 			$cursize = $start_offset;
 		}
@@ -4987,10 +4988,10 @@ sub check_file_changed
 
 	# Compressed files do not allow seeking
 	my $iscompressed   = ($file =~ $compress_extensions) ? 1 : 0;
-	if ($iscompressed) {
+	if ($iscompressed)
+	{
 		close($lfile);
-		return (1, "log file is compressed");
-
+		return (-1, "log file is compressed");
 	}
 
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
@@ -5058,7 +5059,7 @@ sub check_incremental_position
 			if ($cur_date lt $saved_last_line{datetime}) {
 				return 0;
 			} elsif (!$last_line{datetime} && ($cur_date eq $saved_last_line{datetime})) {
-				return 0 if ($line ne $saved_last_line{orig});
+				return 0;
 			}
 		}
 		$last_line{datetime} = $cur_date;
