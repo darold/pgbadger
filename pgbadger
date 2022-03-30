@@ -4907,6 +4907,7 @@ sub detect_new_log_line
 		}
 		else
 		{
+			%prefix_vars = ();
 			my @matches = ($line =~ $compiled_prefix);
 			if ($#matches >= 0)
 			{
