@@ -6445,6 +6445,7 @@ sub change_log_level
 	return 1 if ($msg =~ /replication command:/);
 	return 1 if ($msg =~ /still waiting for/);
 	return 1 if ($msg =~ /server process.*was terminated by signal/);
+	return 1 if ($msg =~ /could not (receive|send) data (from|to) client/);
 
 	return 0;
 }
@@ -6462,6 +6463,7 @@ sub revert_log_level
 	return ($msg, 1) if ($msg =~ s/ERROR:  (received replication command:)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (.*still waiting for)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (server process.*was terminated by signal)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (could not (?:receive|send) data (?:from|to) client)/LOG:  $1/);
 
 	return ($msg, 0);
 }
@@ -16628,7 +16630,7 @@ sub parse_query
 	elsif ($is_log_level)
 	{
 		if ($prefix_vars{'t_query'} !~
-/incomplete startup packet|connection|receive|unexpected EOF|could not send data to client|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
+/incomplete startup packet|connection|unexpected EOF|parameter .*configuration file|autovacuum launcher|automatic (analyze|vacuum)|detected deadlock while waiting for/
 		   )
 		{
 			#&logmsg('DEBUG', "Unrecognized line: $prefix_vars{'t_loglevel'}: $prefix_vars{'t_query'} at line $nlines");
