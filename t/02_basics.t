@@ -8,6 +8,8 @@ my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 my $WEEKDAYLOG = 't/fixtures/weeknumber.log';
 
+`rm -rf t/test_incr/ 2>/dev/null`;
+
 my $ret = `perl pgbadger --help`;
 ok( $? == 0, "Inline help");
 

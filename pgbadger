@@ -3531,13 +3531,11 @@ sub process_file
 	{
 		if ($start_offset && !$chunk_pos) {
 			my ($retcode, $msg) = check_file_changed($logfile, $file_size{$logfile}, $fmt, ($fmt =~ /pgbouncer/) ? $pgb_saved_last_line{datetime} : $saved_last_line{datetime}, $start_offset, 0);
-			if ($retcode <= 0)
+			if ($retcode != 1)
 			{
 				&logmsg('DEBUG', "This file should be parsed from the beginning: $logfile, $msg");
 				&logmsg('DEBUG', "Reverting start offset $start_offset to 0 for file $logfile, stopping offset is " . ($stop_offset || $totalsize));
 				$start_offset = 0;
-			} else {
-				#	&logmsg('DEBUG', "This log might not be parsed: $logfile, $msg");
 			}
 			$cursize = $start_offset;
 		}
@@ -4854,12 +4852,14 @@ sub detect_new_log_line
 	my ($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset) = @_;
 
 	my $more_lines = 0;
+	my $num_line_checked = 0;
 
 	while (my $line = <$lfile>)
 	{
 		$line =~ s/\r//;
 		chomp($line);
 		next if (!$line);
+		$num_line_checked++;
 
 		if ($fmt =~ /syslog|logplex/)
 		{
@@ -4955,7 +4955,7 @@ sub detect_new_log_line
 		if ($saved_date gt $prefix_vars{'t_timestamp'})
 		{
 			close($lfile);
-			return (0, "timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
+			return (0, "this file has already been parsed, timestamp $prefix_vars{'t_timestamp'} read at offset $startoffset is lower than saved timestamp: $saved_date");
 		}
 		elsif ($saved_date eq $prefix_vars{'t_timestamp'})
 		{
@@ -4974,33 +4974,96 @@ sub detect_new_log_line
 
 # Method used to check if the file stores logs after the last incremental position or not
 # This position should have been saved in the incremental file and read in the $last_parsed at
-# start up. Here we just verify that the first date in file is before the last incremental date.
+# start up.
+#
+# How does pgBadger detect that a log file need not to be parsed?
+#
+# In process_file():
+# 
+# File LAST_PARSED is not present in the incremental output directory
+#         => the log is fully parsed.
+# 
+# 
+# File LAST_PARSED is present, read the size of the last parsed log and the timestamp from
+# this file then for each log file provided
+# 
+# If the total size of the log (uncompressed) is smaller than the history size
+# or we can not determine the real file size of a compressed file (ex: bzip2)
+#         => read the log from start and exclude all lines older than the history timestamp
+# 
+# If logfile is input from stdin, in binary or csv format, it is download through an http request
+#         => read the log from start and exclude all lines older than the history timestamp
+# 
+# Call check_file_changed(), return code:
+#	- -1 : the file must be parsed from the beginning
+# 	-  0 : the log has already be parsed
+# 	-  1 : the log must be parsed from the history offset
+# 
+#   - If this is a remote log downloaded using http[s] or [s]ftp, we can not move/seek to the historical position/offset
+#         => return -1, read the log from start and exclude all lines older than the history timestamp
+# 
+#   - If this is a compressed remote log we can not move/seek to the historical position/offset
+#         => return -1, read the log from start and exclude all lines older than the history timestamp
+#            Use of zhead and ztail can cost too much in remote mode, just return -1
+# 
+#   - If the log file is compressed we can not seek to history position, the entire file must be read
+#         => return -1, this file must be parsed from start excluding all lines older than the history timestamp
+# 
+#   - If the history size is smaller than the total size fo the log file:
+#         => move/seek to the history size/offset and look at the next line timestamp
+#            though method detect_new_log_line().
+#   - If the history size is equal to the total size fo the log file:
+#         => rewind/seek to history size/offset - 8192
+# 
+#   - Then go through method detect_new_log_line():
+# 
+#         => if the history timestamp is newer than the current line parsed
+#                 => return 0, this file has already been parsed
+#         => if the current line parsed has the same timestamp than the history timestamp
+#                 => go to next line
+#         => if the next line is newer than the history timestamp
+#                 => return 1, the log will be parsed starting from the history size/offset.
+# 
+#   - If more new line (1) has been returned by detect_new_log_line(), move/seek at the start of
+#     of the log and check the timestamp of the first line.
+#         => if the timestamp of the first line is newer than the history timestamp
+#                 => return -1, "the file is new, the entire file must be parsed"
+#         => else
+#                 => return 1, "the file will parsed from history position and history date"
+#   - else
+#         => return 0, "no new line found in this log"
+# 
 sub check_file_changed
 {
 	my ($file, $totalsize, $fmt, $saved_date, $saved_pos, $look_at_beginning) = @_;
 
-	# Incremental mode is not possible for the moment with http download
-	return 1 if ($file =~ /^(http[s]*:|[s]*ftp:)/);
+	# With http[s] or [s]ftp download we can not seek to the historical position
+	if ($file =~ /^(http[s]*:|[s]*ftp:)/) {
+		return (-1, "no incremental mode for http[s] or [s]ftp download");
+	}
 
 	my $ssh_download   = ($file =~ /^ssh:/i) ? 1 : 0;
+	my $http_download  = ($file =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
+	my $iscompressed   = ($file =~ $compress_extensions) ? 1 : 0;
 
 	my $lfile = &get_log_file($file, $totalsize, $remote_host || $ssh_download);
-	return if (!defined $lfile);
-
-	# Compressed files do not allow seeking
-	my $iscompressed   = ($file =~ $compress_extensions) ? 1 : 0;
-	if ($iscompressed)
-	{
-		close($lfile);
-		return (-1, "log file is compressed");
-	}
+	return (-1, "cannot open file $file") if (!defined $lfile);
 
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
 	my $current_date = $gyear . sprintf("%02d", $gmon + 1) . sprintf("%02d", $gmday);
+	my $startoffset = 0;
+
+	# Compressed files do not allow seeking so we will return 0 or 2
+	if ($iscompressed)
+	{
+		close($lfile);
+
+		return (-1, "seek into compressed file is not supported, the entire file must be parsed");
+	}
 
 	%prefix_vars = ();
-	my $startoffset = 0;
+	
 	# If seeking is not explicitely disabled
 	if (!$look_at_beginning)
 	{
@@ -5030,20 +5093,23 @@ sub check_file_changed
 	}
 
 	my ($more_lines, $msg) = detect_new_log_line($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset);
-	if (!$more_lines)
+	if ($more_lines)
 	{
 		$lfile->seek(0, 0);
 		$startoffset = 0;
 		($more_lines, $msg) = detect_new_log_line($lfile, $fmt, $current_date, $gyear, $saved_date, $startoffset);
-		if (!$more_lines)
-		{
-			close($lfile);
-			return (0, "there are no new lines in this file");
+		close($lfile);
+		if ($more_lines) {
+			return (-1, "the file is new, the entire file must be parsed");
 		}
 	}
-	close($lfile);
+	else
+	{
+		close($lfile);
+		return (0, "no new line found in this log");
+	}
 
-	return (1, "reach the end of check_file_changed() with start date: $saved_date and file size: $totalsize") ;
+	return (1, "the file will parsed from history position $startoffset and history date: $saved_date") ;
 }
 
 # Method used to check if we have already reached the last parsing position in incremental mode
@@ -18438,6 +18504,34 @@ sub get_file_size
 	return $totalsize;
 }
 
+sub uncompress_commands
+{
+	my $file = shift();
+
+	return if (!$file);
+
+	my $uncompress = $zcat;
+	my $sample_cmd = 'zgrep';
+	if (($file =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/))
+	{
+		$uncompress = $bzcat;
+		$sample_cmd = 'bzgrep';
+	} elsif (($file =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
+		$uncompress = $ucat;
+	} elsif (($file =~ /\.lz4/i) && ($zcat =~ /^$zcat_cmd$/)) {
+		$uncompress = $lz4cat;
+	} elsif (($file =~ /\.zst/i) && ($zcat =~ /^$zcat_cmd$/)) {
+		$uncompress = $zstdcat;
+	}
+	elsif (($file =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/))
+	{
+		$uncompress = $xzcat;
+		$sample_cmd = 'xzgrep';
+	}
+
+	return ($uncompress, $sample_cmd);
+}
+
 sub get_log_file
 {
 	my ($logf, $totalsize, $sample_only) = @_;
@@ -18583,24 +18677,7 @@ sub get_log_file
 	}
 	else
 	{
-		my $uncompress = $zcat;
-		my $sample_cmd = 'zgrep';
-		if (($logf =~ /\.bz2/i) && ($zcat =~ /^$zcat_cmd$/))
-		{
-			$uncompress = $bzcat;
-			$sample_cmd = 'bzgrep';
-		} elsif (($logf =~ /\.zip/i) && ($zcat =~ /^$zcat_cmd$/)) {
-			$uncompress = $ucat;
-		} elsif (($logf =~ /\.lz4/i) && ($zcat =~ /^$zcat_cmd$/)) {
-			$uncompress = $lz4cat;
-		} elsif (($logf =~ /\.zst/i) && ($zcat =~ /^$zcat_cmd$/)) {
-			$uncompress = $zstdcat;
-		}
-		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/))
-		{
-			$uncompress = $xzcat;
-			$sample_cmd = 'xzgrep';
-		}
+		my ($uncompress, $sample_cmd) = &uncompress_commands($logf);
 
 		if (!$remote_host && !$http_download && !$ssh_download)
 		{
@@ -18695,7 +18772,7 @@ sub split_logfile
 			$chunks[0] = $saved_pos;
 		}
 	}
-	# With small files splitting is inefficient
+	# With small files < 16MB splitting is inefficient
 	if ($totalsize <= 16777216) {
 		return ($chunks[0], $totalsize);
 	}
