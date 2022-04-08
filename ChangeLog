@@ -1,3 +1,39 @@
+2022-04-08 - v11.8
+
+This release of pgBadger fix some issues reported by users since past
+three months and especially two fixes on new log entries detection in
+incremental mode.
+
+  * Fix detection of new log entries with timestamp when millisecond (%m) or
+    epoch (%n) was used in log_line_prefix.
+  * Fix detection of new log entries in local file when multiprocess was not
+    used.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Full review and simplification of the log file change detection.
+  - Reports messages "could not (receive|send) data (from|to) client" in the
+    Events reports. Thanks to Adrien Nayrat for the report.
+  - Fix parsing issue when the name of a prepared query contain the ':'
+    character. Thanks to aleszeleny for the report.
+  - Fix detection of new log entries with timestamp when millisecond (%m) or
+    epoch (%n). Thanks to aleszeleny for the report.
+  - Fix detection of new log entries in local file when multiprocess was not
+    used. Thanks to aleszeleny for the report.
+  - Fix detection of new log entries in remote files through ssh. Thanks to
+    Luca Ferrari for the report
+  - Fix garbage in username of "Connections per user" report. Thanks to
+    caseyandgina for the report.
+  - Fix ssh command when using URI, the ssh options was missing. Thanks to Luca
+    Ferrari for the report.
+  - Handle queryid %Q placeholder. Thanks to Adrien Nayrat for the patch.
+  - Fix typo in error sentence. Thanks to Luca Ferrari for the patch
+  - Report message: "server process was terminated by signal" in the Events
+    report. Thanks to Avi Vallarapu for the report.
+  - doc: fix filename for incremental every week command. Thanks to Theophile
+    Helleboid for the patch.
+  - t/04_advanced.t: Fix syslog test. Thanks to Christoph Berg for the patch.
+
 2022-01-23 - v11.7
 
 This release of pgBadger fix some issues reported by users since past
