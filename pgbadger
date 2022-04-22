@@ -6558,19 +6558,19 @@ sub show_error_as_text
 			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++)
 			{
 				last if ($i == $sample);
-				($error_info{$curdb}{$k}{error}[$i], $ret) = &revert_log_level($error_info{$k}{error}[$i]);
+				($error_info{$curdb}{$k}{error}[$i], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
 				if ($msg && ($logs_type{$curdb}{ERROR} > 0))
 				{
 					$logs_type{$curdb}{ERROR}--;
 					$logs_type{$curdb}{LOG}++;
 				}
-				print $fh "\t- Example $j: $error_info{$curdb}{$k}{date}[$i] - $error_info{$k}{error}[$i]\n";
-				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[$i]\n"       if ($error_info{$k}{detail}[$i]);
-				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[$i]\n"     if ($error_info{$k}{context}[$i]);
-				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[$i]\n"	   if ($error_info{$k}{hint}[$i]);
-				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[$i]), "\n" if ($error_info{$k}{statement}[$i]);
-				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[$i]\n" if ($error_info{$k}{queryid}[$i]);
-				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[$i]\n" if ($error_info{$k}{db}[$i]);
+				print $fh "\t- Example $j: $error_info{$curdb}{$k}{date}[$i] - $error_info{$curdb}{$k}{error}[$i]\n";
+				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[$i]\n"       if ($error_info{$curdb}{$k}{detail}[$i]);
+				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[$i]\n"     if ($error_info{$curdb}{$k}{context}[$i]);
+				print $fh "\t\tHint: $error_info{$curdb}{$k}{hint}[$i]\n"	   if ($error_info{$curdb}{$k}{hint}[$i]);
+				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[$i]), "\n" if ($error_info{$curdb}{$k}{statement}[$i]);
+				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[$i]\n" if ($error_info{$curdb}{$k}{queryid}[$i]);
+				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[$i]\n" if ($error_info{$curdb}{$k}{db}[$i]);
 				$j++;
 			}
 		}
