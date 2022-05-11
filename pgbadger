@@ -4621,7 +4621,7 @@ sub parse_jsonlog_input
 
 
 	# Extract the date
-	if ($str =~ m/[\{,]"timestamp":\s*"(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)\.(\d+)/)
+	if ($str =~ m/[\{,]"timestamp":\s*"(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/)
 	{
 		$infos{'t_year'} = $1;
 		$infos{'t_month'} = $2;
@@ -4629,10 +4629,8 @@ sub parse_jsonlog_input
 		$infos{'t_hour'} = $4;
 		$infos{'t_min'} = $5;
 		$infos{'t_sec'} = $6;
-		my $milli = $7 || 0;
 		$infos{'t_timestamp'} = "$infos{'t_year'}-$infos{'t_month'}-$infos{'t_day'} $infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
     $infos{'t_time'} = "$infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
-
 	}
 
 	# Set query parameters as global variables
