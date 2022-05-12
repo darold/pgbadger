@@ -8843,10 +8843,10 @@ sub print_user_session
 	my @main_user = ('unknown',0);
 	foreach my $u (sort keys %{$session_info{$curdb}{user}})
 	{
-		$session_info{user}{$u}{count} ||= 1;
-		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($session_info{user}{$u}{count}) .
-				   "</td><td>" . &convert_time($session_info{user}{$u}{duration}) . "</td><td>" .
-				   &convert_time($session_info{user}{$u}{duration} / $session_info{user}{$u}{count}) .
+		$session_info{$curdb}{user}{$u}{count} ||= 1;
+		$sess_user_info .= "<tr><td>$u</td><td>" . &comma_numbers($session_info{$curdb}{user}{$u}{count}) .
+				   "</td><td>" . &convert_time($session_info{$curdb}{user}{$u}{duration}) . "</td><td>" .
+				   &convert_time($session_info{$curdb}{user}{$u}{duration} / $session_info{$curdb}{user}{$u}{count}) .
 				   "</td></tr>";
 		$total_count += $session_info{$curdb}{user}{$u}{count};
 		if ($main_user[1] < $session_info{$curdb}{user}{$u}{count}) {
@@ -9315,7 +9315,6 @@ sub print_database_session
 							<thead>
 								<tr>
 									<th>Database</th>
-									<th>User</th>
 									<th>Count</th>
 									<th>Total Duration</th>
 									<th>Average Duration</th>
