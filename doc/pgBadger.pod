@@ -441,6 +441,7 @@ pgBadger can also be used in a central place to parse remote log files using a
 passwordless SSH connection. This mode can be used with compressed files and in
 the multiprocess per file mode (-J) but can not be used with the CSV log format.
 
+Example of reports can be found here https://pgbadger.darold.net/#reports
 
 =head1 REQUIREMENT
 
