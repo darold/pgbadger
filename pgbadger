@@ -18338,6 +18338,7 @@ sub get_file_size
 	my $logf = shift;
 
 	# Remove log format from log file if any
+	$logf =~ s/[\r\n]+//sg;
 	$logf =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
 
 	my $http_download  = ($logf =~ /^(http[s]*:|[s]*ftp:)/i) ? 1 : 0;
@@ -18386,6 +18387,8 @@ sub get_file_size
 		} elsif ($ssh_download && $logf =~ m#^ssh:\/\/([^\/]+)/(.*)#i) {
 			my $host_info = $1;
 			my $file = $2;
+			$file =~ s/[\r\n]+//sg;
+			$file =~ s/:(stderr|csv|syslog|pgbouncer|jsonlog|logplex|rds|redshift)\d*$//i;
 			my $ssh = $ssh_command || 'ssh';
 			if ($host_info =~ s/:(\d+)$//) {
 				$host_info = "-p $1 $host_info";
