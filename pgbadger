@@ -15837,24 +15837,30 @@ sub validate_log_line
 			return 0;
 		}
 	}
-	if ($#exclude_appname >= 0)
+	if ($#exclude_appname >= 0 && $prefix_vars{'t_appname'})
 	{
 		# Log line matches the excluded appname
-		if ($prefix_vars{'t_appname'} && grep(/^\Q$prefix_vars{'t_appname'}\E$/i, @exclude_appname))
+		foreach my $p (@exclude_appname)
 		{
-			delete $current_sessions{$prefix_vars{'t_pid'}};
-			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
-			return 0;
+			if ($prefix_vars{'t_appname'} =~ /^$p$/i)
+			{
+				delete $current_sessions{$prefix_vars{'t_pid'}};
+				delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+				return 0;
+			}
 		}
 	}
-	if ($#exclude_client >= 0)
+	if ($#exclude_client >= 0 && $prefix_vars{'t_client'})
 	{
 		# Log line matches the excluded dbclient
-		if ($prefix_vars{'t_client'} && grep(/^$prefix_vars{'t_client'}$/i, @exclude_client))
+		foreach my $p (@exclude_client)
 		{
-			delete $current_sessions{$prefix_vars{'t_pid'}};
-			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
-			return 0;
+			if ($prefix_vars{'t_client'} =~ /^$p$/i)
+			{
+				delete $current_sessions{$prefix_vars{'t_pid'}};
+				delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+				return 0;
+			}
 		}
 	}
 	if ($#exclude_queryid >= 0)
