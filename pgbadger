@@ -15913,6 +15913,36 @@ sub parse_log_prefix
 	}
 }
 
+sub is_excluded_query
+{
+	my $query = shift;
+
+	foreach (@exclude_query)
+	{
+		if ($query =~ /$_/i)
+		{
+			$query = '';
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+sub is_included_query
+{
+	my $query = shift;
+	foreach (@include_query)
+	{
+		if ($query =~ /$_/i)
+		{
+			$query = '';
+			return 1;
+		}
+	}
+	return 0;
+}
+
 sub parse_query
 {
 	my $fmt = shift;
@@ -16613,6 +16643,13 @@ sub parse_query
 		$t_action = $2;
 		$t_action =~ s/ from fetch//;
 		$t_action = 'prepare' if ($t_action eq 'parse');
+
+		# Should we have to exclude some queries
+		return 1 if ($#exclude_query >= 0 && &is_excluded_query($prefix_vars{'t_query'}));
+
+		# Should we have to include only some queries
+		return 1 if ($#include_query >= 0 && !&is_included_query($prefix_vars{'t_query'}));
+
 		$overall_stat{$t_action}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
 		if ($t_action !~ /query|statement|execute/)
@@ -16660,6 +16697,13 @@ sub parse_query
 		$t_action = $1;
 		$t_action =~ s/ from fetch//;
 		$t_action = 'prepare' if ($t_action eq 'parse');
+
+		# Should we have to exclude some queries
+		return 1 if ($#exclude_query >= 0 && &is_excluded_query($prefix_vars{'t_query'}));
+
+		# Should we have to include only some queries
+		return 1 if ($#include_query >= 0 && !&is_included_query($prefix_vars{'t_query'}));
+
 		$overall_stat{$t_action}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{$t_action}++;
 		# Skipping parse and bind logs but after storing their duration time
@@ -17071,24 +17115,10 @@ sub store_queries
 		}
 
 		# Should we have to exclude some queries
-		if ($#exclude_query >= 0) {
-			foreach (@exclude_query) {
-				if ($cur_info{$t_pid}{query} =~ /$_/i) {
-					$cur_info{$t_pid}{query} = '';
-					return 1;
-				}
-			}
-		}
+		return 1 if ($#exclude_query >= 0 && &is_excluded_query($cur_info{$t_pid}{query}));
 
 		# Should we have to include only some queries
-		if ($#include_query >= 0) {
-			foreach (@include_query) {
-				if ($cur_info{$t_pid}{query} !~ /$_/i) {
-					$cur_info{$t_pid}{query} = '';
-					return 1;
-				}
-			}
-		}
+		return 1 if ($#include_query >= 0 && !&is_included_query($cur_info{$t_pid}{query}));
 
 		# Dump queries as tsung request and return
 		if ($is_tsung_output) {
