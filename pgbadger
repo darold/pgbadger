@@ -4724,7 +4724,7 @@ sub parse_orphan_line
 	}
 
 	# Store vacuum related information
-	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^\t*(pages|tuples|buffer usage|avg read rate|system usage|WAL usage):/))
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^[\s\t]*(pages|tuples|buffer usage|avg read rate|system usage|WAL usage):/))
 	{
 		if ($line =~ /(pages|tuples): (\d+) removed, (\d+) remain/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
