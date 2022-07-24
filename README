@@ -101,6 +101,7 @@ SYNOPSIS
                                  zcat or bzcat or unzip is not in your path.
         -Z | --timezone +/-XX  : Set the number of hours from GMT of the timezone.
                                  Use this to adjust date/time in JavaScript graphs.
+                                 The value can be an integer, ex: 2 or a float: 2.5.
         --pie-limit num        : pie data lower than num% will show a sum instead.
         --exclude-query regex  : any query matching the given regex will be excluded
                                  from the report. For example: "^(VACUUM|COMMIT)"
@@ -174,6 +175,7 @@ SYNOPSIS
                                  that must be used to adjust date/time read from
                                  log file before beeing parsed. Using this option
                                  make more difficult log search with a date/time.
+                                 The value can be an integer, ex: 2 or a float: 2.5.
         --prettify-json        : use it if you want json output to be prettified.
         --month-report YYYY-MM : create a cumulative HTML report over the specified
                                  month. Requires incremental output directories and
@@ -188,7 +190,7 @@ SYNOPSIS
         --no-week              : inform pgbadger to not build weekly reports in
                                  incremental mode. Useful if it takes too much time.
         --explain-url URL      : use it to override the url of the graphical explain
-                                 tool. Default: http://explain.depesz.com/?is_public=0&is_anon=0&plan=
+                                 tool. Default: http://explain.depesz.com/
         --tempdir DIR          : set directory where temporary files will be written
                                  Default: File::Spec->tmpdir() || '/tmp'
         --no-process-info      : disable changing process title to help identify
@@ -259,7 +261,7 @@ SYNOPSIS
 
     Generate report every week using incremental behavior:
 
-        0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` -o /var/reports/pg_report-`date +\%F`.html -l /var/reports/pgbadger_incremental_file.dat
+        0 4 * * 1 /usr/bin/pgbadger -q `find /var/log/ -mtime -7 -name "postgresql.log*"` -o /var/reports/pg_errors-`date +\%F`.html -l /var/reports/pgbadger_incremental_file.dat
 
     This supposes that your log file and HTML report are also rotated every
     week.

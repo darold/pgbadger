@@ -120,6 +120,7 @@ Options:
                              zcat or bzcat or unzip is not in your path.
     -Z | --timezone +/-XX  : Set the number of hours from GMT of the timezone.
                              Use this to adjust date/time in JavaScript graphs.
+                             The value can be an integer, ex: 2 or a float: 2.5.
     --pie-limit num        : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
                              from the report. For example: "^(VACUUM|COMMIT)"
@@ -193,6 +194,7 @@ Options:
                              that must be used to adjust date/time read from
                              log file before beeing parsed. Using this option
                              make more difficult log search with a date/time.
+                             The value can be an integer, ex: 2 or a float: 2.5.
     --prettify-json        : use it if you want json output to be prettified.
     --month-report YYYY-MM : create a cumulative HTML report over the specified
                              month. Requires incremental output directories and
@@ -207,7 +209,7 @@ Options:
     --no-week              : inform pgbadger to not build weekly reports in
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
-                             tool. Default: http://explain.depesz.com/?is_public=0&is_anon=0&plan=
+                             tool. Default: http://explain.depesz.com/
     --tempdir DIR          : set directory where temporary files will be written
                              Default: File::Spec->tmpdir() || '/tmp'
     --no-process-info      : disable changing process title to help identify
@@ -456,6 +458,8 @@ specify the granularity down to the minute.
 pgBadger can also be used in a central place to parse remote log files using a
 passwordless SSH connection. This mode can be used with compressed files and in
 the multiprocess per file mode (-J) but can not be used with the CSV log format.
+
+Example of reports can be found here https://pgbadger.darold.net/#reports
 
 ### REQUIREMENT
 

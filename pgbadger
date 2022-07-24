@@ -508,7 +508,7 @@ my $result = GetOptions(
 	"x|extension=s"            => \$extension,
 	"X|extra-files!"           => \$extra_files,
 	"z|zcat=s"                 => \$zcat,
-	"Z|timezone=s"             => \$opt_timezone,
+	"Z|timezone=f"             => \$opt_timezone,
 	"pie-limit=i"              => \$pie_percentage_limit,
 	"image-format=s"           => \$img_format,
 	"exclude-query=s"          => \@exclude_query,
@@ -554,7 +554,7 @@ my $result = GetOptions(
 	'start-monday!'	           => \$week_start_monday,
 	'iso-week-number!'	   => \$iso_week_number,
 	'normalized-only!'	   => \$dump_normalized_only,
-	'log-timezone=i'	   => \$opt_log_timezone,
+	'log-timezone=f'	   => \$opt_log_timezone,
 	'prettify-json!'	   => \$json_prettify,
 	'month-report=s'	   => \$month_report,
 	'day-report=s'	           => \$day_report,
@@ -2144,6 +2144,7 @@ Options:
 			     zcat or bzcat or unzip is not in your path.
     -Z | --timezone +/-XX  : Set the number of hours from GMT of the timezone.
 			     Use this to adjust date/time in JavaScript graphs.
+			     The value can be an integer, ex: 2 or a float: 2.5.
     --pie-limit num	   : pie data lower than num% will show a sum instead.
     --exclude-query regex  : any query matching the given regex will be excluded
 			     from the report. For example: "^(VACUUM|COMMIT)"
@@ -2217,6 +2218,7 @@ Options:
 			     that must be used to adjust date/time read from
 			     log file before beeing parsed. Using this option
 			     make more difficult log search with a date/time.
+			     The value can be an integer, ex: 2 or a float: 2.5.
     --prettify-json	   : use it if you want json output to be prettified.
     --month-report YYYY-MM : create a cumulative HTML report over the specified
                              month. Requires incremental output directories and
