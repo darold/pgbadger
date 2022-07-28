@@ -75,7 +75,6 @@ Options:
                              the given size. Default truncate size is 100000.
     -M | --no-multiline    : do not collect multiline statements to avoid garbage
                              especially on errors that generate a huge report.
-    -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html, out.txt, out.bin,

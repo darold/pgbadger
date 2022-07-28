@@ -291,7 +291,6 @@ my $maxlength               = 100000;
 my $graph                   = 1;
 my $nograph                 = 0;
 my $debug                   = 0;
-my $nohighlight             = 0;
 my $noprettify              = 0;
 my $from                    = '';
 my $to                      = '';
@@ -486,7 +485,6 @@ my $result = GetOptions(
 	"m|maxlength=i"            => \$maxlength,
 	"M|no-multiline!"          => \$nomultiline,
 	"N|appname=s"              => \@dbappname,
-	"n|nohighlight!"           => \$nohighlight,
 	"o|outfile=s"              => \@outfiles,
 	"O|outdir=s"               => \$outdir,
 	"p|prefix=s"               => \$log_line_prefix,
@@ -2099,7 +2097,6 @@ Options:
 			     the given size. Default truncate size is $maxlength.
     -M | --no-multiline    : do not collect multiline statements to avoid garbage
 			     especially on errors that generate a huge report.
-    -n | --nohighlight     : disable SQL code highlighting.
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
 			     on the output format: out.html, out.txt, out.bin,
@@ -15648,7 +15645,6 @@ sub highlight_code
 		$sql_prettified->beautify();
 		$code = $sql_prettified->content();
 	}
-	return $code if ($nohighlight);
 
 	if ($wide_char)
 	{
