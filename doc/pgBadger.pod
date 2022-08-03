@@ -148,7 +148,7 @@ Options:
     --exclude-line regex   : exclude any log entry that will match the given
     			     regex. Can be used multiple times.
     --exclude-client name  : exclude log entries for the specified client ip.
-			     Can be used multiple timeis.
+			     Can be used multiple times.
     --anonymize	           : obscure all literals in queries, useful to hide
 			     confidential data.
     --noreport	           : no reports will be created in incremental mode.
@@ -164,7 +164,7 @@ Options:
                              execution of pgBadger. Default: pgbadger.pid
     --rebuild              : used to rebuild all html reports in incremental
                              output directories where there's binary data files.
-    --pgbouncer-only       : nly show PgBouncer-related menu in the header.
+    --pgbouncer-only       : only show PgBouncer-related menus in the header.
     --start-monday	   : in incremental mode, calendar weeks start on
 			     Sunday. Use this option to start on a Monday.
     --iso-week-number      : in incremental mode, calendar weeks start on
@@ -315,9 +315,9 @@ rds format:
 
     pgbadger -f rds -o rds_out.html rds.log
 
-Each CloudSQL Postgresql log is fairly normal PostgreSQL log, but encapsulated
-in JSON format. It is autodetected too by pgBagder, but in case you need to force
-the log format, use `jsonlog`
+Each CloudSQL Postgresql log is a fairly normal PostgreSQL log, but encapsulated
+in JSON format. It is autodetected by pgBadger but in case you need to force
+the log format use `jsonlog`:
 
     pgbadger -f jsonlog -o cloudsql_out.html cloudsql.log
 
@@ -334,7 +334,7 @@ Use -E or --explode if the reports were built using this option.
 
 =head1 DESCRIPTION
 
-pgBadger is a PostgreSQL log analyzer built for fast providing fully
+pgBadger is a PostgreSQL log analyzer built for speed providing fully
 detailed reports based on your PostgreSQL log files. It's a small standalone
 Perl script that outperforms any other PostgreSQL log analyzer.
 
@@ -348,9 +348,9 @@ pgBadger is able to autodetect your log file format (syslog, stderr, csvlog
 or jsonlog) if the file is long enough. It is designed to parse huge log
 files as well as compressed files. Supported compressed formats are gzip,
 bzip2, lz4, xz, zip and zstd. For the xz format you must have an xz version
-higher than 5.05 that supports the --robot option. For pgbadger to determine
-uncompressed file size with lz4, file must be compressed with --content-size
-option. For the complete list of features, see below.
+higher than 5.05 that supports the --robot option. lz4 files must be
+compressed with the --content-size option for pgbadger to determine the
+uncompressed file size. For the complete list of features, see below.
 
 
 All charts are zoomable and can be saved as PNG images.
