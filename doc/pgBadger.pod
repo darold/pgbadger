@@ -224,6 +224,14 @@ http[s] and [s]ftp. The curl command will be used to download the file, and the
 file will be parsed during download. The ssh protocol is also supported and will
 use the ssh command like with the remote host use. See examples bellow.
 
+Return codes:
+
+    0: on success
+    1: die on error
+    2: if it has been interrupted using ctr+c for example
+    3: the pid file already exists or can not be created
+    4: no log file was given at command line
+
 Examples:
 
     pgbadger /var/log/postgresql.log

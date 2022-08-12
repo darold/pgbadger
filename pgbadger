@@ -451,7 +451,7 @@ sub wait_child
 	{
 		unlink("$PID_FILE");
 	}
-	_exit(0);
+	_exit(2);
 }
 $SIG{INT} = \&wait_child;
 $SIG{TERM} = \&wait_child;
@@ -599,7 +599,7 @@ if ($enable_checksum)
 	}
 }
 
-# Check if an other process is already running
+# Check if another process is already running
 unless ($PID_FILE) {
   $PID_FILE = $PID_DIR . '/pgbadger.pid';
 }
@@ -613,7 +613,7 @@ if (-e "$PID_FILE")
 	if (!$@ && ($is_running <= 1)) {
 		unlink("$PID_FILE");
 	} else {
-		print "FATAL: an other process is already started or remove the file, see $PID_FILE\n";
+		print "FATAL: another process is already started or remove the file, see $PID_FILE\n";
 		exit 3;
 	}
 }
@@ -706,7 +706,7 @@ if (!$rebuild && $empty_files)
 if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command)
 {
 	if (!$quiet) {
-		localdie("FATAL: you must give a log file at command line parameter.\n\n");
+		localdie("FATAL: you must give a log file at command line parameter.\n\n", 4);
 	}
 	else
 	{
@@ -2263,6 +2263,14 @@ http[s] and [s]ftp. The curl command will be used to download the file, and the
 file will be parsed during download. The ssh protocol is also supported and will
 use the ssh command like with the remote host use. See examples bellow.
 
+Return codes:
+
+    0: on success
+    1: die on error
+    2: if it has been interrupted using ctr+c for example
+    3: the pid file already exists or can not be created
+    4: no log file was given at command line
+
 Examples:
 
     pgbadger /var/log/postgresql.log
@@ -2731,7 +2739,7 @@ sub set_parser_regex
 		elsif ($fmt =~ /^rds$/)
 		{
 		       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
-		       # With Cloudwatch it is prefixed with an other timestamp
+		       # With Cloudwatch it is prefixed with another timestamp
 
 		       $llp = '^' . $llp
 			      . '(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
@@ -2785,7 +2793,7 @@ sub set_parser_regex
 	elsif ($fmt eq 'rds')
 	{
 	       # The output format of the RDS pg logs is as follows: %t:%r:%u@%d:[%p]: message
-	       # With Cloudwatch it is prefixed with an other timestamp
+	       # With Cloudwatch it is prefixed with another timestamp
 
 	       $compiled_prefix =
 			 qr/^(?:\d+-\d+-\d+T\d+:\d+:\d+\.\d+Z)?\s*(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)\s*[^:]*:([^:]*):([^\@]*)\@([^:]*):\[(\d+)\]:(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
@@ -17208,7 +17216,7 @@ sub store_queries
 	elsif ($cur_info{$t_pid}{loglevel} eq 'LOG')
 	{
 
-		# Store auto explain plan when switching to an other log entry
+		# Store auto explain plan when switching to another log entry
 		if (exists $cur_plan_info{$t_pid}{plan})
 		{
 			$cur_plan_info{$t_pid}{plan} =~ s/^\s+//s;
@@ -19087,13 +19095,13 @@ sub _gethostbyaddr
 
 sub localdie
 {
-	my $msg = shift;
+	my ($msg, $code) = @_;
 
 	my ($package, $filename, $line) = caller;
 	print STDERR "$msg    - Error at line $line\n";
 	unlink("$PID_FILE");
 
-	exit 1;
+	exit($code || 1);
 }
 
 ####
@@ -19464,7 +19472,7 @@ Takes options as hash. Following options are recognized:
 
 =item * wrap - wraps given keywords in pre- and post- markup. Specific docs in SQL::Beautify
 
-=item * format_type - try an other formatting
+=item * format_type - try another formatting
 
 =item * wrap_limit - wrap queries at a certain length
 
@@ -23340,7 +23348,7 @@ sub _remove_dynamic_code
     if ($#dynsep == -1)
     {
         # if a dollar sign is found after EXECUTE then the following string
-        # until an other dollar is found will be understand as a text delimiter
+        # until another dollar is found will be understand as a text delimiter
         @dynsep = $$str =~ /EXECUTE\s+(\$[^\$\s]*\$)/igs;
     }
 
