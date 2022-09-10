@@ -16586,10 +16586,7 @@ sub parse_query
 					$cur_info{$t_pid}{query} = $prefix_vars{'t_query'} . ' - ' . $real_query;
 					$cur_info{$t_pid}{'bind'} = 1;
 					my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
-					for (my $i = 0 ; $i <= $#t_res ; $i++) {
-						my $num = $i + 1;
-						$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/s;
-					}
+					$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 				}
 				# go look at other params
 				return;
@@ -17059,21 +17056,14 @@ sub store_queries
 		# Replace bind parameters values in the query if any
 		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
 		{
-			my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
-			shift(@t_res);
-			for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-				$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/gs;
-			}
+			my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:,|$)/g;
+			$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 		}
 		else
 		{
 			# parameters from EXECUTE statements
 			my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
-			for (my $i = 0 ; $i <= $#t_res ; $i++)
-			{
-				my $num = $i + 1;
-				$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/gs;
-			}
+			$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 		}
 		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
 		print $fh "# Query #", $query_numbering++, "\n" if ($query_numbering);
@@ -17105,21 +17095,14 @@ sub store_queries
 	# Replace bind parameters values in the query if any
 	if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
 	{
-		my @t_res = split(/[,\s]*\$(\d+)\s=\s/, $cur_info{$t_pid}{parameters});
-		shift(@t_res);
-		for (my $i = 0 ; $i < $#t_res ; $i += 2) {
-			$cur_info{$t_pid}{query} =~ s/\$$t_res[$i]\b/$t_res[$i+1]/gs;
-		}
+		my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:,|$)/g;
+		$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 	}
 	else
 	{
 		# parameters from EXECUTE statements
 		my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
-		for (my $i = 0 ; $i <= $#t_res ; $i++)
-		{
-			my $num = $i + 1;
-			$cur_info{$t_pid}{query} =~ s/\$$num\b/$t_res[$i]/gs;
-		}
+		$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 	}
 
 	# We only process stored object with query here
