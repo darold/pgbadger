@@ -4016,6 +4016,7 @@ sub process_file
 						}
 					}
 					delete $prefix_vars{'t_textPayload'};
+					$prefix_vars{'t_query'} = unescape_jsonlog($prefix_vars{'t_query'});
 
 					$prefix_vars{'t_pid'} = $prefix_vars{'t_session_id'} if ($use_sessionid_as_pid);
 
@@ -15990,17 +15991,18 @@ sub parse_query
 	# Force some LOG messages to be ERROR messages so that they will appear
 	# in the event/error/warning messages report.
 	####
-	if ($prefix_vars{'t_loglevel'} eq 'LOG') {
+	if ($prefix_vars{'t_loglevel'} eq 'LOG')
+	{
 		if (&change_log_level($prefix_vars{'t_query'})) {
 			$prefix_vars{'t_loglevel'} = 'ERROR';
 		} else {
 			$is_log_level = 1;
 		}
-
-	} elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only) {
-
-		if ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/) {
-
+	}
+	elsif (($prefix_vars{'t_loglevel'} eq 'ERROR') && !$error_only)
+	{
+		if ($prefix_vars{'t_query'} =~ /canceling statement due to statement timeout/)
+		{
 			# Stores cancelled queries
 			return if ($disable_query);
 			$cancelled_info{$curdb}{count}++;
@@ -16026,18 +16028,22 @@ sub parse_query
 	}
 
 	# Remove session failure from current workload because there is no disconnection entry
-	if (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'FATAL')) {
-		delete $current_sessions{$prefix_vars{'t_pid'}};
-		delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+	if (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'FATAL'))
+	{
+		delete $current_sessions{$t_pid};
+		delete $last_execute_stmt{$t_pid};
 		if ($is_tsung_output) {
-			delete $tsung_session{$prefix_vars{'t_pid'}}
+			delete $tsung_session{$t_pid}
 		}
-	} elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING')) {
-		if ($prefix_vars{'t_query'} =~ /terminating connection/) {
-			delete $current_sessions{$prefix_vars{'t_pid'}};
-			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+	}
+	elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING'))
+	{
+		if ($prefix_vars{'t_query'} =~ /terminating connection/)
+		{
+			delete $current_sessions{$t_pid};
+			delete $last_execute_stmt{$t_pid};
 			if ($is_tsung_output) {
-				delete $tsung_session{$prefix_vars{'t_pid'}}
+				delete $tsung_session{$t_pid}
 			}
 		}
 	}
@@ -16086,7 +16092,9 @@ sub parse_query
 	}
 
 	# Stores the error's detail if previous line was an error
-	if (exists $cur_info{$t_pid} && ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/) && ($cur_info{$t_pid}{loglevel} =~ $main_error_regex)) {
+	if (exists $cur_info{$t_pid} && ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/)
+		&& ($cur_info{$t_pid}{loglevel} =~ $main_error_regex))
+	{
 		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
 			# Store error details only if this is not a parameter list (never present with errors)
 			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
@@ -16098,16 +16106,19 @@ sub parse_query
 	}
 
 	# Special cases when a STATEMENT is parsed
-	if ($prefix_vars{'t_loglevel'} eq 'STATEMENT') {
+	if ($prefix_vars{'t_loglevel'} eq 'STATEMENT')
+	{
 		# Stores temporary file statement if a temporary record with the same pid exists
-		if ( exists $cur_temp_info{$t_pid}{size}) {
+		if ( exists $cur_temp_info{$t_pid}{size})
+		{
 			# Store query of the last temporary file found.
 			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
 			return;
 		}
 
 		# Stores query related to last lock information
-		if (exists $cur_lock_info{$t_pid}{wait}) {
+		if (exists $cur_lock_info{$t_pid}{wait})
+		{
 			$cur_lock_info{$t_pid}{query}     = $prefix_vars{'t_query'};
 			$cur_lock_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 			$cur_lock_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
@@ -16120,7 +16131,8 @@ sub parse_query
 		}
 
 		# Stores query related to cancelled queries information
-		if (exists $cur_cancel_info{$t_pid}{count}) {
+		if (exists $cur_cancel_info{$t_pid}{count})
+		{
 			$cur_cancel_info{$t_pid}{query}     = $prefix_vars{'t_query'};
 			$cur_cancel_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'};
 			$cur_cancel_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'};
@@ -16131,6 +16143,7 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{cur_db}    = $curdb;
 			return;
 		}
+
 	}
 
 	# set current session workload
@@ -16206,7 +16219,7 @@ sub parse_query
 	# Stores pre-connection activity
 	if ($is_log_level && ($prefix_vars{'t_query'} =~ /connection received: host=([^\s]+)(?: port=(\d+))?/))
 	{
-		$current_sessions{$prefix_vars{'t_pid'}}{host} = $1;
+		$current_sessions{$t_pid}{host} = $1;
 		return if ($disable_connection);
 		$conn_received{$t_pid} = $1;
 		$conn_received{$t_pid} = _gethostbyaddr($conn_received{$t_pid}) if ($dns_resolv);
@@ -16217,21 +16230,21 @@ sub parse_query
 	if (   $is_log_level
 		&& ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+)(?: database=([^\s]+))?/))
 	{
-		$current_sessions{$prefix_vars{'t_pid'}}{user} = $1;
-		$current_sessions{$prefix_vars{'t_pid'}}{database} = $2;
+		$current_sessions{$t_pid}{user} = $1;
+		$current_sessions{$t_pid}{database} = $2;
 		if ($prefix_vars{'t_query'} =~ /application_name=(.*)/)
 		{
 			if ($1)
 			{
 				$prefix_vars{'t_appname'} = $1;
-				$current_sessions{$prefix_vars{'t_pid'}}{appname} = $1;
+				$current_sessions{$t_pid}{appname} = $1;
 			}
 		}
 
 		return if ($disable_connection);
 
-		my $usr = $current_sessions{$prefix_vars{'t_pid'}}{user} || '';
-		my $db  = $current_sessions{$prefix_vars{'t_pid'}}{database} || 'unknown';
+		my $usr = $current_sessions{$t_pid}{user} || '';
+		my $db  = $current_sessions{$t_pid}{database} || 'unknown';
 		my $host  = '';
 		if ($prefix_vars{'t_query'} =~ / database=([^\s]+)/) {
 			$db = $1;
@@ -16246,9 +16259,9 @@ sub parse_query
 			$host = _gethostbyaddr($host) if ($dns_resolv);
 		}
 		if ($is_tsung_output) {
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $db;
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $usr;
-			$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
+			$tsung_session{$t_pid}{connection}{database} = $db;
+			$tsung_session{$t_pid}{connection}{user}     = $usr;
+			$tsung_session{$t_pid}{connection}{date}     = $prefix_vars{'t_date'};
 			return;
 		}
 		$overall_stat{$curdb}{'peak'}{$cur_last_log_timestamp}{connection}++;
@@ -16287,13 +16300,13 @@ sub parse_query
 		my $host = $4;
 		$host = _gethostbyaddr($host) if ($dns_resolv);
 
-		delete $current_sessions{$prefix_vars{'t_pid'}};
-		delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+		delete $current_sessions{$t_pid};
+		delete $last_execute_stmt{$t_pid};
 
 		if ($is_tsung_output)
 		{
-			$tsung_session{$prefix_vars{'t_pid'}}{disconnection}{date} = $prefix_vars{'t_timestamp'};
-			&store_tsung_session($prefix_vars{'t_pid'});
+			$tsung_session{$t_pid}{disconnection}{date} = $prefix_vars{'t_timestamp'};
+			&store_tsung_session($t_pid);
 			return;
 		}
 
@@ -16397,9 +16410,7 @@ sub parse_query
 	# Store autoanalyze information
 	if (
 		$is_log_level
-		&& ($prefix_vars{'t_query'} =~
-/automatic analyze of table "([^\s]+)"/
-		   )
+		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)"/)
 	   )
 	{
 		return if ($disable_autovacuum);
@@ -16567,19 +16578,23 @@ sub parse_query
 		delete $conn_received{$cur_info{$t_pid}{pid}};
 
 		# The query is complete but we are missing some debug/info/bind parameter logs
-		if ($cur_info{$t_pid}{loglevel} eq 'LOG' && $prefix_vars{'t_loglevel'} eq 'DETAIL') {
-
+		if ($cur_info{$t_pid}{loglevel} eq 'LOG' && $prefix_vars{'t_loglevel'} eq 'DETAIL')
+		{
 			# Apply bind parameters if any
-			if ($prefix_vars{'t_query'} =~ /parameters: (.*)/) {
+			if ($prefix_vars{'t_query'} =~ /parameters: (.*)/)
+			{
 				$cur_bind_info{$t_pid}{'bind'}{'parameters'} = $1 if (exists $cur_bind_info{$t_pid});
 				$cur_info{$t_pid}{parameters} = "$1";
 				# go look at other params
 				return;
 			# replace the execute statements with the prepared query and set the parameters
-			} elsif ($prefix_vars{'t_query'} =~ s/prepare: PREPARE\s+([^\s]+)(\s*\([^\)]*\))?\s+AS\s*(.*)/[ EXECUTE $1 (PARAM) ]/is) {
+			}
+			elsif ($prefix_vars{'t_query'} =~ s/prepare: PREPARE\s+([^\s]+)(\s*\([^\)]*\))?\s+AS\s*(.*)/[ EXECUTE $1 (PARAM) ]/is)
+			{
 				my $q_name = $1;
 				my $real_query = $3;
-				if ($cur_info{$t_pid}{query} =~ /\b$q_name\b/) {
+				if ($cur_info{$t_pid}{query} =~ /\b$q_name\b/)
+				{
 					$cur_info{$t_pid}{query} =~ s/EXECUTE\s+$q_name\s*\((.*)\)[;]*$//is;
 					$cur_info{$t_pid}{parameters} = $1;
 					$prefix_vars{'t_query'} =~ s/\(PARAM\)/($cur_info{$t_pid}{parameters})/;
@@ -16619,11 +16634,11 @@ sub parse_query
 	}
 
 	# Store info as tsung session following the output file extension
-	if ($is_tsung_output && !exists $tsung_session{$prefix_vars{'t_pid'}}{connection} && $prefix_vars{'t_dbname'})
+	if ($is_tsung_output && !exists $tsung_session{$t_pid}{connection} && $prefix_vars{'t_dbname'})
 	{
-		$tsung_session{$prefix_vars{'t_pid'}}{connection}{database} = $prefix_vars{'t_dbname'};
-		$tsung_session{$prefix_vars{'t_pid'}}{connection}{user}     = $prefix_vars{'t_dbuser'};
-		$tsung_session{$prefix_vars{'t_pid'}}{connection}{date}     = $prefix_vars{'t_date'};
+		$tsung_session{$t_pid}{connection}{database} = $prefix_vars{'t_dbname'};
+		$tsung_session{$t_pid}{connection}{user}     = $prefix_vars{'t_dbuser'};
+		$tsung_session{$t_pid}{connection}{date}     = $prefix_vars{'t_date'};
 	}
 
 	my $t_action = '';
@@ -16642,9 +16657,9 @@ sub parse_query
 			if ($prefix_vars{'t_query'} =~ /^PREPARE$/i) {
 				$t_action = 'prepare';
 				$overall_stat{$curdb}{'queries_duration'}{$t_action} += $prefix_vars{'t_duration'} if ($prefix_vars{'t_duration'});
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
+				$cur_bind_info{$t_pid}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$t_pid}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
+				$cur_bind_info{$t_pid}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
 				return;
 			}
 		}
@@ -16669,9 +16684,9 @@ sub parse_query
 		{
 			if ($prefix_vars{'t_duration'}) {
 				$overall_stat{$curdb}{'queries_duration'}{$t_action} += $prefix_vars{'t_duration'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
+				$cur_bind_info{$t_pid}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$t_pid}{$t_action}{'duration'} = $prefix_vars{'t_duration'};
+				$cur_bind_info{$t_pid}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
 			}
 			return;
 		}
@@ -16684,15 +16699,15 @@ sub parse_query
 		# the risk is to fill memory with this storage.
 		if (scalar keys %session_info)
 		{
-			$last_execute_stmt{$prefix_vars{'t_pid'}}{query} = $prefix_vars{'t_query'};
-			$last_execute_stmt{$prefix_vars{'t_pid'}}{timestamp} = $cur_last_log_timestamp;
+			$last_execute_stmt{$t_pid}{query} = $prefix_vars{'t_query'};
+			$last_execute_stmt{$t_pid}{timestamp} = $cur_last_log_timestamp;
 		}
 	}
 	# Activate storage of the explain plan generated by auto_explain
 	elsif (!$noexplain && $prefix_vars{'t_query'} =~ s/duration: ([0-9\.]+) ms\s+(?:rows: \d+\s+size: \d+ bytes\s+)?plan://s)
 	{
-		$cur_plan_info{$prefix_vars{'t_pid'}}{duration} = $1;
-		$cur_plan_info{$prefix_vars{'t_pid'}}{plan} = '';
+		$cur_plan_info{$t_pid}{duration} = $1;
+		$cur_plan_info{$t_pid}{plan} = '';
 		$prefix_vars{'t_duration'} = $1; # needed to be saved later
 	}
 	# Log line without duration at all
@@ -16723,7 +16738,7 @@ sub parse_query
 		return if ($t_action !~ /query|statement|execute/);
 		$prefix_vars{'t_bind'} = 1;
 		# Stores execute query in case of temporary file
-		$last_execute_stmt{$prefix_vars{'t_pid'}} = $prefix_vars{'t_query'};
+		$last_execute_stmt{$t_pid} = $prefix_vars{'t_query'};
 	}
 	# Log line without duration at all
 	elsif ($fmt eq 'redshift' and $prefix_vars{'t_query'})
@@ -16740,8 +16755,8 @@ sub parse_query
 
 			if ($prefix_vars{'t_query'} =~ /^PREPARE$/i) {
 				$t_action = 'prepare';
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'query'} = $prefix_vars{'t_query'};
-				$cur_bind_info{$prefix_vars{'t_pid'}}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
+				$cur_bind_info{$t_pid}{$t_action}{'query'} = $prefix_vars{'t_query'};
+				$cur_bind_info{$t_pid}{$t_action}{'timestamp'} = $cur_last_log_timestamp,
 				return;
 			}
 		}
@@ -16758,7 +16773,8 @@ sub parse_query
 		return;
 	}
 
-	if ( ($fmt =~ /csv|jsonlog/) && ($prefix_vars{'t_loglevel'} ne 'LOG')) {
+	if (($fmt =~ /csv|jsonlog/) && ($prefix_vars{'t_loglevel'} ne 'LOG'))
+	{
 		$cur_info{$t_pid}{detail} = $prefix_vars{'t_detail'};
 		$cur_info{$t_pid}{hint} = $prefix_vars{'t_hint'};
 		$cur_info{$t_pid}{context} = $prefix_vars{'t_context'};
@@ -16979,7 +16995,6 @@ sub set_current_infos
 	$cur_info{$t_pid}{backendtype}  = $prefix_vars{'t_backend_type'} if (!$cur_info{$t_pid}{backendtype});
 	# Store current report name and list of database
 	$cur_info{$t_pid}{cur_db} = set_current_db($cur_info{$t_pid}{dbname});
-
 }
 
 sub store_tsung_session
