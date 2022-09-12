@@ -327,7 +327,6 @@ my $t_min                   = 0;
 my $t_max                   = 0;
 my $remove_comment          = 0;
 my $select_only             = 0;
-my $tsung_queries           = 0;
 my $queue_size              = 0;
 my $job_per_file            = 0;
 my $charset                 = 'utf-8';
@@ -356,7 +355,6 @@ my $dump_normalized_only    = 0;
 my $log_timezone            = 0;
 my $opt_log_timezone        = 0;
 my $json_prettify           = 0;
-my $is_tsung_output         = 0;
 my $report_per_database     = 0;
 my $html_outdir             = '';
 my $param_size_limit        = 24;
@@ -879,47 +877,13 @@ if ($^O =~ /MSWin32|dos/i) {
 	}
 }
 
-if ($extens eq 'tsung') {
-
-	# Open filehandle
-	my $fh = new IO::File ">$current_out_file";
-	if (not defined $fh) {
-		localdie("FATAL: can't write to $current_out_file, $!\n");
-	}
-	print $fh qq{<?xml version="1.0"?>
-<!DOCTYPE tsung SYSTEM "/usr/share/tsung/tsung-1.0.dtd">
-<tsung loglevel="notice" version="1.0">
-
-    <!-- Configuration du client -->
-    <clients>
-	<client host="localhost" use_controller_vm="true"/>
-    </clients>
-
-    <!-- Configuration du serveur -->
-    <servers>
-	<server host="localhost" port="5432" type="tcp"></server>
-    </servers>
-
-    <load>
-	<arrivalphase phase="1" duration="1" unit="second">
-	    <users maxnumber="1" arrivalrate="1" unit="second"></users>
-	</arrivalphase>
-    </load>
-
-<sessions>
-};
-	$fh->close();
-
-} else {
-
-	# Test file creation before going to parse log
-	my $tmpfh = new IO::File ">$current_out_file";
-	if (not defined $tmpfh) {
-		localdie("FATAL: can't write to $current_out_file, $!\n");
-	}
-	$tmpfh->close();
-	unlink($current_out_file) if (-e $current_out_file);
+# Test file creation before going to parse log
+my $tmpfh = new IO::File ">$current_out_file";
+if (not defined $tmpfh) {
+	localdie("FATAL: can't write to $current_out_file, $!\n");
 }
+$tmpfh->close();
+unlink($current_out_file) if (-e $current_out_file);
 
 # -w and --disable-error can't go together
 if ($error_only && $disable_error) {
@@ -1101,7 +1065,6 @@ my %last_line	        = ();
 my %pgb_last_line       = ();
 our %saved_last_line    = ();
 our %pgb_saved_last_line= ();
-my %tsung_session       = ();
 my %top_locked_info     = ();
 my %top_tempfile_info   = ();
 my %top_cancelled_info  = ();
@@ -1389,16 +1352,18 @@ if (!$noclean && $outdir &&
 			}
 		}
 	}
-	foreach my $p (@obsolete_days) {
+	foreach my $p (@obsolete_days)
+	{
 		unless(opendir(DIR, "$p")) {
 			localdie("FATAL: can't opendir $p: $!\n");
 		}
-		my @hfiles = grep { $_ =~ /\.(html|txt|tsung|json)$/i } readdir(DIR);
+		my @hfiles = grep { $_ =~ /\.(html|txt|json)$/i } readdir(DIR);
 		next if ($#hfiles == -1); # do not remove files if report file has not been generated
 		seekdir(DIR, 0);
 		my @bfiles = grep { $_ =~ /\.bin$/i } readdir(DIR);
 		closedir DIR;
-		foreach my $f (@bfiles) {
+		foreach my $f (@bfiles)
+		{
 			&logmsg('DEBUG', "Removing obsolete binary file: $p/$f");
 			unlink("$p/$f");
 		}
@@ -2100,10 +2065,10 @@ Options:
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
 			     on the output format: out.html, out.txt, out.bin,
-			     out.json or out.tsung. This option can be used
-			     multiple times to output several formats. To use json
-			     output, the Perl module JSON::XS must be installed,
-			     To dump output to stdout, use - as filename.
+			     or out.json. This option can be used multiple times
+			     to output several formats. To use json output, the
+			     Perl module JSON::XS must be installed, to dump
+			     output to stdout, use - as filename.
     -O | --outdir path     : directory where out files must be saved.
     -p | --prefix string   : the value of your custom log_line_prefix as
 			     defined in your postgresql.conf. Only use it if you
@@ -2134,8 +2099,8 @@ Options:
     -w | --watch-mode      : only report errors just like logwatch could do.
     -W | --wide-char       : encode html output of queries into UTF8 to avoid
                              Perl message "Wide character in print".
-    -x | --extension       : output format. Values: text, html, bin, json or
-			     tsung. Default: html
+    -x | --extension       : output format. Values: text, html, bin or json.
+			     Default: html
     -X | --extra-files     : in incremental mode allow pgBadger to write CSS and
 			     JS files in the output directory as separate files.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
@@ -2297,10 +2262,6 @@ You can use together a local PostgreSQL log and a remote pgbouncer log file to p
 
     pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username\@172.12.110.14/pgbouncer.log
 
-Generate Tsung sessions XML file with select queries only:
-
-  pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-10.1.log
-
 Reporting errors every week by cron job:
 
     30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
@@ -2409,57 +2370,35 @@ sub gen_database_report
 			&logmsg('LOG', "Ok, generating $extens report...");
 		}
 
-		if ($extens ne 'tsung')
+		$fh = new IO::File ">$current_out_file";
+		if (not defined $fh) {
+			localdie("FATAL: can't write to $current_out_file, $!\n");
+		}
+		if (($extens eq 'text') || ($extens eq 'txt'))
 		{
-			$fh = new IO::File ">$current_out_file";
-			if (not defined $fh)
-			{
-				localdie("FATAL: can't write to $current_out_file, $!\n");
+			if ($error_only) {
+				&dump_error_as_text($db);
+			} else {
+				&dump_as_text($db);
 			}
-			if (($extens eq 'text') || ($extens eq 'txt'))
-			{
-				if ($error_only)
-				{
-					&dump_error_as_text($db);
-				}
-				else
-				{
-					&dump_as_text($db);
-				}
+		}
+		elsif ($extens eq 'json')
+		{
+			if ($error_only) {
+				&dump_error_as_json($db);
+			} else {
+				&dump_as_json($db);
 			}
-			elsif ($extens eq 'json')
-			{
-				if ($error_only)
-				{
-					&dump_error_as_json($db);
-				}
-				else
-				{
-					&dump_as_json($db);
-				}
-			}
-			elsif ($extens eq 'binary')
-			{
-				&dump_as_binary($fh, $db);
-			}
-			else
-			{
-				&dump_as_html('.', $db);
-			}
-			$fh->close;
+		}
+		elsif ($extens eq 'binary')
+		{
+			&dump_as_binary($fh, $db);
 		}
 		else
 		{
-
-			# Open filehandle
-			$fh = new IO::File ">>$current_out_file";
-			if (not defined $fh)
-			{
-				localdie("FATAL: can't write to $current_out_file, $!\n");
-			}
-			print $fh "</sessions>\n</tsung>\n";
-			$fh->close();
+			&dump_as_html('.', $db);
 		}
+		$fh->close;
 	}
 }
 
@@ -3359,7 +3298,6 @@ sub init_stats_vars
 	@graph_values	     = ();
 	%cur_info	     = ();
 	$nlines	             = 0;
-	%tsung_session       = ();
 }
 
 ####
@@ -4444,12 +4382,6 @@ sub process_file
 		&store_temporary_and_lock_infos($pid);
 	}
 
-	if ($extens eq 'tsung') {
-		foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
-			&store_tsung_session($pid);
-		}
-	}
-
 	if ($progress && ($getout != 1))
 	{
 
@@ -4845,11 +4777,6 @@ sub store_current_timestamp
 		$curdb = $cur_info{$t_pid}{cur_db};
 	}
 
-	if ($is_tsung_output) {
-		$prefix_vars{'t_date'} = $t_timestamp;
-		$prefix_vars{'t_date'} =~ s/\D+//g;
-	}
-
 	if (!$overall_stat{$curdb}{'first_log_ts'} || ($overall_stat{$curdb}{'first_log_ts'} gt $t_timestamp)) {
 		$overall_stat{$curdb}{'first_log_ts'} = $t_timestamp;
 	}
@@ -5182,13 +5109,6 @@ sub check_incremental_position
 			# Stores last temporary files and lock information
 			foreach my $pid (keys %cur_lock_info) {
 				&store_temporary_and_lock_infos($pid);
-			}
-			# Stores tsung sessions
-			if ($extens eq 'tsung')
-			{
-				foreach my $pid (sort {$a <=> $b} keys %tsung_session) {
-					&store_tsung_session($pid);
-				}
 			}
 
 			# set path and create subdirectories
@@ -16032,9 +15952,6 @@ sub parse_query
 	{
 		delete $current_sessions{$t_pid};
 		delete $last_execute_stmt{$t_pid};
-		if ($is_tsung_output) {
-			delete $tsung_session{$t_pid}
-		}
 	}
 	elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING'))
 	{
@@ -16042,9 +15959,6 @@ sub parse_query
 		{
 			delete $current_sessions{$t_pid};
 			delete $last_execute_stmt{$t_pid};
-			if ($is_tsung_output) {
-				delete $tsung_session{$t_pid}
-			}
 		}
 	}
 
@@ -16258,12 +16172,6 @@ sub parse_query
 			$host = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$host = _gethostbyaddr($host) if ($dns_resolv);
 		}
-		if ($is_tsung_output) {
-			$tsung_session{$t_pid}{connection}{database} = $db;
-			$tsung_session{$t_pid}{connection}{user}     = $usr;
-			$tsung_session{$t_pid}{connection}{date}     = $prefix_vars{'t_date'};
-			return;
-		}
 		$overall_stat{$curdb}{'peak'}{$cur_last_log_timestamp}{connection}++;
 
 		$connection_info{$curdb}{count}++;
@@ -16302,13 +16210,6 @@ sub parse_query
 
 		delete $current_sessions{$t_pid};
 		delete $last_execute_stmt{$t_pid};
-
-		if ($is_tsung_output)
-		{
-			$tsung_session{$t_pid}{disconnection}{date} = $prefix_vars{'t_timestamp'};
-			&store_tsung_session($t_pid);
-			return;
-		}
 
 		# Store time in milliseconds
 		$time =~ /(\d+):(\d+):(\d+\.\d+)/;
@@ -16631,14 +16532,6 @@ sub parse_query
 		$overall_stat{$curdb}{histogram}{query_total}++;
 		&set_current_infos($t_pid);
 		return;
-	}
-
-	# Store info as tsung session following the output file extension
-	if ($is_tsung_output && !exists $tsung_session{$t_pid}{connection} && $prefix_vars{'t_dbname'})
-	{
-		$tsung_session{$t_pid}{connection}{database} = $prefix_vars{'t_dbname'};
-		$tsung_session{$t_pid}{connection}{user}     = $prefix_vars{'t_dbuser'};
-		$tsung_session{$t_pid}{connection}{date}     = $prefix_vars{'t_date'};
 	}
 
 	my $t_action = '';
@@ -16989,63 +16882,11 @@ sub set_current_infos
 	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} if (!$cur_info{$t_pid}{dbuser});
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'} if (!$cur_info{$t_pid}{dbclient});
 	$cur_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'} if (!$cur_info{$t_pid}{dbappname});
-	$cur_info{$t_pid}{date}      = $prefix_vars{'t_date'} if ($is_tsung_output && !$cur_info{$t_pid}{date});
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
 	$cur_info{$t_pid}{backendtype}  = $prefix_vars{'t_backend_type'} if (!$cur_info{$t_pid}{backendtype});
 	# Store current report name and list of database
 	$cur_info{$t_pid}{cur_db} = set_current_db($cur_info{$t_pid}{dbname});
-}
-
-sub store_tsung_session
-{
-	my $pid = shift;
-
-	return if ($#{$tsung_session{$pid}{dates}} < 0);
-
-	# Open filehandle
-	my $fh = new IO::File ">>$current_out_file";
-	if (not defined $fh) {
-		localdie("FATAL: can't write to $current_out_file, $!\n");
-	}
-	if ($pid) {
-		print $fh "  <session weight=\"100\" name=\"pgbadger-$pid\" type=\"ts_pgsql\">\n";
-		if (exists $tsung_session{$pid}{connection}{database}) {
-			print $fh qq{    <transaction name="connection">
-      <request><pgsql type="connect" database="$tsung_session{$pid}{connection}{database}" username="$tsung_session{$pid}{connection}{user}" /></request>
-      <request><pgsql type="authenticate" password="changeme"/></request>
-    </transaction>
-};
-		}
-		if ($#{$tsung_session{$pid}{dates}} >= 0) {
-			my $sec = 0;
-			if ($tsung_session{$pid}{connection}{date}) {
-				$sec = $tsung_session{$pid}{dates}[0] - $tsung_session{$pid}{connection}{date};
-			}
-			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
-			print $fh "    <transaction name=\"requests\">\n";
-			for (my $i = 0 ; $i <= $#{$tsung_session{$pid}{queries}} ; $i++) {
-				$tsung_queries++;
-				$sec = 0;
-				if ($i > 0) {
-					$sec = $tsung_session{$pid}{dates}[$i] - $tsung_session{$pid}{dates}[$i - 1];
-					print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
-				}
-				print $fh "    <request><pgsql type='sql'><![CDATA[$tsung_session{$pid}{queries}[$i];]]></pgsql></request>\n";
-			}
-			print $fh "    </transaction>\n";
-		}
-		if ($#{$tsung_session{$pid}{dates}} >= 0) {
-			my $sec = $tsung_session{$pid}{disconnection}{date} - $tsung_session{$pid}{dates}[-1];
-			print $fh "    <thinktime value=\"$sec\" random=\"true\"></thinktime>\n" if ($sec > 0);
-		}
-		if (exists $tsung_session{$pid}{connection}{database}) {
-			print $fh "    <request><pgsql type=\"close\"></pgsql></request>\n";
-		}
-		print $fh "  </session>\n\n";
-		delete $tsung_session{$pid};
-	}
-	$fh->close;
 }
 
 sub store_queries
@@ -17133,25 +16974,6 @@ sub store_queries
 
 		# Should we have to include only some queries
 		return 1 if ($#include_query >= 0 && !&is_included_query($cur_info{$t_pid}{query}));
-
-		# Dump queries as tsung request and return
-		if ($is_tsung_output) {
-			if ($cur_info{$t_pid}{loglevel} eq 'LOG') {
-				push(@{$tsung_session{$t_pid}{queries}}, $cur_info{$t_pid}{query});
-				push(@{$tsung_session{$t_pid}{dates}},   $cur_info{$t_pid}{date});
-				if (!exists $tsung_session{$t_pid}{connection} && $cur_info{$t_pid}{dbname}) {
-					$tsung_session{$t_pid}{connection}{database} = $cur_info{$t_pid}{dbname};
-					$tsung_session{$t_pid}{connection}{user}     = $cur_info{$t_pid}{dbuser};
-					$tsung_session{$t_pid}{connection}{date}     = $cur_info{$t_pid}{date};
-				}
-			}
-
-			# Stores global statistics
-			$overall_stat{'queries_number'}++;
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_number'}++;
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'}{'execute'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-			return 1;
-		}
 
 		# Truncate the query if requested by the user
 		if ($maxlength > 0) {
@@ -18092,15 +17914,7 @@ sub progress_bar
 	my $lbl = 'queries';
 	$lbl = 'stats' if ($fmt =~ /pgbouncer/);
 
-	if ($is_tsung_output)
-	{
-		sprintf(
-			"[%-${width}s] Parsed %${num_width}s bytes of %s (%.2f%%), $lbl: %d\r",
-			$char x $nchars . '>',
-			$got, $total, 100 * $got / +$total, ($queries || $overall_stat{'queries_number'})
-		);
-	}
-	elsif ($format eq 'binary')
+	if ($format eq 'binary')
 	{
 		my $file = $_[-1];
 		sprintf(
@@ -19176,8 +18990,6 @@ sub set_output_extension
 {
 	my ($of, $ext, $db) = @_;
 
-	$is_tsung_output = 0;
-
 	if (!$ext)
 	{
 		if ($of =~ /\.bin/i)
@@ -19195,10 +19007,6 @@ sub set_output_extension
 				JSON::XS->import();
 			}
 			$ext = 'json';
-		}
-		elsif ($of =~ /\.tsung/i)
-		{
-			$ext = 'tsung';
 		}
 		elsif ($of =~ /\.htm[l]*/i)
 		{
@@ -19225,9 +19033,8 @@ sub set_output_extension
 		}
 	}
 
-	$is_tsung_output = 1 if ($ext eq 'tsung');
-
-	if ($dump_normalized_only || $dump_all_queries) {
+	if ($dump_normalized_only || $dump_all_queries)
+	{
 		$ext = 'txt';
 		$incremental = 0;
 		$report_title = 'Normalized query report' if (!$report_title && !$dump_all_queries);
