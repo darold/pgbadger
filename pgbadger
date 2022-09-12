@@ -3528,7 +3528,9 @@ sub process_file
 		{
 			$has_exclusion = 1;
 		}
-		&logmsg('DEBUG', "Start parsing pgbouncer log at offset $start_offset of file $logfile to " . ($stop_offset || $totalsize));
+		&logmsg('DEBUG', "Start parsing pgbouncer log at offset $start_offset of " .
+			( ($logfile ne '-') ? " file $logfile" : "stdin" ) . " to " .
+			($stop_offset || ( ($totalsize > 0) ? $totalsize : 'end' ) ));
 		if ($start_offset)
 		{
 			# Move to the starting offset position in file
