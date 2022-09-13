@@ -6,32 +6,27 @@ past five months. As usual there is also new features and improvements:
   * Remove support to Tsung output.
   * Improve pgbadger performances when there are hundred of bind parameters
     to replace.
-  * Fix detection of new log entries in local file when multiprocess was not
-    used.
-  * Remove option -n | --nohighlight which is no more uses since upgrade to
+  * Remove option -n | --nohighlight which is no more used since upgrade to
     pgFormatter 4.
   * Use POST method to send auto_explain plan to explain.depesz.com to avoid
     GET length parameter limit.
   * Apply --exclude-query and --include-query to bind/parse traces.
-  * Add link to pgBadger reportsexamples to documentation.
+  * Add link to pgBadger report examples to documentation.
 
 Here is the complete list of changes and acknowledgments:
 
-  - Remove autovacuum and autoanalyze from session count, even if technically
-    they use a session. In these cases the session is always seen open by
-    pgbadger which is not the case. Thanks to vitalca for the report.
   - Fix monthly reports that was failing on "log file ... must exists". Thanks
     to Jaume Sabater for the report.
   - Fix pgbouncer start parsing debug message when input is stdin. Thanks to
     aleszeleny for the report.
   - Remove support to Tsung output.
   - Drastically improve pgbadger performances for bind parameters
-    replacemeent that could make pgbadger run infinitely when there was
+    replacement that could make pgbadger run infinitely when there was
     hundred of parameters. Thanks to Monty Mobile for the report.
   - Fix documentation about pgBadger return codes and also some wrong return
     code at some places. Thanks to Jaume Sabater for the report.
   - Fix several typo. Thanks to David Gilman for the patch.
-  - Remove option -n | --nohighlight which is no more uses since upgrade to
+  - Remove option -n | --nohighlight which is no more used since upgrade to
     pgFormatter 4. Thanks to Elena Indrupskaya for the report.
   - Lot of pgbadger documentation fixes. Thanks to Elena Indrupskay from
     Postgres Pro for the patch.
