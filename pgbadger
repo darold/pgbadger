@@ -16248,6 +16248,7 @@ sub parse_query
 		   )
 	   )
 	{
+		delete $session_info{$curdb} if (exists $session_info{$curdb});
 		return if ($disable_autovacuum);
 
 		$cur_info{$t_pid}{vacuum} = $3;
@@ -16320,6 +16321,7 @@ sub parse_query
 		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)"/)
 	   )
 	{
+		delete $session_info{$curdb} if (exists $session_info{$curdb});
 		return if ($disable_autovacuum);
 		my $table = $1;
 		$table =~ /^([^\.]+)\./;
