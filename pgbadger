@@ -660,8 +660,12 @@ if ($log_command)
 my $empty_files = 1;
 if ($#ARGV >= 0)
 {
-	foreach my $file (@ARGV) {
-		push(@log_files, &set_file_list($file));
+	if (!$month_report) {
+		foreach my $file (@ARGV) {
+			push(@log_files, &set_file_list($file));
+		}
+	} elsif (!$outdir) { 
+		$outdir = $ARGV[0];
 	}
 }
 
@@ -1094,7 +1098,7 @@ if ($incremental)
 	# Ensure this is not a relative path
 	if ($outdir && dirname($outdir) eq '.')
 	{
-		localdie("FATAL: output directory ($outdir) is not an absolute path.\n");
+		localdie("FATAL3: output directory ($outdir) is not an absolute path.\n");
 	}
 	if ($html_outdir && dirname($html_outdir) eq '.')
 	{
