@@ -1,3 +1,60 @@
+2022-09-13 - v12.0
+
+This major release of pgBadger fixes some issues reported by users since
+past five months. As usual there is also new features and improvements:
+
+  * Remove support to Tsung output.
+  * Improve pgbadger performances when there are hundred of bind parameters
+    to replace.
+  * Fix detection of new log entries in local file when multiprocess was not
+    used.
+  * Remove option -n | --nohighlight which is no more uses since upgrade to
+    pgFormatter 4.
+  * Use POST method to send auto_explain plan to explain.depesz.com to avoid
+    GET length parameter limit.
+  * Apply --exclude-query and --include-query to bind/parse traces.
+  * Add link to pgBadger reportsexamples to documentation.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Remove autovacuum and autoanalyze from session count, even if technically
+    they use a session. In these cases the session is always seen open by
+    pgbadger which is not the case. Thanks to vitalca for the report.
+  - Fix monthly reports that was failing on "log file ... must exists". Thanks
+    to Jaume Sabater for the report.
+  - Fix pgbouncer start parsing debug message when input is stdin. Thanks to
+    aleszeleny for the report.
+  - Remove support to Tsung output.
+  - Drastically improve pgbadger performances for bind parameters
+    replacemeent that could make pgbadger run infinitely when there was
+    hundred of parameters. Thanks to Monty Mobile for the report.
+  - Fix documentation about pgBadger return codes and also some wrong return
+    code at some places. Thanks to Jaume Sabater for the report.
+  - Fix several typo. Thanks to David Gilman for the patch.
+  - Remove option -n | --nohighlight which is no more uses since upgrade to
+    pgFormatter 4. Thanks to Elena Indrupskaya for the report.
+  - Lot of pgbadger documentation fixes. Thanks to Elena Indrupskay from
+    Postgres Pro for the patch.
+  - Allow half hour in --log-timezone and --timezone, value can be an integer,
+    ex: 2 or a float, ex: 2.5. Thanks to Mujjamil-K for the feature request.
+  - Allow use of regexp for --exclude-app and --exclude-client. Thanks to
+    rdnkrkmz for the feature request.
+  - Allow use of --explain-url with previous commit and restore the limitation
+    to explain text format.
+  - Use POST method to send auto_explain plan to explain.depesz.com to avoid
+    GET length parameter limit. Thanks to hvisage for the report.
+  - Apply --exclude-query and --include-query to bind/parse traces. Thanks to
+    Alec Lazarescu for the report.
+  - Fix parsing of autovacuum stats from RDS logs. Thanks to David Gilman for
+    the report.
+  - Fix passing of log format when parsing remote log. Thanks to spookypeanut
+    the report.
+  - Add link to pgBadger report examples to documentation.
+  - Fix Session per user reports. Thanks to vitalca for the report.
+  - Fix jsonlog parsing from PG15 ouput
+  - Fix text-based error/events reporting. Thanks to Michael Banck for the patch
+  - Fix regexp typo in normalize_error(). Thanks to Michael Banck for the patch.
+
 2022-04-08 - v11.8
 
 This release of pgBadger fix some issues reported by users since past
