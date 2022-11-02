@@ -78,10 +78,10 @@ Options:
     -N | --appname name    : only report on entries for given application name
     -o | --outfile filename: define the filename for the output. Default depends
                              on the output format: out.html, out.txt, out.bin,
-                             out.json or out.tsung. This option can be used
-                             multiple times to output several formats. To use json
-                             output, the Perl module JSON::XS must be installed,
-                             To dump output to stdout, use - as filename.
+                             or out.json. This option can be used multiple times
+                             to output several formats. To use json output, the
+                             Perl module JSON::XS must be installed, to dump
+                             output to stdout, use - as filename.
     -O | --outdir path     : directory where out files must be saved.
     -p | --prefix string   : the value of your custom log_line_prefix as
                              defined in your postgresql.conf. Only use it if you
@@ -112,8 +112,8 @@ Options:
     -w | --watch-mode      : only report errors just like logwatch could do.
     -W | --wide-char       : encode html output of queries into UTF8 to avoid
                              Perl message "Wide character in print".
-    -x | --extension       : output format. Values: text, html, bin, json or
-                             tsung. Default: html
+    -x | --extension       : output format. Values: text, html, bin or json.
+                             Default: html
     -X | --extra-files     : in incremental mode allow pgBadger to write CSS and
                              JS files in the output directory as separate files.
     -z | --zcat exec_path  : set the full path to the zcat program. Use it if
@@ -274,10 +274,6 @@ Use URI notation for remote log file:
 You can use together a local PostgreSQL log and a remote pgbouncer log file to parse:
 
     pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username@172.12.110.14/pgbouncer.log
-
-Generate Tsung sessions XML file with select queries only:
-
-    pgbadger -S -o sessions.tsung --prefix '%t [%p]: user=%u,db=%d ' /pglog/postgresql-10.1.log
 
 Reporting errors every week by cron job:
 
@@ -719,7 +715,7 @@ By default, pgBadger in incremental mode only computes daily and weekly reports.
 If you want monthly cumulative reports, you will have to use a separate command
 to specify the report to build. For example, to build a report for August 2019:
 
-    pgbadger -X --month-report 2919-08 /var/www/pg_reports/
+    pgbadger -X --month-report 2019-08 /var/www/pg_reports/
 
 this will add a link to the month name into the calendar view of incremental
 reports to look at monthly report. The report for a current month can be run
@@ -729,7 +725,7 @@ default because it could take a lot of time following the amount of data.
 If reports were built with the per-database option ( -E | --explode ), it must
 be used too when calling pgbadger to build monthly report:
 
-    pgbadger -E -X --month-report 2919-08 /var/www/pg_reports/
+    pgbadger -E -X --month-report 2019-08 /var/www/pg_reports/
 
 This is the same when using the rebuild option ( -R | --rebuild ).
 

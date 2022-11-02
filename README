@@ -719,7 +719,7 @@ INCREMENTAL REPORTS
     separate command to specify the report to build. For example, to build a
     report for August 2019:
 
-        pgbadger -X --month-report 2919-08 /var/www/pg_reports/
+        pgbadger -X --month-report 2019-08 /var/www/pg_reports/
 
     this will add a link to the month name into the calendar view of
     incremental reports to look at monthly report. The report for a current
@@ -730,7 +730,7 @@ INCREMENTAL REPORTS
     If reports were built with the per-database option ( -E | --explode ),
     it must be used too when calling pgbadger to build monthly report:
 
-        pgbadger -E -X --month-report 2919-08 /var/www/pg_reports/
+        pgbadger -E -X --month-report 2019-08 /var/www/pg_reports/
 
     This is the same when using the rebuild option ( -R | --rebuild ).
 
