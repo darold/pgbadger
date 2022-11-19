@@ -862,6 +862,7 @@ if ($current_out_file ne '-')
 	}
 	$current_out_file = basename($current_out_file);
 	$current_out_file = ($html_outdir || $outdir) . '/' . $current_out_file;
+	$current_out_file =~ s#//#/#g;
 }
 
 # Remove graph support if output is not html
@@ -4538,6 +4539,10 @@ sub parse_jsonlog_input
 {
 	my $str = shift;
 
+
+	# This is Azure json log input
+	return parse_jsonazure_input($str) if ($str =~ /"record_application_name_s"/);
+
 	my %infos = ();
 
 	# json columns information from jsonlog extension:
@@ -4569,7 +4574,6 @@ sub parse_jsonlog_input
 	# query id *
 	#
 	# (*) information not available for the moment
-
 
 	# Extract the date
 	if ($str =~ m/[\{,]"timestamp":\s*"(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/)
@@ -4659,6 +4663,100 @@ sub parse_jsonlog_input
 	return %infos;
 }
 
+sub parse_jsonazure_input
+{
+	my $str = shift;
+
+	my %infos = ();
+
+	# json columns information from Azure Log Analytics Workspaces
+	# ------------------------------------------------------------
+	# TableName
+	# record_application_name_s
+	# record_backend_type_s
+	# record_command_tag_s
+	# record_connection_from_s
+	# record_context_s
+	# record_database_name_s
+	# record_detail_s
+	# record_error_severity_s
+	# record_hint_s
+	# record_log_time_s
+	# record_message_s
+	# record_process_id_s
+	# record_query_id_s
+	# record_query_pos_s
+	# record_query_s
+	# record_session_id_s
+	# record_session_line_num_s
+	# record_session_start_time_s
+	# record_sql_state_code_s
+	# record_transaction_id_s
+	# record_user_name_s
+	# record_virtual_transaction_id_s
+
+	# Extract the date
+	if ($str =~ m/"record_log_time_s":\s*"(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/)
+	{
+		$infos{'t_year'} = $1;
+		$infos{'t_month'} = $2;
+		$infos{'t_day'} = $3;
+		$infos{'t_hour'} = $4;
+		$infos{'t_min'} = $5;
+		$infos{'t_sec'} = $6;
+		$infos{'t_timestamp'} = "$infos{'t_year'}-$infos{'t_month'}-$infos{'t_day'} $infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+    $infos{'t_time'} = "$infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+	}
+
+	if ($str =~ m/"record_user_name_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_dbuser'}  = $1;
+	}
+	if ($str =~ m/"record_database_name_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_dbname'}  = $1;
+	}
+	if ($str =~ m/"record_application_name_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_appname'} = $1;
+	}
+	if ($str =~ m/"record_connection_from_s":\s*"(.*?)"(?:,\s*"|\})/)
+	{
+		$infos{'t_client'}  = $1;
+		$infos{'t_client'}  =~ s/:.*//;
+		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv && $infos{'t_client'} ne '[local]');
+	}
+	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
+
+	if ($str =~ m/"record_process_id_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_pid'} = $1;
+	}
+
+	if ($str =~ m/"record_error_severity_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_loglevel'} = $1;
+	}
+	if ($str =~ m/"record_sql_state_code_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_sqlstate'} = $1;
+	}
+	if ($str =~ m/"record_query_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
+	}
+
+	# Set ERROR additional information
+	if ($str =~ m/"record_detail_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_detail'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"record_hint_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_hint'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"record_context_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_context'} = unescape_jsonlog($1);
+	}
+
+	# Backend type information
+	if ($str =~ m/"record_backend_type_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_backend_type'} = $1;
+	}
+
+	return %infos;
+}
 
 sub parse_orphan_line
 {
@@ -19052,7 +19150,7 @@ sub set_output_extension
 	$of = $db . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
 
 	# Add the destination directory
-	$of = $od . '/' . $of if ($od);
+	$of = $od . '/' . $of if ($od && $of !~ m#^$od#);
 
 	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild && !$report_per_database);
 
