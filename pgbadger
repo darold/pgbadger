@@ -818,7 +818,7 @@ elsif ($#outfiles == -1)
 # Set the default extension and output format, load JSON Perl module if required
 # Force text output with normalized query list only and disable incremental report
 # Set default filename of the output file
-my ($current_out_file, $extens) = &set_output_extension($outfile, $extension);
+my ($current_out_file, $extens) = &set_output_extension($outdir, $outfile, $extension);
 
 # Set default syslog ident name
 $ident ||= 'postgres';
@@ -2361,7 +2361,7 @@ sub gen_database_report
 
 	foreach $outfile (@outfiles)
 	{
-		($current_out_file, $extens) = &set_output_extension($outfile, $extension, $db);
+		($current_out_file, $extens) = &set_output_extension($outdir, $outfile, $extension, $db);
 
 		$extens = $dft_extens if ($current_out_file eq '-' && $dft_extens);
 
@@ -18994,7 +18994,7 @@ sub change_timezone
 # Set default filename of the output file
 sub set_output_extension
 {
-	my ($of, $ext, $db) = @_;
+	my ($od, $of, $ext, $db) = @_;
 
 	if (!$ext)
 	{
@@ -19050,6 +19050,9 @@ sub set_output_extension
 
 	# Append the current database name to the output file.
 	$of = $db . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
+
+	# Add the destination directory
+	$of = $od . '/' . $of if ($od);
 
 	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild && !$report_per_database);
 
