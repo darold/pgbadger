@@ -345,6 +345,10 @@ the log format use \`jsonlog\`:
 This is the same as with the jsonlog extension, the json format is different
 but pgBadger can parse both formats.
 
+pgBadger also supports logs produced by CloudNativePG Postgres operator for Kubernetes:
+
+    pgbadger -f jsonlog -o cnpg_out.html cnpg.log
+
 To create a cumulative report over a month use command:
 
     pgbadger --month-report 2919-05 /path/to/incremental/reports/

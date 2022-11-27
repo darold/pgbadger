@@ -1,4 +1,4 @@
-use Test::Simple tests => 21;
+use Test::Simple tests => 23;
 use JSON::XS;
 
 my $json = new JSON::XS;
@@ -7,6 +7,7 @@ my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
 my $HLOG = 't/fixtures/logplex.gz';
 my $RDSLOG = 't/fixtures/rds.log.bz2';
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
+my $CNPGLOG = 't/fixtures/cnpg.log.gz';
 my $TIMELOG = 't/fixtures/begin_end.log';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
@@ -57,6 +58,13 @@ $ret = `perl pgbadger -q -o $OUT $GCPLOG`;
 ok( $? == 0, "Generate json report from CloudSQL log file");
 $json_ref = $json->decode(`cat $OUT`);
 ok( $json_ref->{connection_info}{postgres}{database_user}{cloudsqladmin}{cloudsqladmin} eq "151", "Consistent CloudSQL log format");
+
+`rm -f $OUT`;
+
+$ret = `perl pgbadger -q -o $OUT $CNPGLOG`;
+ok( $? == 0, "Generate json report from CloudNativePG log file");
+$json_ref = $json->decode(`cat $OUT`);
+ok( $json_ref->{connection_info}{postgres}{database_user}{postgres}{postgres} eq "378", "Consistent CloudNativePG log format");
 
 `rm -f $OUT`;
 

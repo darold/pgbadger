@@ -2337,6 +2337,10 @@ the log format use `jsonlog`:
 This is the same as with the jsonlog extension, the json format is different
 but pgBadger can parse both formats.
 
+pgBadger also supports logs produced by CloudNativePG Postgres operator for Kubernetes:
+
+    pgbadger -f jsonlog -o cnpg_out.html cnpg.log
+
 To create a cumulative report over a month use command:
 
     pgbadger --month-report 2919-05 /path/to/incremental/reports/
@@ -4543,6 +4547,9 @@ sub parse_jsonlog_input
 	# This is Azure json log input
 	return parse_jsonazure_input($str) if ($str =~ /"record_application_name_s"/);
 
+	# This is CloudNativePG json log input
+	return parse_jsoncnpg_input($str) if ($str =~ /"logging_pod"/);
+
 	my %infos = ();
 
 	# json columns information from jsonlog extension:
@@ -4752,6 +4759,115 @@ sub parse_jsonazure_input
 
 	# Backend type information
 	if ($str =~ m/"record_backend_type_s":\s*"(.*?)"(?:,\s*"|\})/) {
+		$infos{'t_backend_type'} = $1;
+	}
+
+	return %infos;
+}
+
+sub parse_jsoncnpg_input
+{
+	my $str = shift;
+
+	my %infos = ();
+
+	# json log line from CloudNativePG Operator:
+	# -------------------------------------------------
+	# {
+	#   "level": "info",
+	#   "ts": 1619781249.7188137,
+	#   "logger": "postgres",
+	#   "msg": "record",
+	#   "record": {
+	#     "log_time": "2021-04-30 11:14:09.718 UTC",
+	#     "user_name": "",
+	#     "database_name": "",
+	#     "process_id": "25",
+	#     "connection_from": "",
+	#     "session_id": "608be681.19",
+	#     "session_line_num": "1",
+	#     "command_tag": "",
+	#     "session_start_time": "2021-04-30 11:14:09 UTC",
+	#     "virtual_transaction_id": "",
+	#     "transaction_id": "0",
+	#     "error_severity": "LOG",
+	#     "sql_state_code": "00000",
+	#     "message": "database system was interrupted; last known up at 2021-04-30 11:14:07 UTC",
+	#     "detail": "",
+	#     "hint": "",
+	#     "internal_query": "",
+	#     "internal_query_pos": "",
+	#     "context": "",
+	#     "query": "",
+	#     "query_pos": "",
+	#     "location": "",
+	#     "application_name": "",
+	#     "backend_type": "startup"
+	#   },
+	#   "logging_pod": "cluster-example-1",
+	# }
+
+	# Extract the date
+	if ($str =~ m/[\{,]"log_time":\s*"(\d+)-(\d+)-(\d+).(\d+):(\d+):(\d+)/)
+	{
+		$infos{'t_year'} = $1;
+		$infos{'t_month'} = $2;
+		$infos{'t_day'} = $3;
+		$infos{'t_hour'} = $4;
+		$infos{'t_min'} = $5;
+		$infos{'t_sec'} = $6;
+		$infos{'t_timestamp'} = "$infos{'t_year'}-$infos{'t_month'}-$infos{'t_day'} $infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+    $infos{'t_time'} = "$infos{'t_hour'}:$infos{'t_min'}:$infos{'t_sec'}";
+	}
+
+	# Set query parameters as global variables
+	if ($str =~ m/"user_name":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_dbuser'}  = $1;
+	}
+	if ($str =~ m/"database_name":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_dbname'}  = $1;
+	}
+	if ($str =~ m/"application_name":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_appname'} = $1;
+	}
+	if ($str =~ m/"connection_from":\s*"(.*?)"(?:,"|\})/)
+	{
+		$infos{'t_client'}  = $1;
+		$infos{'t_client'}  =~ s/:.*//;
+		$infos{'t_client'} = _gethostbyaddr($infos{'t_client'}) if ($dns_resolv);
+	}
+	$infos{'t_host'}    = 'jsonlog'; # this unused variable is used to store format information when log format is not syslog
+
+	if ($str =~ m/"process_id":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_pid'} = $1;
+	}
+
+	if ($str =~ m/"error_severity":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_loglevel'} = $1;
+	}
+	if ($str =~ m/"sql_state_code":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_sqlstate'} = $1;
+	}
+	if ($str =~ m/"message":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_query'} = unescape_jsonlog($1);
+	}
+
+	# Set ERROR additional information
+	if ($str =~ m/"detail":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_detail'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"hint":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_hint'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"context":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_context'} = unescape_jsonlog($1);
+	}
+	if ($str =~ m/"internal_query":\s*"(.*?)"(?:,"|\})/) {
+		$infos{'t_statement'} = unescape_jsonlog($1);
+	}
+
+	# Backend type information
+	if ($str =~ m/"backend_type":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_backend_type'} = $1;
 	}
 
@@ -17890,6 +18006,11 @@ sub search_log_format
 	}
 	# cloudsql lines
 	elsif ($line =~ /"textPayload":\s*"(?:\d+-\d+-\d+[T\s]\d+:\d+:\d+\.\d+\s[^\s]*\s+\[(\d+)\]:.*)",$/)
+	{
+		$fmt = 'jsonlog';
+	}
+	# cnpg lines
+	elsif ($line =~ /"logging_pod":\s*.+"record":/)
 	{
 		$fmt = 'jsonlog';
 	}
