@@ -18361,10 +18361,10 @@ sub build_log_line_prefix_regex
 		'%p' => [('t_pid',	  '(\d+)')],		# process ID
 		'%Q' => [('t_queryid',	  '([\-]*\d+)')],	# Query ID
 		'%n' => [('t_epoch',    '(\d{10}\.\d{3})')],    # timestamp as Unix epoch
-		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})[Z]*(?: [A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
-		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})\.\d+(?: [A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
+		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})[Z]*(?:[ \+\-][A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
+		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})\.\d+(?:[ \+\-][A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
 		'%l' => [('t_session_line', '(\d+)')],							# session line number
-		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2}[\sT]\d{2}):\d{2}:\d{2}(?: [A-Z\+\-\d]{3,6})?')],    # session start timestamp
+		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2}[\sT]\d{2}):\d{2}:\d{2}(?:[ \+\-][A-Z\+\-\d]{3,6})?')],    # session start timestamp
 		'%c' => [('t_session_id',	'([0-9a-f\.]*)')],					       # session ID
 		'%v' => [('t_virtual_xid',       '([0-9a-f\.\/]*)')],					     # virtual transaction ID
 		'%x' => [('t_xid',	       '([0-9a-f\.\/]*)')],					     # transaction ID
