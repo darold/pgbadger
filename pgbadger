@@ -6663,6 +6663,8 @@ sub change_log_level
 	return 1 if ($msg =~ /still waiting for/);
 	return 1 if ($msg =~ /server process.*was terminated by signal/);
 	return 1 if ($msg =~ /could not (receive|send) data (from|to) client/);
+	return 1 if ($msg =~ /logical decoding found consistent point at/);
+	return 1 if ($msg =~ /starting logical decoding for slot/);
 
 	return 0;
 }
@@ -6681,6 +6683,8 @@ sub revert_log_level
 	return ($msg, 1) if ($msg =~ s/ERROR:  (.*still waiting for)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (server process.*was terminated by signal)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (could not (?:receive|send) data (?:from|to) client)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (logical decoding found consistent point at)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (starting logical decoding for slot)/LOG:  $1/);
 
 	return ($msg, 0);
 }
@@ -15904,6 +15908,10 @@ sub validate_log_line
 				}
 			}
 		}
+		if ( !$prefix_vars{'t_appname'} && ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) application_name=([^\s]+)/) ) {
+					$prefix_vars{'t_appname'} = $2;
+					$current_sessions{$prefix_vars{'t_pid'}}{appname} = $2;
+		}
 	}
 
 	# Set details from previous connection line
@@ -16366,16 +16374,14 @@ sub parse_query
 	{
 		$current_sessions{$t_pid}{user} = $1;
 		$current_sessions{$t_pid}{database} = $2;
-		if ($prefix_vars{'t_query'} =~ /application_name=(.*)/)
+		if ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) application_name=([^\s]+)/
+			|| $prefix_vars{'t_query'} =~ /(.*)application_name=(.*)/)
 		{
-			if ($1)
-			{
-				$prefix_vars{'t_appname'} = $1;
-				$current_sessions{$t_pid}{appname} = $1;
-			}
+			$prefix_vars{'t_appname'} = $2;
+			$current_sessions{$t_pid}{appname} = $2;
 		}
 
-		return if ($disable_connection);
+		return if ($disable_connection || $prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) application_name=([^\s]+)/);
 
 		my $usr = $current_sessions{$t_pid}{user} || '';
 		my $db  = $current_sessions{$t_pid}{database} || 'unknown';
@@ -17815,6 +17821,8 @@ sub normalize_error
 	$orig_query =~ s/(side location conflict at ).*/$1 .../;
 	$orig_query =~ s/(permission denied for [^\s]+) .*/$1 .../;
 	$orig_query =~ s/(database) (?:.*)? (must be vacuumed within) \d+ (transactions)/$1 "..." $2 ... $3/;
+	$orig_query =~ s/(logical decoding found consistent point at).*/$1 "..."/;
+	$orig_query =~ s/(starting logical decoding for slot).*/$1 "..."/;
 
 	# Need more normalization stuff here
 	return $orig_query;
