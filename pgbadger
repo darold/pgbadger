@@ -4934,9 +4934,10 @@ sub parse_orphan_line
 		{
 			if ($cur_info{$cur_pid}{parameters} =~ /=$/) {
 				$cur_info{$cur_pid}{parameters} .= ' ';
-				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= ' ' if (exists $cur_bind_info{$cur_pid});
+				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= ' ' if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
 			}
-			$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line;
+			$line =~ s/^\t+/\\n/;
+			$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
 			$cur_info{$cur_pid}{parameters} .= "$line";
 		}
 	}

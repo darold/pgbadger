@@ -1,9 +1,10 @@
-use Test::Simple tests => 10;
+use Test::Simple tests => 11;
 
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $SYSLOG1 = 't/fixtures/pg-syslog.1.bz2';
 my $SYSLOG2 = 't/fixtures/pg-syslog.1.bz2';
 my $STDERR1 = 't/fixtures/postgresql_param_range.log';
+my $STDERR2 = 't/fixtures/multiline_param.log';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 
@@ -59,6 +60,11 @@ $ret = `perl pgbadger -f stderr -q $STDERR1 -o $JSON`;
 $ret = `grep "('D17756227', 'J16274127', 'IDA001127') and (public.t_plage_cloturee_utilisateur.pcu_range_cloture && '\\[2023-02-24T00:00,2023-02-25T00:00\\]'::tsrange" $JSON | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret == 1), "Bind parameter with range: $ret");
+
+$ret = `perl pgbadger -q -o t/out.txt $STDERR2`;
+$ret = `grep 'njvarchar\\\\nbye'* $TEXT | wc -l`;
+chomp($ret);
+ok( $? == 0 && ($ret == 4), "Multiline bind parameters: $ret");
 
 # Remove files generated during the tests
 `rm -f *.html`;

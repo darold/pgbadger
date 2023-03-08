@@ -1,0 +1,16 @@
+2021-12-03 07:14:48.591 UTC [4913] user=user1,db=mydb LOG:  duration: 124.928 ms  statement: select njprocs.njIsVersionOk(16777216)
+2021-12-03 07:14:48.591 UTC [4913] user=user1,db=mydb LOG:  duration: 0.211 ms  statement: SELECT current_setting('nj.maint')
+2021-12-03 07:14:48.591 UTC [4913] user=user1,db=mydb LOG:  duration: 0.032 ms  statement: BEGIN WORK
+2021-12-03 07:14:48.593 UTC [4913] user=user1,db=mydb LOG:  duration: 1.163 ms  parse njTypeOidQuery_Name: SELECT t.oid FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n WHERE (n.nspname = 'njcat') AND (t.typnamespace = $1) AND (t.typname = $2) AND t.test = $3
+2021-12-03 07:14:48.594 UTC [4913] user=user1,db=mydb LOG:  duration: 0.700 ms  bind njTypeOidQuery_Name: SELECT t.oid FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n WHERE (n.nspname = 'njcat') AND (t.typnamespace = $1) AND (t.typname = $2) AND t.test = $3
+2021-12-03 07:14:48.594 UTC [4913] user=user1,db=mydb DETAIL:  parameters: $1 = '1234', $2 = 'njchar
+	hello', $3 = 'aaaa'
+2021-12-03 07:14:48.594 UTC [4913] user=user1,db=mydb LOG:  duration: 0.215 ms  execute njTypeOidQuery_Name: SELECT t.oid FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n WHERE (n.nspname = 'njcat') AND (t.typnamespace = $1) AND (t.typname = $2) AND t.test = $3
+2021-12-03 07:14:48.594 UTC [4913] user=user1,db=mydb DETAIL:  parameters: $1 = '1234', $2 = 'njchar
+	hello', $3 = 'aaaa'
+2021-12-03 07:14:48.595 UTC [4913] user=user1,db=mydb LOG:  duration: 0.145 ms  bind njTypeOidQuery_Name: SELECT t.oid FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n WHERE (n.nspname = 'njcat') AND (t.typnamespace = $1) AND (t.typname = $2) AND t.test = $3
+2021-12-03 07:14:48.595 UTC [4913] user=user1,db=mydb DETAIL:  parameters: $1 = '1234', $2 = 'njvarchar
+	bye', $3 = 'iiii'
+2021-12-03 07:14:48.595 UTC [4913] user=user1,db=mydb LOG:  duration: 0.131 ms  execute njTypeOidQuery_Name: SELECT t.oid FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n WHERE (n.nspname = 'njcat') AND (t.typnamespace = $1) AND (t.typname = $2) AND t.test = $3
+2021-12-03 07:14:48.595 UTC [4913] user=user1,db=mydb DETAIL:  parameters: $1 = '1234', $2 = 'njvarchar
+	bye', $3 = 'iiii'
