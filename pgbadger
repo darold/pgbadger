@@ -4928,11 +4928,15 @@ sub parse_orphan_line
 		}
 	}
 	# stores bind parameters if parameter syntax is detected
-	elsif ( $cur_info{$cur_pid}{parameters})
+	elsif ( $cur_info{$cur_pid}{parameters} || $cur_bind_info{$cur_pid})
 	{
 		if (!$error_only)
 		{
-			$cur_info{$cur_pid}{parameters} .= ' '  if ($cur_info{$cur_pid}{parameters} =~ /=$/);
+			if ($cur_info{$cur_pid}{parameters} =~ /=$/) {
+				$cur_info{$cur_pid}{parameters} .= ' ';
+				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= ' ' if (exists $cur_bind_info{$cur_pid});
+			}
+			$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line;
 			$cur_info{$cur_pid}{parameters} .= "$line";
 		}
 	}
@@ -17138,7 +17142,7 @@ sub store_queries
 		# Replace bind parameters values in the query if any
 		if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
 		{
-			my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:,|$)/g;
+			my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:, |$)/g;
 			$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 		}
 		else
@@ -17177,7 +17181,7 @@ sub store_queries
 	# Replace bind parameters values in the query if any
 	if (exists $cur_info{$t_pid}{parameters} && ($cur_info{$t_pid}{parameters} =~ /[,\s]*\$(\d+)\s=\s/))
 	{
-		my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:,|$)/g;
+		my @t_res = $cur_info{$t_pid}{parameters} =~ /\$\d+\s=\s(.*?)(?:, |$)/g;
 		$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 	}
 	else

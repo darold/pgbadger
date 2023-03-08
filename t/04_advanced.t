@@ -1,8 +1,9 @@
-use Test::Simple tests => 9;
+use Test::Simple tests => 10;
 
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $SYSLOG1 = 't/fixtures/pg-syslog.1.bz2';
 my $SYSLOG2 = 't/fixtures/pg-syslog.1.bz2';
+my $STDERR1 = 't/fixtures/postgresql_param_range.log';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 
@@ -35,8 +36,8 @@ $ret = `perl pgbadger -q --exclude-db cloudsqladmin --explode $GCPLOG && ls *.ht
 chomp($ret);
 ok( $? == 0 && ($ret == 2), "Test database exclusion with jsonlog");
 
-$ret = `perl pgbadger --disable-type --disable-session --disable-connection --disable-lock --disable-checkpoint --disable-autovacuum --disable-query -o out.txt t/fixtures/tempfile_only.log.gz -q`;
-$ret = `grep "Example.*SELECT" out.txt | wc -l`;
+$ret = `perl pgbadger --disable-type --disable-session --disable-connection --disable-lock --disable-checkpoint --disable-autovacuum --disable-query -o $TEXT t/fixtures/tempfile_only.log.gz -q`;
+$ret = `grep "Example.*SELECT" $TEXT | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret == 9), "Test log_temp_files only");
 
@@ -53,9 +54,16 @@ $ret = `md5sum t/file_cluster1 | awk '{print \$1}'`;
 chomp($ret);
 ok( $? == 0 && ($ret eq "7faeb101abf32de3bc4e14fcf525e005" ), "Last parse file must not have changed");
 
+`rm -f $JSON 2>/dev/null`;
+$ret = `perl pgbadger -f stderr -q $STDERR1 -o $JSON`;
+$ret = `grep "('D17756227', 'J16274127', 'IDA001127') and (public.t_plage_cloturee_utilisateur.pcu_range_cloture && '\\[2023-02-24T00:00,2023-02-25T00:00\\]'::tsrange" $JSON | wc -l`;
+chomp($ret);
+ok( $? == 0 && ($ret == 1), "Bind parameter with range: $ret");
+
 # Remove files generated during the tests
 `rm -f *.html`;
-`rm -f out.txt`;
+`rm -f $TEXT`;
+`rm -f $JSON`;
 `rm -rf $incr_outdir`;
 `rm t/cluster1_day_*.bin t/file_cluster1`;
 
