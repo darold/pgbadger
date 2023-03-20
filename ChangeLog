@@ -1,3 +1,27 @@
+2023-03-20 - v12.1
+
+This is a maintenance release of pgBadger that fixes issues reported by users
+since past six months.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix parsing of multiline parameters. Thanks to Bekir Niyaz for the report.
+  - Fix failure to normalize query with ::tsrange. Thanks to Philippe Griboval
+    for the report.
+  - Add logical decoding consistent point and start for slot log entries to
+    the events report.
+  - Handle other ns + timezone format in timestamp. Thanks to Ronan Dunklau
+    for the report.
+  - Fix detection of %m when notation with T is used. Thanks to Ronan Dunklau
+    for the report.
+  - Add parsing of CloudNativePG generated logs. Thanks to codrut panea for
+    the patch.
+  - Fix unused option --outdir in report generation. Thanks to Frederic Guiet
+    for the report.
+  - Update README with last documentation changes. Thanks to Manisankar for
+    the report.
+  - Fix a typo in pgbadger examples. Thanks to Shinichi Hashiba for the patch.
+
 2022-09-13 - v12.0
 
 This major release of pgBadger fixes some issues reported by users since
