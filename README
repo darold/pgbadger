@@ -791,7 +791,7 @@ AUTHORS
 LICENSE
     pgBadger is free software distributed under the PostgreSQL Licence.
 
-    Copyright (c) 2012-2022, Gilles Darold
+    Copyright (c) 2012-2023, Gilles Darold
 
     A modified version of the SQL::Beautify Perl Module is embedded in
     pgBadger with copyright (C) 2009 by Jonas Kramer and is published under
