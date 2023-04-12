@@ -71,7 +71,7 @@ my $MAX_QUERY_LENGTH = 25000;
 my $terminate = 0;
 my %CACHE_DNS = ();
 my $DNSLookupTimeout = 1; # (in seconds)
-my $EXPLAIN_URL = 'http://explain.depesz.com/';
+my $EXPLAIN_URL = 'https://explain.depesz.com/';
 my $EXPLAIN_POST = qq{<form method="POST" target="explain" action="%s"><input type="hidden" name="is_public" value="0"><input type="hidden" name="is_anon" value="0"><input type="hidden" name="plan" value=""></form>};
 my $PID_DIR = $TMP_DIR;
 my $PID_FILE = undef;
