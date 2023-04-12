@@ -209,7 +209,7 @@ Options:
     --no-week              : inform pgbadger to not build weekly reports in
                              incremental mode. Useful if it takes too much time.
     --explain-url URL      : use it to override the url of the graphical explain
-                             tool. Default: http://explain.depesz.com/
+                             tool. Default: https://explain.depesz.com/
     --tempdir DIR          : set directory where temporary files will be written
                              Default: File::Spec->tmpdir() || '/tmp'
     --no-process-info      : disable changing process title to help identify
