@@ -1376,7 +1376,8 @@ if (!$noclean && $outdir &&
 }
 
 # Clear storage when a retention is specified in incremental mode
-if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) )
+my $ret_dir = $html_outdir || $outdir;
+if ( $ret_dir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) )
 {
 	if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
 				($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /))
@@ -1399,38 +1400,38 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 		&logmsg('DEBUG', "Retention cleanup: directories and files older than <$limit> will be removed");
 
 		# Find obsolete weeks dir that shoud be cleaned
-		unless(opendir(DIR, "$outdir")) {
-			localdie("FATAL: can't opendir $outdir: $!\n");
+		unless(opendir(DIR, "$ret_dir")) {
+			localdie("FATAL: can't opendir $ret_dir: $!\n");
 		}
 		my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 		closedir DIR;
 		my @obsolete_weeks = ();
 		foreach my $y (sort { $a <=> $b } @dyears) {
-			unless(opendir(DIR, "$outdir/$y")) {
-				localdie("FATAL: can't opendir $outdir/$y: $!\n");
+			unless(opendir(DIR, "$ret_dir/$y")) {
+				localdie("FATAL: can't opendir $ret_dir/$y: $!\n");
 			}
 			my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
 			closedir DIR;
 			foreach my $w (sort { $a <=> $b } @weeks) {
 				$w =~ /^week-(\d+)$/;
 				if ("$y$1" lt $limit) {
-					&logmsg('DEBUG', "Removing obsolete week directory $outdir/$y/week-$1");
-					&cleanup_directory("$outdir/$y/week-$1", 1);
+					&logmsg('DEBUG', "Removing obsolete week directory $ret_dir/$y/week-$1");
+					&cleanup_directory("$ret_dir/$y/week-$1", 1);
 					push(@obsolete_weeks, "$y$1");
 				}
 			}
 		}
 		# Now removed the corresponding days
 		foreach my $y (sort { $a <=> $b } @dyears) {
-			unless(opendir(DIR, "$outdir/$y")) {
-				localdie("FATAL: can't opendir $outdir/$y: $!\n");
+			unless(opendir(DIR, "$ret_dir/$y")) {
+				localdie("FATAL: can't opendir $ret_dir/$y: $!\n");
 			}
 			my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 			closedir DIR;
 			my @rmmonths = ();
 			foreach my $m (sort { $a <=> $b } @dmonths) {
-				unless(opendir(DIR, "$outdir/$y/$m")) {
-					localdie("FATAL: can't opendir $outdir/$y/$m: $!\n");
+				unless(opendir(DIR, "$ret_dir/$y/$m")) {
+					localdie("FATAL: can't opendir $ret_dir/$y/$m: $!\n");
 				}
 				my @rmdays = ();
 				my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
@@ -1454,8 +1455,8 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 					{
 						if (grep(/^$y$weekNumber$/, @obsolete_weeks))
 						{
-							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
-							&cleanup_directory("$outdir/$y/$m/$d", 1);
+							&logmsg('DEBUG', "Removing obsolete directory $ret_dir/$y/$m/$d");
+							&cleanup_directory("$ret_dir/$y/$m/$d", 1);
 							push(@rmdays, $d);
 						}
 					}
@@ -1471,21 +1472,21 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 							$lastday = POSIX::strftime("%s", 1,1,1,$3,$2-1,$1-1900);
 						}
 						if (($lastday - $oldday) > $diff_day) {
-							&logmsg('DEBUG', "Removing obsolete directory $outdir/$y/$m/$d");
-							&cleanup_directory("$outdir/$y/$m/$d", 1);
+							&logmsg('DEBUG', "Removing obsolete directory $ret_dir/$y/$m/$d");
+							&cleanup_directory("$ret_dir/$y/$m/$d", 1);
 							push(@rmdays, $d);
 						}
 					}
 				}
 				if ($#ddays == $#rmdays) {
-					&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y/$m");
-					rmdir("$outdir/$y/$m");
+					&logmsg('DEBUG', "Removing obsolete empty directory $ret_dir/$y/$m");
+					rmdir("$ret_dir/$y/$m");
 					push(@rmmonths, $m);
 				}
 			}
 			if ($#dmonths == $#rmmonths) {
-				&logmsg('DEBUG', "Removing obsolete empty directory $outdir/$y");
-				rmdir("$outdir/$y");
+				&logmsg('DEBUG', "Removing obsolete empty directory $ret_dir/$y");
+				rmdir("$ret_dir/$y");
 			}
 		}
 	}
