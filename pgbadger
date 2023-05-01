@@ -19285,7 +19285,7 @@ sub set_output_extension
 	$of = $db . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
 
 	# Add the destination directory
-	$of = $od . '/' . $of if ($od && $of !~ m#^$od#);
+	$of = $od . '/' . $of if ($od && $of !~ m#^\Q$od\E#);
 
 	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild && !$report_per_database);
 
