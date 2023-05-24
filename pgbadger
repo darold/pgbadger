@@ -1309,76 +1309,57 @@ $tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
 $tmp_dblist = "$TMP_DIR/dblist.tmp";
 
-# Clean the incremental directory if the feature is not disabled
-if (!$noclean && $outdir &&
-	($saved_last_line{datetime} || $pgb_saved_last_line{datetime}))
-{
+###
+### Explanation:
+###
+### Logic for the BINARY storage ($outdir) SHOULD be:
+### If ('noclean')
+###   do nothing (keep everything)
+### If (NO 'noclean') and (NO 'retention'):
+###   use an arbitrary retention duration of: 5 weeks
+###   remove BINARY files older than LAST_PARSED_MONTH-retention
+###   DO NOT CHECK for HTML file existence as OLD HTML files may be deleted by external tools
+###     which may lead to BINARY files NEVER deleted
+### If (NO 'noclean') and ('retention'):
+###   remove BINARY files older than LAST_PARSED_MONTH-retention
+###   DO NOT CHECK for HTML file existence as OLD HTML files may be deleted by external tools
+###     which may lead to BINARY files NEVER deleted
+###
+### Logic for the HTML storage ($html_outdir || $outdir) SHOULD be:
+### DO NOT check 'noclean' as this flag is dedicated to BINARY files
+### If (NO 'retention'):
+###   do nothing (keep everything)
+### If ('retention'):
+###   remove HTML folders/files older than LAST_PARSED_MONTH-retention (= y/m/d):
+###   days older than d in y/m/d
+###   months older than m in y/m/d
+###   years older than y in y/m/d
+###
 
-	my $last_year  = '';
-	my $last_month = '';
-	my $last_day   = '';
-	# Search the current week following the last parse date
-	if ( ($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) || ($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) )
-	{
-		$last_year  = $1;
-		$last_month = $2;
-		$last_day   = $3;
-	}
-
-	# Get the week number following the date
-	my $wn = &get_week_number($last_year, $last_month, $last_day);
-	# Get the days of the current week where binary files must be preserved
-	my $getwnb = $wn;
-	$getwnb-- if (!$iso_week_number);
-	my @wdays = &get_wdays_per_month($getwnb, "$last_year-$last_month");
-	# Find obsolete dir days that shoud be cleaned
-	unless(opendir(DIR, "$outdir")) {
-		localdie("FATAL: can't opendir $outdir: $!\n");
-	}
-	my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
-	closedir DIR;
-	my @obsolete_days = ();
-	foreach my $y (sort { $a <=> $b } @dyears) {
-		unless(opendir(DIR, "$outdir/$y")) {
-			localdie("FATAL: can't opendir $outdir/$y: $!\n");
-		}
-		my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
-		closedir DIR;
-		foreach my $m (sort { $a <=> $b } @dmonths) {
-			unless(opendir(DIR, "$outdir/$y/$m")) {
-				localdie("FATAL: can't opendir $outdir/$y/$m: $!\n");
-			}
-			my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
-			closedir DIR;
-			foreach my $d (sort { $a <=> $b } @ddays) {
-				if ("$y-$m-$d" lt $wdays[0]) {
-					push(@obsolete_days, "$outdir/$y/$m/$d");
-				}
-			}
-		}
-	}
-	foreach my $p (@obsolete_days)
-	{
-		unless(opendir(DIR, "$p")) {
-			localdie("FATAL: can't opendir $p: $!\n");
-		}
-		my @hfiles = grep { $_ =~ /\.(html|txt|json)$/i } readdir(DIR);
-		next if ($#hfiles == -1); # do not remove files if report file has not been generated
-		seekdir(DIR, 0);
-		my @bfiles = grep { $_ =~ /\.bin$/i } readdir(DIR);
-		closedir DIR;
-		foreach my $f (@bfiles)
-		{
-			&logmsg('DEBUG', "Removing obsolete binary file: $p/$f");
-			unlink("$p/$f");
-		}
-	}
-}
-
-# Clear storage when a retention is specified in incremental mode
-my @all_outdir = ($outdir);
+# Clear BIN/HTML storages in incremental mode
+my @all_outdir = ();
+push(@all_outdir, $outdir) if ($outdir);
 push(@all_outdir, $html_outdir) if ($html_outdir);
-if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) )
+### $retention_bin = 5 if (!$noclean && !$retention);
+### $retention_bin = 0 if ($noclean && !$retention);
+### $retention_bin = $retention if (!$noclean && $retention);
+### $retention_bin = 0 if ($noclean && $retention);
+### equivalent to:
+my $retention_bin = $retention;
+$retention_bin = 0 if ($noclean && $retention);
+$retention_bin = 5 if (!$noclean && !$retention);
+### $retention_html = 0 if (!$noclean && !$retention);
+### $retention_html = 0 if ($noclean && !$retention);
+### $retention_html = $retention if (!$noclean && $retention);
+### $retention_html = $retention if ($noclean && $retention);
+### equivalent to:
+my $retention_html = $retention;
+### We will handle noclean/!noclean and retention_xxx/!retention_xxx below
+### Note: !retention_xxx equivalent to retention_xxx = 0
+
+&logmsg('DEBUG', "BIN/HTML Retention cleanup: Initial cleanup flags - noclean=[$noclean] - retention_bin=[$retention_bin] - retention_html=[$retention_html] - saved_last_line{datetime}=[$saved_last_line{datetime}] - pgb_saved_last_line{datetime}=[$pgb_saved_last_line{datetime}] - all_outdir=[@all_outdir]");
+
+if ( scalar(@all_outdir) && ($saved_last_line{datetime} || $pgb_saved_last_line{datetime}) )
 {
 
 	foreach my $ret_dir (@all_outdir)
@@ -1387,88 +1368,126 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 					($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /))
 		{
 			# Search the current week following the last parse date
-			my $limit = $1;
+			my $limit_yw_bin = $1;
+			my $limit_yw_html = $1;
 			my $wn = &get_week_number($1, $2, $3);
-			# Case of year overlap
-			if (($wn - $retention) < 1)
+			# BIN: Case of year overlap
+			if (($wn - $retention_bin) < 1)
 			{
 				# Rewind to previous year
-				$limit--;
+				$limit_yw_bin--;
 				# Get number of last week of previous year, can be 52 or 53
-				my $prevwn = &get_week_number($limit, 12, 31);
-				# Add week number including retention to the previous year
-				$limit .= sprintf("%02d", $prevwn - abs($wn - $retention));
+				my $prevwn = &get_week_number($limit_yw_bin, 12, 31);
+				# Add week number including retention_bin to the previous year
+				$limit_yw_bin .= sprintf("%02d", $prevwn - abs($wn - $retention_bin));
 			} else {
-				$limit .= sprintf("%02d", $wn - $retention);
+				$limit_yw_bin .= sprintf("%02d", $wn - $retention_bin);
 			}
-			&logmsg('DEBUG', "Retention cleanup: directories and files older than <$limit> will be removed");
+			&logmsg('DEBUG', "BIN Retention cleanup: YearWeek Limit computation - YearWeek=<$limit_yw_bin> - This will help later removal");
+			# HTML: Case of year overlap
+			if (($wn - $retention_html) < 1)
+			{
+				# Rewind to previous year
+				$limit_yw_html--;
+				# Get number of last week of previous year, can be 52 or 53
+				my $prevwn = &get_week_number($limit_yw_html, 12, 31);
+				# Add week number including retention_html to the previous year
+				$limit_yw_html .= sprintf("%02d", $prevwn - abs($wn - $retention_html));
+			} else {
+				$limit_yw_html .= sprintf("%02d", $wn - $retention_html);
+			}
+			&logmsg('DEBUG', "HTML Retention cleanup: YearWeek Limit computation - YearWeek=<$limit_yw_html> - This will help later removal");
 
-			# Find obsolete weeks dir that shoud be cleaned
-			unless(opendir(DIR, "$ret_dir")) {
-				localdie("FATAL: can't opendir $ret_dir: $!\n");
-			}
-			my @dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
-			closedir DIR;
-			my @obsolete_weeks = ();
-			foreach my $y (sort { $a <=> $b } @dyears) {
-				unless(opendir(DIR, "$ret_dir/$y")) {
-					localdie("FATAL: can't opendir $ret_dir/$y: $!\n");
-				}
-				my @weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
+			my @dyears = ();
+			if ( opendir(DIR, "$ret_dir") ) {
+				@dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
 				closedir DIR;
+			} else {
+				&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir: $!");
+			}
+			# Find obsolete weeks dir that shoud be cleaned
+			foreach my $y (sort { $a <=> $b } @dyears) {
+				my @weeks = ();
+				if ( opendir(DIR, "$ret_dir/$y") ) {
+					@weeks = grep { $_ =~ /^week-\d+$/ } readdir(DIR);
+					closedir DIR;
+				} else {
+					&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir/$y: $!");
+				}
 				foreach my $w (sort { $a <=> $b } @weeks) {
 					$w =~ /^week-(\d+)$/;
-					if ("$y$1" lt $limit) {
-						&logmsg('DEBUG', "Removing obsolete week directory $ret_dir/$y/week-$1");
-						&cleanup_directory("$ret_dir/$y/week-$1", 1);
-						push(@obsolete_weeks, "$y$1");
+					if ( (!$noclean) && $retention_bin ) {
+						if ("$y$1" lt $limit_yw_bin) {
+							&logmsg('DEBUG', "BIN Retention cleanup: Removing obsolete week directory $ret_dir/$y/week-$1");
+							&cleanup_directory_bin("$ret_dir/$y/week-$1", 1);
+						}
+					}
+					if ( $retention_html ) {
+						if ("$y$1" lt $limit_yw_html) {
+							&logmsg('DEBUG', "HTML Retention cleanup: Removing obsolete week directory $ret_dir/$y/week-$1");
+							&cleanup_directory_html("$ret_dir/$y/week-$1", 1);
+						}
 					}
 				}
 			}
-			# Now removed the corresponding days
+			# Find obsolete months and days
 			foreach my $y (sort { $a <=> $b } @dyears) {
-				unless(opendir(DIR, "$ret_dir/$y")) {
-					localdie("FATAL: can't opendir $ret_dir/$y: $!\n");
-				}
-				my @dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
-				closedir DIR;
-				my @rmmonths = ();
-				foreach my $m (sort { $a <=> $b } @dmonths) {
-					unless(opendir(DIR, "$ret_dir/$y/$m")) {
-						localdie("FATAL: can't opendir $ret_dir/$y/$m: $!\n");
-					}
-					my @rmdays = ();
-					my @ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+				my @dmonths = ();
+				if ( opendir(DIR, "$ret_dir/$y") ) {
+					@dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
 					closedir DIR;
+				} else {
+					&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir/$y: $!");
+				}
+
+				# Now remove the HTML monthly reports
+				if ( $retention_html ) {
+					foreach my $m (sort { $a <=> $b } @dmonths) {
+						my $diff_day = $retention_html * 7 * 86400;
+						my $lastday = 0;
+						if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
+							($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
+							$lastday = timelocal(1,1,1,$3,$2-1,$1-1900);
+						}
+						if ( $lastday ) {
+							my $lastday_minus_retention = $lastday - $diff_day;
+							my $lastday_minus_retention_Y = strftime('%Y', localtime($lastday_minus_retention));
+							my $lastday_minus_retention_M = strftime('%m', localtime($lastday_minus_retention));
+
+							my $lastday_minus_retention_prev_month_Y = $lastday_minus_retention_Y;
+							my $lastday_minus_retention_prev_month_M = $lastday_minus_retention_M - 1;
+
+							if ( $lastday_minus_retention_prev_month_M < 1 ) {
+								$lastday_minus_retention_prev_month_Y -= 1;
+								$lastday_minus_retention_prev_month_M = 12;
+							}
+
+							$lastday_minus_retention_prev_month_Y = sprintf("%04d", $lastday_minus_retention_prev_month_Y);
+							$lastday_minus_retention_prev_month_M = sprintf("%02d", $lastday_minus_retention_prev_month_M);
+
+							if ("$y$m" lt "$lastday_minus_retention_Y$lastday_minus_retention_M") {
+								&logmsg('DEBUG', "HTML Retention cleanup: Removing obsolete month directory $ret_dir/$y/$m");
+								&cleanup_directory_html("$ret_dir/$y/$m", 1);
+							}
+						}
+					}
+				}
+				
+				# Now remove the corresponding days
+				foreach my $m (sort { $a <=> $b } @dmonths) {
+					my @ddays = ();
+					if ( opendir(DIR, "$ret_dir/$y/$m") ) {
+						@ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+						closedir DIR;
+					} else {
+						&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir/$y/$m: $!");
+					}
 					foreach my $d (sort { $a <=> $b } @ddays)
 					{
-						my $weekNumber = '';
-						if (!$iso_week_number)
-						{
-							if (!$week_start_monday) {
-								$weekNumber = sprintf("%02d", POSIX::strftime("%U", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-							} else {
-								$weekNumber = sprintf("%02d", POSIX::strftime("%W", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-							}
-						}
-						else
-						{
-							$weekNumber = sprintf("%02d", POSIX::strftime("%V", 1, 1, 1, $d, $m - 1, $y - 1900)+1);
-						}
-						if ($#obsolete_weeks >= 0)
-						{
-							if (grep(/^$y$weekNumber$/, @obsolete_weeks))
-							{
-								&logmsg('DEBUG', "Removing obsolete directory $ret_dir/$y/$m/$d");
-								&cleanup_directory("$ret_dir/$y/$m/$d", 1);
-								push(@rmdays, $d);
-							}
-						}
-						else
-						{
+						if ( (!$noclean) && $retention_bin ) {
 							# Remove obsolete days when we are in binary mode
 							# with noreport - there's no week-N directory
-							my $diff_day = $retention * 7 * 86400;
+							my $diff_day = $retention_bin * 7 * 86400;
 							my $oldday = timelocal(1,1,1,$d,$m-1,$y-1900);
 							my $lastday = $oldday;
 							if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
@@ -1476,25 +1495,37 @@ if ( $outdir && $retention && ($saved_last_line{datetime} || $pgb_saved_last_lin
 								$lastday = timelocal(1,1,1,$3,$2-1,$1-1900);
 							}
 							if (($lastday - $oldday) > $diff_day) {
-								&logmsg('DEBUG', "Removing obsolete directory $ret_dir/$y/$m/$d");
-								&cleanup_directory("$ret_dir/$y/$m/$d", 1);
-								push(@rmdays, $d);
+								&logmsg('DEBUG', "BIN Retention cleanup: Removing obsolete day directory $ret_dir/$y/$m/$d");
+								&cleanup_directory_bin("$ret_dir/$y/$m/$d", 1);
+							}
+						}
+						if ( $retention_html ) {
+							# Remove obsolete days when we are in binary mode
+							# with noreport - there's no week-N directory
+							my $diff_day = $retention_html * 7 * 86400;
+							my $oldday = timelocal(1,1,1,$d,$m-1,$y-1900);
+							my $lastday = $oldday;
+							if (($saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /) ||
+								($pgb_saved_last_line{datetime} =~ /^(\d+)\-(\d+)\-(\d+) /)) {
+								$lastday = timelocal(1,1,1,$3,$2-1,$1-1900);
+							}
+							if (($lastday - $oldday) > $diff_day) {
+								&logmsg('DEBUG', "HTML Retention cleanup: Removing obsolete day directory $ret_dir/$y/$m/$d");
+								&cleanup_directory_html("$ret_dir/$y/$m/$d", 1);
 							}
 						}
 					}
-					if ($#ddays == $#rmdays) {
-						&logmsg('DEBUG', "Removing obsolete empty directory $ret_dir/$y/$m");
-						rmdir("$ret_dir/$y/$m");
-						push(@rmmonths, $m);
+					if ( rmdir("$ret_dir/$y/$m") ) {
+						&logmsg('DEBUG', "BIN/HTML Retention cleanup: Removing obsolete empty directory $ret_dir/$y/$m");
 					}
 				}
-				if ($#dmonths == $#rmmonths) {
-					&logmsg('DEBUG', "Removing obsolete empty directory $ret_dir/$y");
-					rmdir("$ret_dir/$y");
+				if ( rmdir("$ret_dir/$y") ) {
+					&logmsg('DEBUG', "BIN/HTML Retention cleanup: Removing obsolete empty directory $ret_dir/$y");
 				}
 			}
 		}
 	}
+
 }
 
 # Main loop reading log files
@@ -3191,6 +3222,32 @@ sub cleanup_directory
 	closedir DIR;
 	map { unlink("$dir/$_"); } @todel;
 	rmdir("$dir") if ($remove_dir);
+}
+
+
+sub cleanup_directory_bin
+{
+	my ($dir, $remove_dir) = @_;
+
+	if (opendir(DIR, "$dir")) {
+		my @todel = grep { $_ =~ /\.bin$/i } readdir(DIR);
+		closedir DIR;
+		map { unlink("$dir/$_"); } @todel;
+		rmdir("$dir") if ($remove_dir);
+	}
+}
+
+
+sub cleanup_directory_html
+{
+	my ($dir, $remove_dir) = @_;
+
+	if (opendir(DIR, "$dir")) {
+		my @todel = grep { $_ =~ /\.(html|txt|tsung|json)$/i } readdir(DIR);
+		closedir DIR;
+		map { unlink("$dir/$_"); } @todel;
+		rmdir("$dir") if ($remove_dir);
+	}
 }
 
 
