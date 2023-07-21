@@ -3513,7 +3513,7 @@ sub process_file
 	my $lfile = &get_log_file($logfile, $totalsize);
 	if (!defined $lfile)
 	{
-		&logmsg('DEBUG', "cannot read file $logfile, no handle.");
+		&logmsg('ERROR', "cannot read file $logfile, no handle.");
 		return;
 	}
 
