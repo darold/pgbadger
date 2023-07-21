@@ -3502,8 +3502,6 @@ sub process_file
 
 	my $curdate = localtime(time);
 
-	$pipe->writer() if (defined $pipe);
-
 	# Syslog does not have year information, so take care of year overlapping
 	my ($gsec, $gmin, $ghour, $gmday, $gmon, $gyear, $gwday, $gyday, $gisdst) = localtime(time);
 	$gyear += 1900;
@@ -3513,6 +3511,14 @@ sub process_file
 
 	# Get a filehandle to the log file
 	my $lfile = &get_log_file($logfile, $totalsize);
+	if (!defined $lfile)
+	{
+		&logmsg('DEBUG', "cannot read file $logfile, no handle.");
+		return;
+	}
+
+	$pipe->writer() if (defined $pipe);
+
 	if ($logfile ne '-')
 	{
 		if ($progress && ($getout != 1))
