@@ -441,7 +441,7 @@ reports:
 
         Request Throughput
         Bytes I/O Throughput
-        Queries Average duration
+        Average Query Duration
         Simultaneous sessions
         Histogram of sessions times
         Sessions per database

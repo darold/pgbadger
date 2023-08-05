@@ -7141,7 +7141,7 @@ $EXPLAIN_POST
 			print $fh qq{
      				<li><a href="#pgbsql-traffic">Request Throughput</a></li>
      				<li><a href="#pgbbytes-traffic">Bytes I/O Throughput</a></li>
-     				<li><a href="#pgbduration-traffic">Queries Average duration</a></li>
+     				<li><a href="#pgbduration-traffic">Average Query Duration</a></li>
 				<li class="divider"></li>
      				<li><a href="#pgbsimultaneous-sessions">Simultaneous sessions</a></li>
 };
@@ -7930,7 +7930,7 @@ $drawn_graphs{pgb_bytepersecond_graph}
 
 	print $fh qq{
 	<div id="pgbduration-traffic" class="analysis-item row">
-		<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Queries Average duration</h2>
+		<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Average Query Duration</h2>
 		<div class="col-md-3">
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
