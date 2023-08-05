@@ -70,8 +70,10 @@ Options:
 			     defined in your postgresql.conf. Only use it if you
 			     aren't using one of the standard prefixes specified
 			     in the pgBadger documentation, such as if your
-			     prefix includes additional variables like client ip
-			     or application name. See examples below.
+			     prefix includes additional variables like client IP
+			     or application name. MUST contain escape sequences
+			     for time (%t, %m or %n) and processes (%p or %c).
+			     See examples below.
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet	   : don't print anything to stdout, not even a progress
 			     bar.
@@ -425,7 +427,7 @@ reports:
 
 	Request Throughput
 	Bytes I/O Throughput
-	Queries Average duration
+	Average Query Duration
 	Simultaneous sessions
 	Histogram of sessions times
 	Sessions per database
