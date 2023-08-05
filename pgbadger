@@ -7959,7 +7959,7 @@ $drawn_graphs{pgb_avgduration_graph}
 
 	print $fh qq{
 	<div id="pgbwaiting-traffic" class="analysis-item row">
-		<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Average waiting time</h2>
+		<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Average Waiting Time</h2>
 		<div class="col-md-3">
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
@@ -8319,7 +8319,7 @@ sub compute_pgbouncer_graphs
 
 	$drawn_graphs{'pgb_avgduration_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgduration_graph', $graph_data{avgduration},'','', 'Average query duration (1 minute average)', 'duration', 'Duration');
 
-	$drawn_graphs{'pgb_avgwaiting_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgwaiting_graph', $graph_data{avgwaiting},'','', 'Average waiting duration (1 minute average)', 'waiting', 'Waiting');
+	$drawn_graphs{'pgb_avgwaiting_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgwaiting_graph', $graph_data{avgwaiting},'','', 'Average waiting time (1 minute average)', 'waiting', 'Waiting');
 
 	$drawn_graphs{'pgb_connectionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_connectionspersecond_graph', $graph_data{conn_max},
 		$graph_data{conn_avg}, $graph_data{conn_min}, 'Connections per second (' . $avg_minutes . ' minutes average)',
