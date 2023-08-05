@@ -3750,16 +3750,17 @@ sub process_file
 				}
 				else
 				{
-					# pgBouncer Statistics appears each minutes in the log
-					if ($prefix_vars{'t_query'} =~ /(\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us/)
+					# pgBouncer Statistics appear each minute in the log
+					if ($prefix_vars{'t_query'} =~ /(\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us,wait time (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_req/s'} = $1;
 						$prefix_vars{'t_inbytes/s'} = $2;
 						$prefix_vars{'t_outbytes/s'} = $3;
 						$prefix_vars{'t_avgduration'} = $4;
+						$prefix_vars{'t_avgwaiting'} = $5;
 					}
-					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us/)
+					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us,wait time (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_xact/s'} = $1;
@@ -3768,6 +3769,7 @@ sub process_file
 						$prefix_vars{'t_outbytes/s'} = $4;
 						$prefix_vars{'t_avgtxduration'} = $5;
 						$prefix_vars{'t_avgduration'} = $6;
+						$prefix_vars{'t_avgwaiting'} = $7;
 					}
 				}
 
@@ -7888,6 +7890,14 @@ sub print_pgbouncer_stats
 		last;
 	}
 
+	my $avgwaiting_peak = 0;
+	my $avgwaiting_peak_date = '';
+	foreach (sort {$pgb_overall_stat{'peak'}{$b}{t_avgwaiting} <=> $pgb_overall_stat{'peak'}{$a}{t_avgwaiting}} keys %{$pgb_overall_stat{'peak'}}) {
+		$avgwaiting_peak = &convert_time($pgb_overall_stat{'peak'}{$_}{t_avgwaiting});
+		$avgwaiting_peak_date = $_;
+		last;
+	}
+
 	print $fh qq{
 	<div id="pgbsql-traffic" class="analysis-item row">
 		<h2 class="col-md-12"><i class="glyphicon icon-road"></i> Request Throughput</h2>
@@ -7946,6 +7956,26 @@ $drawn_graphs{pgb_avgduration_graph}
 	</div><!-- end of duration-traffic -->
 };
 	delete $drawn_graphs{pgb_avgduration_graph};
+
+	print $fh qq{
+	<div id="pgbwaiting-traffic" class="analysis-item row">
+		<h2 class="col-md-12"><i class="glyphicon icon-time"></i> Average waiting time</h2>
+		<div class="col-md-3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$avgwaiting_peak</span> <span class="figure-label">Average Waiting Peak</span></li>
+					<li><span class="figure">$avgwaiting_peak_date</span> <span class="figure-label">Date</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="col-md-9">
+$drawn_graphs{pgb_avgwaiting_graph}
+		</div>
+	</div><!-- end of waiting-traffic -->
+};
+	delete $drawn_graphs{pgb_avgwaiting_graph};
+
 
 }
 
@@ -8214,6 +8244,7 @@ sub compute_pgbouncer_graphs
 					$graph_data{'inbytes'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_inbytes} || 0) . "],";
 					$graph_data{'outbytes'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_outbytes} || 0) . "],";
 					$graph_data{'avgduration'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_avgduration} || 0) . "],";
+					$graph_data{'avgwaiting'} .= "[$t, " . ($pgb_per_minute_info{$tm}{$h}{$m}{t_avgwaiting} || 0) . "],";
 					next if (!exists $pgb_per_minute_info{$tm}{$h}{$m});
 
 					my $rd = &average_per_minutes($m, $avg_minutes);
@@ -8287,6 +8318,8 @@ sub compute_pgbouncer_graphs
 	$drawn_graphs{'pgb_bytepersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_bytepersecond_graph', $graph_data{inbytes},$graph_data{'outbytes'},'','Bytes I/O per seconds (1 minute average)', 'size', 'In b/s', 'Out b/s');
 
 	$drawn_graphs{'pgb_avgduration_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgduration_graph', $graph_data{avgduration},'','', 'Average query duration (1 minute average)', 'duration', 'Duration');
+
+	$drawn_graphs{'pgb_avgwaiting_graph'} = &jqplot_linegraph( $graphid++, 'pgb_avgwaiting_graph', $graph_data{avgwaiting},'','', 'Average waiting duration (1 minute average)', 'waiting', 'Waiting');
 
 	$drawn_graphs{'pgb_connectionspersecond_graph'} = &jqplot_linegraph( $graphid++, 'pgb_connectionspersecond_graph', $graph_data{conn_max},
 		$graph_data{conn_avg}, $graph_data{conn_min}, 'Connections per second (' . $avg_minutes . ' minutes average)',
@@ -14892,6 +14925,7 @@ sub load_stats
 		$pgb_overall_stat{peak}{$k}{t_inbytes} += $_pgb_overall_stat{peak}{$k}{t_inbytes};
 		$pgb_overall_stat{peak}{$k}{t_outbytes} += $_pgb_overall_stat{peak}{$k}{t_outbytes};
 		$pgb_overall_stat{peak}{$k}{t_avgduration} += $_pgb_overall_stat{peak}{$k}{t_avgduration};
+		$pgb_overall_stat{peak}{$k}{t_avgwaiting} += $_pgb_overall_stat{peak}{$k}{t_avgwaiting};
 	}
 
 	foreach my $k (keys %{$_pgb_overall_stat{histogram}{session_time}}) {
@@ -15221,6 +15255,8 @@ sub load_stats
 					($_pgb_per_minute_info{$day}{$hour}{$min}{t_outbytes} || 0);
 				$pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} +=
 					($_pgb_per_minute_info{$day}{$hour}{$min}{t_avgduration} || 0);
+				$pgb_per_minute_info{$day}{$hour}{$min}{t_avgwaiting} +=
+					($_pgb_per_minute_info{$day}{$hour}{$min}{t_avgwaiting} || 0);
 			}
 		}
 	}
@@ -17018,6 +17054,10 @@ sub parse_pgbouncer
 		my $duration = int($prefix_vars{'t_avgduration'}/1000);
 		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_avgduration} = $duration;
 		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_avgduration} = $duration;
+
+		my $waiting = int($prefix_vars{'t_avgwaiting'}/1000);
+		$pgb_per_minute_info{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{t_avgwaiting} = $waiting;
+		$pgb_overall_stat{'peak'}{$cur_last_log_timestamp}{t_avgwaiting} = $waiting;
 
 		return;
 
