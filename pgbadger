@@ -10549,10 +10549,10 @@ sub print_vacuum
 						# Average autovacuums per minute
 						$graph_data{autovacuum_avg} .= "[$t, " . int(($v_dataavg{vcount}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
 
-						# Max connections per minute
+						# Max autovacuums per minute
 						$graph_data{autovacuum_max} .= "[$t, " . ($v_dataavg{vmax}{"$rd"} || 0) . "],";
 
-						# Min connections per minute
+						# Min autovacuums per minute
 						$graph_data{autovacuum_min} .= "[$t, " . ($v_dataavg{vmin}{"$rd"} || 0) . "],";
 					}
 					if (exists $v_dataavg{vcount}{"$rd"}) {
