@@ -4972,9 +4972,12 @@ sub parse_orphan_line
 		}
 		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*)/)
 		{
-			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
+			# Add vacuum counts and duration to the $per_minute_info.
+			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++;
+			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{second}{$cur_info{$cur_pid}{second}} += $3;
+			if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 			{
-				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
+				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
 				$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
 				$autovacuum_info{$curdb}{peak}{system_usage}{date} =
 					"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
