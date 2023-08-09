@@ -15182,6 +15182,11 @@ sub load_stats
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} > $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min}));
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} < $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max}));
 
+					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second} })
+					{
+						$per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second}{$sec} +=
+							($_per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second}{$sec} || 0);
+					}
 					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second} })
 					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second}{$sec} +=
