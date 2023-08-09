@@ -4970,7 +4970,7 @@ sub parse_orphan_line
 		if ($line =~ /(\d+) are dead but not yet removable/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{notremovable} += $1;
 		}
-		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
+		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*)/)
 		{
 			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 			{
