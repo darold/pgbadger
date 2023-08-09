@@ -10513,6 +10513,8 @@ sub print_vacuum
 				my $rd = &average_per_minutes($m, $avg_minutes);
 				$v_dataavg{acount}{"$rd"} = 0 if (!exists $v_dataavg{acount}{"$rd"});
 				$v_dataavg{vcount}{"$rd"} = 0 if (!exists $v_dataavg{vcount}{"$rd"});
+				$v_dataavg{vmax}{"$rd"} = 0 if (!exists $v_dataavg{vmax}{"$rd"});
+				$v_dataavg{vmin}{"$rd"} = 0 if (!exists $v_dataavg{vmin}{"$rd"});
 
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}) {
 					$v_dataavg{vcount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{count} || 0);
