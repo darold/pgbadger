@@ -10518,6 +10518,15 @@ sub print_vacuum
 
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}) {
 					$v_dataavg{vcount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{count} || 0);
+
+					# Search minimum and maximum during this minute
+					foreach my $s (keys %{$per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}}) {
+						$v_dataavg{vmax}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s}
+							if ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s} > $v_dataavg{vmax}{"$rd"});
+						$v_dataavg{vmin}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s}
+							if ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$d} < $v_dataavg{vmin}{"$rd"});
+					}
+					delete $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum};
 				}
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}) {
 					$v_dataavg{acount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}{count} || 0);
