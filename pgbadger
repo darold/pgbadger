@@ -10571,11 +10571,18 @@ sub print_vacuum
 	}
 	# VACUUMs vs ANALYZEs chart
 	$drawn_graphs{autovacuum_graph} = $NODATA;
+	$drawn_graphs{autovacuumpersecond_graph} = $NODATA;
 	if ($graph)
 	{
 		$drawn_graphs{autovacuum_graph} = &jqplot_linegraph($graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount},
 		'', 'Autovacuum actions (' . $avg_minutes . ' minutes period)', '', 'VACUUMs', 'ANALYZEs'
 		);
+
+		$drawn_graphs{autovacuumspersecond_graph} = &jqplot_linegraph($graphid++, 'autovacuumspersecond_graph', $graph_data{autovacuum_max},
+		$graph_data{autovacuum_avg}, $graph_data{autovacuum_min}, 'Autovacuums per second (' . $avg_minutes . ' minutes average)',
+		'Autovacuums per second', 'Maximum', 'Average', 'Mininum'
+		);
+
 	}
 
 	my $vacuum_size_peak = 0;
@@ -10618,6 +10625,23 @@ sub print_vacuum
 $drawn_graphs{autovacuum_graph}
 		</div>
 	</div><!-- end of Autovacuum actions -->
+};
+	delete $drawn_graphs{autovacuum_graph};
+
+print $fh qq{
+	<div id="autovacuums-per-second" class="analysis-item row">
+	<h2 class="col-md-12"><i class="glyphicon icon-pencil"></i> Autovacuums per second</h2>
+	<div class="col-md-3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+			</ul>
+		</div>
+	</div>
+	<div class="col-md-9">
+$drawn_graphs{autovacuumspersecond_graph}
+		</div>
+	</div><!-- end of autovacuums-per-second actions -->
 };
 	delete $drawn_graphs{autovacuum_graph};
 
