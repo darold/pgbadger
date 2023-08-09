@@ -4948,6 +4948,7 @@ sub parse_jsoncnpg_input
 sub parse_orphan_line
 {
 	my ($cur_pid, $line, $t_dbname) = @_;
+	my $date_part = "$cur_info{$cur_pid}{year}$cur_info{$cur_pid}{month}$cur_info{$cur_pid}{day}";
 
 	my $curdb = undef;
 	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db} || !$cur_info{$cur_pid}{cur_db}) {
