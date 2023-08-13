@@ -10579,8 +10579,8 @@ sub print_vacuum
 		);
 
 		$drawn_graphs{autovacuumspersecond_graph} = &jqplot_linegraph($graphid++, 'autovacuumspersecond_graph', $graph_data{autovacuum_max},
-		$graph_data{autovacuum_avg}, $graph_data{autovacuum_min}, 'Autovacuums per second (' . $avg_minutes . ' minutes average)',
-		'Autovacuums per second', 'Maximum', 'Average', 'Mininum'
+		$graph_data{autovacuum_avg}, $graph_data{autovacuum_min}, 'Average Autovacuum Duration (' . $avg_minutes . ' minutes average)',
+		'Average Autovacuum Duration', 'Maximum', 'Average', 'Mininum'
 		);
 
 	}
@@ -10630,7 +10630,7 @@ $drawn_graphs{autovacuum_graph}
 
 print $fh qq{
 	<div id="autovacuums-per-second" class="analysis-item row">
-	<h2 class="col-md-12"><i class="glyphicon icon-pencil"></i> Autovacuums per second</h2>
+	<h2 class="col-md-12"><i class="glyphicon icon-pencil"></i> Average Autovacuum Duration</h2>
 	<div class="col-md-3">
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
