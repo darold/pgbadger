@@ -4971,7 +4971,6 @@ sub parse_orphan_line
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{notremovable} += $1;
 		}
 		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
-		#if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*)/)
 		{
 			# Add vacuum counts and duration to the $per_minute_info.
 			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++;
@@ -10636,6 +10635,8 @@ print $fh qq{
 		<h3 class="">Key values</h3>
 		<div class="well key-figures">
 			<ul>
+				<li><span class="figure">$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">Highest CPU-cost vacuum <br />Table $autovacuum_info{$curdb}{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
+				<li><span class="figure">$autovacuum_info{$curdb}{peak}{system_usage}{date}</span> <span class="figure-label">Date</span></li>
 			</ul>
 		</div>
 	</div>
