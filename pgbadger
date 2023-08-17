@@ -16669,12 +16669,14 @@ sub parse_query
 	# Store autoanalyze information
 	if (
 		$is_log_level
-		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)"/)
-	   )
+		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)" system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*) (?:sec|s)/))
 	{
 		return if ($disable_autovacuum);
 		my $table = $1;
-		$table =~ /^([^\.]+)\./;
+		my $user_time = $2;
+		my $system_time = $3;
+		my $elapsed_time = $4;
+		$table =~ /^([^.]+)\./;
 		$curdb = $1;
 		if (!$report_per_database) {
 			$curdb = $DBALL;
@@ -16683,12 +16685,10 @@ sub parse_query
 		$autoanalyze_info{$curdb}{tables}{$table}{analyzes} += 1;
 		$autoanalyze_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autoanalyze}{count}++;
-		if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-			if ($1 > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed}) {
-				$autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} = $1;
-				$autoanalyze_info{$curdb}{peak}{system_usage}{table} = $table;
-				$autoanalyze_info{$curdb}{peak}{system_usage}{date} = $cur_last_log_timestamp;
-			}
+		if ($elapsed_time > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed}) {
+			$autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} = $elapsed_time;
+			$autoanalyze_info{$curdb}{peak}{system_usage}{table} = $table;
+			$autoanalyze_info{$curdb}{peak}{system_usage}{date} = $cur_last_log_timestamp;
 		}
 	}
 
