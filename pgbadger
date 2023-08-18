@@ -4950,6 +4950,7 @@ sub parse_jsoncnpg_input
 sub parse_orphan_line
 {
 	my ($cur_pid, $line, $t_dbname) = @_;
+	my $date_part = "$cur_info{$cur_pid}{year}$cur_info{$cur_pid}{month}$cur_info{$cur_pid}{day}";
 
 	my $curdb = undef;
 	if (!exists $cur_info{$cur_pid} || !exists $cur_info{$cur_pid}{cur_db} || !$cur_info{$cur_pid}{cur_db}) {
@@ -4971,11 +4972,14 @@ sub parse_orphan_line
 		if ($line =~ /(\d+) are dead but not yet removable/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{notremovable} += $1;
 		}
-		if ($line =~ m#^\t?system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
+		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
 		{
-			if ($1 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
+			# Add vacuum counts and duration to the $per_minute_info.
+			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++;
+			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{second}{$cur_info{$cur_pid}{second}} += $3;
+			if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 			{
-				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $1;
+				$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
 				$autovacuum_info{$curdb}{peak}{system_usage}{table} = $cur_info{$cur_pid}{vacuum};
 				$autovacuum_info{$curdb}{peak}{system_usage}{date} =
 					"$cur_info{$cur_pid}{year}-$cur_info{$cur_pid}{month}-$cur_info{$cur_pid}{day} " .
@@ -10542,9 +10546,20 @@ sub print_vacuum
 				my $rd = &average_per_minutes($m, $avg_minutes);
 				$v_dataavg{acount}{"$rd"} = 0 if (!exists $v_dataavg{acount}{"$rd"});
 				$v_dataavg{vcount}{"$rd"} = 0 if (!exists $v_dataavg{vcount}{"$rd"});
+				$v_dataavg{vmax}{"$rd"} = 0 if (!exists $v_dataavg{vmax}{"$rd"});
+				$v_dataavg{vmin}{"$rd"} = 0 if (!exists $v_dataavg{vmin}{"$rd"});
 
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}) {
 					$v_dataavg{vcount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{count} || 0);
+
+					# Search minimum and maximum during this minute
+					foreach my $s (keys %{$per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}}) {
+						$v_dataavg{vmax}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s}
+							if ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s} > $v_dataavg{vmax}{"$rd"});
+						$v_dataavg{vmin}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s}
+							if ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$d} < $v_dataavg{vmin}{"$rd"});
+					}
+					delete $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum};
 				}
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}) {
 					$v_dataavg{acount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}{count} || 0);
@@ -10563,6 +10578,16 @@ sub print_vacuum
 					next if ($t < $t_min);
 					last if ($t > $t_max);
 
+					if (scalar keys %v_dataavg) {
+						# Average autovacuums per minute
+						$graph_data{autovacuum_avg} .= "[$t, " . int(($v_dataavg{vcount}{"$rd"} || 0) / (60 * $avg_minutes)) . "],";
+
+						# Max autovacuums per minute
+						$graph_data{autovacuum_max} .= "[$t, " . ($v_dataavg{vmax}{"$rd"} || 0) . "],";
+
+						# Min autovacuums per minute
+						$graph_data{autovacuum_min} .= "[$t, " . ($v_dataavg{vmin}{"$rd"} || 0) . "],";
+					}
 					if (exists $v_dataavg{vcount}{"$rd"}) {
 						$graph_data{vcount} .= "[$t, " . ($v_dataavg{vcount}{"$rd"} || 0) . "],";
 					}
@@ -10579,11 +10604,18 @@ sub print_vacuum
 	}
 	# VACUUMs vs ANALYZEs chart
 	$drawn_graphs{autovacuum_graph} = $NODATA;
+	$drawn_graphs{autovacuumpersecond_graph} = $NODATA;
 	if ($graph)
 	{
 		$drawn_graphs{autovacuum_graph} = &jqplot_linegraph($graphid++, 'autovacuum_graph', $graph_data{vcount}, $graph_data{acount},
 		'', 'Autovacuum actions (' . $avg_minutes . ' minutes period)', '', 'VACUUMs', 'ANALYZEs'
 		);
+
+		$drawn_graphs{autovacuumspersecond_graph} = &jqplot_linegraph($graphid++, 'autovacuumspersecond_graph', $graph_data{autovacuum_max},
+		$graph_data{autovacuum_avg}, $graph_data{autovacuum_min}, 'Average Autovacuum Duration (' . $avg_minutes . ' minutes average)',
+		'Average Autovacuum Duration', 'Maximum', 'Average', 'Mininum'
+		);
+
 	}
 
 	my $vacuum_size_peak = 0;
@@ -10626,6 +10658,25 @@ sub print_vacuum
 $drawn_graphs{autovacuum_graph}
 		</div>
 	</div><!-- end of Autovacuum actions -->
+};
+	delete $drawn_graphs{autovacuum_graph};
+
+print $fh qq{
+	<div id="autovacuums-per-second" class="analysis-item row">
+	<h2 class="col-md-12"><i class="glyphicon icon-pencil"></i> Average Autovacuum Duration</h2>
+	<div class="col-md-3">
+		<h3 class="">Key values</h3>
+		<div class="well key-figures">
+			<ul>
+				<li><span class="figure">$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} sec</span> <span class="figure-label">Highest CPU-cost vacuum <br />Table $autovacuum_info{$curdb}{peak}{system_usage}{table} <br />Database $autovacuum_peak_system_usage_db</span></li>
+				<li><span class="figure">$autovacuum_info{$curdb}{peak}{system_usage}{date}</span> <span class="figure-label">Date</span></li>
+			</ul>
+		</div>
+	</div>
+	<div class="col-md-9">
+$drawn_graphs{autovacuumspersecond_graph}
+		</div>
+	</div><!-- end of autovacuums-per-second actions -->
 };
 	delete $drawn_graphs{autovacuum_graph};
 
@@ -15167,6 +15218,11 @@ sub load_stats
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min} > $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{min}));
 					$per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} = $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} if (!exists $per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} || ($per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max} < $_per_minute_info{$curdb}{$day}{$hour}{$min}{query}{max}));
 
+					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second} })
+					{
+						$per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second}{$sec} +=
+							($_per_minute_info{$curdb}{$day}{$hour}{$min}{autovacuum}{second}{$sec} || 0);
+					}
 					foreach my $sec (keys %{ $_per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second} })
 					{
 						$per_minute_info{$curdb}{$day}{$hour}{$min}{connection}{second}{$sec} +=
@@ -16649,12 +16705,14 @@ sub parse_query
 	# Store autoanalyze information
 	if (
 		$is_log_level
-		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)"/)
-	   )
+		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)" system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*) (?:sec|s)/))
 	{
 		return if ($disable_autovacuum);
 		my $table = $1;
-		$table =~ /^([^\.]+)\./;
+		my $user_time = $2;
+		my $system_time = $3;
+		my $elapsed_time = $4;
+		$table =~ /^([^.]+)\./;
 		$curdb = $1;
 		if (!$report_per_database) {
 			$curdb = $DBALL;
@@ -16663,12 +16721,10 @@ sub parse_query
 		$autoanalyze_info{$curdb}{tables}{$table}{analyzes} += 1;
 		$autoanalyze_info{$curdb}{chronos}{$date_part}{$prefix_vars{'t_hour'}}{count}++;
 		$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autoanalyze}{count}++;
-		if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#) {
-			if ($1 > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed}) {
-				$autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} = $1;
-				$autoanalyze_info{$curdb}{peak}{system_usage}{table} = $table;
-				$autoanalyze_info{$curdb}{peak}{system_usage}{date} = $cur_last_log_timestamp;
-			}
+		if ($elapsed_time > $autoanalyze_info{$curdb}{peak}{system_usage}{elapsed}) {
+			$autoanalyze_info{$curdb}{peak}{system_usage}{elapsed} = $elapsed_time;
+			$autoanalyze_info{$curdb}{peak}{system_usage}{table} = $table;
+			$autoanalyze_info{$curdb}{peak}{system_usage}{date} = $cur_last_log_timestamp;
 		}
 	}
 
