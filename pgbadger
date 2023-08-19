@@ -2721,7 +2721,7 @@ sub set_parser_regex
 		       $compiled_prefix = qr/$llp/;
 		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 		       push(@prefix_params, 't_loglevel', 't_query');
-		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.\d+\][:]?\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s+(.*)/;
+		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.\d+\][:]?\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s*(.*)/;
 		}
 		elsif ($fmt =~ /^rds$/)
 		{
@@ -2775,7 +2775,7 @@ sub set_parser_regex
 			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
 	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
-	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[(postgres)\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*)/;
+	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[(postgres)\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s*(.*)/;
 	}
 	elsif ($fmt eq 'rds')
 	{
@@ -4258,6 +4258,7 @@ sub process_file
 
 					# Some log line may be written by applications
 					next if ($t_query =~ /\bLOG:  /);
+
 					# Parse orphan lines to append information to the right place
 					&parse_orphan_line($cur_pid, $t_query);
 
@@ -4265,12 +4266,30 @@ sub process_file
 				# Collect orphaned lines of multiline queries
 				elsif ($cur_pid)
 				{
-					# Some log line may be written by applications
-					next if ($line =~ /\bLOG:  /);
+					if ($line =~ $other_syslog_line)
+					{
+						$cur_pid = $8;
+						my $t_query = $10;
+						if ($fmt eq 'logplex' && not exists $cur_info{$cur_pid}{cur_db}) {
+							$cur_info{$cur_pid}{cur_db} = $9;
+						}
+						$t_query =~ s/#011/\t/g;
+						next if ($t_query eq "\t");
 
-					# Parse orphan lines to append information to the right place
-					&parse_orphan_line($cur_pid, $line);
+						# Some log line may be written by applications
+						next if ($t_query =~ /\bLOG:  /);
 
+						# Parse orphan lines to append information to the right place
+						&parse_orphan_line($cur_pid, $t_query);
+					}
+					else
+					{
+						# Some log line may be written by applications
+						next if ($line =~ /\bLOG:  /);
+
+						# Parse orphan lines to append information to the right place
+						&parse_orphan_line($cur_pid, $line);
+					}
 				}
 				else
 				{
@@ -4671,7 +4690,7 @@ sub parse_jsonlog_input
 	# Set query parameters as global variables
 	if ($str =~ m/"user":\s*"(.*?)"(?:,"|\})/) {
 		$infos{'t_dbuser'}  = $1;
-	} elsif ($str =~ m/,user=([\s]*) /) {
+	} elsif ($str =~ m/,user=([^\s]*) /) {
 		$infos{'t_dbuser'}  = $1;
 	}
 	if ($str =~ m/"dbname":\s*"(.*?)"(?:,"|\})/) {
@@ -4950,6 +4969,7 @@ sub parse_jsoncnpg_input
 sub parse_orphan_line
 {
 	my ($cur_pid, $line, $t_dbname) = @_;
+
 	my $date_part = "$cur_info{$cur_pid}{year}$cur_info{$cur_pid}{month}$cur_info{$cur_pid}{day}";
 
 	my $curdb = undef;
