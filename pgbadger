@@ -899,7 +899,7 @@ if ($error_only && $disable_error) {
 my $regex_prefix_dbname = qr/(?:db|database)=([^,]*)/;
 my $regex_prefix_dbuser = qr/(?:user|usr)=([^,]*)/;
 my $regex_prefix_dbclient = qr/(?:client|remote|ip|host|connection_source)=([^,\(]*)/;
-my $regex_prefix_dbappname = qr/(?:app|application)=([^,]*)/;
+my $regex_prefix_dbappname = qr/(?:app|application|application_name)=([^,]*)/;
 my $regex_prefix_queryid = qr/(?:queryid)=([^,]*)/;
 my $regex_prefix_sqlstate = qr/(?:error_code|state|state_code)=([^,]*)/;
 my $regex_prefix_backendtype = qr/(?:backend_type|btype)=([^,]*)/;
@@ -16225,27 +16225,31 @@ sub parse_log_prefix
 	my ($t_logprefix) = @_;
 
 	# Extract user and database information from the logprefix part
-	if ($t_logprefix) {
-
+	if ($t_logprefix)
+	{
 		# Search for database user
 		if ($t_logprefix =~ $regex_prefix_dbuser) {
 			$prefix_vars{'t_dbuser'} = $1;
+			$prefix_vars{'t_dbuser'} =~ s/^"([^"]+)".*/$1/;
 		}
 
 		# Search for database name
 		if ($t_logprefix =~ $regex_prefix_dbname) {
 			$prefix_vars{'t_dbname'} = $1;
+			$prefix_vars{'t_dbname'} =~ s/^"([^"]+)".*/$1/;
 		}
 
 		# Search for client host name
 		if ($t_logprefix =~ $regex_prefix_dbclient) {
 			$prefix_vars{'t_dbclient'} = $1;
+			$prefix_vars{'t_dbclient'} =~ s/^"//;
 			$prefix_vars{'t_dbclient'} = _gethostbyaddr($prefix_vars{'t_dbclient'}) if ($dns_resolv);
 		}
 
 		# Search for application name
 		if ($t_logprefix =~ $regex_prefix_dbappname) {
 			$prefix_vars{'t_appname'} = $1;
+			$prefix_vars{'t_appname'} =~ s/^"([^"]+)".*/$1/;
 		}
 
 		# Search for queryid
