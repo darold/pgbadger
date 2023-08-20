@@ -3896,6 +3896,7 @@ sub process_file
 					$prefix_vars{'t_dbuser'}  = $row->[1] || '';
 					$prefix_vars{'t_dbname'}  = $row->[2] || '';
 					$prefix_vars{'t_appname'} = $row->[22] || '';
+					$prefix_vars{'t_appname'} =~ s/[<>]/'/g;
 					$prefix_vars{'t_client'}  = $row->[4] || '';
 					$prefix_vars{'t_client'}  =~ s/:.*//;
 					$prefix_vars{'t_client'} = _gethostbyaddr($prefix_vars{'t_client'}) if ($dns_resolv);
@@ -16100,13 +16101,15 @@ sub validate_log_line
 				if ($1)
 				{
 					$prefix_vars{'t_appname'} = $1;
+					$prefix_vars{'t_appname'} =~ s/[<>]/'/g;
 					$current_sessions{$prefix_vars{'t_pid'}}{appname} = $1;
 				}
 			}
 		}
 		if ( !$prefix_vars{'t_appname'} && ($prefix_vars{'t_query'} =~ /connection authorized: user=([^\s]+) application_name=([^\s]+)/) ) {
-					$prefix_vars{'t_appname'} = $2;
-					$current_sessions{$prefix_vars{'t_pid'}}{appname} = $2;
+			$prefix_vars{'t_appname'} = $2;
+			$prefix_vars{'t_appname'} =~ s/[<>]/'/g;
+			$current_sessions{$prefix_vars{'t_pid'}}{appname} = $2;
 		}
 	}
 
@@ -16259,6 +16262,7 @@ sub parse_log_prefix
 		if ($t_logprefix =~ $regex_prefix_dbappname) {
 			$prefix_vars{'t_appname'} = $1;
 			$prefix_vars{'t_appname'} =~ s/^"([^"]+)".*/$1/;
+			$prefix_vars{'t_appname'} =~ s/[<>]/'/g;
 		}
 
 		# Search for queryid
@@ -16579,6 +16583,7 @@ sub parse_query
 			|| $prefix_vars{'t_query'} =~ /(.*)application_name=(.*)/)
 		{
 			$prefix_vars{'t_appname'} = $2;
+			$prefix_vars{'t_appname'} =~ s/[<>]/'/g;
 			$current_sessions{$t_pid}{appname} = $2;
 		}
 
