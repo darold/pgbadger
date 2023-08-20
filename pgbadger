@@ -4244,6 +4244,10 @@ sub process_file
 
 						$cur_pid = $prefix_vars{'t_pid'};
 					}
+					else
+					{
+						$cur_pid = '';
+					}
 
 				}
 				elsif ($goon && ($line =~ $other_syslog_line))
@@ -4422,6 +4426,10 @@ sub process_file
 						&parse_query($fmt);
 
 						$cur_pid = $prefix_vars{'t_pid'};
+					}
+					else
+					{
+						$cur_pid = '';
 					}
 
 				}
@@ -16128,6 +16136,7 @@ sub validate_log_line
 		{
 			delete $current_sessions{$prefix_vars{'t_pid'}};
 			delete $last_execute_stmt{$prefix_vars{'t_pid'}};
+			%prefix_vars = ();
 			return 0;
 		}
 	}
