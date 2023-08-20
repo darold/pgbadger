@@ -1,3 +1,43 @@
+2023-08-20 - v12.2
+
+This is a maintenance release of pgBadger that fixes issues reported by
+users since last release. It also adds two new features:
+
+  * Add support for max, avg, min autovacuum duration. Thanks to Francisco
+    Reinolds for the patch.
+  * Add support for pgbouncer's average waiting time. Thanks to Francisco
+    Reinolds for the patch.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix broken HTML output when application name contains <...>. Thanks to
+    Fabio Geiss for the report.
+  - Fix incorrect association of orphan lines when a filter on database was
+    applied.  Thanks to jcasanov for the report.
+  - Fix logplex prefix parsing.
+  - Fix logplex orphan lines detection.
+  - Fix `autovacuum`'s `system usage: CPU: ...` line parsing. Thanks to
+    Francisco Reinolds for the patch.
+  - Avoid prepending output directory if output is stdout.
+  - Standardise Average Query Duration label. Thanks to Francisco Reinolds
+    for the patch
+  - Update documentation for new pgbadger options. Thanks to Francisco Reinolds
+    for the patch.
+  - Fix case where parsing was not aborted when no file handle can be opened.
+    Thanks to vp for the report.
+  - Fix help by adding %p/%t mandatory placeholder log information. Thanks to
+    Christophe Courtois for the patch.
+  - Fix --retention parameter. Thanks to Bertrand Bourgier for the patch.
+  - Fix cleanup output directory removed by commit 0e5c7d5 when HTML output dir
+    is set. Thanks to Bertrand Bourgier for the report.
+  - Fix output extension when destination directory contain a character that
+    need to be escaped in regexp. Thanks to Bertrand Bourgier for the patch.
+  - Replace calls to POSIX::strftime("%s", ....) by a call to localtime for
+    Windows port. Thanks to Bertrand Bourgier for the patch.
+  - Fix html output dir cleanup. Thanks to Bertrand Bourgier for the patch.
+  - Use https for explain URL by default. Thanks to Philipp Trulson for the
+    patch.
+
 2023-03-20 - v12.1
 
 This is a maintenance release of pgBadger that fixes issues reported by users
