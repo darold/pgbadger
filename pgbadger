@@ -2690,7 +2690,7 @@ sub set_parser_regex
 		if ($fmt eq 'syslog')
 		{
 			$llp =
-				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*'
+				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*'
 				. $llp
 				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
@@ -2754,10 +2754,10 @@ sub set_parser_regex
 	elsif ($fmt eq 'syslog')
 	{
 		$compiled_prefix =
-	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
 		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
-		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*)/;
+		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*)/;
 	}
 	elsif ($fmt eq 'syslog2')
 	{
@@ -18255,7 +18255,7 @@ sub search_log_format
 	# Are syslog lines ?
 	}
 	elsif ($line =~
-/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+(?:\-\d+)?\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
+/^[A-Z][a-z]{2}\s+\d+\s\d+:\d+:\d+(?:\.\d+)?(\s[^\s]+)?\s[^\s]+\s([^\s\[]+)\[\d+\]:(?:\s\[[^\]]+\])?\s\[\d+(?:\-\d+)?\].*?(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT):/
 	   )
 	{
 		$fmt = 'syslog';
