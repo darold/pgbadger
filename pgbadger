@@ -16743,7 +16743,7 @@ sub parse_query
 	# Store autoanalyze information
 	if (
 		$is_log_level
-		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)" system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*) (?:sec|s)/))
+		&& ($prefix_vars{'t_query'} =~ /automatic analyze of table "([^\s]+)"( system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: (.*) (?:sec|s))?/))
 	{
 		return if ($disable_autovacuum);
 		my $table = $1;
