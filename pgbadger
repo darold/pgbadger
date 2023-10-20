@@ -19814,8 +19814,20 @@ sub query
 
     # Replace any \\ by BSLHPGF
     $self->{ 'query' } =~ s/\\\\/BSLHPGF/sg;
-    # Replace any \' by PGFBSLHQ
-    $self->{ 'query' } =~ s/\\'/PGFBSLHQ/sg;
+
+### BBO - 2023-10-18 - FIX - single-quoted Windows Network paths tokenization
+### Do not have single quote disappear from tokenization otherwise strings like:
+### '\\some.site.com\folder1\folder2\'
+### get wrongly tokenized into: ( ('\\some.site.com),(folder1),(folder2\') )
+### (related to Windows-convention network paths)
+### Fix consists still in characterizing the \' part but while keeping the quote in the string
+### for proper quote-to-quote string tokenization
+###
+###    # Replace any \' by PGFBSLHQ
+###    $self->{ 'query' } =~ s/\\'/PGFBSLHQ/sg;
+    # Replace any \' by PGFBSLBEFOREHQ'
+    $self->{ 'query' } =~ s/\\'/PGFBSLBEFOREHQ'/sg;
+
     # Replace any '' by PGFESCQ1
     while ($self->{ 'query' } =~ s/([^'])''([^'])/$1PGFESCQ1$2/s) {};
     # Replace any '''' by PGFESCQ1PGFESCQ1
@@ -20004,8 +20016,13 @@ sub content
 
     # Replace any BSLHPGF by \\
     $self->{ 'content' } =~ s/BSLHPGF/\\\\/g;
-    # Replace any PGFBSLHQ by \'
-    $self->{ 'content' } =~ s/PGFBSLHQ/\\'/g;
+
+### BBO - 2023-10-18 - FIX - single-quoted Windows Network paths tokenization
+###    # Replace any PGFBSLHQ by \'
+###    $self->{ 'content' } =~ s/PGFBSLHQ/\\'/g;
+    # Replace any PGFBSLBEFOREHQ by \
+    $self->{ 'content' } =~ s/PGFBSLBEFOREHQ/\\/g;
+
     # Replace any $PGFDLM$ by code delimiter '
     $self->{ 'content' } =~ s/\$PGFDLM\$/'/g;
 
