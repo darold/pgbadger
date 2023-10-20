@@ -5038,13 +5038,20 @@ sub parse_orphan_line
 	{
 		if (!$error_only)
 		{
-			if ($cur_info{$cur_pid}{parameters} =~ /=$/) {
-				$cur_info{$cur_pid}{parameters} .= ' ';
-				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= ' ' if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
+			if ($cur_info{$cur_pid}{parameters})
+			{
+				if ($cur_info{$cur_pid}{parameters} =~ /=$/) {
+					$cur_info{$cur_pid}{parameters} .= ' ';
+					$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= ' ' if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
+				}
+				$line =~ s/^\t+/\\n/;
+				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
+				$cur_info{$cur_pid}{parameters} .= "$line";
 			}
-			$line =~ s/^\t+/\\n/;
-			$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
-			$cur_info{$cur_pid}{parameters} .= "$line";
+			else
+			{
+				$cur_info{$cur_pid}{query} .= "$line";
+			}
 		}
 	}
 	# stores explain plan lines
