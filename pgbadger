@@ -5535,8 +5535,34 @@ sub normalize_query
 	%objnames = ();
 
 	# Remove string content
-	$orig_query =~ s/\\'//gs;
-	$orig_query =~ s/'[^']*'/\?/gs;
+	
+### BBO - 2023-10-21 - FIX - proper handling of balanced single-quoted strings with escaped quotes inside
+### Regexp s/\\'//gs removes \' (escaped quotes supposed to be inside quoted strings) from the query string
+### BUT
+### This simple regexp DOES NOT check for balanced quotes for the outer quoted string
+### and the quotes within quotes disturb the next replacement (Regexp s/'[^']*'/\?/gs)
+### where we remove everything quoted to replace it with a question mark (?)
+### Example#01 - Simple Case: Query string is: call foo('foo1 is \'foo2\'')
+### call foo('foo1 is \'foo2\'') >> call foo('foo1 is foo2') >> call foo(?)
+### >> In this simple case, the replacement works ok
+### Example#02 - BUG Case: Query string is: call foo(3, '\\some.site.com\folder\', 1000);
+### The problem here is that we don't want to remove the \' because it really is \'
+### and NOT an escaped quote inside another quoted string...
+### Replacement sequence is:
+### call foo(3, '\\rooterpd1v0166.corp.idemia.com\sftp_boomi$\cps\in\', 1000);
+###   >> call foo(3, '\\rooterpd1v0166.corp.idemia.com\sftp_boomi$\cps\in, 1000);
+###   >> and that's all :-( Normalization does not work in this case
+### Fix:
+### In order to properly handle quoted strings with escaped quotes inside AND make sure outer quotes
+### are balanced, we'll use a more complicates regexp
+### This regexp will replace balanced quoted strings (including empty strings)
+### WITH escaped quotes inside by a question mark (?)
+### Matching pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/gs
+### Replace pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/\?/gs
+###
+	$orig_query =~ s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/\?/gs;
+	###$orig_query =~ s/\\'//gs;
+	###$orig_query =~ s/'[^']*'/\?/gs;
 	$orig_query =~ s/\?(\?)+/\?/gs;
 
 	# Remove comments starting with --
