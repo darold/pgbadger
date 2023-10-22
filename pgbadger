@@ -5557,10 +5557,10 @@ sub normalize_query
 ### are balanced, we'll use a more complicates regexp
 ### This regexp will replace balanced quoted strings (including empty strings)
 ### WITH escaped quotes inside by a question mark (?)
-### Matching pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/gs
-### Replace pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/\?/gs
+### Matching pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/gs
+### Replace pattern: s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/\?/gs
 ###
-	$orig_query =~ s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*.?)\1)/\?/gs;
+	$orig_query =~ s/((?<![\\])['"])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/\?/gs;
 	###$orig_query =~ s/\\'//gs;
 	###$orig_query =~ s/'[^']*'/\?/gs;
 	$orig_query =~ s/\?(\?)+/\?/gs;
