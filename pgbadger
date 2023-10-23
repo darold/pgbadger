@@ -5559,8 +5559,18 @@ sub normalize_query
 ### WITH escaped quotes inside by a question mark (?)
 ### Matching pattern: s/((?<![\\])['])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/gs
 ### Replace pattern: s/((?<![\\])['])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/\?/gs
+### Such Regexp testing can be done here:
+### https://rubular.com/
 ###
 	$orig_query =~ s/((?<![\\])['])(?:\1|((?:.(?!(?<![\\])\1))*[^,\s]?)\1)/\?/gs;
+
+### BBO - 2023-10-23 - FIX - Additional replacement to handle a remaining case after previous regexp processing
+### Case remains because of the [^,\s]? part used previously to properly detect and split call parameters
+### Remaining case: '<any_chars><spaces or commas>'
+### Matching pattern: s/('[^']*[,\s]+')/gs
+### Replace pattern: s/('[^']*[,\s]+')/\?/gs
+	$orig_query =~ s/('[^']*[,\s]+')/\?/gs;
+
 	###$orig_query =~ s/\\'//gs;
 	###$orig_query =~ s/'[^']*'/\?/gs;
 	$orig_query =~ s/\?(\?)+/\?/gs;
