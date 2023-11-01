@@ -8194,7 +8194,7 @@ sub compute_query_graphs
 								$graph_data{"$action-min"} .= "[$t, " . ($a_dataavg{$action}{min}{"$rd"} || 0) . "],";
 								# Average query duration
 								$graph_data{"$action-2"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{$action}{duration}{"$rd"} || 0) / ($a_dataavg{$action}{count}{"$rd"} || 1)) . "],";
-							} else {
+							} elsif ($action eq 'DDL') {
 								# Average query duration
 								$graph_data{"write"} .= "[$t, " . sprintf("%.3f", ($a_dataavg{write}{duration}{"$rd"} || 0) / ($a_dataavg{write}{count}{"$rd"} || 1)) . "],";
 							}
@@ -9518,7 +9518,7 @@ sub print_app_session
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
 				<ul>
-					<li><span class="figure">$main_app[0]</span> <span class="figure-label">Main Host</span></li>
+					<li><span class="figure">$main_app[0]</span> <span class="figure-label">Main Application</span></li>
 					<li><span class="figure">$total_count sessions</span> <span class="figure-label">Total</span></li>
 				</ul>
 			</div>
