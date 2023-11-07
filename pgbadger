@@ -380,6 +380,9 @@ my %last_execute_stmt = ();
 my $disable_process_title = 0;
 my $dump_all_queries = 0;
 my $dump_raw_csv = 0;
+my $header_done = 0;
+my @include_pid = ();
+my @include_session = ();
 
 my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
@@ -565,6 +568,8 @@ my $result = GetOptions(
 	'keep-comments!'           => \$keep_comments,
 	'no-progressbar!'          => \$no_progessbar,
 	'dump-raw-csv!'            => \$dump_raw_csv,
+	'include-pid=i'            => \@include_pid,
+	'include-session=s'        => \@include_session,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -2256,6 +2261,10 @@ Options:
     --no-progressbar       : disable progressbar.
     --dump-raw-csv         : parse the log and dump the information into CSV
                              format. No further processing is done, no report.
+    --include-pid PID      : only report events related to the session pid (\%p).
+                             Can be used multiple time.
+    --include-session ID   : only report events related to the session id (\%c).
+                             Can be used multiple time.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
@@ -17353,6 +17362,13 @@ sub store_queries
 		$cur_info{$t_pid}{query} =~ s/\/\*(.*?)\*\///gs;
 	}
 
+	if ($#include_pid >= 0) {
+		return 1 if (!grep(/^$t_pid$/, @include_pid));
+	}
+	if ($#include_session >= 0) {
+		return 1 if (!grep(/^$cur_info{$t_pid}{session}$/, @include_session));
+	}
+
 	# In dump all queries mode we just print the query to output file
 	if ($dump_all_queries && $cur_info{$t_pid}{loglevel} eq 'LOG')
 	{
@@ -19620,7 +19636,8 @@ sub dump_raw_csv
 	# backend type
 	# query id
 	
-	print "timestamp;username;dbname;pid;client;sessionid;loglevel;sqlstate;duration;query/error;parameters;appname;backendtype;queryid\n";
+	print "timestamp;username;dbname;pid;client;sessionid;loglevel;sqlstate;duration;query/error;parameters;appname;backendtype;queryid\n" if (!$header_done);
+	$header_done = 1;
 	print "$cur_info{$t_pid}{timestamp};$cur_info{$t_pid}{dbuser};$cur_info{$t_pid}{dbname};";
 	print "$cur_info{$t_pid}{pid};$cur_info{$t_pid}{dbclient};$cur_info{$t_pid}{session};";
 	print "$cur_info{$t_pid}{loglevel};$cur_info{$t_pid}{sqlstate};$cur_info{$t_pid}{duration};";

@@ -206,6 +206,10 @@ SYNOPSIS
         --no-progressbar       : disable progressbar.
         --dump-raw-csv         : parse the log and dump the information into CSV
                                  format. No further processing is done, no report.
+        --include-pid PID      : only report events related to the session pid (%p).
+                                 Can be used multiple time.
+        --include-session ID   : only report events related to the session id (%c).
+                                 Can be used multiple time.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use -r or --remote-host to set the host IP address or
