@@ -379,6 +379,7 @@ my @prefix_q_params = ();
 my %last_execute_stmt = ();
 my $disable_process_title = 0;
 my $dump_all_queries = 0;
+my $dump_raw_csv = 0;
 
 my $compress_extensions = qr/\.(zip|gz|xz|bz2|lz4|zst)$/i;
 
@@ -562,7 +563,8 @@ my $result = GetOptions(
 	'no-process-info!'         => \$disable_process_title,
 	'dump-all-queries!'        => \$dump_all_queries,
 	'keep-comments!'           => \$keep_comments,
-	'no-progressbar!'          => \$no_progessbar
+	'no-progressbar!'          => \$no_progessbar,
+	'dump-raw-csv!'            => \$dump_raw_csv,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -2252,6 +2254,8 @@ Options:
                              can be useful if you want to distinguish between
 			     same normalized queries.
     --no-progressbar       : disable progressbar.
+    --dump-raw-csv         : parse the log and dump the information into CSV
+                             format. No further processing is done, no report.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
@@ -17371,6 +17375,11 @@ sub store_queries
 		$overall_stat{'queries_number'}++;
 		return 1;
 	}
+	elsif ($dump_raw_csv)
+	{
+		&dump_raw_csv($t_pid);
+		return 1;
+	}
 
 	# Cleanup and pre-normalize the current query
 	$cur_info{$t_pid}{query} =~ s/^\s+//s;
@@ -19588,6 +19597,41 @@ sub html_escape
 
 	return $toencode;
 }
+
+sub dump_raw_csv
+{
+
+	my $t_pid = shift;
+
+	# CSV columns information:
+	# ------------------------
+	# timestamp without milliseconds
+	# username
+	# database name
+	# Process id
+	# Remote host
+	# session id
+	# Error severity
+	# SQL state code
+	# Query duration
+	# user query / error message
+	# bind parameters
+	# application name
+	# backend type
+	# query id
+	
+	print "timestamp;username;dbname;pid;client;sessionid;loglevel;sqlstate;duration;query/error;parameters;appname;backendtype;queryid\n";
+	print "$cur_info{$t_pid}{timestamp};$cur_info{$t_pid}{dbuser};$cur_info{$t_pid}{dbname};";
+	print "$cur_info{$t_pid}{pid};$cur_info{$t_pid}{dbclient};$cur_info{$t_pid}{session};";
+	print "$cur_info{$t_pid}{loglevel};$cur_info{$t_pid}{sqlstate};$cur_info{$t_pid}{duration};";
+	my $query = ($cur_info{$t_pid}{query} || $cur_lock_info{$t_pid}{query} || $cur_temp_info{$t_pid}{query}
+	        || $cur_cancel_info{$t_pid}{query} || "plan:\n" .$cur_plan_info{$t_pid}{plan});
+	$query =~ s/[\r\n]/\\n/gs;
+	print $query . ";";
+	print "\"$cur_info{$t_pid}{parameters}\";\"$cur_info{$t_pid}{dbappname}\";";
+	print "$cur_info{$t_pid}{backendtype};$cur_info{$t_pid}{queryid}\n";
+}
+
 
 # Inclusion of Perl package pgFormatter::Beautify.
 {

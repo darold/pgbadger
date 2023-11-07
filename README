@@ -204,6 +204,8 @@ SYNOPSIS
                                  can be useful if you want to distinguish between
                                  same normalized queries.
         --no-progressbar       : disable progressbar.
+        --dump-raw-csv         : parse the log and dump the information into CSV
+                                 format. No further processing is done, no report.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use -r or --remote-host to set the host IP address or
