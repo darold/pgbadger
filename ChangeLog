@@ -1,3 +1,32 @@
+2023-11-27 - v12.3
+
+This is a maintenance release of pgBadger that fixes issues reported by
+users since last release. It also adds some new features:
+
+  * Add option --include-pid to only report events related to a session
+    pid (%p). Can be used multiple time. Thanks to Henrietta Dombrovskaya
+    for the feature request.
+  * Add option --include-session to only report events related to the
+    session id (%c). Can be used multiple time. Thanks to Henrietta Dombrovskaya
+    for the feature request.
+  * Add new option --dump-raw-csv to only parse the log and dump the information
+    into CSV format. No further processing is done, no report is generated.
+    Thanks to Henrietta Dombrovskaya for the feature request.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Update pgFormatter to version 5.5
+  - Fix end date of parsing with jsonlog format. Thanks to jw1u1 for the report.
+  - Fix typo in "Sessions per application". Thanks to fairyfar for the patch.
+  - Fix "INSERT/UPDATE/DELETE Traffic" chart bug. Thanks to fairyfar for the
+    patch.
+  - Fix parsing of orphan lines with bind queries. Thanks to youxq for the
+    report.
+  - Fix Analyze per table report with new PG versions. Thanks to Jean-Christophe
+    Arnu for the patch.
+  - Fix syslog entry parser when the syslog timestamp contains milliseconds.
+    Thanks to Pavel Rabel for the report.
+
 2023-08-20 - v12.2
 
 This is a maintenance release of pgBadger that fixes issues reported by

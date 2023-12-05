@@ -52,7 +52,7 @@ use Socket;
 use constant EBCDIC => "\t" ne "\011";
 use Encode qw(encode decode);
 
-$VERSION = '12.2';
+$VERSION = '12.3';
 
 $SIG{'CHLD'} = 'DEFAULT';
 
@@ -5956,7 +5956,7 @@ sub set_top_error_sample
 	# Stop when we have our number of samples
 	if (!exists $error_info{$curdb}{$q}{date} || ($#{$error_info{$curdb}{$q}{date}}+1 < $sample))
 	{
-		if ( ($q =~ /deadlock detected/) || ($real_error && !grep(/^\Q$real_error\E$/, @{$error_info{$curdb}{$q}{error}})) )
+		if ( $q =~ /deadlock detected/ || (!$statement && $detail && !grep(/^\Q$detail\E$/, @{$error_info{$curdb}{$q}{detail}})) || ($statement && !grep(/^\Q$statement\E$/, @{$error_info{$curdb}{$q}{statement}})) )
 		{
 			push(@{$error_info{$curdb}{$q}{date}},      $date);
 			push(@{$error_info{$curdb}{$q}{detail}},    $detail);
