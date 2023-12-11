@@ -6849,13 +6849,13 @@ sub show_error_as_text
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++)
 			{
-				last if ($i == $sample);
-				($error_info{$curdb}{$k}{error}[$i], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
+				($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
 				if ($msg && ($logs_type{$curdb}{ERROR} > 0))
 				{
 					$logs_type{$curdb}{ERROR}--;
 					$logs_type{$curdb}{LOG}++;
 				}
+				next if ($i == $sample);
 				print $fh "\t- Example $j: $error_info{$curdb}{$k}{date}[$i] - $error_info{$curdb}{$k}{error}[$i]\n";
 				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[$i]\n"       if ($error_info{$curdb}{$k}{detail}[$i]);
 				print $fh "\t\tContext: $error_info{$curdb}{$k}{context}[$i]\n"     if ($error_info{$curdb}{$k}{context}[$i]);
@@ -6868,7 +6868,7 @@ sub show_error_as_text
 		}
 		elsif ($error_info{$curdb}{$k}{error}[0])
 		{
-			($error_info{$curdb}{$k}{error}[0], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
+			($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
 			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
 			{
 				$logs_type{$curdb}{ERROR}--;
@@ -14060,23 +14060,34 @@ sub escape_html
 sub restore_log_type_count
 {
 	my $curdb = shift;
-	my $ret = 0;
 
 	# Some messages have seen their log level change during log parsing.
 	# Set the real log level count back
-	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}}) {
-		next if (!$error_info{$curdb}{$k}{count});
-		if ($error_info{$curdb}{$k}{count} > 1) {
+	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}})
+	{
+		my ($msg, $ret) = &revert_log_level($k);
+		if ($error_info{$curdb}{$k}{count} > 1)
+		{
 			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++) {
-				($error_info{$curdb}{$k}{error}[$i], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
-				if ($ret && ($logs_type{$curdb}{ERROR} > 0)) {
+				my ($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
+				if ($msg && ($logs_type{$curdb}{ERROR} > 0)) {
 					$logs_type{$curdb}{ERROR}--;
 					$logs_type{$curdb}{LOG}++;
 				}
 			}
-		} else {
-			($error_info{$curdb}{$k}{error}[0], $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
+		}
+		elsif ($error_info{$curdb}{$k}{error}[0])
+		{
+			my ($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
 			if ($ret && ($logs_type{$curdb}{ERROR} > 0)) {
+				$logs_type{$curdb}{ERROR}--;
+				$logs_type{$curdb}{LOG}++;
+			}
+		}
+		else
+		{
+			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
+			{
 				$logs_type{$curdb}{ERROR}--;
 				$logs_type{$curdb}{LOG}++;
 			}
