@@ -6842,7 +6842,6 @@ sub show_error_as_text
 		last if (!$error_info{$curdb}{$k}{count});
 
 		my ($msg, $ret) = &revert_log_level($k);
-
 		if ($error_info{$curdb}{$k}{count} > 1)
 		{
 			print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $msg\n";
@@ -6891,6 +6890,14 @@ sub show_error_as_text
 			{
 				print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $msg\n";
 				print $fh "--\n";
+			}
+		}
+		else
+		{
+			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
+			{
+				$logs_type{$curdb}{ERROR}--;
+				$logs_type{$curdb}{LOG}++;
 			}
 		}
 		$idx++;
