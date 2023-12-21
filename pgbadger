@@ -1675,6 +1675,9 @@ if ($^O !~ /MSWin32|dos/i && $progress)
 # be the postgres database to be read by the DBA of the PostgreSQL cluster.
 $DBLIST{$DBALL} = 1;
 
+# Prevent parallelism perl file to be higher than the number of files
+$job_per_file = ($#given_log_files+1) if ( ($job_per_file > 1) && ($job_per_file > ($#given_log_files+1)) );
+
 # Parse each log file following the multiprocess mode chosen (-j or -J)
 foreach my $logfile ( @given_log_files )
 {
