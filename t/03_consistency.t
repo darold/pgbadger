@@ -1,9 +1,9 @@
-use Test::Simple tests => 23;
+use Test::Simple tests => 24;
 use JSON::XS;
 
 my $json = new JSON::XS;
 
-my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz';
+my $LOG = 't/fixtures/light.postgres.log.bz2 t/fixtures/pgbouncer.log.gz t/fixtures/pgbouncer.1.21.log.gz';
 my $HLOG = 't/fixtures/logplex.gz';
 my $RDSLOG = 't/fixtures/rds.log.bz2';
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
@@ -17,6 +17,7 @@ ok( $? == 0, "Generate intermediate binary file from log");
 
 $ret = `perl pgbadger -q -o $OUT --format binary $BIN`;
 ok( $? == 0, "Generate json report from binary file");
+`cp $OUT /tmp/`;
 
 `rm -f $BIN`;
 
@@ -32,6 +33,10 @@ ok( $json_ref->{overall_stat}{postgres}{histogram}{query_total} == 629, "Consist
 ok( $json_ref->{overall_stat}{postgres}{peak}{"2017-09-06 08:48:45"}{write} == 1, "Consistent peak write");
 
 ok( $json_ref->{pgb_session_info}{chronos}{20180912}{16}{count} == 63943, "pgBouncer connections");
+
+$ret = `ls -la $OUT | awk '{print \$5}'`;
+chomp($ret);
+ok( $ret == 229298, "Consistent pgbouncer reports");
 
 `rm -f $OUT`;
 

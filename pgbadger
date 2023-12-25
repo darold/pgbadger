@@ -3787,6 +3787,21 @@ sub process_file
 						$prefix_vars{'t_avgduration'} = $6;
 						$prefix_vars{'t_avgwaiting'} = $7;
 					}
+					# pgbouncer 1.21
+					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, (\d+) client parses\/s, (\d+) server parses\/s, (\d+) binds\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us, wait (\d+) us/)
+					{
+						$prefix_vars{'t_loglevel'} = 'STATS';
+						$prefix_vars{'t_xact/s'} = $1;
+						$prefix_vars{'t_req/s'} = $2;
+						$prefix_vars{'t_client_parses/s'} = $3;
+						$prefix_vars{'t_server_parses/s'} = $4;
+						$prefix_vars{'t_binds/s'} = $5;
+						$prefix_vars{'t_inbytes/s'} = $6;
+						$prefix_vars{'t_outbytes/s'} = $7;
+						$prefix_vars{'t_avgtxduration'} = $8;
+						$prefix_vars{'t_avgduration'} = $9;
+						$prefix_vars{'t_avgwaiting'} = $10;
+					}
 				}
 
 				# Check if the log line should be excluded from the report
@@ -17300,7 +17315,7 @@ sub parse_pgbouncer
 
 	# Store session duration
 	if (($prefix_vars{'t_loglevel'} eq 'LOG')
-		&& ($prefix_vars{'t_query'} =~ /\(age=(\d+)\)$/))
+		&& ($prefix_vars{'t_query'} =~ /\(age=(\d+)[a-z]*\)$/))
 	{
 		return if ($disable_session);
 
