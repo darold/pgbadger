@@ -1,3 +1,15 @@
+2023-12-25 - v12.4
+
+This is a maintenance release of pgBadger that fixes issues reported by
+users since last release.
+
+  - Fix pgbouncer report with version 1.21. Thanks to Ales Zeleny for the patch.
+  - Prevent parallelism perl file to be higher than the number of files. Thanks
+    to maliangzhu for the report.
+  - Fix regression test broken since v12.3. Thanks to ieshin for the report.
+  - Fix cases where LOG entries where counted as ERROR log level entries. Thanks
+    to Matti Linnanvuori for the report.
+
 2023-11-27 - v12.3
 
 This is a maintenance release of pgBadger that fixes issues reported by
