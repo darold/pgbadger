@@ -19687,6 +19687,10 @@ sub dump_raw_csv
 	my $query = ($cur_info{$t_pid}{query} || $cur_lock_info{$t_pid}{query} || $cur_temp_info{$t_pid}{query}
 	        || $cur_cancel_info{$t_pid}{query} || "plan:\n" .$cur_plan_info{$t_pid}{plan});
 	$query =~ s/[\r\n]/\\n/gs;
+	if ($query =~ /;/) {
+		$query =~ s/"/""/g;
+		$query = '"' . $query . '"';
+	}
 	print $query . ";";
 	print "\"$cur_info{$t_pid}{parameters}\";\"$cur_info{$t_pid}{dbappname}\";";
 	print "$cur_info{$t_pid}{backendtype};$cur_info{$t_pid}{queryid}\n";
