@@ -19692,7 +19692,8 @@ sub dump_raw_csv
 		$query = '"' . $query . '"';
 	}
 	print $query . ";";
-	print "\"$cur_info{$t_pid}{parameters}\";\"$cur_info{$t_pid}{dbappname}\";";
+	($cur_info{$t_pid}{parameters}) ? print "\"$cur_info{$t_pid}{parameters}\";" : print ';';
+	($cur_info{$t_pid}{dbappname}) ? print "\"$cur_info{$t_pid}{dbappname}\";" : print ';';
 	print "$cur_info{$t_pid}{backendtype};$cur_info{$t_pid}{queryid}\n";
 }
 
