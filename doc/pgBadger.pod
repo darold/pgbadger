@@ -208,6 +208,7 @@ Options:
     --no-progressbar       : disable progressbar.
     --dump-raw-csv         : parse the log and dump the information into CSV
                              format. No further processing is done, no report.
+    --csv-separator CHAR   : change CSV separator character. Default: semicolon.
     --include-pid PID      : only report events related to the session pid (%p).
                              Can be used multiple time.
     --include-session ID   : only report events related to the session id (%c).

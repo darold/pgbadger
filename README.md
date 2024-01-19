@@ -87,8 +87,10 @@ Options:
                              defined in your postgresql.conf. Only use it if you
                              aren't using one of the standard prefixes specified
                              in the pgBadger documentation, such as if your
-                             prefix includes additional variables like client ip
-                             or application name. See examples below.
+                             prefix includes additional variables like client IP
+                             or application name. MUST contain escape sequences
+                             for time (%t, %m or %n) and processes (%p or %c).
+                             See examples below.
     -P | --no-prettify     : disable SQL queries prettify formatter.
     -q | --quiet           : don't print anything to stdout, not even a progress
                              bar.
@@ -221,6 +223,13 @@ Options:
                              can be useful if you want to distinguish between
                              same normalized queries.
     --no-progressbar       : disable progressbar.
+    --dump-raw-csv         : parse the log and dump the information into CSV
+                             format. No further processing is done, no report.
+    --csv-separator CHAR   : change CSV separator character. Default: semicolon.
+    --include-pid PID      : only report events related to the session pid (%p).
+                             Can be used multiple time.
+    --include-session ID   : only report events related to the session id (%c).
+                             Can be used multiple time.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
