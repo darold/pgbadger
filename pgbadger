@@ -19662,6 +19662,11 @@ sub dump_raw_csv
 
 	my $t_pid = shift;
 
+	my $sep = ';';
+	if ($csv_sep_char) {
+		$sep = $csv_sep_char;
+	}
+
 	# CSV columns information:
 	# ------------------------
 	# timestamp without milliseconds
@@ -19678,23 +19683,23 @@ sub dump_raw_csv
 	# application name
 	# backend type
 	# query id
-	
-	print "timestamp;username;dbname;pid;client;sessionid;loglevel;sqlstate;duration;query/error;parameters;appname;backendtype;queryid\n" if (!$header_done);
+
+	print "timestamp${sep}username${sep}dbname${sep}pid${sep}client${sep}sessionid${sep}loglevel${sep}sqlstate${sep}duration${sep}query/error${sep}parameters${sep}appname${sep}backendtype${sep}queryid\n" if (!$header_done);
 	$header_done = 1;
-	print "$cur_info{$t_pid}{timestamp};$cur_info{$t_pid}{dbuser};$cur_info{$t_pid}{dbname};";
-	print "$cur_info{$t_pid}{pid};$cur_info{$t_pid}{dbclient};$cur_info{$t_pid}{session};";
-	print "$cur_info{$t_pid}{loglevel};$cur_info{$t_pid}{sqlstate};$cur_info{$t_pid}{duration};";
+	print "$cur_info{$t_pid}{timestamp}${sep}$cur_info{$t_pid}{dbuser}${sep}$cur_info{$t_pid}{dbname}${sep}";
+	print "$cur_info{$t_pid}{pid}${sep}$cur_info{$t_pid}{dbclient}${sep}$cur_info{$t_pid}{session}${sep}";
+	print "$cur_info{$t_pid}{loglevel}${sep}$cur_info{$t_pid}{sqlstate}${sep}$cur_info{$t_pid}{duration}${sep}";
 	my $query = ($cur_info{$t_pid}{query} || $cur_lock_info{$t_pid}{query} || $cur_temp_info{$t_pid}{query}
 	        || $cur_cancel_info{$t_pid}{query} || "plan:\n" .$cur_plan_info{$t_pid}{plan});
 	$query =~ s/[\r\n]/\\n/gs;
-	if ($query =~ /;/) {
+	if ($query =~ /${sep}/) {
 		$query =~ s/"/""/g;
 		$query = '"' . $query . '"';
 	}
-	print $query . ";";
-	($cur_info{$t_pid}{parameters}) ? print "\"$cur_info{$t_pid}{parameters}\";" : print ';';
-	($cur_info{$t_pid}{dbappname}) ? print "\"$cur_info{$t_pid}{dbappname}\";" : print ';';
-	print "$cur_info{$t_pid}{backendtype};$cur_info{$t_pid}{queryid}\n";
+	print $query . "${sep}";
+	($cur_info{$t_pid}{parameters}) ? print "\"$cur_info{$t_pid}{parameters}\"${sep}" : print "${sep}";
+	($cur_info{$t_pid}{dbappname}) ? print "\"$cur_info{$t_pid}{dbappname}\"${sep}" : print "${sep}";
+	print "$cur_info{$t_pid}{backendtype}${sep}$cur_info{$t_pid}{queryid}\n";
 }
 
 
