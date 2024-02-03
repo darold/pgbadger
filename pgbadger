@@ -21652,7 +21652,7 @@ sub beautify
 	    $add_newline = 0 if ($self->{ '_is_in_value' } and $self->{ '_parenthesis_level_value' });
 	    $add_newline = 0 if ($self->{ '_is_in_function' } or $self->{ '_is_in_statistics' });
 	    $add_newline = 0 if (defined $self->_next_token and !$self->{ 'no_comments' } and $self->_is_comment($self->_next_token));
-	    $add_newline = 0 if (defined $self->_next_token and $self->_next_token =~ /KEYWCONST/ and defined $self->{ '_tokens' }[1] and $self->{ '_tokens' }[1] =~ /^(LANGUAGE|STRICT)$/i);
+	    $add_newline = 0 if (defined $self->_next_token and $self->_next_token =~ /KEYWCONST/ and $#{ $self->{ '_tokens' } } >= 1 and $self->{ '_tokens' }[1] =~ /^(LANGUAGE|STRICT)$/i);
 	    $add_newline = 1 if ($self->{ '_is_in_truncate' });
 	    $self->_new_line($token,$last) if ($add_newline and $self->{ 'comma' } eq 'end' and ($self->{ 'comma_break' } || $self->{ '_current_sql_stmt' } ne 'INSERT'));
         }
