@@ -5084,11 +5084,15 @@ sub parse_orphan_line
 				}
 				$line =~ s/^\t+/\\n/;
 				$cur_bind_info{$cur_pid}{'bind'}{'parameters'} .= $line if (exists $cur_bind_info{$cur_pid}{'bind'}{'parameters'});
-				$cur_info{$cur_pid}{parameters} .= "$line";
+				$cur_info{$cur_pid}{parameters} .= $line;
+			}
+			elsif (exists $cur_bind_info{$cur_pid}{bind}{'query'} && !exists $cur_info{$cur_pid}{query})
+			{
+				$cur_bind_info{$cur_pid}{bind}{'query'} .= $line;
 			}
 			else
 			{
-				$cur_info{$cur_pid}{query} .= "$line";
+				$cur_info{$cur_pid}{query} .= $line;
 			}
 		}
 	}
@@ -5130,7 +5134,7 @@ sub parse_orphan_line
 		# After all append to the query if one is defined
 		} elsif (exists $cur_info{$cur_pid}{query}) {
 			$cur_info{$cur_pid}{query} .= "\n" . $line if (!$nomultiline && !$error_only);
-		# Associate to bind|prepare query now that& we collect it too
+		# Associate to bind|prepare query now that we collect it too
 		} elsif (exists $cur_bind_info{$cur_pid}{'bind'}) {
 			$cur_bind_info{$cur_pid}{'bind'}{'query'} .= "\n" . $line;
 		} elsif (exists $cur_bind_info{$cur_pid}{'prepare'}) {
@@ -21011,7 +21015,6 @@ sub beautify
 
 	if ($token =~ /^(BEGIN|DECLARE)$/i)
 	{
-		#	print STDERR "JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ $token\n" if (uc($token) eq 'DECLARE');
             $self->{ '_is_in_create' }-- if ($self->{ '_is_in_create' });
 	    if (uc($token) eq 'BEGIN')
 	    {
