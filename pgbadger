@@ -2415,10 +2415,6 @@ sub gen_database_report
 {
 	my $db = shift;
 
-	# Some message have been temporary stored as ERROR but
-	# they are LOG, restore them to the right log level.
-	&restore_log_type_count($db);
-
 	foreach $outfile (@outfiles)
 	{
 		($current_out_file, $extens) = &set_output_extension($outdir, $outfile, $extension, $db);
@@ -6871,12 +6867,6 @@ sub show_error_as_text
 			my $j = 1;
 			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++)
 			{
-				($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
-				if ($msg && ($logs_type{$curdb}{ERROR} > 0))
-				{
-					$logs_type{$curdb}{ERROR}--;
-					$logs_type{$curdb}{LOG}++;
-				}
 				next if ($i == $sample);
 				print $fh "\t- Example $j: $error_info{$curdb}{$k}{date}[$i] - $error_info{$curdb}{$k}{error}[$i]\n";
 				print $fh "\t\tDetail: $error_info{$curdb}{$k}{detail}[$i]\n"       if ($error_info{$curdb}{$k}{detail}[$i]);
@@ -6891,11 +6881,6 @@ sub show_error_as_text
 		elsif ($error_info{$curdb}{$k}{error}[0])
 		{
 			($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
-			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
-			{
-				$logs_type{$curdb}{ERROR}--;
-				$logs_type{$curdb}{LOG}++;
-			}
 			if ($sample)
 			{
 				print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $error_info{$curdb}{$k}{error}[0]\n";
@@ -6912,14 +6897,6 @@ sub show_error_as_text
 			{
 				print $fh "$idx) " . &comma_numbers($error_info{$curdb}{$k}{count}) . " - $msg\n";
 				print $fh "--\n";
-			}
-		}
-		else
-		{
-			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
-			{
-				$logs_type{$curdb}{ERROR}--;
-				$logs_type{$curdb}{LOG}++;
 			}
 		}
 		$idx++;
@@ -14079,44 +14056,6 @@ sub escape_html
 	return $_[0];
 }
 
-sub restore_log_type_count
-{
-	my $curdb = shift;
-
-	# Some messages have seen their log level change during log parsing.
-	# Set the real log level count back
-	foreach my $k (sort {$error_info{$curdb}{$b}{count} <=> $error_info{$curdb}{$a}{count}} keys %{$error_info{$curdb}})
-	{
-		my ($msg, $ret) = &revert_log_level($k);
-		if ($error_info{$curdb}{$k}{count} > 1)
-		{
-			for (my $i = 0 ; $i <= $#{$error_info{$curdb}{$k}{date}} ; $i++) {
-				my ($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
-				if ($msg && ($logs_type{$curdb}{ERROR} > 0)) {
-					$logs_type{$curdb}{ERROR}--;
-					$logs_type{$curdb}{LOG}++;
-				}
-			}
-		}
-		elsif ($error_info{$curdb}{$k}{error}[0])
-		{
-			my ($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[0]);
-			if ($ret && ($logs_type{$curdb}{ERROR} > 0)) {
-				$logs_type{$curdb}{ERROR}--;
-				$logs_type{$curdb}{LOG}++;
-			}
-		}
-		else
-		{
-			if ($msg && ($logs_type{$curdb}{ERROR} > 0))
-			{
-				$logs_type{$curdb}{ERROR}--;
-				$logs_type{$curdb}{LOG}++;
-			}
-		}
-	}
-}
-
 sub print_log_level
 {
 	my $curdb = shift;
@@ -14137,7 +14076,7 @@ sub print_log_level
 	}
 	my %graph_data = ();
 	my %max_events = ();
-	if ($graph) {
+	if ($graph){
 		my @small = ();
 		foreach my $d (sort keys %{$logs_type{$curdb}}) {
 			if ((($logs_type{$curdb}{$d} * 100) / ($total_logs || 1)) > $pie_percentage_limit) {
@@ -14152,7 +14091,7 @@ sub print_log_level
 			$infos{$small[0]} = $infos{"Sum log types < $pie_percentage_limit%"};
 			delete $infos{"Sum log types < $pie_percentage_limit%"};
 		}
-		foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
+		foreach my $l (qw(FATAL WARNING ERROR PANIC EVENTLOG)) {
 			$max_events{$l} = 0;
 		}
 		my %e_dataavg = ();
@@ -14161,13 +14100,12 @@ sub print_log_level
 				next if (!exists $per_minute_info{$curdb}{$tm}{$h});
 				foreach my $m ("00" .. "59") {
 					next if (!exists $per_minute_info{$curdb}{$tm}{$h}{$m});
-
 					if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{log_level}) {
 
 						my $rd = &average_per_minutes($m, $avg_minutes);
 
 						# Average per minute
-						foreach my $l (qw(FATAL WARNING ERROR PANIC)) {
+						foreach my $l (qw(FATAL WARNING ERROR PANIC EVENTLOG)) {
 							$e_dataavg{$l}{$tm}{$h}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{log_level}{$l} || 0);
 							$max_events{$l} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{log_level}{$l} || 0);
 						}
@@ -14204,7 +14142,7 @@ sub print_log_level
 	}
 
 	$drawn_graphs{'eventspersecond_graph'} = &jqplot_linegraph( $graphid++, 'eventspersecond_graph', $graph_data{'PANIC'},
-		$graph_data{FATAL}, $graph_data{'ERROR'}, 'Errors per ' . $avg_minutes . ' minutes',
+		$graph_data{FATAL}, $graph_data{'ERROR'}, 'Events per ' . $avg_minutes . ' minutes',
 		'Errors per ' . $avg_minutes . ' minutes', 'PANIC', 'FATAL', 'ERROR', '', $graph_data{'WARNING'}, 'WARNING'
 	);
 
@@ -14224,7 +14162,8 @@ sub print_log_level
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
 				<ul>
-					<li><span class="figure">$total_logs</span> <span class="figure-label">Log entries</span></li>
+					<li><span class="figure">$total_logs</span> <span class="figure-label">Event entries</span></li>
+					<li><span class="figure-label">(EVENTLOG entries are formaly LOG level entries that are not queries)</span></li>
 				</ul>
 			</div>
 		</div>
@@ -14258,7 +14197,7 @@ sub print_log_level
 	</div><!-- end of event flow -->
 
 	<div class="analysis-item row" id="minutes-errors-levels">
-		<h2 class="col-md-12"><i class="glyphicon icon-tags"></i> Events distribution</h2>
+		<h2 class="col-md-12"><i class="glyphicon icon-tags"></i> Events distribution (except queries)</h2>
 		<div class="col-md-3">
 			<h3 class="">Key values</h3>
 			<div class="well key-figures">
@@ -14267,6 +14206,7 @@ sub print_log_level
 					<li><span class="figure">$max_events{FATAL}</span> <span class="figure-label">FATAL entries</span></li>
 					<li><span class="figure">$max_events{ERROR}</span> <span class="figure-label">ERROR entries</span></li>
 					<li><span class="figure">$max_events{WARNING}</span> <span class="figure-label">WARNING entries</span></li>
+					<li><span class="figure">$max_events{EVENTLOG}</span> <span class="figure-label">EVENTLOG entries</span></li>
 				</ul>
 			</div>
 		</div>
@@ -14536,7 +14476,8 @@ sub show_error_as_html
 		{
 			last if (($sample > 0) && ($i == $sample));
 			# Escape HTML code in error message
-			my $message = &escape_html($error_info{$curdb}{$k}{error}[$i]);
+			my ($msg, $ret) = &revert_log_level($error_info{$curdb}{$k}{error}[$i]);
+			my $message = &escape_html($msg);
 			my $details = "<b>Date:</b> " . $error_info{$curdb}{$k}{date}[$i] . "\n";
 			my $info    = '';
 			if ($error_info{$curdb}{$k}{detail}[$i]) {
@@ -15081,7 +15022,7 @@ sub load_stats
 	$pgb_overall_stat{histogram}{session_total} += $_pgb_overall_stat{histogram}{session_total};
 
 	### Logs level ###
-	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT))
+	foreach my $l (qw(LOG WARNING ERROR FATAL PANIC DETAIL HINT STATEMENT CONTEXT EVENTLOG))
 	{
 		foreach my $curdb (keys %_logs_type)
 		{
@@ -16413,9 +16354,13 @@ sub parse_query
 	####
 	if ($prefix_vars{'t_loglevel'} eq 'LOG')
 	{
-		if (&change_log_level($prefix_vars{'t_query'})) {
+		if (&change_log_level($prefix_vars{'t_query'}))
+		{
+			$prefix_vars{'t_origloglevel'} = 'EVENTLOG';
 			$prefix_vars{'t_loglevel'} = 'ERROR';
-		} else {
+		}
+		else
+		{
 			$is_log_level = 1;
 		}
 	}
@@ -16468,7 +16413,11 @@ sub parse_query
 	}
 
 	# Store a counter of logs type
-	$logs_type{$curdb}{$prefix_vars{'t_loglevel'}}++;
+	if (!exists $prefix_vars{'t_origloglevel'}) {
+		$logs_type{$curdb}{$prefix_vars{'t_loglevel'}}++;
+	} else {
+		$logs_type{$curdb}{$prefix_vars{'t_origloglevel'}}++;
+	}
 
 	# Do not parse lines that are not an error message when error only report is requested
 	if ($error_only && ($prefix_vars{'t_loglevel'} !~ $full_error_regex)) {
@@ -17381,6 +17330,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{pid}       = $prefix_vars{'t_pid'} if (!$cur_info{$t_pid}{pid});
 	$cur_info{$t_pid}{session}   = $prefix_vars{'t_session_line'} if (!$cur_info{$t_pid}{session});
 	$cur_info{$t_pid}{loglevel}  = $prefix_vars{'t_loglevel'} if (!$cur_info{$t_pid}{loglevel});
+	$cur_info{$t_pid}{origloglevel}= $prefix_vars{'t_origloglevel'} if (exists $prefix_vars{'t_origloglevel'});
 	$cur_info{$t_pid}{dbname}    = $prefix_vars{'t_dbname'} if (!$cur_info{$t_pid}{dbname});
 	$cur_info{$t_pid}{dbuser}    = $prefix_vars{'t_dbuser'} if (!$cur_info{$t_pid}{dbuser});
 	$cur_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'} if (!$cur_info{$t_pid}{dbclient});
@@ -17525,10 +17475,15 @@ sub store_queries
 		$error_info{$cur_info{$t_pid}{cur_db}}{$normalized_error}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
 		# Stores log level count per minute
-		$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{log_level}{$cur_info{$t_pid}{loglevel}}++;
+		if (!exists $cur_info{$t_pid}{origloglevel}) {
+			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{log_level}{$cur_info{$t_pid}{loglevel}}++;
+		} else {
+			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{log_level}{$cur_info{$t_pid}{origloglevel}}++;
+		}
 
 		# Stores normalized query samples
-		if ($sample > 0) {
+		if ($sample > 0)
+		{
 			my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 							"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
 			&set_top_error_sample( $cur_info{$t_pid}{cur_db},	$normalized_error,
