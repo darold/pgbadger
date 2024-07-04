@@ -1,4 +1,4 @@
-use Test::Simple tests => 24;
+use Test::Simple tests => 34;
 use JSON::XS;
 
 my $json = new JSON::XS;
@@ -9,6 +9,8 @@ my $RDSLOG = 't/fixtures/rds.log.bz2';
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $CNPGLOG = 't/fixtures/cnpg.log.gz';
 my $TIMELOG = 't/fixtures/begin_end.log';
+my $VACUUMLOG = 't/fixtures/pg_vacuums.log.gz';
+my $VACUUMJSON = 't/fixtures/pg_vacuums.json.gz';
 my $BIN = 'out.bin';
 my $OUT = 'out.json';
 
@@ -104,3 +106,21 @@ ok( $? == 0 && $ret eq 'Total number of sessions: 6', "Generate report from excl
 $ret = `perl pgbadger -q --log-timezone +5 -p "%t:%h:%u@%d:[%p]:" -o - t/fixtures/pg-timezones.log`;
 chomp($ret);
 ok( $? == 0 && $ret =~ m{Log start from 2021-05-27 12:00:00 to 2021-05-27 12:46:39} , "Correct first and last query timestamps on timezone adjusted log");
+
+$ret = `perl pgbadger -f stderr -q -p "%t [%p]: [%l-1] user=%u,db=%d,host=%h,app=%a" -o $OUT $VACUUMLOG`;
+ok( $? == 0, "Generate vacuums report from stderr log");
+$json_ref = $json->decode(`cat $OUT`);
+ok( $json_ref->{autoanalyze_info}{postgres}{count} eq "1450", "Autoanalyze count stderrlog");
+ok( $json_ref->{autoanalyze_info}{postgres}{chronos}{"20240627"}{"01"}{count} eq "474", "Autoanalyze count at 01 am stderrlog");
+ok( $json_ref->{autovacuum_info}{postgres}{count} eq "2094", "Autovacuum count stderrlog");
+ok( $json_ref->{autovacuum_info}{postgres}{chronos}{"20240627"}{"02"}{count} eq "730", "Autovacuum count at 2 am stderrlog");
+`rm -f $OUT`;
+
+$ret = `perl pgbadger -f jsonlog -q -x json -o $OUT $VACUUMJSON`;
+ok( $? == 0, "Generate vacuums report from jsonlog");
+$json_ref = $json->decode(`cat $OUT`);
+ok( $json_ref->{autoanalyze_info}{postgres}{count} eq "1450", "Autoanalyze count jsonlog");
+ok( $json_ref->{autoanalyze_info}{postgres}{chronos}{"20240627"}{"01"}{count} eq "474", "Autoanalyze count at 01 am jsonlog");
+ok( $json_ref->{autovacuum_info}{postgres}{count} eq "2094", "Autovacuum count jsonlog");
+ok( $json_ref->{autovacuum_info}{postgres}{chronos}{"20240627"}{"02"}{count} eq "730", "Autovacuum count at 2 am jsonlog");
+`rm -f $OUT`;
