@@ -5038,7 +5038,7 @@ sub parse_orphan_line
 		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
 		{
 			# Add vacuum counts and duration to the $per_minute_info.
-			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++;
+			# $per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++; # Duplicate to parse_query() -> Store autovacuum information
 			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{second}{$cur_info{$cur_pid}{second}} += $3;
 			if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 			{
@@ -10621,7 +10621,7 @@ sub print_vacuum
 						$v_dataavg{vmin}{"$rd"} = $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$s}
 							if ($per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}{second}{$d} < $v_dataavg{vmin}{"$rd"});
 					}
-					delete $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum};
+					# delete $per_minute_info{$curdb}{$tm}{$h}{$m}{autovacuum}; # Used in report printing the #vacuums-activity
 				}
 				if (exists $per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}) {
 					$v_dataavg{acount}{"$rd"} += ($per_minute_info{$curdb}{$tm}{$h}{$m}{autoanalyze}{count} || 0);
@@ -16709,7 +16709,12 @@ sub parse_query
 
 		if ($fmt eq 'csv' || $fmt eq 'jsonlog')
 		{
-			if ($prefix_vars{'t_query'} =~ /(pages|tuples): (\d+) removed, (\d+) remain/)
+			if ($prefix_vars{'t_query'} =~ /(pages): (\d+) removed, (\d+) remain/)
+			{
+					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
+					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
+			}
+			if ($prefix_vars{'t_query'} =~ /(tuples): (\d+) removed, (\d+) remain/)
 			{
 					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
 					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
@@ -16717,8 +16722,9 @@ sub parse_query
 			if ($prefix_vars{'t_query'} =~ /(\d+) are dead but not yet removable/) {
 				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{notremovable} += $1;
 			}
-			if ($prefix_vars{'t_query'} =~ m#system usage: CPU .* (?:sec|s,) elapsed (.*) s#)
+			if ($prefix_vars{'t_query'} =~ /system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
 			{
+				$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{second}{$prefix_vars{'t_sec'}{second}} += $3;
 				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 				{
 					$autovacuum_info{$curdb}{peak}{system_usage}{elapsed} = $3;
