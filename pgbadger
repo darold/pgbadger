@@ -3930,9 +3930,12 @@ sub process_file
 					$prefix_vars{'t_timestamp'} =
 						"$prefix_vars{'t_year'}-$prefix_vars{'t_month'}-$prefix_vars{'t_day'} $prefix_vars{'t_time'}";
 
-					# Remove newline characters from queries
-					for (my $i = 0; $i <= $#$row; $i++) {
-						$row->[$i] =~ s/[\r\n]+/ /gs;
+					# Remove newline characters from queries but not explain plan
+					if (!grep(/Query Text:/, @$row))
+					{
+						for (my $i = 0; $i <= $#$row; $i++) {
+							$row->[$i] =~ s/[\r\n]+/ /gs;
+						}
 					}
 
 					# Skip unwanted lines
