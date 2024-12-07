@@ -17514,14 +17514,20 @@ sub store_queries
 	}
 	elsif ($cur_info{$t_pid}{loglevel} eq 'LOG')
 	{
+		# Special case for auto_explain plan with csv and json logs
+		if ((!exists $cur_plan_info{$t_pid}{plan} || $cur_plan_info{$t_pid}{plan} eq '') && $cur_info{$t_pid}{query} =~ s/^Query Text: ([^;]+);(.*)/$1/s)
+		{
+			$cur_plan_info{$t_pid}{plan} = $2;
+		}
 
 		# Store auto explain plan when switching to another log entry
 		if (exists $cur_plan_info{$t_pid}{plan})
 		{
 			$cur_plan_info{$t_pid}{plan} =~ s/^\s+//s;
 			$cur_plan_info{$t_pid}{plan} =~ s/\s+$//s;
-			# Extract the query part from the plan then the plan itself
-			if ($cur_plan_info{$t_pid}{plan}) {
+			# Extract the query part from the plan, then the plan itself
+			if ($cur_plan_info{$t_pid}{plan})
+			{
 				my $key = 'query';
 				my @plan = split("\n", $cur_plan_info{$t_pid}{plan});
 				foreach my $l (@plan) {
