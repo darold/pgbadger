@@ -6821,6 +6821,9 @@ sub change_log_level
 	return 1 if ($msg =~ /could not (receive|send) data (from|to) client/);
 	return 1 if ($msg =~ /logical decoding found consistent point at/);
 	return 1 if ($msg =~ /starting logical decoding for slot/);
+	return 1 if ($msg =~ /unexpected EOF/);
+	return 1 if ($msg =~ /incomplete startup packet/);
+	return 1 if ($msg =~ /detected deadlock while waiting for/);
 
 	return 0;
 }
