@@ -463,6 +463,9 @@ if ($^O !~ /MSWin32|dos/i) {
 
 $| = 1;
 
+my $histogram_query = '';
+my $histogram_session = '';
+
 # get the command line parameters
 my $result = GetOptions(
 	"a|average=i"              => \$avg_minutes,
@@ -570,6 +573,8 @@ my $result = GetOptions(
 	'dump-raw-csv!'            => \$dump_raw_csv,
 	'include-pid=i'            => \@include_pid,
 	'include-session=s'        => \@include_session,
+	'histogram-query=s'        => \$histogram_query,
+	'histogram-session=s'      => \$histogram_session,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -1037,6 +1042,23 @@ my @histogram_query_time = (0, 1, 5, 10, 25, 50, 100, 500, 1000, 10000);
 
 # Inbounds of session times histogram
 my @histogram_session_time = (0, 500, 1000, 30000, 60000, 600000, 1800000, 3600000, 28800000);
+
+# Check histogram values user redefinition
+if ($histogram_query)
+{
+	if ($histogram_query =~ /[^0-9\s,]+/) {
+		die("Incorrect value for option --histogram_query\n");
+	}
+	@histogram_query_time = split(/\s*,\s*/, $histogram_query);
+}
+if ($histogram_session)
+{
+	if ($histogram_session =~ /[^0-9\s,]+/) {
+		die("Incorrect value for option --histogram_session\n");
+	}
+	@histogram_session_time = split(/\s*,\s*/, $histogram_session);
+}
+
 
 # Where statistics are stored
 my %overall_stat	= ();
@@ -2268,6 +2290,12 @@ Options:
                              Can be used multiple time.
     --include-session ID   : only report events related to the session id (\%c).
                              Can be used multiple time.
+   --histogram-query VAL   : use custom inbounds for query times histogram.
+                             Default inbounds in miliseconds:
+			 0,1,5,10,25,50,100,500,1000,10000
+   --histogram-session VAL : use custom inbounds for session times histogram.
+                             Default inbounds in miliseconds:
+			 0,500,1000,30000,60000,600000,1800000,3600000,28800000
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
