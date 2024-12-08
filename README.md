@@ -229,11 +229,11 @@ Options:
                               Can be used multiple time.
      --include-session ID   : only report events related to the session id (%c).
                               Can be used multiple time.
-    --histogram-query VAL   : use custom inbounds for query times histogram.
-                              Default inbounds in miliseconds:
+    --histogram-query VAL   : use custom inbound for query times histogram.
+                              Default inbound in milliseconds:
                           0,1,5,10,25,50,100,500,1000,10000
-    --histogram-session VAL : use custom inbounds for session times histogram.
-                              Default inbounds in miliseconds:
+    --histogram-session VAL : use custom inbound for session times histogram.
+                              Default inbound in milliseconds:
                           0,500,1000,30000,60000,600000,1800000,3600000,28800000
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
