@@ -1,3 +1,54 @@
+2024-12-08 - v13.0
+
+This is a major release of pgBadger that fixes issues reported by
+users since last release and adds some new features:
+
+  * Add two new option to be able to redefined inbound of query and session
+    histogram.
+       --histogram-query VAL   : use custom inbound for query times histogram.
+                                 Default inbound in milliseconds:
+                             0,1,5,10,25,50,100,500,1000,10000
+       --histogram-session VAL : use custom inbound for session times histogram.
+                                 Default inbound in milliseconds:
+                             0,500,1000,30000,60000,600000,1800000,3600000,28800000
+    Thanks to JosefMachytkaNetApp for the feature request.
+  * Add support of auto_explain plan for csv and json log formats. Thanks
+    to zxwsbg and to Alexander Rumyantsev for the report.
+  * Add three LOG message that was not reported as events: unexpected EOF,
+    incomplete startup packet and detected deadlock while waiting for. Thanks
+    to dottle for the report.
+
+Backward compatibility issues:
+
+  - Change the way LOG level events reported in the Events reports are
+    stored. Some of them was still reported and counted as errors instead
+    as LOG level entries. The fix is to stored and report them as EVENTLOG
+    to differentiate them from queries. This change introduce a backward
+    compatibility break when pgbadger is used in incremental mode. You will
+    just have the double behavior during the week of the upgrade.
+    Thanks to Matti Linnanvuori for the report.
+
+Bug fixes:
+
+  - Fix non reported queries generating the most cancellation due to statement_timeout.
+  - Update regression tests
+  - Fix formatting of explain plan when extracted from csv log format.
+  - Fix jsonlog missing autovacuum data reports:
+    Average Autovacuum Duration, Tuples removed per table
+    and vacuums by hour in autovacuum activity report.
+    Thanks to Ales Zeleny for the patch.
+  - Fix orphan line not associated to the time consuming bind queries.
+    Thanks to Henrietta Dombrovskaya for the report.
+    Fix use of uninitialized value in pattern match. Thanks to Junior Dias
+    for the patch.
+  - Apply option --csv-separator to raw export to CSV. Default separator
+    is semicolon (;). Thanks to Henrietta Dombrovskaya for the feature
+    request.
+  - Raw csv output: do not add double quote to parameters and application
+    name if they are empty.
+  - Add double quotes when queries have a semi colon in raw csv output.
+    Thanks to Henrietta Dombrovskaya for the report.
+
 2023-12-25 - v12.4
 
 This is a maintenance release of pgBadger that fixes issues reported by
