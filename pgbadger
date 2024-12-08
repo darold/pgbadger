@@ -16499,7 +16499,7 @@ sub parse_query
 		if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid}{query} eq '')) {
 			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
 		}
-		return;
+		#return;
 	}
 
 	# Special cases when a STATEMENT is parsed
