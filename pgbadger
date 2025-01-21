@@ -2730,11 +2730,11 @@ sub set_parser_regex
 		if ($fmt eq 'syslog')
 		{
 			$llp =
-				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*'
+				  '^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*'
 				. $llp
 				. '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)';
 			$compiled_prefix = qr/$llp/;
-			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line');
+			unshift(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_ms', 't_host', 't_ident', 't_pid', 't_session_line');
 			push(@prefix_params, 't_loglevel', 't_query');
 			$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*)/;
 		}
@@ -2755,11 +2755,11 @@ sub set_parser_regex
 		       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 
 		       $llp =
-				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+'
+				 '^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+'
 			       . $llp
 			       . '\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)';
 		       $compiled_prefix = qr/$llp/;
-		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
+		       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_ms', 't_pid', 't_dbname');
 		       push(@prefix_params, 't_loglevel', 't_query');
 		       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.\d+\][:]?\s+\[([^\]]+)\]\s+\[(\d+)\-(\d+)\]\s*(.*)/;
 		}
@@ -2794,8 +2794,8 @@ sub set_parser_regex
 	elsif ($fmt eq 'syslog')
 	{
 		$compiled_prefix =
-	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_host', 't_ident', 't_pid', 't_session_line',
+	qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_ms', 't_host', 't_ident', 't_pid', 't_session_line',
 			't_logprefix', 't_loglevel', 't_query');
 		$other_syslog_line = qr/^(...)\s+(\d+)\s(\d+):(\d+):(\d+)(?:\.\d+)?(?:\s[^\s]+)?\s([^\s]+)\s([^\s\[]+)\[(\d+)\]:(?:\s\[[^\]]+\])?\s\[(\d+)(?:\-\d+)?\]\s*(.*)/;
 	}
@@ -2812,8 +2812,8 @@ sub set_parser_regex
 	{
 	       # The output format of the heroku pg logs is as follows: timestamp app[dyno]: message
 	       $compiled_prefix =
-			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
-	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_pid', 't_dbname');
+			 qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[postgres\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s+(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(.*)/;
+	       unshift(@prefix_params, 't_year', 't_month', 't_day', 't_hour', 't_min', 't_sec', 't_ms', 't_pid', 't_dbname');
 	       push(@prefix_params, 't_logprefix', 't_loglevel', 't_query');
 	       $other_syslog_line = qr/^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)(?:\.\d+)?[+\-]\d{2}:\d{2}\s+(?:[^\s]+)?\s*app\[(postgres)\.(\d+)\][:]?\s+\[([^\]]+)\]\s+\[\d+\-\d+\]\s*(.*)/;
 	}
@@ -2837,15 +2837,15 @@ sub set_parser_regex
 	elsif ($fmt eq 'stderr')
 	{
 		$compiled_prefix =
-	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(?:\[\d+\-\d+\])?\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-		push(@prefix_params, 't_timestamp', 't_pid', 't_logprefix', 't_loglevel', 't_query');
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})(\.\d+)?(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(?:\[\d+\-\d+\])?\s*(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_timestamp', 't_ms', 't_pid', 't_logprefix', 't_loglevel', 't_query');
 	}
 	elsif ($fmt eq 'default')
 	{
 		$fmt = 'stderr';
 		$compiled_prefix =
-	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})[\.\d]*(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
-		push(@prefix_params, 't_timestamp', 't_pid', 't_logprefix', 't_loglevel', 't_query');
+	qr/^(\d{10}\.\d{3}|\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})(\.\d+)?(?: [A-Z\+\-\d]{3,6})?\s\[([0-9a-f\.]+)\][:]*\s(.*?)\s*(LOG|WARNING|ERROR|FATAL|PANIC|DETAIL|STATEMENT|HINT|CONTEXT|LOCATION):\s+(?:[0-9A-Z]{5}:\s+)?(.*)/;
+		push(@prefix_params, 't_timestamp', 't_ms', 't_pid', 't_logprefix', 't_loglevel', 't_query');
 	}
 
 	return $fmt;
@@ -4105,6 +4105,10 @@ sub process_file
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
 
+					if ($prefix_vars{'t_mtimestamp'} && $prefix_vars{'t_mtimestamp'} =~ s/(\.\d+)$//) {
+						$prefix_vars{'t_ms'} = $1;
+					}
+
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 					} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
@@ -4396,6 +4400,10 @@ sub process_file
 
 					# Skip location information
 					next if ($prefix_vars{'t_loglevel'} eq 'LOCATION');
+
+					if ($prefix_vars{'t_mtimestamp'} && $prefix_vars{'t_mtimestamp'} =~ s/(\.\d+)$//) {
+						$prefix_vars{'t_ms'} = $1;
+					}
 
 					if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 						$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
@@ -5261,6 +5269,9 @@ sub detect_new_log_line
 				}
 
 				$prefix_vars{'t_client'} =~ s/\(.*// if ($fmt eq 'rds');
+				if ($prefix_vars{'t_mtimestamp'} && $prefix_vars{'t_mtimestamp'} =~ s/(\.\d+)$//) {
+					$prefix_vars{'t_ms'} = $1;
+				}
 				if (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_mtimestamp'}) {
 					$prefix_vars{'t_timestamp'} = $prefix_vars{'t_mtimestamp'};
 				} elsif (!$prefix_vars{'t_timestamp'} && $prefix_vars{'t_session_timestamp'}) {
@@ -17359,9 +17370,10 @@ sub set_current_infos
 	$cur_info{$t_pid}{year}      = $prefix_vars{'t_year'} if (!$cur_info{$t_pid}{year});
 	$cur_info{$t_pid}{month}     = $prefix_vars{'t_month'} if (!$cur_info{$t_pid}{month});
 	$cur_info{$t_pid}{day}       = $prefix_vars{'t_day'} if (!$cur_info{$t_pid}{day});
-	$cur_info{$t_pid}{hour}      = $prefix_vars{'t_hour'} if (!exists $cur_info{$t_pid}{sec} || ($cur_info{$t_pid}{hour} eq ''));
-	$cur_info{$t_pid}{min}       = $prefix_vars{'t_min'} if (!exists $cur_info{$t_pid}{sec} || ($cur_info{$t_pid}{min} eq ''));
+	$cur_info{$t_pid}{hour}      = $prefix_vars{'t_hour'} if (!exists $cur_info{$t_pid}{hour} || ($cur_info{$t_pid}{hour} eq ''));
+	$cur_info{$t_pid}{min}       = $prefix_vars{'t_min'} if (!exists $cur_info{$t_pid}{min} || ($cur_info{$t_pid}{min} eq ''));
 	$cur_info{$t_pid}{sec}       = $prefix_vars{'t_sec'} if (!exists $cur_info{$t_pid}{sec} || ($cur_info{$t_pid}{sec} eq ''));
+	$cur_info{$t_pid}{ms}        = $prefix_vars{'t_ms'} if (!exists $cur_info{$t_pid}{ms} || ($cur_info{$t_pid}{ms} eq ''));
 	$cur_info{$t_pid}{timestamp} = $prefix_vars{'t_timestamp'} if (!$cur_info{$t_pid}{timestamp});
 	$cur_info{$t_pid}{ident}     = $prefix_vars{'t_ident'} if (!$cur_info{$t_pid}{ident});
 	$cur_info{$t_pid}{query}     = $prefix_vars{'t_query'} if (!$cur_info{$t_pid}{query});
@@ -18660,7 +18672,7 @@ sub build_log_line_prefix_regex
 		'%Q' => [('t_queryid',	  '([\-]*\d+)')],	# Query ID
 		'%n' => [('t_epoch',    '(\d{10}\.\d{3})')],    # timestamp as Unix epoch
 		'%t' => [('t_timestamp',    '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})[Z]*(?:[ \+\-][A-Z\+\-\d]{3,6})?')],      # timestamp without milliseconds
-		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})\.\d+(?:[ \+\-][A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
+		'%m' => [('t_mtimestamp',   '(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}\.\d+)(?:[ \+\-][A-Z\+\-\d]{3,6})?')], # timestamp with milliseconds
 		'%l' => [('t_session_line', '(\d+)')],							# session line number
 		'%s' => [('t_session_timestamp', '(\d{4}-\d{2}-\d{2}[\sT]\d{2}):\d{2}:\d{2}(?:[ \+\-][A-Z\+\-\d]{3,6})?')],    # session start timestamp
 		'%c' => [('t_session_id',	'([0-9a-f\.]*)')],					       # session ID
@@ -19691,7 +19703,7 @@ sub dump_raw_csv
 
 	print "timestamp${sep}username${sep}dbname${sep}pid${sep}client${sep}sessionid${sep}loglevel${sep}sqlstate${sep}duration${sep}query/error${sep}parameters${sep}appname${sep}backendtype${sep}queryid\n" if (!$header_done);
 	$header_done = 1;
-	print "$cur_info{$t_pid}{timestamp}${sep}$cur_info{$t_pid}{dbuser}${sep}$cur_info{$t_pid}{dbname}${sep}";
+	print "$cur_info{$t_pid}{timestamp}$cur_info{$t_pid}{ms}${sep}$cur_info{$t_pid}{dbuser}${sep}$cur_info{$t_pid}{dbname}${sep}";
 	print "$cur_info{$t_pid}{pid}${sep}$cur_info{$t_pid}{dbclient}${sep}$cur_info{$t_pid}{session}${sep}";
 	print "$cur_info{$t_pid}{loglevel}${sep}$cur_info{$t_pid}{sqlstate}${sep}$cur_info{$t_pid}{duration}${sep}";
 	my $query = ($cur_info{$t_pid}{query} || $cur_lock_info{$t_pid}{query} || $cur_temp_info{$t_pid}{query}

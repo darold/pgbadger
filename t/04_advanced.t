@@ -1,10 +1,11 @@
-use Test::Simple tests => 11;
+use Test::Simple tests => 12;
 
 my $GCPLOG = 't/fixtures/cloudsql.log.gz';
 my $SYSLOG1 = 't/fixtures/pg-syslog.1.bz2';
 my $SYSLOG2 = 't/fixtures/pg-syslog.1.bz2';
 my $STDERR1 = 't/fixtures/postgresql_param_range.log';
 my $STDERR2 = 't/fixtures/multiline_param.log';
+my $RAWCSV  = 't/fixtures/pg_rawcsv.log';
 my $JSON = 't/out.json';
 my $TEXT = 't/out.txt';
 
@@ -65,6 +66,9 @@ $ret = `perl pgbadger -q -o t/out.txt $STDERR2`;
 $ret = `grep 'njvarchar\\\\nbye'* $TEXT | wc -l`;
 chomp($ret);
 ok( $? == 0 && ($ret == 4), "Multiline bind parameters: $ret");
+
+$ret = `perl pgbadger -q -p '%m [%p] %q%u@%d ' --dump-raw-csv $RAWCSV`;
+ok( $? == 0 && length($ret) == 638, "Dump log as raw csv: " . length($ret));
 
 # Remove files generated during the tests
 `rm -f *.html`;

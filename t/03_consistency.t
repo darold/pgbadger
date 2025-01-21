@@ -50,7 +50,7 @@ ok( $json_ref->{database_info}{postgres}{GREEN}{"cte|duration"} eq "21761.546", 
 # check logplex multiline and new format
 $ret = `grep -E "WHERE missions.checker_id = " out.json | wc -l`;
 chomp($ret);
-ok( $ret == 1, "logplex multiline and new format");
+ok( $ret == 1, "logplex multiline and new format : $ret");
 
 `rm -f $OUT`;
 
