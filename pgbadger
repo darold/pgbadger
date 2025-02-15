@@ -1701,8 +1701,10 @@ $DBLIST{$DBALL} = 1;
 $job_per_file = ($#given_log_files+1) if ( ($job_per_file > 1) && ($job_per_file > ($#given_log_files+1)) );
 
 # Parse each log file following the multiprocess mode chosen (-j or -J)
+my $current_log_file = '';
 foreach my $logfile ( @given_log_files )
 {
+	$current_log_file = $logfile if ($#given_log_files > 0);
 
 	# If we just want to build incremental reports from binary files
 	# just build the list of input directories with binary files
@@ -5983,7 +5985,7 @@ sub set_top_slowest
 # Stores top N slowest sample queries
 sub set_top_sample
 {
-	my ($curdb, $norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan, $queryid) = @_;
+	my ($curdb, $norm, $q, $dt, $date, $db, $user, $remote, $app, $bind, $plan, $queryid, $lfile) = @_;
 
 	return if (!$norm || !$q || $sample <= 0);
 
@@ -5996,6 +5998,7 @@ sub set_top_sample
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{bind}	= $bind;
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{plan}	= $plan;
 	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{queryid}	= $queryid;
+	$normalyzed_info{$curdb}{$norm}{samples}{$dt}{logfile}	= $lfile;
 
 	my $i = 1;
 	foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$norm}{samples}}) {
@@ -6009,7 +6012,7 @@ sub set_top_sample
 # Stores top N error sample queries
 sub set_top_error_sample
 {
-	my ($curdb, $q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote, $sqlstate, $queryid) = @_;
+	my ($curdb, $q, $date, $real_error, $detail, $context, $statement, $hint, $db, $user, $app, $remote, $sqlstate, $queryid, $lfile) = @_;
 
 	$errors_code{$curdb}{$sqlstate}++ if ($sqlstate);
 
@@ -6030,6 +6033,7 @@ sub set_top_error_sample
 			push(@{$error_info{$curdb}{$q}{remote}},    $remote);
 			push(@{$error_info{$curdb}{$q}{sqlstate}},  $sqlstate);
 			push(@{$error_info{$curdb}{$q}{queryid}},   $queryid);
+			push(@{$error_info{$curdb}{$q}{logfile}},   $lfile);
 		}
 	}
 }
@@ -6412,6 +6416,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+				$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$j++;
@@ -6477,6 +6482,7 @@ Report not supported by text format
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+					$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 					$db =~ s/^, / - /;
 					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 					$j++;
@@ -6539,6 +6545,7 @@ Report not supported by text format
 					$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+					$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 					$db =~ s/^, / - /;
 					print $fh "\t- Example $j: ", &convert_time($d), " - $db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 					$j++;
@@ -6618,6 +6625,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+				$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 				$db =~ s/^, / - /;
 				print $fh "\t- Example $j: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$j++;
@@ -6659,6 +6667,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+				$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$i++;
@@ -6700,6 +6709,7 @@ Report not supported by text format
 				$db .= ", app: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$db .= ", queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$db .= ", bind query: yes" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{yes});
+				$db .= ", log file: " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 				$db =~ s/^, / - /;
 				print $fh "\tExample $i: ", &convert_time($d), "$db - ", &anonymize_query($normalyzed_info{$curdb}{$k}{samples}{$d}{query}), "\n";
 				$i++;
@@ -6920,6 +6930,7 @@ sub show_error_as_text
 				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[$i]), "\n" if ($error_info{$curdb}{$k}{statement}[$i]);
 				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[$i]\n" if ($error_info{$curdb}{$k}{queryid}[$i]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[$i]\n" if ($error_info{$curdb}{$k}{db}[$i]);
+				print $fh "\t\tLog file: $error_info{$curdb}{$k}{logfile}[$i]\n" if ($error_info{$curdb}{$k}{logfile}[$i]);
 				$j++;
 			}
 		}
@@ -6937,6 +6948,7 @@ sub show_error_as_text
 				print $fh "\t\tStatement: ", &anonymize_query($error_info{$curdb}{$k}{statement}[0]), "\n" if ($error_info{$curdb}{$k}{statement}[0]);
 				print $fh "\t\tQueryid: $error_info{$curdb}{$k}{queryid}[0]\n" if ($error_info{$curdb}{$k}{queryid}[0]);
 				print $fh "\t\tDatabase: $error_info{$curdb}{$k}{db}[0]\n" if ($error_info{$curdb}{$k}{db}[0]);
+				print $fh "\t\tLog file: $error_info{$curdb}{$k}{logfile}[0]\n" if ($error_info{$curdb}{$k}{logfile}[0]);
 			}
 			else
 			{
@@ -11973,6 +11985,7 @@ sub print_lock_queries_report
 				$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 				$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 				$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+				$details .= "<b>Log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 				my $explain = '';
 				if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 					$explain = &display_plan("query-a-explain-$rank", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
@@ -12147,6 +12160,7 @@ sub print_tempfile_report
 					$details .= "<b>Remote:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{remote}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{remote});
 					$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
+					$details .= "<b>Log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 					if (exists $top_tempfile_info{$curdb} && $#{$top_tempfile_info{$curdb}} >= $i) {
 						$details .= "<b>Info:</b> $top_tempfile_info{$curdb}[$i]->[7]" if ($top_tempfile_info{$curdb}[$i]->[7]);
 					}
@@ -12298,6 +12312,7 @@ sub print_cancelled_report
 					$details .= "Application: $normalyzed_info{$curdb}{$k}{samples}{$d}{app}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 					$details .= "Queryid: $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 					$details .= "Bind query: yes<br/>" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+					$details .= "<b>log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 					print $fh qq{
 						<dt>
 						<div id="query-d-$rank-$idx" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
@@ -12747,6 +12762,7 @@ sub print_time_consuming
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+			$details .= "<b>Log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-e-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
@@ -13003,6 +13019,7 @@ sub print_most_frequent
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+			$details .= "<b>Log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-f-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
@@ -13259,6 +13276,7 @@ sub print_slowest_queries
 			$details .= "<b>Application:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{app}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{app});
 			$details .= "<b>Queryid:</b> $normalyzed_info{$curdb}{$k}{samples}{$d}{queryid}\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{queryid});
 			$details .= "<b>Bind query:</b> yes\n" if ($normalyzed_info{$curdb}{$k}{samples}{$d}{bind});
+			$details .= "<b>Log file:</b> " . $normalyzed_info{$curdb}{$k}{samples}{$d}{logfile} if ($normalyzed_info{$curdb}{$k}{samples}{$d}{logfile});
 			my $explain = '';
 			if ($normalyzed_info{$curdb}{$k}{samples}{$d}{plan}) {
 				$explain = &display_plan("query-g-explain-$rank-$idx", $normalyzed_info{$curdb}{$k}{samples}{$d}{plan});
@@ -14546,6 +14564,9 @@ sub show_error_as_html
 				$details .= "<b>Remote:</b> $error_info{$curdb}{$k}{remote}[$i]\n";
 				$details .= "<b>Code:</b> $error_info{$curdb}{$k}{sqlstate}[$i]\n" if ($error_info{$curdb}{$k}{sqlstate}[$i]);
 			}
+			if ($error_info{$curdb}{$k}{logfile}[$i]) {
+				$details .= "<b>Log file:</b> $error_info{$curdb}{$k}{logfile}[$i]\n";
+			}
 			$details =~ s/<br\/>$//s;
 			if ($wide_char)
 			{
@@ -15233,7 +15254,8 @@ sub load_stats
 										$_error_info{$curdb}{$q}{app}[$i],
 										$_error_info{$curdb}{$q}{remote}[$i],
 										$_error_info{$curdb}{$q}{sqlstate}[$i],
-										$_error_info{$curdb}{$q}{queryid}[$i]
+										$_error_info{$curdb}{$q}{queryid}[$i],
+										$_error_info{$curdb}{$q}{logfile}[$i]
 										);
 			}
 		}
@@ -16534,6 +16556,7 @@ sub parse_query
 			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 			$cur_lock_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
+			$cur_lock_info{$t_pid}{logfile}   = $current_log_file if ($current_log_file);
 			$cur_lock_info{$t_pid}{cur_db}    = $curdb;
 			return;
 		}
@@ -16549,6 +16572,7 @@ sub parse_query
 			$cur_cancel_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 			$cur_cancel_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
 			$cur_cancel_info{$t_pid}{cur_db}    = $curdb;
+			$cur_cancel_info{$t_pid}{logfile}   = $current_log_file if ($current_log_file);
 			return;
 		}
 
@@ -16584,6 +16608,7 @@ sub parse_query
 			$cur_lock_info{$t_pid}{dbclient}  = $prefix_vars{'t_client'} || $prefix_vars{'t_dbclient'};
 			$cur_lock_info{$t_pid}{dbappname} = $prefix_vars{'t_appname'};
 			$cur_lock_info{$t_pid}{queryid}   = $prefix_vars{'t_queryid'};
+			$cur_lock_info{$t_pid}{logfile}   = $current_log_file if ($current_log_file);
 			$cur_lock_info{$t_pid}{cur_db}    = $curdb;
 		}
 		return;
@@ -17390,6 +17415,7 @@ sub set_current_infos
 	$cur_info{$t_pid}{bind}      = $prefix_vars{'t_bind'} if (!$cur_info{$t_pid}{bind});
 	$cur_info{$t_pid}{sqlstate}  = $prefix_vars{'t_sqlstate'} if (!$cur_info{$t_pid}{sqlstate});
 	$cur_info{$t_pid}{backendtype}  = $prefix_vars{'t_backend_type'} if (!$cur_info{$t_pid}{backendtype});
+	$cur_info{$t_pid}{logfile}   = $current_log_file if ($current_log_file);
 	# Store current report name and list of database
 	$cur_info{$t_pid}{cur_db} = set_current_db($cur_info{$t_pid}{dbname});
 }
@@ -17551,6 +17577,7 @@ sub store_queries
 									$cur_info{$t_pid}{dbclient},
 									$cur_info{$t_pid}{sqlstate},
 									$cur_info{$t_pid}{queryid},
+									$cur_info{$t_pid}{logfile}
 			);
 		}
 
@@ -17796,7 +17823,8 @@ sub store_queries
 										$cur_info{$t_pid}{dbappname},
 										$cur_info{$t_pid}{bind},
 										$cur_info{$t_pid}{plan},
-										$cur_info{$t_pid}{queryid}
+										$cur_info{$t_pid}{queryid},
+										$cur_info{$t_pid}{logfile}
 									);
 			}
 		}
@@ -18000,7 +18028,8 @@ sub store_temporary_and_lock_infos
 									$cur_temp_info{$t_pid}{dbappname},
 									$cur_temp_info{$t_pid}{bind},
 									$cur_temp_info{$t_pid}{plan},
-									$cur_temp_info{$t_pid}{queryid});
+									$cur_temp_info{$t_pid}{queryid},
+									$cur_temp_info{$t_pid}{logfile});
 		}
 		delete $cur_temp_info{$t_pid};
 	}
@@ -18050,7 +18079,8 @@ sub store_temporary_and_lock_infos
 									$cur_lock_info{$t_pid}{dbappname},
 									$cur_lock_info{$t_pid}{bind},
 									$cur_lock_info{$t_pid}{plan},
-									$cur_lock_info{$t_pid}{queryid});
+									$cur_lock_info{$t_pid}{queryid},
+									$cur_lock_info{$t_pid}{logfile});
 		}
 		delete $cur_lock_info{$t_pid};
 	}
