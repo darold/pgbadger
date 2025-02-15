@@ -6900,6 +6900,24 @@ sub revert_log_level
 	return ($msg, 0);
 }
 
+sub revert_log_level_by_reference
+{
+	my $str = shift;
+
+	$$str =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
+	$$str =~ s/ERROR:  (database system was)/LOG:  $1/;
+	$$str =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
+	$$str =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
+	$$str =~ s/ERROR:  (skipping analyze of)/LOG:  $1/;
+	$$str =~ s/ERROR:  (using stale statistics)/LOG:  $1/;
+	$$str =~ s/ERROR:  (received replication command:)/LOG:  $1/;
+	$$str =~ s/ERROR:  (.*still waiting for)/LOG:  $1/;
+	$$str =~ s/ERROR:  (server process.*was terminated by signal)/LOG:  $1/;
+	$$str =~ s/ERROR:  (could not (?:receive|send) data (?:from|to) client)/LOG:  $1/;
+	$$str =~ s/ERROR:  (logical decoding found consistent point at)/LOG:  $1/;
+	$$str =~ s/ERROR:  (starting logical decoding for slot)/LOG:  $1/;
+}
+
 sub show_error_as_text
 {
 	my $curdb = shift;
@@ -15998,6 +16016,7 @@ sub dump_error_as_json
 {
 	my $perl_hash = { 'error_info' => \%error_info };
 
+
 	my $json = undef;
 	if (!$json_prettify) {
 		$json = encode_json($perl_hash) || localdie ("Encode events objects to JSON failed!\n");
@@ -16005,6 +16024,8 @@ sub dump_error_as_json
 		my $coder = JSON::XS->new->ascii->pretty->allow_nonref(0);
 		$json = $coder->encode($perl_hash) || localdie ("Encode events objects to prettified JSON failed!\n");
 	}
+
+	revert_log_level_by_reference(\$json);
 
 	print $fh $json;
 }
@@ -16048,6 +16069,8 @@ sub dump_as_json
 		my $coder = JSON::XS->new->ascii->pretty->allow_nonref(0);
 		$json = $coder->encode($perl_hash) || localdie ("Encode stats objects to prettified JSON failed!\n");
 	}
+
+	revert_log_level_by_reference(\$json);
 
 	print $fh $json;
 }
