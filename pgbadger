@@ -5086,7 +5086,7 @@ sub parse_orphan_line
 	}
 
 	# Store vacuum related information
-	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^[\s\t]*(pages|tuples|buffer usage|avg read rate|system usage|WAL usage):/))
+	if ($cur_info{$cur_pid}{vacuum} && ($line =~ /^[\s\t]*(pages|tuples|buffer usage|avg read rate|system usage|WAL usage|I\/O timings|frozen):/))
 	{
 		if ($line =~ /(pages|tuples): (\d+) removed, (\d+) remain/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{$1}{removed} += $2;
@@ -5095,8 +5095,20 @@ sub parse_orphan_line
 		if ($line =~ /(\d+) are dead but not yet removable/) {
 			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{notremovable} += $1;
 		}
+
+		if ($line =~ /timings: read: ([\d\.]+) ms, write: ([\d\.]+) ms/)
+		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{read} += $1;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{write} += $2;
+		}
+		if ($line =~ /frozen: (\d+) pages from table .* had (\d+) tuples frozen/)
+		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{pages}{frozen} += $1;
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{tuples}{frozen} += $2;
+		}
 		if ($line =~ /^[\s\t]*system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
 		{
+			$autovacuum_info{$curdb}{tables}{$cur_info{$cur_pid}{vacuum}}{elapsed} += $3;
 			# Add vacuum counts and duration to the $per_minute_info.
 			# $per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{count}++; # Duplicate to parse_query() -> Store autovacuum information
 			$per_minute_info{$curdb}{$date_part}{$cur_info{$cur_pid}{hour}}{$cur_info{$cur_pid}{min}}{autovacuum}{second}{$cur_info{$cur_pid}{second}} += $3;
@@ -7220,6 +7232,7 @@ $EXPLAIN_POST
      				<li><a href="#vacuums-activity">Vacuums activity</a></li>
      				<li><a href="#analyzes-per-table">Analyzes per Tables</a></li>
      				<li><a href="#vacuums-per-table">Vacuums per Tables</a></li>
+     				<li><a href="#vacuums-elapsed-per-table">Vacuums throughput</a></li>
      				<li><a href="#tuples-removed-per-table">Tuples removed</a></li>
      				<li><a href="#pages-removed-per-table">Page removed</a></li>
      			</ul>
@@ -10841,6 +10854,7 @@ $drawn_graphs{autovacuumspersecond_graph}
 
 	# VACUUM stats per table
 	&print_vacuum_per_table($curdb);
+	&print_vacuum_throughput($curdb);
 
 	# Show tuples and pages removed per table
 	&print_vacuum_tuple_removed($curdb);
@@ -10923,11 +10937,13 @@ sub print_vacuum_per_table
 	my $total_hits = 0;
 	my $total_misses = 0;
 	my $total_dirtied = 0;
-	my $total_pins = 0;
-	my $total_frozen = 0;
+	my $total_skippins = 0;
+	my $total_skipfrozen = 0;
 	my $total_records = 0;
 	my $total_full_page = 0;
 	my $total_bytes = 0;
+	my $total_pages_frozen = 0;
+	my $total_tuples_frozen = 0;
 	my $vacuum_info   = '';
 	my @main_vacuum   = ('unknown',0);
 	foreach my $t (sort {
@@ -10944,17 +10960,21 @@ sub print_vacuum_per_table
 			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_record}) .
 			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_full_page}) .
 			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{wal_bytes}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{pages}{frozen}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{tuples}{frozen}) .
 			"</td></tr>";
 		$total_count += $autovacuum_info{$curdb}{tables}{$t}{vacuums};
 		$total_idxscan += $autovacuum_info{$curdb}{tables}{$t}{idxscans};
 		$total_hits += $autovacuum_info{$curdb}{tables}{$t}{hits};
 		$total_misses += $autovacuum_info{$curdb}{tables}{$t}{misses};
 		$total_dirtied += $autovacuum_info{$curdb}{tables}{$t}{dirtied};
-		$total_pins += $autovacuum_info{$curdb}{tables}{$t}{skip_pins};
-		$total_frozen += $autovacuum_info{$curdb}{tables}{$t}{skip_frozen};
+		$total_skippins += $autovacuum_info{$curdb}{tables}{$t}{skip_pins};
+		$total_skipfrozen += $autovacuum_info{$curdb}{tables}{$t}{skip_frozen};
 		$total_records += $autovacuum_info{$curdb}{tables}{$t}{wal_record};
 		$total_full_page += $autovacuum_info{$curdb}{tables}{$t}{wal_full_page};
 		$total_bytes += $autovacuum_info{$curdb}{tables}{$t}{wal_bytes};
+		$total_pages_frozen += $autovacuum_info{$curdb}{tables}{$t}{pages}{frozen};
+		$total_tuples_frozen += $autovacuum_info{$curdb}{tables}{$t}{tuples}{frozen};
 		if ($main_vacuum[1] < $autovacuum_info{$curdb}{tables}{$t}{vacuums})
 		{
 			$main_vacuum[0] = $t;
@@ -10966,11 +10986,13 @@ sub print_vacuum_per_table
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_hits);
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_misses);
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_dirtied);
-	$vacuum_info .= "</td><td>" . &comma_numbers($total_pins);
-	$vacuum_info .= "</td><td>" . &comma_numbers($total_frozen);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_skippins);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_skipfrozen);
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_records);
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_full_page);
 	$vacuum_info .= "</td><td>" . &comma_numbers($total_bytes);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_pages_frozen);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_tuples_frozen);
 	$vacuum_info .= "</td></tr>";
 
 	my %infos = ();
@@ -11026,7 +11048,7 @@ sub print_vacuum_per_table
 					<div class="tab-pane" id="vacuums-per-table-table">
 						<table class="table table-striped table-hover">
 							<thead>
-								<tr><th colspan="2">&nbsp;</th><th style="text-align:center;">Index</th><th colspan="3" style="text-align:center;">Buffer usage</th><th colspan="2" style="text-align:center;">Skipped</th><th colspan="3" style="text-align:center;">WAL usage</th>
+								<tr><th colspan="2">&nbsp;</th><th style="text-align:center;">Index</th><th colspan="3" style="text-align:center;">Buffer usage</th><th colspan="2" style="text-align:center;">Skipped</th><th colspan="3" style="text-align:center;">WAL usage</th><th colspan="2" style="text-align:center;">Frozen</th>
 								<tr>
 									<th>Table</th>
 									<th>Vacuums</th>
@@ -11039,6 +11061,8 @@ sub print_vacuum_per_table
 									<th>records</th>
 									<th>full page</th>
 									<th>bytes</th>
+									<th>pages</th>
+									<th>tuples</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -11054,6 +11078,130 @@ sub print_vacuum_per_table
 	delete $drawn_graphs{tablevacuums_graph};
 
 }
+
+sub print_vacuum_throughput
+{
+	my $curdb = shift;
+
+	# VACUUM stats per table
+	my $total_read = 0;
+	my $total_write = 0;
+	my $total_elapsed = 0;
+	my $vacuum_info  = '';
+	my @main_elapsed = ('unknown',0);
+	my @main_write   = ('unknown',0);
+	my @main_read   = ('unknown',0);
+	foreach my $t (sort {
+			$autovacuum_info{$curdb}{tables}{$b}{vacuums} <=> $autovacuum_info{$curdb}{tables}{$a}{vacuums}
+		} keys %{$autovacuum_info{$curdb}{tables}})
+	{
+		$vacuum_info .= "<tr><td>$t</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{read}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{write}) .
+			"</td><td>" . &comma_numbers($autovacuum_info{$curdb}{tables}{$t}{elapsed}) .
+			"</td></tr>";
+		$total_read += $autovacuum_info{$curdb}{tables}{$t}{read};
+		$total_write += $autovacuum_info{$curdb}{tables}{$t}{write};
+		$total_elapsed += $autovacuum_info{$curdb}{tables}{$t}{elapsed};
+		if ($main_elapsed[1] < $autovacuum_info{$curdb}{tables}{$t}{elapsed})
+		{
+			$main_elapsed[0] = $t;
+			$main_elapsed[1] = $autovacuum_info{$curdb}{tables}{$t}{elapsed};
+		}
+		if ($main_write[1] < $autovacuum_info{$curdb}{tables}{$t}{write})
+		{
+			$main_write[0] = $t;
+			$main_write[1] = $autovacuum_info{$curdb}{tables}{$t}{write};
+		}
+		if ($main_read[1] < $autovacuum_info{$curdb}{tables}{$t}{read})
+		{
+			$main_read[0] = $t;
+			$main_read[1] = $autovacuum_info{$curdb}{tables}{$t}{read};
+		}
+	}
+	$vacuum_info .= "<tr><th>Total</th><td>" . &comma_numbers($total_read);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_write);
+	$vacuum_info .= "</td><td>" . &comma_numbers($total_elapsed);
+	$vacuum_info .= "</td></tr>";
+
+	my %infos = ();
+	my @small = ();
+	foreach my $d (sort keys %{$autovacuum_info{$curdb}{tables}})
+	{
+		if ((($autovacuum_info{$curdb}{tables}{$d}{elapsed} * 100) / ($total_elapsed||1)) > $pie_percentage_limit) {
+			$infos{$d} = $autovacuum_info{$curdb}{tables}{$d}{elapsed} || 0;
+		}
+		else
+		{
+			$infos{"Sum CPU elapsed < $pie_percentage_limit%"} += $autovacuum_info{$curdb}{tables}{$d}{elapsed} || 0;
+			push(@small, $d);
+		}
+	}
+	if ($#small == 0)
+	{
+		$infos{$small[0]} = $infos{"Sum CPU elapsed < $pie_percentage_limit%"};
+		delete $infos{"Sum CPU elapsed < $pie_percentage_limit%"};
+	}
+	$drawn_graphs{tablevacuumselapsed_graph} = $NODATA;
+	if ($graph) {
+		$drawn_graphs{tablevacuumselapsed_graph} = &jqplot_piegraph($graphid++, 'graph_tablevacuumselapsed', 'CPU elapsed per tables', %infos);
+	}
+	$vacuum_info = qq{<tr><td colspan="3">$NODATA</td></tr>} if (!$total_elapsed);
+	$total_elapsed = &comma_numbers($total_elapsed);
+	my $database = '';
+	if ($main_elapsed[0] =~ s/^([^\.]+)\.//) {
+		$database = $1;
+	}
+	$main_read[0] =~ s/^([^\.]+)\.//;
+	$main_write[0] =~ s/^([^\.]+)\.//;
+
+	print $fh qq{
+	<div class="analysis-item row" id="vacuums-elapsed-per-table">
+		<h2 class="col-md-12"><i class="glyphicon icon-table"></i> Vacuum throughput per table</h2>
+		<div class="col-md-3">
+			<h3 class="">Key values</h3>
+			<div class="well key-figures">
+				<ul>
+					<li><span class="figure">$main_elapsed[0] ($main_elapsed[1])</span> <span class="figure-label">Max CPU elapsed for vacuum on database $database</span></li>
+					<li><span class="figure">$main_read[0] ($main_read[1] ms)</span> <span class="figure-label">Max I/O read time for vacuum on database $database</span></li>
+					<li><span class="figure">$main_write[0] ($main_write[1] ms)</span> <span class="figure-label">Max I/O write time for vacuum on database $database</span></li>
+				</ul>
+			</div>
+		</div>
+		<div class="col-md-9">
+			<div class="tabbable">
+				<ul class="nav nav-tabs">
+					<li class="active"><a href="#vacuums-elapsed-per-table-graph" data-toggle="tab">Chart</a></li>
+					<li><a href="#vacuums-elapsed-per-table-table" data-toggle="tab">Table</a></li>
+				</ul>
+				<div class="tab-content">
+					<div class="tab-pane active" id="vacuums-elapsed-per-table-graph">
+						$drawn_graphs{tablevacuumselapsed_graph}
+					</div>
+					<div class="tab-pane" id="vacuums-elapsed-per-table-table">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr><th colspan="1">&nbsp;</th><th colspan="2" style="text-align:center;">I/O timing (ms)</th><th colspan="1" style="text-align:center;">CPU (s)</th>
+								<tr>
+									<th>Table</th>
+									<th>read</th>
+									<th>write</th>
+									<th>elapsed</th>
+								</tr>
+							</thead>
+							<tbody>
+							$vacuum_info
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div><!-- end of vacuums CPU elapsed per table -->
+};
+	delete $drawn_graphs{tablevacuumselapsed_graph};
+
+}
+
 
 sub print_vacuum_tuple_removed
 {
@@ -15753,6 +15901,12 @@ sub load_stats
 			$autovacuum_info{$curdb}{tables}{$table}{wal_record} += $_autovacuum_info{$curdb}{tables}{$table}{wal_record};
 			$autovacuum_info{$curdb}{tables}{$table}{wal_full_page} += $_autovacuum_info{$curdb}{tables}{$table}{wal_full_page};
 			$autovacuum_info{$curdb}{tables}{$table}{wal_bytes} += $_autovacuum_info{$curdb}{tables}{$table}{wal_bytes};
+			$autovacuum_info{$curdb}{tables}{$table}{pages}{frozen} += $_autovacuum_info{$curdb}{tables}{$table}{pages}{frozen};
+			$autovacuum_info{$curdb}{tables}{$table}{tuples}{frozen} += $_autovacuum_info{$curdb}{tables}{$table}{tuples}{frozen};
+			$autovacuum_info{$curdb}{tables}{$table}{read} += $_autovacuum_info{$curdb}{tables}{$table}{read};
+			$autovacuum_info{$curdb}{tables}{$table}{write} += $_autovacuum_info{$curdb}{tables}{$table}{write};
+			$autovacuum_info{$curdb}{tables}{$table}{elapsed} += $_autovacuum_info{$curdb}{tables}{$table}{elapsed};
+
 		}
 		if ($_autovacuum_info{$curdb}{peak}{system_usage}{elapsed} > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 		{
@@ -16824,19 +16978,30 @@ sub parse_query
 		{
 			if ($prefix_vars{'t_query'} =~ /(pages): (\d+) removed, (\d+) remain/)
 			{
-					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
-					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
 			}
 			if ($prefix_vars{'t_query'} =~ /(tuples): (\d+) removed, (\d+) remain/)
 			{
-					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
-					$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{removed} += $2;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{$1}{remain} += $3;
+			}
+			if ($prefix_vars{'t_query'} =~ /timings: read: ([\d\.]+) ms, write: ([\d\.]+) ms/)
+			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{read} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{write} += $2;
+			}
+			if ($prefix_vars{'t_query'} =~ /frozen: (\d+) pages from table .* had (\d+) tuples frozen/)
+			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{pages}{frozen} += $1;
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{frozen} += $2;
 			}
 			if ($prefix_vars{'t_query'} =~ /(\d+) are dead but not yet removable/) {
 				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{tuples}{notremovable} += $1;
 			}
 			if ($prefix_vars{'t_query'} =~ /system usage: CPU: user: (.*) (?:sec|s,) system: (.*) (?:sec|s,) elapsed: ([^\s]+)/)
 			{
+				$autovacuum_info{$curdb}{tables}{$cur_info{$t_pid}{vacuum}}{elapsed} += $3;
 				$per_minute_info{$curdb}{$date_part}{$prefix_vars{'t_hour'}}{$prefix_vars{'t_min'}}{autovacuum}{second}{$prefix_vars{'t_sec'}{second}} += $3;
 				if ($3 > $autovacuum_info{$curdb}{peak}{system_usage}{elapsed})
 				{
