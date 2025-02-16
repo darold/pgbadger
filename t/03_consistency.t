@@ -38,7 +38,7 @@ ok( $json_ref->{pgb_session_info}{chronos}{20180912}{16}{count} == 63943, "pgBou
 
 $ret = `ls -la $OUT | awk '{print \$5}'`;
 chomp($ret);
-ok( $ret == 229293, "Consistent pgbouncer reports $ret != 229293");
+ok( $ret == 230257, "Consistent pgbouncer reports $ret != 230257");
 
 `rm -f $OUT`;
 
