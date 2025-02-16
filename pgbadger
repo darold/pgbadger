@@ -395,6 +395,7 @@ my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
 my $force_sample = 0;
+my $nofork = 0;
 
 my $curl_command = 'curl -k -s ';
 
@@ -459,6 +460,8 @@ $SIG{INT} = \&wait_child;
 $SIG{TERM} = \&wait_child;
 if ($^O !~ /MSWin32|dos/i) {
 	$SIG{USR2} = \&stop_parsing;
+} else {
+	$nofork = 1;
 }
 
 $| = 1;
@@ -575,6 +578,7 @@ my $result = GetOptions(
 	'include-session=s'        => \@include_session,
 	'histogram-query=s'        => \$histogram_query,
 	'histogram-session=s'      => \$histogram_session,
+	'no-fork'                  => \$nofork,
 );
 die "FATAL: use pgbadger --help\n" if (not $result);
 
@@ -886,12 +890,13 @@ my $end_top = $top - 1;
 $queue_size ||= 1;
 $job_per_file ||= 1;
 
-if ($^O =~ /MSWin32|dos/i) {
+if ($^O =~ /MSWin32|dos/i)
+{
 	if ( ($queue_size > 1) || ($job_per_file > 1) ) {
 		print STDERR "WARNING: parallel processing is not supported on this platform.\n";
-		$queue_size = 1;
-		$job_per_file = 1;
 	}
+	$queue_size = 1;
+	$job_per_file = 1;
 }
 
 # Test file creation before going to parse log
@@ -1680,7 +1685,7 @@ my $parallel_process = 0;
 my $reader = new IO::Handle;
 my $writer = new IO::Handle;
 # Fork the logger process
-if ($^O !~ /MSWin32|dos/i && $progress)
+if (!$nofork && $progress)
 {
 	$pipe = IO::Pipe->new($reader, $writer);
 	$writer->autoflush(1);
@@ -1819,7 +1824,7 @@ foreach my $logfile ( @given_log_files )
 	else
 	{
 		# Start parsing one file per parallel process
-		if ($^O !~ /MSWin32|dos/i)
+		if (!$nofork)
 		{
 			push(@tempfiles, [ tempfile('tmp_pgbadgerXXXX', SUFFIX => '.bin', DIR => $TMP_DIR, UNLINK => 1 ) ]);
 			spawn sub
@@ -1850,7 +1855,7 @@ while (scalar keys %RUNNING_PIDS > $progress)
 }
 
 # Terminate the process logger
-if ($^O !~ /MSWin32|dos/i)
+if (!$nofork)
 {
 	foreach my $k (keys %RUNNING_PIDS)
 	{
@@ -1863,13 +1868,16 @@ if ($^O !~ /MSWin32|dos/i)
 }
 
 # Load all data gathered by all the different processes
-foreach my $f (@tempfiles)
+if (!$nofork)
 {
-	next if (!-e "$f->[1]" || -z "$f->[1]");
-	my $fht = new IO::File;
-	$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
-	load_stats($fht);
-	$fht->close();
+	foreach my $f (@tempfiles)
+	{
+		next if (!-e "$f->[1]" || -z "$f->[1]");
+		my $fht = new IO::File;
+		$fht->open("< $f->[1]") or localdie("FATAL: can't open temp file $f->[1], $!\n");
+		load_stats($fht);
+		$fht->close();
+	}
 }
 
 # Get last line parsed from all process
@@ -2005,7 +2013,7 @@ if ( !$incremental && ($#given_log_files >= 0) )
 	{
 		next if (!$db);
 
-		if ($^O =~ /MSWin32|dos/i || $parallel_process <= 1) {
+		if ($nofork || $parallel_process <= 1) {
 			&gen_database_report($db);
 		}
 		else
@@ -2029,7 +2037,7 @@ if ( !$incremental && ($#given_log_files >= 0) )
 		}
 	}
 
-	if ($^O !~ /MSWin32|dos/i && $parallel_process > 1)
+	if (!$nofork && $parallel_process > 1)
 	{
 		while (scalar keys %RUNNING_PIDS > $progress)
 		{
@@ -2045,7 +2053,8 @@ elsif (!$incremental || !$noreport)
 {
 	# Look for directory where report must be generated
 	my @build_directories = ();
-	if (-e "$last_parsed.tmp") {
+	if (-e "$last_parsed.tmp")
+	{
 		if (open(my $in, '<', "$last_parsed.tmp")) {
 			while (my $l = <$in>) {
 				chomp($l);
@@ -2298,6 +2307,7 @@ Options:
    --histogram-session VAL : use custom inbound for session times histogram.
                              Default inbound in milliseconds:
 			 0,500,1000,30000,60000,600000,1800000,3600000,28800000
+   --no-fork               : do not fork any process, for debugging purpose.
 
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
@@ -2501,6 +2511,15 @@ sub gen_database_report
 sub confirm_multiprocess
 {
 	my $file = shift;
+
+	if (!$nofork && $progress)
+	{
+		# Not supported on Windows
+		if ($queue_size > 1) {
+			&logmsg('DEBUG', "parallel processing is not supported on this plateform.");
+		}
+		return 0;
+	}
 
 	if ($remote_host || $file =~ /^(http[s]*|ftp[s]*|ssh):/) {
 
@@ -4537,7 +4556,7 @@ sub process_file
 	close $lfile;
 
 	# Inform the parent that it should stop parsing other files
-	if ($terminate)
+	if (!$nofork && $terminate)
 	{
 		if ($^O !~ /MSWin32|dos/i) {
 			kill('USR2', $parent_pid);
@@ -4677,7 +4696,7 @@ sub process_file
 	}
 
 	# Inform the parent that it should stop parsing other files
-	if ($getout) {
+	if (!$nofork && $getout) {
 		if ($^O !~ /MSWin32|dos/i) {
 			kill('USR2', $parent_pid);
 		} else {
@@ -16032,6 +16051,7 @@ sub dump_error_as_json
 
 sub dump_as_json
 {
+
 	my $perl_hash = {
 		'overall_stat' => \%overall_stat,
 		'pgb_overall_stat' => \%pgb_overall_stat,

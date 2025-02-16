@@ -216,6 +216,7 @@ SYNOPSIS
        --histogram-session VAL : use custom inbound for session times histogram.
                                  Default inbound in milliseconds:
                              0,500,1000,30000,60000,600000,1800000,3600000,28800000
+       --no-fork               : do not fork any process, for debugging purpose.
 
     pgBadger is able to parse a remote log file using a passwordless ssh
     connection. Use -r or --remote-host to set the host IP address or
