@@ -16561,7 +16561,7 @@ sub is_excluded_query
 
 	foreach (@exclude_query)
 	{
-		if ($query =~ /$_/i)
+		if ($query =~ /$_/iis)
 		{
 			$query = '';
 			return 1;
@@ -16576,7 +16576,7 @@ sub is_included_query
 	my $query = shift;
 	foreach (@include_query)
 	{
-		if ($query =~ /$_/i)
+		if ($query =~ /$_/is)
 		{
 			$query = '';
 			return 1;
