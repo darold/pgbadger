@@ -1,3 +1,32 @@
+2025-03-16 - v13.1
+
+This is a maintenance release of pgBadger that fixes issues reported by
+users since last release and adds some new features:
+
+  - Add new report about vacuum throughput with a graph about vacuum per
+    table that consume the more CPU. The table output reports I/O timing
+    read and write per table as well as the CPU time elapsed on the table.
+    Thanks to Ales Zeleny for the feature request.
+    This patch also adds frozen pages and tuples to the Vacuums per Table
+    report.
+  - Add --no-fork option for debugging purpose to not fork processes at all.
+    Thanks to Ales Zeleny for the feature request.
+  - Add millisecond to the raw csv output. Thanks to Henrietta Dombrovskaya
+    for the feature request.
+  - Add log filename to sample reports when multiple file are processed.
+    Thanks to Adrien Nayrat for the feature request.
+
+Here is the complete list of changes and acknowledgments:
+
+  - Fix bind parameters parsing. Thanks to Thomas Kotzian for the patch
+  - Apply query filter on multi-lines queries. Thanks to Benjamin Jacobs
+    for the patch
+  - Update test result for log filename storage changes
+  - Fix ERROR vs LOG message level in json output. Thanks to Philippe Viegas
+    for the report.
+  - Remove import of tmpdir not exported method from File::Temp. Thanks to
+    kmoradha for the report.
+
 2024-12-08 - v13.0
 
 This is a major release of pgBadger that fixes issues reported by
