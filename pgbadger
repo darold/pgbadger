@@ -16722,7 +16722,7 @@ sub parse_query
 	if (exists $cur_info{$t_pid} && ($prefix_vars{'t_loglevel'} =~ /(DETAIL|STATEMENT|CONTEXT|HINT)/)
 		&& ($cur_info{$t_pid}{loglevel} =~ $main_error_regex))
 	{
-		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /parameters: (.*)/)) {
+		if (($prefix_vars{'t_loglevel'} ne 'DETAIL') || ($prefix_vars{'t_query'} !~ /[Pp]arameters: (.*)/)) {
 			# Store error details only if this is not a parameter list (never present with errors)
 			$cur_info{$t_pid}{"\L$prefix_vars{'t_loglevel'}\E"} .= $prefix_vars{'t_query'};
 		}
@@ -17214,7 +17214,7 @@ sub parse_query
 		if ($cur_info{$t_pid}{loglevel} eq 'LOG' && $prefix_vars{'t_loglevel'} eq 'DETAIL')
 		{
 			# Apply bind parameters if any
-			if ($prefix_vars{'t_query'} =~ /parameters: (.*)/)
+			if ($prefix_vars{'t_query'} =~ /[Pp]arameters: (.*)/)
 			{
 				$cur_bind_info{$t_pid}{'bind'}{'parameters'} = $1 if (exists $cur_bind_info{$t_pid});
 				$cur_info{$t_pid}{parameters} = "$1";
@@ -17243,7 +17243,7 @@ sub parse_query
 	}
 
 	# Apply bind parameters if any
-	if ($prefix_vars{'t_detail'} =~ /parameters: (.*)/)
+	if ($prefix_vars{'t_detail'} =~ /[Pp]arameters: (.*)/)
 	{
 		$cur_bind_info{$t_pid}{'bind'}{'parameters'} = $1 if (exists $cur_bind_info{$t_pid});
 		$cur_info{$t_pid}{parameters} = "$1";
@@ -17667,7 +17667,7 @@ sub store_queries
 			my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
 			$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
 		}
-		return if ($cur_info{$t_pid}{query} =~ /^parameters:/);
+		return if ($cur_info{$t_pid}{query} =~ /^[Pp]arameters:/);
 		print $fh "# Query #", $query_numbering++, "\n" if ($query_numbering);
 		$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 		print $fh "$cur_info{$t_pid}{query}\n";
