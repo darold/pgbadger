@@ -3812,7 +3812,7 @@ sub process_file
 				else
 				{
 					# pgBouncer Statistics appear each minute in the log
-					if ($prefix_vars{'t_query'} =~ /(\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us, wait time (\d+) us/)
+					if ($prefix_vars{'t_query'} =~ /(\d+) req\/s, in (\d+) b\/s, out (\d+) b\/s,query (\d+) us, wait(?: time)? (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_req/s'} = $1;
@@ -3821,7 +3821,7 @@ sub process_file
 						$prefix_vars{'t_avgduration'} = $4;
 						$prefix_vars{'t_avgwaiting'} = $5;
 					}
-					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us, wait time (\d+) us/)
+					elsif ($prefix_vars{'t_query'} =~ /(\d+) xacts\/s, (\d+) queries\/s, in (\d+) B\/s, out (\d+) B\/s, xact (\d+) us, query (\d+) us, wait(?: time)? (\d+) us/)
 					{
 						$prefix_vars{'t_loglevel'} = 'STATS';
 						$prefix_vars{'t_xact/s'} = $1;
