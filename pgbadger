@@ -394,6 +394,7 @@ my $ssh_identity = '';
 my $ssh_user = '';
 my $ssh_timeout = 10;
 my $ssh_options = "-o ConnectTimeout=$ssh_timeout -o PreferredAuthentications=hostbased,publickey";
+my $ssh_sudo = 0;
 my $force_sample = 0;
 my $nofork = 0;
 
@@ -545,6 +546,7 @@ my $result = GetOptions(
 	'ssh-port=i'	           => \$ssh_port,
 	'ssh-identity=s'	   => \$ssh_identity,
 	'ssh-option=s'	           => \$ssh_options,
+	'ssh-sudo!'		   => \$ssh_sudo,
 	'ssh-user=s'	           => \$ssh_user,
 	'ssh-timeout=i'	           => \$ssh_timeout,
 	'anonymize!'	           => \$anonymize,
@@ -2565,7 +2567,6 @@ sub set_ssh_command
 	} else {
 		$ssh_cmd .= " $rhost";
 	}
-
 	if (wantarray()) {
 		return ($ssh_cmd, $fmt);
 	} else {
@@ -2631,7 +2632,10 @@ sub set_file_list
 			if ($file !~ /^ssh:/)
 			{
 				my($filename, $dirs, $suffix) = fileparse($file);
-				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command \"ls '$dirs'$filename\"");
+				my $ssh_command_ls = "\"";
+				$ssh_command_ls .= "sudo " if ($ssh_sudo);
+				$ssh_command_ls .= "ls '$dirs'$filename\"";
+				&logmsg('DEBUG', "Looking for remote filename using command: $remote_command $ssh_command_ls");
 				my @rfiles = `$remote_command "ls '$dirs'$filename"`;
 				foreach my $f (@rfiles)
 				{
@@ -2649,8 +2653,11 @@ sub set_file_list
 				$ssh .= " -i $ssh_identity" if ($ssh_identity);
 				$ssh .= " $ssh_options" if ($ssh_options);
 				my($filename, $dirs, $suffix) = fileparse($file);
-				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info \"ls '$dirs'$filename\"");
-				my @rfiles = `$ssh $host_info "ls '$dirs'$filename"`;
+				my $ssh_command_ls = "\"";
+				$ssh_command_ls .= "sudo " if ($ssh_sudo);
+				$ssh_command_ls .= "ls '$dirs'$filename\"";
+				&logmsg('DEBUG', "Looking for remote filename using command: $ssh $host_info $ssh_command_ls");
+				my @rfiles = `$ssh $host_info $ssh_command_ls`;
 				$dirs = '' if ( $filename ne '' ); #ls returns relative paths for an directory but absolute ones for a file or filename pattern
 				foreach my $f (@rfiles)
 				{
@@ -19026,13 +19033,22 @@ sub get_file_size
 			}
 			$ssh .= " -i $ssh_identity" if ($ssh_identity);
 			$ssh .= " $ssh_options" if ($ssh_options);
-			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info \"ls -l '$file'\" | awk '{print \$5}'");
-			$totalsize = `$ssh $host_info "ls -l '$file'" | awk '{print \$5}'`;
+
+			my $ssh_command_ls = "\"";
+			$ssh_command_ls .= "sudo " if ($ssh_sudo);
+			$ssh_command_ls .= "ls -l '$file'\" | awk '{print \$5}'";
+
+			&logmsg('DEBUG', "Looking for file size using command: $ssh $host_info $ssh_command_ls");
+			$totalsize = `$ssh $host_info $ssh_command_ls`;
 			chomp($totalsize);
 			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh $host_info \"ls -l '$file'\"\n") if ($totalsize eq '');
 		} elsif ($remote_host) {
-			&logmsg('DEBUG', "Looking for file size using command: $remote_command \"ls -l '$logf'\" | awk '{print \$5}'");
-			$totalsize = `$remote_command "ls -l '$logf'" | awk '{print \$5}'`;
+			my $ssh_command_ls = "\"";
+			$ssh_command_ls .= "sudo " if ($ssh_sudo);
+			$ssh_command_ls .= "ls -l '$logf'\" | awk '{print \$5}'";
+
+			&logmsg('DEBUG', "Looking for file size using command: $remote_command $ssh_command_ls");
+			$totalsize = `$remote_command $ssh_command_ls`;
 			chomp($totalsize);
 			localdie("FATAL: can't get size of remote file, please check what's going wrong with command: $ssh_command \"ls -l '$logf'\"\n") if ($totalsize eq '');
 		}
@@ -19256,9 +19272,14 @@ sub get_log_file
 						my $ssh = $ssh_command || 'ssh';
 						$ssh .= " -i $ssh_identity" if ($ssh_identity);
 						$ssh .= " $ssh_options" if ($ssh_options);
-						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info \"cat '$file'\" |");
+
+						my $ssh_command_cat = "\"";
+						$ssh_command_cat .= "sudo " if ($ssh_sudo);
+						$ssh_command_cat .= "cat '$file'\"";
+
+						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info $ssh_command_cat |");
 						# Open a pipe to cat program
-						open($lfile, '-|', "$ssh $host_info \"cat '$file'\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"cat '$file'\". $!\n");
+						open($lfile, '-|', "$ssh $host_info $ssh_command_cat") || localdie("FATAL: cannot read from pipe to $ssh $host_info $ssh_command_cat. $!\n");
 					}
 					else
 					{
@@ -19286,9 +19307,14 @@ sub get_log_file
 					}
 					$ssh .= " -i $ssh_identity" if ($ssh_identity);
 					$ssh .= " $ssh_options" if ($ssh_options);
-					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info \"tail -n 100 '$file'\" |");
+
+					my $ssh_command_tail = "\"";
+					$ssh_command_tail .= "sudo " if ($ssh_sudo);
+					$ssh_command_tail .= "tail -n 100 '$file'\"";
+
+					&logmsg('DEBUG', "Retrieving log sample using command: $ssh $host_info $ssh_command_tail |");
 					# Open a pipe to cat program
-					open($lfile, '-|', "$ssh $host_info \"tail -n 100 '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"tail -n 100 '$logf'\". $!\n");
+					open($lfile, '-|', "$ssh $host_info $ssh_command_tail") || localdie("FATAL: cannot read from pipe to $remote_command $ssh_command_tail. $!\n");
 				}
 				else
 				{

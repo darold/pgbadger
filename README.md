@@ -249,6 +249,8 @@ some additional options to fully control the ssh connection.
                              Options always used:
                                  -o ConnectTimeout=$ssh_timeout
                                  -o PreferredAuthentications=hostbased,publickey
+    --ssh-sudo		     Runs all commands on remote host as sudo, will not work
+			     with wildcard filenames
 
 Log file to parse can also be specified using an URI, supported protocols are
 http\[s\] and \[s\]ftp. The curl command will be used to download the file, and the
