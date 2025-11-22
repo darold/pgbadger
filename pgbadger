@@ -17077,12 +17077,13 @@ sub parse_query
 	if (
 		$is_log_level
 		&& ($prefix_vars{'t_query'} =~
-/point complete: wrote (\d+) buffers \(([^\)]+)\); (\d+) (?:transaction log|WAL) file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
+/point complete: wrote (\d+) buffers \(([^\)]+)\).*?; (\d+) (?:transaction log|WAL) file\(s\) added, (\d+) removed, (\d+) recycled; write=([0-9\.]+) s, sync=([0-9\.]+) s, total=([0-9\.]+) s/
 		   )
 	   )
 	{
 		# Example: LOG:  checkpoint complete: wrote 8279 buffers (50.5%); 0 transaction log file(s) added, 0 removed, 0 recycled; write=2.277 s, sync=0.194 s, total=2.532 s; sync files=13, longest=0.175 s, average=0.014 s; distance=402024 kB, estimate=402024 kB
 		# checkpoint complete: wrote 38 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.160 s, sync=0.096 s, total=4.338 s; sync files=29, longest=0.018 s, average=0.003 s; distance=79 kB, estimate=79 kB
+		# (postgres-18): LOG:  checkpoint complete: wrote 1284 buffers (7.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=8.782 s, sync=0.035 s, total=8.846 s; sync files=16, longest=0.008 s, average=0.003 s; distance=16387 kB, estimate=16387 kB; lsn=0/4E7F8F0, redo lsn=0/4001488
 		return if ($disable_checkpoint);
 
 		$checkpoint_info{wbuffer} += $1;
