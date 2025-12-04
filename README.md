@@ -291,6 +291,10 @@ You can use together a local PostgreSQL log and a remote pgbouncer log file to p
 
     pgbadger /var/log/postgresql/postgresql-10.1-main.log ssh://username@172.12.110.14/pgbouncer.log
 
+You can use multiple options to configure the ssh connection when parsing a remote PostgreSQL log file:
+
+    pgbadger -r 192.168.1.159 --ssh-identity ~/.ssh/id_ed25519 --ssh-user pgbadger --ssh-option='-o PreferredAuthentications=hostbased,publickey -o MACs=hmac-sha2-256' -O /var/www/pg_reports/ /data/log/postgresql/postgresql-10.1-main.log
+
 Reporting errors every week by cron job:
 
     30 23 * * 1 /usr/bin/pgbadger -q -w /var/log/postgresql.log -o /var/reports/pg_errors.html
