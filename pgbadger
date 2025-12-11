@@ -20429,7 +20429,9 @@ sub content
         $self->{ 'content' } =~ s/CODEPART[B]*(\d+)CODEPART[B]*/$self->{ 'placeholder_values' }[$1]/igs;
     }
 
-    $self->{ 'content' } =~ s/PGFALIAS(\d+)/$self->{ 'alias_constant' }{$1}/gs;
+    if (scalar keys %{$self->{ 'alias_constant' }} > 0) {
+	    $self->{ 'content' } =~ s/PGFALIAS(\d+)/$self->{ 'alias_constant' }{$1}/gs;
+    }
 
     while ( $self->{ 'content' } =~ s/AAKEYWCONST(\d+)AA/$self->{ 'keyword_constant' }{$1}/s ) {
 	    delete $self->{ 'keyword_constant' }{$1};
