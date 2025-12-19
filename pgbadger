@@ -735,8 +735,15 @@ if ( !$rebuild && ($#log_files < 0) && !$journalctl_cmd && !$log_command)
 	}
 }
 
-if ($#outfiles >= 1 && ($dump_normalized_only || $dump_all_queries)) {
-	localdie("FATAL: dump of normalized queries can not ne used with multiple output.\n\n");
+# Check that binary format is not mixed with other formats in multiple output mode
+if ($#outfiles >= 1) {
+	my @has_binary = grep { /\.bin$/i } @outfiles;
+	if (@has_binary && @outfiles > 1) {
+		localdie("FATAL: binary format (.bin) cannot be used with multiple output formats.\n\n");
+	}
+	if ($dump_normalized_only || $dump_all_queries) {
+		localdie("FATAL: dump of normalized queries cannot be used with multiple output.\n\n");
+	}
 }
 
 # Remove follow option from journalctl command to prevent infinit loop
@@ -811,19 +818,18 @@ if (($dump_normalized_only || $dump_all_queries) && $outfile && $outfile !~ /\.t
 my $dft_extens = '';
 if ($#outfiles >= 1)
 {
-	# We can not have multiple output in incremental mode
-	if ($incremental)
+	# In non-incremental mode, use a temporary binary file.
+	# In incremental mode, each format will be generated from the binary data.
+	if (!$incremental)
 	{
-		localdie("FATAL: you can not use multiple output format with incremental mode.\n\n");
+		# Set temporary binary file for non-incremental mode.
+		$outfile = $TMP_DIR . "/pgbadger_tmp_$$.bin";
+
+		# Remove the default output format for the moment
+		# otherwise all dump will have the same output
+		$dft_extens = $extension;
+		$extension = '';
 	}
-
-	# Set temporary binary file.
-	$outfile = $TMP_DIR . "/pgbadger_tmp_$$.bin";
-
-	# Remove the default output format for the moment
-	# otherwise all dump will have the same output
-	$dft_extens = $extension;
-	$extension = '';
 }
 elsif ($#outfiles == -1)
 {
@@ -2945,26 +2951,54 @@ sub build_incremental_reports
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
-			&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$bpath/...");
-			# set path and create subdirectories
-			mkdir("$tmp_dir") if (!-d "$tmp_dir");
-			if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#)
-			{
-				mkdir("$tmp_dir/$1") if (!-d "$tmp_dir/$1");
-				mkdir("$tmp_dir/$1/$2") if (!-d "$tmp_dir/$1/$2");
-				mkdir("$tmp_dir/$1/$2/$3") if (!-d "$tmp_dir/$1/$2/$3");
-			}
-			else
-			{
-				&logmsg('ERROR', "invalid path: $bpath, can not create subdirectories.");
-			}
 
-			$fh = new IO::File ">$tmp_dir/$bpath/$current_out_file";
-			if (not defined $fh) {
-				localdie("FATAL: can't write to $tmp_dir/$bpath/$current_out_file, $!\n");
+			# Generate reports for each specified output format
+			foreach $outfile (@outfiles)
+			{
+				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+				$extens = $out_ext;
+				$current_out_file = $out_filename;
+
+				&logmsg('LOG', "Ok, generating $extens daily report into $tmp_dir/$bpath/...");
+				# set path and create subdirectories
+				mkdir("$tmp_dir") if (!-d "$tmp_dir");
+				if ($bpath =~ m#^(\d+)/(\d+)/(\d+)#)
+				{
+					mkdir("$tmp_dir/$1") if (!-d "$tmp_dir/$1");
+					mkdir("$tmp_dir/$1/$2") if (!-d "$tmp_dir/$1/$2");
+					mkdir("$tmp_dir/$1/$2/$3") if (!-d "$tmp_dir/$1/$2/$3");
+				}
+				else
+				{
+					&logmsg('ERROR', "invalid path: $bpath, can not create subdirectories.");
+				}
+
+				$fh = new IO::File ">$tmp_dir/$bpath/$current_out_file";
+				if (not defined $fh) {
+					localdie("FATAL: can't write to $tmp_dir/$bpath/$current_out_file, $!\n");
+				}
+				if (($extens eq 'text') || ($extens eq 'txt'))
+				{
+					if ($error_only) {
+						&dump_error_as_text($db);
+					} else {
+						&dump_as_text($db);
+					}
+				}
+				elsif ($extens eq 'json')
+				{
+					if ($error_only) {
+						&dump_error_as_json($db);
+					} else {
+						&dump_as_json($db);
+					}
+				}
+				else
+				{
+					&dump_as_html('../../..', $db);
+				}
+				$fh->close;
 			}
-			&dump_as_html('../../..', $db);
-			$fh->close;
 
 		}
 	}
@@ -3015,21 +3049,49 @@ sub build_incremental_reports
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
 			my $tmp_dir = "$destdir/$db";
 			$tmp_dir = $destdir if (!$report_per_database);
-			&logmsg('LOG', "Ok, generating HTML weekly report into $tmp_dir/$wdir/...");
-			mkdir("$tmp_dir") if (!-d "$tmp_dir");
-			my $path = $tmp_dir;
-			foreach my $d (split('/', $wdir))
-			{
-				mkdir("$path/$d") if (!-d "$path/$d");
-				$path .= "/$d";
-			}
 
-			$fh = new IO::File ">$tmp_dir/$wdir/$current_out_file";
-			if (not defined $fh) {
-				localdie("FATAL: can't write to $tmp_dir/$wdir/$current_out_file, $!\n");
+			# Generate reports for each specified output format
+			foreach $outfile (@outfiles)
+			{
+				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+				$extens = $out_ext;
+				$current_out_file = $out_filename;
+
+				&logmsg('LOG', "Ok, generating $extens weekly report into $tmp_dir/$wdir/...");
+				mkdir("$tmp_dir") if (!-d "$tmp_dir");
+				my $path = $tmp_dir;
+				foreach my $d (split('/', $wdir))
+				{
+					mkdir("$path/$d") if (!-d "$path/$d");
+					$path .= "/$d";
+				}
+
+				$fh = new IO::File ">$tmp_dir/$wdir/$current_out_file";
+				if (not defined $fh) {
+					localdie("FATAL: can't write to $tmp_dir/$wdir/$current_out_file, $!\n");
+				}
+				if (($extens eq 'text') || ($extens eq 'txt'))
+				{
+					if ($error_only) {
+						&dump_error_as_text($db);
+					} else {
+						&dump_as_text($db);
+					}
+				}
+				elsif ($extens eq 'json')
+				{
+					if ($error_only) {
+						&dump_error_as_json($db);
+					} else {
+						&dump_as_json($db);
+					}
+				}
+				else
+				{
+					&dump_as_html('../..', $db);
+				}
+				$fh->close;
 			}
-			&dump_as_html('../..', $db);
-			$fh->close;
 		}
 	}
 
@@ -3076,19 +3138,47 @@ sub build_month_reports
 	{
 		my $tmp_dir = "$dest_dir/$db";
 		$tmp_dir = $dest_dir if (!$report_per_database);
-		&logmsg('LOG', "Ok, generating HTML monthly report into $tmp_dir/$month_path/index.html");
-		mkdir("$tmp_dir") if (!-d "$tmp_dir");
-		my $path = $tmp_dir;
-		foreach my $d (split('/', $month_path)) {
-			mkdir("$path/$d") if (!-d "$path/$d");
-			$path .= "/$d";
+
+		# Generate reports for each specified output format
+		foreach $outfile (@outfiles)
+		{
+			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+			$extens = $out_ext;
+			$current_out_file = $out_filename;
+
+			&logmsg('LOG', "Ok, generating $extens monthly report into $tmp_dir/$month_path/$current_out_file");
+			mkdir("$tmp_dir") if (!-d "$tmp_dir");
+			my $path = $tmp_dir;
+			foreach my $d (split('/', $month_path)) {
+				mkdir("$path/$d") if (!-d "$path/$d");
+				$path .= "/$d";
+			}
+			$fh = new IO::File ">$tmp_dir/$month_path/$current_out_file";
+			if (not defined $fh) {
+				localdie("FATAL: can't write to $tmp_dir/$month_path/$current_out_file, $!\n");
+			}
+			if (($extens eq 'text') || ($extens eq 'txt'))
+			{
+				if ($error_only) {
+					&dump_error_as_text($db);
+				} else {
+					&dump_as_text($db);
+				}
+			}
+			elsif ($extens eq 'json')
+			{
+				if ($error_only) {
+					&dump_error_as_json($db);
+				} else {
+					&dump_as_json($db);
+				}
+			}
+			else
+			{
+				&dump_as_html('../..', $db);
+			}
+			$fh->close;
 		}
-		$fh = new IO::File ">$tmp_dir/$month_path/index.html";
-		if (not defined $fh) {
-			localdie("FATAL: can't write to $tmp_dir/$month_path/index.html, $!\n");
-		}
-		&dump_as_html('../..', $db);
-		$fh->close;
 	}
 	# Generate global index to access incremental reports
 	&build_global_index();
@@ -3133,20 +3223,48 @@ sub build_day_reports
 	{
 		my $tmp_dir = "$dest_dir/$db";
 		$tmp_dir = $dest_dir if (!$report_per_database);
-		&logmsg('LOG', "Ok, generating HTML daily report into $tmp_dir/$day_path/index.html");
-		mkdir("$tmp_dir") if (!-d "$tmp_dir");
-		my $path = $tmp_dir;
-		foreach my $d (split('/', $day_path))
+
+		# Generate reports for each specified output format
+		foreach $outfile (@outfiles)
 		{
-			mkdir("$path/$d") if (!-d "$path/$d");
-			$path .= "/$d";
+			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+			$extens = $out_ext;
+			$current_out_file = $out_filename;
+
+			&logmsg('LOG', "Ok, generating $extens daily report into $tmp_dir/$day_path/$current_out_file");
+			mkdir("$tmp_dir") if (!-d "$tmp_dir");
+			my $path = $tmp_dir;
+			foreach my $d (split('/', $day_path))
+			{
+				mkdir("$path/$d") if (!-d "$path/$d");
+				$path .= "/$d";
+			}
+			$fh = new IO::File ">$tmp_dir/$day_path/$current_out_file";
+			if (not defined $fh) {
+				localdie("FATAL: can't write to $tmp_dir/$day_path/$current_out_file, $!\n");
+			}
+			if (($extens eq 'text') || ($extens eq 'txt'))
+			{
+				if ($error_only) {
+					&dump_error_as_text($db);
+				} else {
+					&dump_as_text($db);
+				}
+			}
+			elsif ($extens eq 'json')
+			{
+				if ($error_only) {
+					&dump_error_as_json($db);
+				} else {
+					&dump_as_json($db);
+				}
+			}
+			else
+			{
+				&dump_as_html('../..', $db);
+			}
+			$fh->close;
 		}
-		$fh = new IO::File ">$tmp_dir/$day_path/index.html";
-		if (not defined $fh) {
-			localdie("FATAL: can't write to $tmp_dir/$day_path/index.html, $!\n");
-		}
-		&dump_as_html('../..', $db);
-		$fh->close;
 	}
 	# Generate global index to access incremental reports
 	&build_global_index();
