@@ -2016,6 +2016,55 @@ if ($report_per_database)
 
 if ( !$incremental && ($#given_log_files >= 0) )
 {
+	# If we have a temporary binary file (multiple output formats), load it before generating reports
+	if ($#outfiles >= 1 && -e $TMP_DIR . "/pgbadger_tmp_$$.bin")
+	{
+		&init_stats_vars();
+		if (open(my $bin_fh, '<', $TMP_DIR . "/pgbadger_tmp_$$.bin"))
+		{
+			my %stats = %{ fd_retrieve($bin_fh) };
+			close($bin_fh);
+
+			# Restore all statistics from binary file
+			%overall_stat = %{ $stats{overall_stat} } if (exists $stats{overall_stat});
+			%pgb_overall_stat = %{ $stats{pgb_overall_stat} } if (exists $stats{pgb_overall_stat});
+			%overall_checkpoint = %{ $stats{overall_checkpoint} } if (exists $stats{overall_checkpoint});
+			%normalyzed_info = %{ $stats{normalyzed_info} } if (exists $stats{normalyzed_info});
+			%error_info = %{ $stats{error_info} } if (exists $stats{error_info});
+			%pgb_error_info = %{ $stats{pgb_error_info} } if (exists $stats{pgb_error_info});
+			%pgb_pool_info = %{ $stats{pgb_pool_info} } if (exists $stats{pgb_pool_info});
+			%connection_info = %{ $stats{connection_info} } if (exists $stats{connection_info});
+			%pgb_connection_info = %{ $stats{pgb_connection_info} } if (exists $stats{pgb_connection_info});
+			%database_info = %{ $stats{database_info} } if (exists $stats{database_info});
+			%application_info = %{ $stats{application_info} } if (exists $stats{application_info});
+			%user_info = %{ $stats{user_info} } if (exists $stats{user_info});
+			%host_info = %{ $stats{host_info} } if (exists $stats{host_info});
+			%checkpoint_info = %{ $stats{checkpoint_info} } if (exists $stats{checkpoint_info});
+			%session_info = %{ $stats{session_info} } if (exists $stats{session_info});
+			%pgb_session_info = %{ $stats{pgb_session_info} } if (exists $stats{pgb_session_info});
+			%tempfile_info = %{ $stats{tempfile_info} } if (exists $stats{tempfile_info});
+			%logs_type = %{ $stats{logs_type} } if (exists $stats{logs_type});
+			%lock_info = %{ $stats{lock_info} } if (exists $stats{lock_info});
+			%per_minute_info = %{ $stats{per_minute_info} } if (exists $stats{per_minute_info});
+			%pgb_per_minute_info = %{ $stats{pgb_per_minute_info} } if (exists $stats{pgb_per_minute_info});
+			%top_slowest = %{ $stats{top_slowest} } if (exists $stats{top_slowest});
+			@log_files = @{ $stats{log_files} } if (exists $stats{log_files});
+			%autovacuum_info = %{ $stats{autovacuum_info} } if (exists $stats{autovacuum_info});
+			%autoanalyze_info = %{ $stats{autoanalyze_info} } if (exists $stats{autoanalyze_info});
+			%top_tempfile_info = %{ $stats{top_tempfile_info} } if (exists $stats{top_tempfile_info});
+			%top_locked_info = %{ $stats{top_locked_info} } if (exists $stats{top_locked_info});
+			%prepare_info = %{ $stats{prepare_info} } if (exists $stats{prepare_info});
+			%bind_info = %{ $stats{bind_info} } if (exists $stats{bind_info});
+			$nlines = $stats{nlines} if (exists $stats{nlines});
+
+			&logmsg('DEBUG', "binary statistics loaded from temporary file.");
+		}
+		else
+		{
+			&logmsg('WARNING', "could not load temporary binary file for multiple output generation.");
+		}
+	}
+
 	my $chld_running = 0;
 	foreach my $db (sort keys %DBLIST)
 	{
