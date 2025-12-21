@@ -6057,7 +6057,7 @@ sub set_top_error_sample
 	# Stop when we have our number of samples
 	if (!exists $error_info{$curdb}{$q}{date} || ($#{$error_info{$curdb}{$q}{date}}+1 < $sample))
 	{
-		if ( $q =~ /deadlock detected/ || (!$statement && $detail && !grep(/^\Q$detail\E$/, @{$error_info{$curdb}{$q}{detail}})) || ($statement && !grep(/^\Q$statement\E$/, @{$error_info{$curdb}{$q}{statement}})) )
+#		if ( $q =~ /deadlock detected/ || (!$statement && $detail && !grep(/^\Q$detail\E$/, @{$error_info{$curdb}{$q}{detail}})) || ($statement && !grep(/^\Q$statement\E$/, @{$error_info{$curdb}{$q}{statement}})) )
 		{
 			push(@{$error_info{$curdb}{$q}{date}},      $date);
 			push(@{$error_info{$curdb}{$q}{detail}},    $detail);
@@ -20533,10 +20533,10 @@ sub highlight_code {
   # if the token is not a keyword, an open parenthesis or a comment
 	if (
 		(
-			   $self->_is_function( $token, $last_token, $next_token )
+		   $self->_is_function( $token, $last_token, $next_token )
 			&& $next_token eq '('
 		)
-		|| (   !$self->_is_keyword( $token, $next_token, $last_token )
+		|| (   not $self->_is_keyword( $token, $next_token, $last_token )
 			&& $next_token ne '('
 			&& $token ne '('
 			&& not $self->_is_comment($token) )
