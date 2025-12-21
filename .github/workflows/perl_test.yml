@@ -24,7 +24,7 @@ jobs:
             submodules: recursive
       - run: perl -V
       - run: cpanm --notest --installdeps --verbose .
-      - run: apt install -y libtext-csv-xs-perl
+      - run: cpanm Text::CSV_XS
       - run: perl Makefile.PL
       - run: make
       - run: make install
