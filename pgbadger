@@ -20539,7 +20539,7 @@ sub highlight_code {
 		|| (   !$self->_is_keyword( $token, $next_token, $last_token )
 			&& $next_token ne '('
 			&& $token ne '('
-			&& !$self->_is_comment($token) )
+			&& not $self->_is_comment($token) )
 	  )
 	{
 		if ( $self->{'uc_functions'} == 1 ) {
