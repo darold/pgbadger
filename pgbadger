@@ -5642,6 +5642,10 @@ sub normalize_query
 
 	return if (!$orig_query);
 
+	# replace \' and \ in string
+	$orig_query =~ s/[\\]'/ESCPQUOTE/gs;
+	$orig_query =~ s/[\\]/ESCAPEME/gs;
+
 	# Remove comments /* ... */
 	if (!$keep_comments) {
 		$orig_query =~ s/\/\*(.*?)\*\///gs;
@@ -5724,6 +5728,10 @@ sub normalize_query
 
 	# Remove any whitespace before a semicolon
 	$orig_query =~ s/\s+;/;/;
+
+        # restore \' in string
+        $orig_query =~ s/ESCPQUOTE/\\'/gis;
+        $orig_query =~ s/ESCAPEME/\\/gis;
 
 	return $orig_query;
 }
