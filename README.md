@@ -403,7 +403,8 @@ You can also limit pgBadger to only report errors or remove any part of the
 report using command-line options.
 
 pgBadger supports any custom format set in the log\_line\_prefix directive of
-your postgresql.conf file as long as it at least specifies the %t and %p patterns.
+your postgresql.conf file as long as it at least specifies the %t, %m or %n and
+%p or %c patterns.
 
 pgBadger allows parallel processing of a single log file or multiple
 files through the use of the -j option specifying the number of CPUs.

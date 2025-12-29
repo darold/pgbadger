@@ -232,8 +232,8 @@ SYNOPSIS
                                  Options always used:
                                      -o ConnectTimeout=$ssh_timeout
                                      -o PreferredAuthentications=hostbased,publickey
-	--ssh-sudo		Runs all commands on remote host as sudo, will not work
-				with wildcard filenames
+        --ssh-sudo               Runs all commands on remote host as sudo, will not work
+                                 with wildcard filenames
 
     Log file to parse can also be specified using an URI, supported
     protocols are http[s] and [s]ftp. The curl command will be used to
@@ -388,8 +388,8 @@ DESCRIPTION
     the report using command-line options.
 
     pgBadger supports any custom format set in the log_line_prefix directive
-    of your postgresql.conf file as long as it at least specifies the %t and
-    %p patterns.
+    of your postgresql.conf file as long as it at least specifies the %t, %m
+    or %n and %p or %c patterns.
 
     pgBadger allows parallel processing of a single log file or multiple
     files through the use of the -j option specifying the number of CPUs.
@@ -813,3 +813,4 @@ LICENSE
     A modified version of the SQL::Beautify Perl Module is embedded in
     pgBadger with copyright (C) 2009 by Jonas Kramer and is published under
     the terms of the Artistic License 2.0.
+
