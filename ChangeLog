@@ -1,3 +1,29 @@
+2025-12-29 - v13.2
+
+This is a maintenance release of pgBadger that fixes issues and applied patches
+reported by users since last release.
+
+  - Fix normalization that was not handling properly balanced single-quoted
+    strings along with escaped quotes inside. Thanks to Bertrand Bourgier for
+    the report.
+  - Fix placeholder requirements in the doc.
+  - Fix case where no error sample log entries was reported. Thanks to john doe
+    for the report.
+  - Fix possible precedence problem between ! and %s. Thanks to Luca Santarelli
+    and Philipp Trulson for the report.
+  - Update pgFormatter code to v5.9
+  - Add github CI action for testing on commit push.
+  - Fix parsing of %r placeholder in log_line_prefix. Thanks to nike7o0 for the
+    report.
+  - Fix uninitialized value warning. Thanks to Ales Zeleny for the report.
+  - Enhance docs of ssh-options for postgres log parsing with examples. Thanks
+    to Ulrich Konrad for the patch.
+  - Add command --ssh-sudo to run commands over ssh as sudo. Thanks to Andrew
+    Jackson for the patch.
+  - Fix possible precedence problem between ! and string eq. Thanks to Adrien
+    Nayrat for the report.
+  - Fix parsing of pgbouncer stats. Thanks to mrgtt for the report.
+
 2025-03-16 - v13.1
 
 This is a maintenance release of pgBadger that fixes issues reported by
