@@ -2233,7 +2233,7 @@ Options:
 			     included in the report. Example: "2013-04-12 .*"
 			     You can use this option multiple times.
     --exclude-db name      : exclude entries for the specified database from
-			     report. Example: "pg_dump". Can be used multiple
+			     report. Example: "postgres". Can be used multiple
 			     times.
     --exclude-appname name : exclude entries for the specified application name
 			     from report.  Example: "pg_dump".  Can be used
