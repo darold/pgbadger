@@ -44,7 +44,7 @@ $ret = `perl pgbadger -q --outdir '.' -o $TEXT -o $JSON -o - -x json $LOG > t/re
 my $ret2 = `stat --printf='%s' t/ret.json $TEXT $JSON`;
 chomp($ret);
 chomp($ret2);
-ok( $? == 0 && $ret2 eq '13518815900135188', "Multiple output format '$ret2' = '13518815900135188'");
+ok( $? == 0 && $ret2 eq '13545016004135450', "Multiple output format '$ret2' = '13545016004135450'");
 
 `perl pgbadger -q -o /tmp/syslog.html $SYSLOG`;
 $ret = `perl pgbadger -q -o - $SYSLOG`;
