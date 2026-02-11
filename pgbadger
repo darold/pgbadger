@@ -22633,7 +22633,7 @@ sub beautify {
 				and !$self->{'no_comments'}
 				and $self->_is_comment( $self->_next_token ) );
 			$add_newline = 0
-			  if (  defined $self->_next_token
+			  if (  defined $self->_next_token and $#{$self->{'_tokens'}} >= 1
 				and $self->_next_token =~ /KEYWCONST/
 				and $self->{'_tokens'}[1] =~ /^(LANGUAGE|STRICT)$/i );
 			$add_newline = 1 if ( $self->{'_is_in_truncate'} );
