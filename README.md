@@ -553,6 +553,9 @@ For example, to install everything just like Debian does, proceed as follows:
 
 By default, INSTALLDIRS is set to site.
 
+### DOCKER IMAGE
+You can build a docker image of pgbadger following the instructions in [README_Docker.md](README_docker.md)
+
 ### POSTGRESQL CONFIGURATION
 
 You must enable and set some configuration directives in your postgresql.conf
