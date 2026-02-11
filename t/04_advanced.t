@@ -30,7 +30,7 @@ ok( $? == 0 && ($ret == 4), "Test incremental mode with --explode");
 
 `rm -rf $incr_outdir/*`;
 
-$ret = `perl pgbadger -q --dbname=pgbench --explode -I -O $incr_outdir $SYSLOG1 $SYSLOG2 && ls $incr_outdir | grep ">12,474 queries" $incr_outdir/pgbench/20*/week-0*/index.html`;
+$ret = `perl pgbadger -q --dbname=pgbench --explode -I -O $incr_outdir $SYSLOG1 $SYSLOG2 && grep "12,474 queries" $incr_outdir/pgbench/*/week-*/pgbench_index.html`;
 chomp($ret);
 ok( $? == 0 && ($ret ne ''), "Test incremental mode with --explode and --dbname");
 
