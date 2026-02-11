@@ -834,7 +834,13 @@ if ($#outfiles >= 1)
 elsif ($#outfiles == -1)
 {
 	$extension = 'txt' if ($dump_normalized_only || $dump_all_queries);
-	($extension) ? push(@outfiles, 'out.' . $extension) : push(@outfiles, 'out.html');
+	if ($extension) {
+		push(@outfiles, 'out.' . $extension);
+	} elsif ($incremental) {
+		push(@outfiles, 'index.html');
+	} else {
+		push(@outfiles, 'out.html');
+	}
 	map { s/\.text/.txt/; } @outfiles;
 
 }
