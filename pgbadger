@@ -4115,6 +4115,9 @@ sub process_file
 				$nlines++;
 				&update_progress_bar($tmpoutfile, $nlines, $stop_offset, $totalsize, \$cursize, \$old_queries_count, \$old_errors_count, $fmt);
 
+				# Reset state extracted from the previous csvlog row.
+				%prefix_vars = ();
+
 				next if ( ($row->[11] !~ $parse_regex)  || ($row->[11] eq 'LOCATION'));
 
 				# Extract the date
@@ -15830,30 +15833,33 @@ sub load_stats
 	{
 		foreach my $stmt (keys %{$_normalyzed_info{$curdb}})
 		{
-			foreach my $dt (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}} )
+			if (exists $_normalyzed_info{$curdb}{$stmt}{samples})
 			{
-				foreach my $k (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}{$dt}} ) {
-					$normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k};
+				foreach my $dt (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}} )
+				{
+					foreach my $k (keys %{$_normalyzed_info{$curdb}{$stmt}{samples}{$dt}} ) {
+						$normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k} = $_normalyzed_info{$curdb}{$stmt}{samples}{$dt}{$k};
+					}
 				}
-			}
 
-			# Keep only the top N samples
-			my $i = 1;
-			foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$stmt}{samples}})
-			{
-				if ($i > $sample) {
-					delete $normalyzed_info{$curdb}{$stmt}{samples}{$k};
+				# Keep only the top N samples
+				my $i = 1;
+				foreach my $k (sort {$b <=> $a} keys %{$normalyzed_info{$curdb}{$stmt}{samples}})
+				{
+					if ($i > $sample) {
+						delete $normalyzed_info{$curdb}{$stmt}{samples}{$k};
+					}
+					$i++;
 				}
-				$i++;
 			}
 
 			$normalyzed_info{$curdb}{$stmt}{count} += $_normalyzed_info{$curdb}{$stmt}{count};
 
 			# Set min / max duration for this query
-			if (!exists $normalyzed_info{$curdb}{$stmt}{min} || ($normalyzed_info{$curdb}{$stmt}{min} > $_normalyzed_info{$curdb}{$stmt}{min})) {
+			if (defined $_normalyzed_info{$curdb}{$stmt}{min} && (!exists $normalyzed_info{$curdb}{$stmt}{min} || ($normalyzed_info{$curdb}{$stmt}{min} > $_normalyzed_info{$curdb}{$stmt}{min}))) {
 				$normalyzed_info{$curdb}{$stmt}{min} = $_normalyzed_info{$curdb}{$stmt}{min};
 			}
-			if (!exists $normalyzed_info{$curdb}{$stmt}{max} || ($normalyzed_info{$curdb}{$stmt}{max} < $_normalyzed_info{$curdb}{$stmt}{max})) {
+			if (defined $_normalyzed_info{$curdb}{$stmt}{max} && (!exists $normalyzed_info{$curdb}{$stmt}{max} || ($normalyzed_info{$curdb}{$stmt}{max} < $_normalyzed_info{$curdb}{$stmt}{max}))) {
 				$normalyzed_info{$curdb}{$stmt}{max} = $_normalyzed_info{$curdb}{$stmt}{max};
 			}
 
@@ -15863,22 +15869,30 @@ sub load_stats
 				{
 					$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count} +=
 						$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{count};
-					$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
-						$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
+					if (defined $_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration})
+					{
+						$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration} +=
+							$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{duration};
+					}
 					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}} )
 					{
 						$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min} +=
 							$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min}{$min};
 					}
-					foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} )
+					if (exists $_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration})
 					{
-						$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
-							$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+						foreach my $min (keys %{$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}} )
+						{
+							$normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min} +=
+								$_normalyzed_info{$curdb}{$stmt}{chronos}{$day}{$hour}{min_duration}{$min};
+						}
 					}
 				}
 			}
 
-			$normalyzed_info{$curdb}{$stmt}{duration} += $_normalyzed_info{$curdb}{$stmt}{duration};
+			if (defined $_normalyzed_info{$curdb}{$stmt}{duration}) {
+				$normalyzed_info{$curdb}{$stmt}{duration} += $_normalyzed_info{$curdb}{$stmt}{duration};
+			}
 
 			if (exists $_normalyzed_info{$curdb}{$stmt}{locks})
 			{

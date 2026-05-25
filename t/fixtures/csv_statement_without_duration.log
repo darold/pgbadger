@@ -1,0 +1,2 @@
+"2026-05-16 05:11:50.269 UTC","example_user","example_db",1001,"192.0.2.10:54321",00000001.000003e9,1,"SELECT","2026-05-16 05:00:00 UTC",1/1,0,LOG,00000,"duration: 688786.283 ms  execute stmt_slow/stmt_slow: SELECT example_schema.slow_table.id FROM example_schema.slow_table",,,,,,,,,"example app","client backend",0
+"2026-05-16 05:20:03.994 UTC","health_user","health_db",1002,"192.0.2.20:54322",00000002.000003ea,2,"idle","2026-05-16 05:00:00 UTC",2/2,0,LOG,00000,"statement: SELECT example_schema.health_check()",,,,,,,,,"example healthcheck","client backend",0
