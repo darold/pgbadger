@@ -18031,6 +18031,10 @@ sub store_queries
 				# TEXT format
 				} elsif ($cur_info{$t_pid}{query} =~ s/Query Text: ([^"]+)/$1/s) {
 					$cur_info{$t_pid}{plan} .= "\n";
+					if ($cur_info{$t_pid}{query} =~ s/Query (Parameters: .*\$\d+ = '[^']*')//s) {
+						$cur_info{$t_pid}{plan} .= "$1";
+					}
+
 				# JSON format
 				} elsif ($cur_info{$t_pid}{query} =~ s/.*"Query Text": "//s) {
 					$cur_info{$t_pid}{query} =~ s/"$//s;
