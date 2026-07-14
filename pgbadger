@@ -24449,7 +24449,7 @@ sub _next_token_skip_comment {
 		return $self->{'_tokens'}->[$i];
 	}
 
-	return undef;
+	return 0;
 }
 
 =head2 _token
