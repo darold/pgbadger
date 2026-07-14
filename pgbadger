@@ -7084,6 +7084,7 @@ sub change_log_level
 	my $msg = shift;
 
 	return 1 if ($msg =~ /parameter "[^"]+" changed to "[^"]+"/);
+	return 1 if ($msg =~ /parameter "[^"]+" removed/);
 	return 1 if ($msg =~ /database system was/);
 	return 1 if ($msg =~ /recovery has paused/);
 	return 1 if ($msg =~ /ending cancel to blocking autovacuum/);
@@ -7098,7 +7099,7 @@ sub change_log_level
 	return 1 if ($msg =~ /unexpected EOF/);
 	return 1 if ($msg =~ /incomplete startup packet/);
 	return 1 if ($msg =~ /detected deadlock while waiting for/);
-
+	return 1 if ($msg =~ /terminating .* timeout/);
 	return 0;
 }
 
@@ -7107,6 +7108,7 @@ sub revert_log_level
 	my $msg = shift;
 
 	return ($msg, 1) if ($msg =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (parameter "[^"]+" removed)/LOG: $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (database system was)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (recovery has paused)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/);
@@ -7118,6 +7120,7 @@ sub revert_log_level
 	return ($msg, 1) if ($msg =~ s/ERROR:  (could not (?:receive|send) data (?:from|to) client)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (logical decoding found consistent point at)/LOG:  $1/);
 	return ($msg, 1) if ($msg =~ s/ERROR:  (starting logical decoding for slot)/LOG:  $1/);
+	return ($msg, 1) if ($msg =~ s/ERROR:  (terminating .* timeout)/LOG:  $1/);
 
 	return ($msg, 0);
 }
@@ -7127,6 +7130,7 @@ sub revert_log_level_by_reference
 	my $str = shift;
 
 	$$str =~ s/ERROR:  (parameter "[^"]+" changed to)/LOG:  $1/;
+	$$str =~ s/ERROR:  (parameter "[^"]+" removed)/LOG: $1/;
 	$$str =~ s/ERROR:  (database system was)/LOG:  $1/;
 	$$str =~ s/ERROR:  (recovery has paused)/LOG:  $1/;
 	$$str =~ s/ERROR:  (sending cancel to blocking autovacuum)/LOG:  $1/;
@@ -7138,6 +7142,8 @@ sub revert_log_level_by_reference
 	$$str =~ s/ERROR:  (could not (?:receive|send) data (?:from|to) client)/LOG:  $1/;
 	$$str =~ s/ERROR:  (logical decoding found consistent point at)/LOG:  $1/;
 	$$str =~ s/ERROR:  (starting logical decoding for slot)/LOG:  $1/;
+	$$str =~ s/ERROR:  (terminating .* timeout)/LOG:  $1/;
+
 }
 
 sub show_error_as_text
