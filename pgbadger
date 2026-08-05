@@ -12280,9 +12280,9 @@ sub display_plan
 
 	# Only TEXT format plan can be sent to Depesz site.
 	if ($plan !~ /Node Type:|"Node Type":|Node-Type/s) {
-		return "<div id=\"$id\" class=\"sql sql-largesize\"><a href=\"#\" title=\"Click to beautify Explain Plan\" onclick=\"document.forms[0].plan.value='" . html_escape($plan) . "'; document.forms[0].submit(); return true;\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre id=\"explain_$id\">" . $plan . "</pre>\n</div>\n";
+		return "<div id=\"$id\" class=\"sql sql-largesize\"><a href=\"#\" title=\"Click to beautify Explain Plan\" onclick=\"document.forms[0].plan.value='" . html_escape($plan) . "'; document.forms[0].submit(); return true;\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre id=\"explain_$id\"><i class=\"glyphicon icon-copy\" title=\"Click to select explain plan\"></i>" . $plan . "</pre>\n</div>\n";
 	} else {
-		return "<div id=\"$id\" class=\"sql sql-largesize\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre id=\"explain_$id\">" . $plan . "</pre>\n</div>\n";
+		return "<div id=\"$id\" class=\"sql sql-largesize\"><i class=\"glyphicon icon-compass\"></i><b>Explain plan</b></a></div>\n<div style=\"width:900px;overflow:auto\">\n<pre id=\"explain_$id\"><i class=\"glyphicon icon-copy\" title=\"Click to select explain plan\"></i>" . $plan . "</pre>\n</div>\n";
 	}
 }
 
