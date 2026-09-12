@@ -4405,6 +4405,21 @@ sub process_file
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid};
 						}
+
+						# A completed query may still be buffered for THIS backend when the
+						# lines that would normally flush it were dropped by --dbuser/--dbname/
+						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
+						# entry stays in %cur_info and set_current_infos() refuses to overwrite
+						# its non-empty query slot, silently dropping this query.
+						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
+							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
+							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
+							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
+						{
+							&store_queries($prefix_vars{'t_pid'});
+							delete $cur_info{$prefix_vars{'t_pid'}};
+						}
+
 						# Parse the query now
 						&parse_query($fmt);
 					}
@@ -4511,6 +4526,20 @@ sub process_file
 						{
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid} if (!$log_duration || ($cur_info{$cur_pid}{duration} ne '' && $cur_info{$cur_pid}{query} ne ''));
+						}
+
+						# A completed query may still be buffered for THIS backend when the
+						# lines that would normally flush it were dropped by --dbuser/--dbname/
+						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
+						# entry stays in %cur_info and set_current_infos() refuses to overwrite
+						# its non-empty query slot, silently dropping this query.
+						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
+							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
+							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
+							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
+						{
+							&store_queries($prefix_vars{'t_pid'});
+							delete $cur_info{$prefix_vars{'t_pid'}};
 						}
 
 						# Process the log line
@@ -4698,6 +4727,20 @@ sub process_file
 						if ($cur_pid && exists $cur_info{$cur_pid} && $prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/) {
 							&store_queries($cur_pid);
 							delete $cur_info{$cur_pid} if (!$log_duration || ($cur_info{$cur_pid}{duration} ne '' && $cur_info{$cur_pid}{query} ne ''));
+						}
+
+						# A completed query may still be buffered for THIS backend when the
+						# lines that would normally flush it were dropped by --dbuser/--dbname/
+						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
+						# entry stays in %cur_info and set_current_infos() refuses to overwrite
+						# its non-empty query slot, silently dropping this query.
+						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
+							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
+							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
+							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
+						{
+							&store_queries($prefix_vars{'t_pid'});
+							delete $cur_info{$prefix_vars{'t_pid'}};
 						}
 
 						# Process the log line
