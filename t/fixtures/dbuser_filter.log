@@ -1,0 +1,6 @@
+2026-09-10 17:00:00 UTC:10.0.0.9(5001):batch@appdb:[200]:LOG:  duration: 12.001 ms  execute <unnamed>: /* other_batch_query */ select id from other_table where k = $1
+2026-09-10 17:00:00 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  duration: 34.567 ms  execute <unnamed>: /* stale_batch_query */ select name from accounts where id = $1
+2026-09-10 17:00:01 UTC:10.0.0.7(6000):webapp@appdb:[300]:LOG:  duration: 1.234 ms  statement: SELECT now()
+2026-09-10 17:00:01 UTC:10.0.0.9(5001):batch@appdb:[200]:DETAIL:  parameters: $1 = '42'
+2026-09-10 17:00:02 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  duration: 987654.321 ms  execute <unnamed>: /* IMPORTANT_slow_batch_query */ select count(*) from huge_reporting_table where created > $1
+2026-09-10 17:00:02 UTC:10.0.0.9(5000):batch@appdb:[100]:DETAIL:  parameters: $1 = '2026-09-01 00:00:00'
