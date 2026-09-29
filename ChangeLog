@@ -20,6 +20,8 @@ reported by users since last release.
     to Ulrich Konrad for the patch.
   - Add command --ssh-sudo to run commands over ssh as sudo. Thanks to Andrew
     Jackson for the patch.
+  - Filter SSH log streams on the remote host in watch mode to reduce network
+    bandwidth. CSV records are filtered without breaking multiline fields.
   - Fix possible precedence problem between ! and string eq. Thanks to Adrien
     Nayrat for the report.
   - Fix parsing of pgbouncer stats. Thanks to mrgtt for the report.
@@ -3080,4 +3082,3 @@ This release fixes lot of issues and adds several main features.
 	  are available
 	- Fix display of empty column of checkpoint when no checkpoint was found
 	  in log file
-
