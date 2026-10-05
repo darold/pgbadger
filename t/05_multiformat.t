@@ -63,7 +63,7 @@ ok($? == 0 && -e $dir_html && -e $dir_txt,
    "Multiple outputs with --outdir option");
 
 # Test 9: Verify temporary binary file is cleaned up
-$ret = `perl pgbadger -q -o $html_file -o $txt_file $LOG && find /tmp -name 'pgbadger_tmp_*.bin' -type f | wc -l`;
+$ret = `perl pgbadger -q -o $html_file -o $txt_file $LOG && find /tmp -maxdepth 1 -name 'pgbadger_tmp_*.bin' -type f | wc -l`;
 chomp($ret);
 ok($ret eq '0',
    "Temporary binary file is cleaned up");
