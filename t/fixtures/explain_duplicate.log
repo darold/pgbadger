@@ -1,0 +1,21 @@
+2026-10-03 10:00:05.400 MSK [45]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2400.100 ms  plan:
+	Query Text: SELECT * FROM ta WHERE id = 42
+	Seq Scan on ta  (cost=0.00..35.50 rows=10 width=4)
+	  Filter: (id = 42)
+2026-10-03 10:00:05.401 MSK [45]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2400.900 ms  statement: SELECT * FROM ta WHERE id = 42
+2026-10-03 10:00:06.400 MSK [46]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2400.900 ms  statement: SELECT * FROM tc WHERE id = 42
+2026-10-03 10:00:06.401 MSK [46]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2400.100 ms  plan:
+	Query Text: SELECT * FROM tc WHERE id = 42
+	Seq Scan on tc  (cost=0.00..35.50 rows=10 width=4)
+	  Filter: (id = 42)
+2026-10-03 10:00:10.000 MSK [46]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2600.000 ms  statement: SELECT * FROM tc WHERE id = 42
+2026-10-03 10:00:10.002 MSK [46]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2599.000 ms  plan:
+	Query Text: SELECT * FROM tc WHERE id = 42
+	Seq Scan on tc  (cost=0.00..35.50 rows=10 width=4)
+	  Filter: (id = 42)
+2026-10-03 10:00:05.400 MSK [47]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2400.100 ms  plan:
+	Query Text: SELECT * FROM tb WHERE id = 42
+	Seq Scan on tb  (cost=0.00..35.50 rows=10 width=4)
+	  Filter: (id = 42)
+2026-10-03 10:00:08.000 MSK [47]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2500.000 ms  statement: SELECT * FROM tb WHERE id = 42
+2026-10-03 10:00:59.000 MSK [1]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  checkpoint starting: time

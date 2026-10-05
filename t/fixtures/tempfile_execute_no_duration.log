@@ -1,0 +1,5 @@
+2026-10-03 09:59:59.000 MSK [40]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  disconnection: session time: 0:00:01.000 user=u database=d host=1.1.1.1
+2026-10-03 10:00:00.000 MSK [44]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  connection authorized: user=u database=d
+2026-10-03 10:00:00.100 MSK [44]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  execute <unnamed>: select * from t5 order by 1
+2026-10-03 10:00:00.900 MSK [44]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp44.0", size 4096
+2026-10-03 10:00:00.950 MSK [44]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  disconnection: session time: 0:00:01.000 user=u database=d host=1.1.1.1

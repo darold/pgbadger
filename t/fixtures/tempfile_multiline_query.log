@@ -1,0 +1,5 @@
+2026-10-03 10:00:00.000 MSK [43]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp43.1", size 2097152
+2026-10-03 10:00:00.000 MSK [43]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  duration: 2500.000 ms  execute <unnamed>: select *
+	from t3
+	order by 2
+2026-10-03 10:00:00.000 MSK [43]: user=u,db=d,app=a,client=1.1.1.1,xid=0 LOG:  disconnection: session time: 0:00:03.000 user=u database=d host=1.1.1.1

@@ -377,6 +377,7 @@ my %prefix_vars = ();
 my $q_prefix    = '';
 my @prefix_q_params = ();
 my %last_execute_stmt = ();
+my %last_query_entry = ();
 my $disable_process_title = 0;
 my $dump_all_queries = 0;
 my $dump_raw_csv = 0;
@@ -5396,7 +5397,11 @@ sub parse_orphan_line
 		$cur_plan_info{$cur_pid}{plan} .= "\n" . $line;
 	}
 	# If we have previously stored a temporary file query, append to that query
-	elsif (exists $cur_temp_info{$cur_pid}{size})
+	# Only when the query comes from a STATEMENT line, otherwise the temporary
+	# file is still waiting for its query: orphan lines belong to the query
+	# being collected and will be associated to the temporary file information
+	# in store_queries().
+	elsif (exists $cur_temp_info{$cur_pid}{size} && $cur_temp_info{$cur_pid}{from_stmt})
 	{
 		$cur_temp_info{$cur_pid}{query} .= "\n" . $line;
 	}
@@ -16912,6 +16917,7 @@ sub parse_query
 	{
 		delete $current_sessions{$t_pid};
 		delete $last_execute_stmt{$t_pid};
+		delete $last_query_entry{$t_pid};
 	}
 	elsif (!$disable_session && ($prefix_vars{'t_loglevel'} eq 'WARNING'))
 	{
@@ -16979,6 +16985,8 @@ sub parse_query
 		}
 		if (($prefix_vars{'t_loglevel'} eq 'STATEMENT') && exists $cur_temp_info{$t_pid} && ($cur_temp_info{$t_pid}{query} eq '')) {
 			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
+			$cur_temp_info{$t_pid}{from_stmt} = 1;
+			delete $cur_temp_info{$t_pid}{wait_query};
 		}
 		#return;
 	}
@@ -16991,6 +16999,8 @@ sub parse_query
 		{
 			# Store query of the last temporary file found.
 			$cur_temp_info{$t_pid}{query} = $prefix_vars{'t_query'};
+			$cur_temp_info{$t_pid}{from_stmt} = 1;
+			delete $cur_temp_info{$t_pid}{wait_query};
 			return;
 		}
 
@@ -17176,6 +17186,7 @@ sub parse_query
 
 		delete $current_sessions{$t_pid};
 		delete $last_execute_stmt{$t_pid};
+		delete $last_query_entry{$t_pid};
 
 		# Store time in milliseconds
 		$time =~ /(\d+):(\d+):(\d+\.\d+)/;
@@ -17615,7 +17626,13 @@ sub parse_query
 		return if ($t_action !~ /query|statement|execute/);
 		$prefix_vars{'t_bind'} = 1;
 		# Stores execute query in case of temporary file
-		$last_execute_stmt{$t_pid} = $prefix_vars{'t_query'};
+		# only if log_disconnection is enabled otherwise
+		# the risk is to fill memory with this storage.
+		if (scalar keys %session_info)
+		{
+			$last_execute_stmt{$t_pid}{query} = $prefix_vars{'t_query'};
+			$last_execute_stmt{$t_pid}{timestamp} = $cur_last_log_timestamp;
+		}
 	}
 	# Log line without duration at all
 	elsif ($fmt eq 'redshift' and $prefix_vars{'t_query'})
@@ -17656,6 +17673,16 @@ sub parse_query
 		$cur_info{$t_pid}{hint} = $prefix_vars{'t_hint'};
 		$cur_info{$t_pid}{context} = $prefix_vars{'t_context'};
 		$cur_info{$t_pid}{statement} = $prefix_vars{'t_statement'}
+	}
+
+	# Temporary files have been logged without STATEMENT, the query
+	# responsible of them is the one we are parsing now. It will be
+	# associated to the temporary file information once fully collected
+	# (multiline query) in store_queries().
+	if ($t_action =~ /^(query|statement|execute)$/ && exists $cur_temp_info{$t_pid}{size}
+		&& $cur_temp_info{$t_pid}{query} eq '' && !$cur_temp_info{$t_pid}{from_stmt})
+	{
+		$cur_temp_info{$t_pid}{wait_query} = 1;
 	}
 
 	&set_current_infos($t_pid);
@@ -17880,6 +17907,84 @@ sub set_current_infos
 	$cur_info{$t_pid}{cur_db} = set_current_db($cur_info{$t_pid}{dbname});
 }
 
+# Return the timestamp of the current entry of a backend in milliseconds,
+# millisecond precision is only available with %m in log_line_prefix.
+sub get_entry_epoch_ms
+{
+	my $t_pid = shift;
+
+	return undef if (!$cur_info{$t_pid}{year});
+	my $ts = timegm_nocheck($cur_info{$t_pid}{sec}, $cur_info{$t_pid}{min}, $cur_info{$t_pid}{hour},
+			$cur_info{$t_pid}{day}, $cur_info{$t_pid}{month} - 1, $cur_info{$t_pid}{year}) * 1000;
+	if (defined $cur_info{$t_pid}{ms} && $cur_info{$t_pid}{ms} =~ /^\.\d+$/) {
+		$ts += int($cur_info{$t_pid}{ms} * 1000);
+	}
+
+	return $ts;
+}
+
+# When log_min_duration_statement and auto_explain.log_min_duration are both
+# enabled, the same execution is reported twice: by the "duration: ... statement
+# or execute" message and by the "duration: ... plan:" message, in any order.
+# Detect that the current entry is the counterpart of the previous entry stored
+# for the same backend. In that case complete the stored entry with the missing
+# information (explain plan or bind flag) and return 1 so that the execution is
+# not counted twice.
+sub merge_explain_duplicate
+{
+	my ($t_pid, $is_plan) = @_;
+
+	my $last = $last_query_entry{$t_pid};
+	return 0 if (!$last || ($last->{is_plan} == $is_plan));
+	return 0 if (!$cur_info{$t_pid}{query} || $cur_info{$t_pid}{duration} eq '');
+	return 0 if ($last->{cur_db} ne $cur_info{$t_pid}{cur_db});
+
+	# Executor time reported by auto_explain can not exceed the statement duration
+	my ($plan_dur, $stmt_dur) = ($is_plan) ? ($cur_info{$t_pid}{duration}, $last->{duration})
+					      : ($last->{duration}, $cur_info{$t_pid}{duration});
+	return 0 if ($plan_dur > $stmt_dur + 1);
+
+	# Both messages of an execution are logged at the same time, a new execution
+	# on the same backend can not be logged before its own duration has elapsed.
+	my $ts = &get_entry_epoch_ms($t_pid);
+	return 0 if (!defined $ts || !defined $last->{ts});
+	my $diff = abs($ts - $last->{ts});
+	if (defined $cur_info{$t_pid}{ms} && $cur_info{$t_pid}{ms} =~ /^\.\d+$/) {
+		return 0 if ($diff >= $cur_info{$t_pid}{duration});
+	} else {
+		# Without milliseconds only accept entries logged in the same second
+		return 0 if ($diff > 0 || $cur_info{$t_pid}{duration} < 1000);
+	}
+
+	# Must be the same normalized query
+	my $query = $cur_info{$t_pid}{query};
+	$query =~ s/^\s+//s;
+	$query =~ s/[\s;]+$//s;
+	$query .= ';';
+	return 0 if (&normalize_query($query) ne $last->{norm});
+
+	# Complete the entry previously stored
+	my $sample = $normalyzed_info{$last->{cur_db}}{$last->{norm}}{samples}{$last->{duration}};
+	$sample = undef if ($sample && ($sample->{date} ne $last->{date} || $sample->{query} ne $last->{query}));
+	my ($slowest) = grep { $_->[0] == $last->{duration} && $_->[1] eq $last->{date} && $_->[2] eq $last->{query} }
+				@{$top_slowest{$last->{cur_db}}};
+	if ($is_plan && $cur_info{$t_pid}{plan})
+	{
+		$sample->{plan} = $cur_info{$t_pid}{plan} if ($sample && !$sample->{plan});
+		$slowest->[8] = $cur_info{$t_pid}{plan} if ($slowest && !$slowest->[8]);
+	}
+	elsif (!$is_plan && $cur_info{$t_pid}{bind})
+	{
+		$sample->{bind} = $cur_info{$t_pid}{bind} if ($sample);
+		$slowest->[7] = $cur_info{$t_pid}{bind} if ($slowest);
+	}
+
+	# One message can only be the counterpart of one other
+	delete $last_query_entry{$t_pid};
+
+	return 1;
+}
+
 sub store_queries
 {
 	my ($t_pid, $end, $line)  = @_;
@@ -17962,6 +18067,18 @@ sub store_queries
 		# parameters from EXECUTE statements
 		my @t_res = split(/[\s]*,[\s]*/, $cur_info{$t_pid}{parameters});
 		$cur_info{$t_pid}{query} =~ s/\$(\d+)/$t_res[$1-1]/gs;
+	}
+
+	# Associate the full query to the temporary files waiting for it
+	if ($cur_info{$t_pid}{query} ne '' && exists $cur_temp_info{$t_pid}
+		&& $cur_temp_info{$t_pid}{wait_query})
+	{
+		delete $cur_temp_info{$t_pid}{wait_query};
+		$cur_temp_info{$t_pid}{query} = $cur_info{$t_pid}{query};
+		# Same sample key and information than the query entry itself
+		$cur_temp_info{$t_pid}{duration} = $cur_info{$t_pid}{duration};
+		$cur_temp_info{$t_pid}{bind} = $cur_info{$t_pid}{bind};
+		&store_temporary_and_lock_infos($t_pid);
 	}
 
 	# We only process stored object with query here
@@ -18050,6 +18167,9 @@ sub store_queries
 			$cur_plan_info{$t_pid}{plan} = $2;
 		}
 
+		# Remember if this entry comes from an auto_explain plan message
+		my $is_plan = (exists $cur_plan_info{$t_pid}{plan}) ? 1 : 0;
+
 		# Store auto explain plan when switching to another log entry
 		if (exists $cur_plan_info{$t_pid}{plan})
 		{
@@ -18100,196 +18220,220 @@ sub store_queries
 			delete $cur_plan_info{$t_pid};
 		}
 
-		# Stores global statistics
-
-		$overall_stat{'queries_number'}++;
-		$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_number'}++;
-		$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'}{'execute'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-
 		my $cur_last_log_timestamp = "$cur_info{$t_pid}{year}-$cur_info{$t_pid}{month}-$cur_info{$t_pid}{day} " .
 						"$cur_info{$t_pid}{hour}:$cur_info{$t_pid}{min}:$cur_info{$t_pid}{sec}";
-		if (!$overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'} || ($overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'} gt $cur_last_log_timestamp)) {
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'}   = $cur_last_log_timestamp;
-		}
-		if (!$overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} || ($overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} lt $cur_last_log_timestamp)) {
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} = $cur_last_log_timestamp;
-		}
-		$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{query}++;
 
-		if ($graph) {
-			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{count}++;
-			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{second}{$cur_info{$t_pid}{sec}}++;
-			# Store min / max duration
-			if ($cur_info{$t_pid}{duration}) {
-				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-				if (!exists $per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} || ($per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} > $cur_info{$t_pid}{duration})) {
-					$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} = $cur_info{$t_pid}{duration};
-				}
-				if (!exists $per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} || ($per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} < $cur_info{$t_pid}{duration})) {
-					$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} = $cur_info{$t_pid}{duration};
+		# Do not count twice an execution already stored from its counterpart
+		# message (log_min_duration_statement vs auto_explain), only complete
+		# the stored entry with the missing information.
+		if (!&merge_explain_duplicate($t_pid, $is_plan))
+		{
+			# Stores global statistics
+
+			$overall_stat{'queries_number'}++;
+			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_number'}++;
+			$overall_stat{$cur_info{$t_pid}{cur_db}}{'queries_duration'}{'execute'} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+
+			if (!$overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'} || ($overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'} gt $cur_last_log_timestamp)) {
+				$overall_stat{$cur_info{$t_pid}{cur_db}}{'first_query_ts'}   = $cur_last_log_timestamp;
+			}
+			if (!$overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} || ($overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} lt $cur_last_log_timestamp)) {
+				$overall_stat{$cur_info{$t_pid}{cur_db}}{'last_query_ts'} = $cur_last_log_timestamp;
+			}
+			$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{query}++;
+
+			if ($graph) {
+				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{count}++;
+				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{second}{$cur_info{$t_pid}{sec}}++;
+				# Store min / max duration
+				if ($cur_info{$t_pid}{duration}) {
+					$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+					if (!exists $per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} || ($per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} > $cur_info{$t_pid}{duration})) {
+						$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{min} = $cur_info{$t_pid}{duration};
+					}
+					if (!exists $per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} || ($per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} < $cur_info{$t_pid}{duration})) {
+						$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{query}{max} = $cur_info{$t_pid}{duration};
+					}
 				}
 			}
-		}
 
-		# Counter per database and application name
-		if ($cur_info{$t_pid}{dbname}) {
-			$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{count}++;
-			$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		} else {
-			$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
-			$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		}
-		if ($cur_info{$t_pid}{dbappname}) {
-			$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{count}++;
-			$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		} else {
-			$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
-			$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		}
-		if ($cur_info{$t_pid}{dbuser}) {
-			$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{count}++;
-			$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		} else {
-			$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
-			$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		}
-		if ($cur_info{$t_pid}{dbclient}) {
-			$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{count}++;
-			$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		} else {
-			$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
-			$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
-		}
-
-		if ($cur_info{$t_pid}{query}) {
-
-			# add a semi-colon at end of the query
-			$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
-
-			# normalize query
-			my $normalized = &normalize_query($cur_info{$t_pid}{query});
-			my $action = uc($1);
-			if ($normalized =~ $action_regex) {
-				$action = lc($1);
-				$action = 'cte' if ($action eq 'with');
-				# if this is a copy statement try to find if this is a write or read statement
-				if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+\?/is))) {
-					$action = 'copy from';
-				} elsif ($action eq 'copy') {
-					$action = 'copy to';
-				} elsif ($action eq 'with') {
-					$action = 'cte';
-				} elsif ($action eq 'create' || $action eq 'drop' || $action eq 'alter' || $action eq 'truncate') {
-					$action = 'ddl';
-				} elsif ($action eq 'begin' || $action eq 'commit' || $action eq 'rollback' || $action eq 'start' || $action eq 'end' || $action eq 'savepoint') {
-					$action = 'tcl';
-				} elsif ($action eq 'declare' || $action eq 'close' || $action eq 'fetch' || $action eq 'move') {
-					$action = 'cursor';
-				}
-			} else {
-				$action = 'others';
-			}
-			$overall_stat{$cur_info{$t_pid}{cur_db}}{$action}++;
-			if ($action eq 'select') {
-				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{select}++;
-			} elsif ($action ne 'others') {
-				$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{write}++;
-			}
-			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
-			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
-			$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+			# Counter per database and application name
 			if ($cur_info{$t_pid}{dbname}) {
-				$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{$action}++;
-				$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{count}++;
+				$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			} else {
-				$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
-				$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
+				$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 			if ($cur_info{$t_pid}{dbappname}) {
-				$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{$action}++;
-				$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{count}++;
+				$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			} else {
-				$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
-				$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
+				$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 			if ($cur_info{$t_pid}{dbuser}) {
-				$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{$action}++;
-				$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{count}++;
+				$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			} else {
-				$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
-				$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
+				$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 			if ($cur_info{$t_pid}{dbclient}) {
-				$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{$action}++;
-				$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{count}++;
+				$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			} else {
-				$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
-				$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{count}++;
+				$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 			}
 
-			# store normalized query count
-			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{count}++;
+			if ($cur_info{$t_pid}{query}) {
 
-			# store normalized query count and duration per time
-			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
-			$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
+				# add a semi-colon at end of the query
+				$cur_info{$t_pid}{query} .= ';' if ($cur_info{$t_pid}{query} !~ /;\s*$/s);
 
-			if ($cur_info{$t_pid}{duration} || $force_sample)
-			{
-				# update top slowest queries statistics
-				&set_top_slowest($cur_info{$t_pid}{cur_db}, 	$cur_info{$t_pid}{query},
-										$cur_info{$t_pid}{duration},
-										$cur_last_log_timestamp,
-										$cur_info{$t_pid}{dbname},
-										$cur_info{$t_pid}{dbuser},
-										$cur_info{$t_pid}{dbclient},
-										$cur_info{$t_pid}{dbappname},
-										$cur_info{$t_pid}{bind},
-										$cur_info{$t_pid}{plan},
-										$cur_info{$t_pid}{queryid}
-									);
+				# normalize query
+				my $normalized = &normalize_query($cur_info{$t_pid}{query});
 
-				# store normalized query total duration
-				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{duration} += $cur_info{$t_pid}{duration};
-				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $cur_info{$t_pid}{duration};
-
-				# store min / max duration
-				if (!exists $normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} || ($normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} > $cur_info{$t_pid}{duration})) {
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} = $cur_info{$t_pid}{duration};
+				# Remember this entry to detect the same execution reported
+				# by both log_min_duration_statement and auto_explain
+				if ($cur_info{$t_pid}{duration} ne '')
+				{
+					$last_query_entry{$t_pid} = {
+						'cur_db'   => $cur_info{$t_pid}{cur_db},
+						'norm'     => $normalized,
+						'query'    => $cur_info{$t_pid}{query},
+						'duration' => $cur_info{$t_pid}{duration},
+						'date'     => $cur_last_log_timestamp,
+						'ts'       => &get_entry_epoch_ms($t_pid),
+						'is_plan'  => $is_plan
+					};
+				} else {
+					delete $last_query_entry{$t_pid};
 				}
-				if (!exists $normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} || ($normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} < $cur_info{$t_pid}{duration})) {
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} = $cur_info{$t_pid}{duration};
+				my $action = uc($1);
+				if ($normalized =~ $action_regex) {
+					$action = lc($1);
+					$action = 'cte' if ($action eq 'with');
+					# if this is a copy statement try to find if this is a write or read statement
+					if (($action eq 'copy') && (($normalized =~ /from\s+stdin/i) || ($normalized =~ /from\s+\?/is))) {
+						$action = 'copy from';
+					} elsif ($action eq 'copy') {
+						$action = 'copy to';
+					} elsif ($action eq 'with') {
+						$action = 'cte';
+					} elsif ($action eq 'create' || $action eq 'drop' || $action eq 'alter' || $action eq 'truncate') {
+						$action = 'ddl';
+					} elsif ($action eq 'begin' || $action eq 'commit' || $action eq 'rollback' || $action eq 'start' || $action eq 'end' || $action eq 'savepoint') {
+						$action = 'tcl';
+					} elsif ($action eq 'declare' || $action eq 'close' || $action eq 'fetch' || $action eq 'move') {
+						$action = 'cursor';
+					}
+				} else {
+					$action = 'others';
 				}
-
-				# stores query/user information
-				if ($cur_info{$t_pid}{dbuser}) {
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+				$overall_stat{$cur_info{$t_pid}{cur_db}}{$action}++;
+				if ($action eq 'select') {
+					$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{select}++;
+				} elsif ($action ne 'others') {
+					$overall_stat{$cur_info{$t_pid}{cur_db}}{'peak'}{$cur_last_log_timestamp}{write}++;
 				}
-
-				# stores query/app information
+				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{count}++;
+				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{second}{$cur_info{$t_pid}{sec}}++;
+				$per_minute_info{$cur_info{$t_pid}{cur_db}}{"$cur_day_str"}{"$cur_hour_str"}{$cur_info{$t_pid}{min}}{$action}{duration} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				if ($cur_info{$t_pid}{dbname}) {
+					$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{$action}++;
+					$database_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				} else {
+					$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
+					$database_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				}
 				if ($cur_info{$t_pid}{dbappname}) {
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
-					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
+					$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{$action}++;
+					$application_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbappname}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				} else {
+					$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
+					$application_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
 				}
+				if ($cur_info{$t_pid}{dbuser}) {
+					$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{$action}++;
+					$user_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbuser}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				} else {
+					$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
+					$user_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				}
+				if ($cur_info{$t_pid}{dbclient}) {
+					$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{$action}++;
+					$host_info{$cur_info{$t_pid}{cur_db}}{$cur_info{$t_pid}{dbclient}}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				} else {
+					$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{$action}++;
+					$host_info{$cur_info{$t_pid}{cur_db}}{unknown}{"$action|duration"} += $cur_info{$t_pid}{duration} if ($cur_info{$t_pid}{duration});
+				}
+
+				# store normalized query count
+				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{count}++;
 
 				# store normalized query count and duration per time
-				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{count}++;
+				$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min}{$cur_info{$t_pid}{min}}++;
 
-				# store normalized query samples
-				&set_top_sample($cur_info{$t_pid}{cur_db}, 	$normalized,
-										$cur_info{$t_pid}{query},
-										$cur_info{$t_pid}{duration},
-										$cur_last_log_timestamp,
-										$cur_info{$t_pid}{dbname},
-										$cur_info{$t_pid}{dbuser},
-										$cur_info{$t_pid}{dbclient},
-										$cur_info{$t_pid}{dbappname},
-										$cur_info{$t_pid}{bind},
-										$cur_info{$t_pid}{plan},
-										$cur_info{$t_pid}{queryid},
-										$cur_info{$t_pid}{logfile}
-									);
+				if ($cur_info{$t_pid}{duration} || $force_sample)
+				{
+					# update top slowest queries statistics
+					&set_top_slowest($cur_info{$t_pid}{cur_db}, 	$cur_info{$t_pid}{query},
+											$cur_info{$t_pid}{duration},
+											$cur_last_log_timestamp,
+											$cur_info{$t_pid}{dbname},
+											$cur_info{$t_pid}{dbuser},
+											$cur_info{$t_pid}{dbclient},
+											$cur_info{$t_pid}{dbappname},
+											$cur_info{$t_pid}{bind},
+											$cur_info{$t_pid}{plan},
+											$cur_info{$t_pid}{queryid}
+										);
+
+					# store normalized query total duration
+					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{duration} += $cur_info{$t_pid}{duration};
+					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{min_duration}{$cur_info{$t_pid}{min}} += $cur_info{$t_pid}{duration};
+
+					# store min / max duration
+					if (!exists $normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} || ($normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} > $cur_info{$t_pid}{duration})) {
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{min} = $cur_info{$t_pid}{duration};
+					}
+					if (!exists $normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} || ($normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} < $cur_info{$t_pid}{duration})) {
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{max} = $cur_info{$t_pid}{duration};
+					}
+
+					# stores query/user information
+					if ($cur_info{$t_pid}{dbuser}) {
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{duration} += $cur_info{$t_pid}{duration};
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{users}{$cur_info{$t_pid}{dbuser}}{count}++;
+					}
+
+					# stores query/app information
+					if ($cur_info{$t_pid}{dbappname}) {
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{duration} += $cur_info{$t_pid}{duration};
+						$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{apps}{$cur_info{$t_pid}{dbappname}}{count}++;
+					}
+
+					# store normalized query count and duration per time
+					$normalyzed_info{$cur_info{$t_pid}{cur_db}}{$normalized}{chronos}{"$cur_day_str"}{"$cur_hour_str"}{duration} += $cur_info{$t_pid}{duration};
+
+					# store normalized query samples
+					&set_top_sample($cur_info{$t_pid}{cur_db}, 	$normalized,
+											$cur_info{$t_pid}{query},
+											$cur_info{$t_pid}{duration},
+											$cur_last_log_timestamp,
+											$cur_info{$t_pid}{dbname},
+											$cur_info{$t_pid}{dbuser},
+											$cur_info{$t_pid}{dbclient},
+											$cur_info{$t_pid}{dbappname},
+											$cur_info{$t_pid}{bind},
+											$cur_info{$t_pid}{plan},
+											$cur_info{$t_pid}{queryid},
+											$cur_info{$t_pid}{logfile}
+										);
+				}
 			}
 		}
 
