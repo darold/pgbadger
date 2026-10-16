@@ -13892,7 +13892,7 @@ sub print_prepare_consuming
 		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
-						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+						<div id="time-consuming-prepare-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
 			foreach my $u (sort {$prepare_info{$curdb}{$k}{users}{$b}{duration} <=> $prepare_info{$curdb}{$k}{users}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{users}})
@@ -14141,7 +14141,7 @@ sub print_bind_consuming
 		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
-						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+						<div id="time-consuming-bind-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
 			foreach my $u (sort {$bind_info{$curdb}{$k}{users}{$b}{duration} <=> $bind_info{$curdb}{$k}{users}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{users}})
