@@ -6166,14 +6166,14 @@ sub set_top_tempfile_info
 # Stores top N slowest sample queries
 sub set_top_prepare_bind_sample
 {
-	my ($type, $q, $dt, $t, $param, $db, $user, $remote, $app, $queryid) = @_;
+	my ($type, $q, $dt, $t, $param, $db, $dbname, $user, $remote, $app, $queryid) = @_;
 
 	return if ($sample <= 0);
 
 	if ($type eq 'prepare') {
 		$prepare_info{$db}{$q}{samples}{$dt}{query}     = $q;
 		$prepare_info{$db}{$q}{samples}{$dt}{date}      = $t;
-		$prepare_info{$db}{$q}{samples}{$dt}{db}        = $db;
+		$prepare_info{$db}{$q}{samples}{$dt}{db}        = $dbname;
 		$prepare_info{$db}{$q}{samples}{$dt}{user}      = $user;
 		$prepare_info{$db}{$q}{samples}{$dt}{remote}    = $remote;
 		$prepare_info{$db}{$q}{samples}{$dt}{app}       = $app;
@@ -6191,7 +6191,7 @@ sub set_top_prepare_bind_sample
 	if ($type eq 'bind') {
 		$bind_info{$db}{$q}{samples}{$dt}{query}        = $q;
 		$bind_info{$db}{$q}{samples}{$dt}{date}         = $t;
-		$bind_info{$db}{$q}{samples}{$dt}{db}           = $db;
+		$bind_info{$db}{$q}{samples}{$dt}{db}           = $dbname;
 		$bind_info{$db}{$q}{samples}{$dt}{user}         = $user;
 		$bind_info{$db}{$q}{samples}{$dt}{remote}       = $remote;
 		$bind_info{$db}{$q}{samples}{$dt}{app}          = $app;
