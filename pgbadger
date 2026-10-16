@@ -5385,6 +5385,10 @@ sub parse_orphan_line
 			{
 				$cur_bind_info{$cur_pid}{bind}{'query'} .= $line;
 			}
+			elsif (exists $cur_bind_info{$cur_pid}{prepare}{'query'} && !exists $cur_info{$cur_pid}{query})
+			{
+				$cur_bind_info{$cur_pid}{prepare}{'query'} .= $line;
+			}
 			else
 			{
 				$cur_info{$cur_pid}{query} .= $line;
