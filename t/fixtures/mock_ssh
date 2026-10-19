@@ -1,0 +1,11 @@
+#!/bin/sh
+
+while [ "$#" -gt 1 ]; do
+	shift
+done
+
+if [ -n "$PGBADGER_MOCK_SSH_LOG" ]; then
+	printf '%s\n' "$1" >> "$PGBADGER_MOCK_SSH_LOG"
+fi
+
+exec sh -c "$1"

@@ -2248,6 +2248,7 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
+                             SSH inputs are filtered on the remote host.
     -W | --wide-char       : encode html output of queries into UTF8 to avoid
                              Perl message "Wide character in print".
     -x | --extension       : output format. Values: text, html, bin or json.
@@ -2376,6 +2377,9 @@ Options:
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
 some additional options to fully control the ssh connection.
+
+In watch mode (-w), SSH log files are filtered on the remote host before being
+transferred. CSV records are filtered with awk, multiline fields are preserved.
 
     --ssh-identity file      path to the identity file to use.
     --ssh-option  options    list of -o options to use for the ssh connection.
@@ -4212,7 +4216,7 @@ sub process_file
 				print STDERR "reset CSV parser\n";
 				$csv->SetDiag(0);
 			}
-			else
+			elsif ($totalsize > 0)
 			{
 				$cursize = $totalsize;
 			}
@@ -19379,8 +19383,14 @@ sub get_file_size
 	# Get file size
 	my $totalsize = 0;
 
+	# The size of an SSH stream filtered remotely in watch mode is unknown.
+	if ($error_only && ($remote_host || $ssh_download))
+	{
+		$totalsize = -1;
+	}
+
 	# Log entries extracted from journalctl command are of indetermined size
-	if ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) )
+	elsif ( $journalctl_cmd && ($logf =~ m/\Q$journalctl_cmd\E/) )
 	{
 		$totalsize = -1;
 	}
@@ -19572,6 +19582,46 @@ sub uncompress_commands
 	return ($uncompress, $sample_cmd);
 }
 
+sub remote_error_filter_command
+{
+	my ($read_command, $logfile) = @_;
+
+	return $read_command if (!$error_only);
+
+	if (($format eq 'csv') || ($logfile =~ /\.csv(?:\.(?:zip|gz|xz|bz2|lz4|zst))?$/i))
+	{
+		# CSV-aware filter: a record is complete when it holds an even number
+		# of double quotes (multiline quoted fields), then the 12th field
+		# (error_severity) is extracted honoring quoted separators. The raw
+		# record is printed unchanged. Works with POSIX awk, mawk, gawk, busybox.
+		my $awk_prog = q{
+{
+	rec = n ? rec "\n" $0 : $0; n++;
+	l = $0; q += gsub(/"/, "", l);
+	if (q % 2) next;
+	f = 1; inq = 0; sev = ""; len = length(rec);
+	for (i = 1; i <= len; i++) {
+		c = substr(rec, i, 1);
+		if (c == "\"") { inq = !inq; continue; }
+		if (!inq && c == sep) { if (f == 12) break; f++; continue; }
+		if (f == 12) sev = sev c;
+	}
+	if (sev == "WARNING" || sev == "ERROR" || sev == "FATAL" || sev == "PANIC") print rec;
+	rec = ""; n = 0; q = 0;
+}};
+		$awk_prog =~ s/\s*\n\s*/ /g;
+		# The command is embedded in a double-quoted string run by the local
+		# shell (ssh command line): escape characters special in that context.
+		$awk_prog =~ s/([\\"\$`])/\\$1/g;
+		my $sep = $csv_sep_char;
+		$sep =~ s/'/'\\''/g;
+		$sep =~ s/([\\"\$`])/\\$1/g;
+		return "$read_command | LC_ALL=C awk -v sep='$sep' '$awk_prog'";
+	}
+
+	return "$read_command | grep -E -A 200 'WARNING|ERROR|FATAL|PANIC'";
+}
+
 sub get_log_file
 {
 	my ($logf, $totalsize, $sample_only) = @_;
@@ -19668,17 +19718,18 @@ sub get_log_file
 
 						my $ssh_command_cat = "\"";
 						$ssh_command_cat .= "sudo " if ($ssh_sudo);
-						$ssh_command_cat .= "cat '$file'\"";
+						$ssh_command_cat .= &remote_error_filter_command("cat '$file'", $file) . "\"";
 
 						&logmsg('DEBUG', "Retrieving log entries using command: $ssh $host_info $ssh_command_cat |");
-						# Open a pipe to cat program
+						# Open a pipe to the remote reader program
 						open($lfile, '-|', "$ssh $host_info $ssh_command_cat") || localdie("FATAL: cannot read from pipe to $ssh $host_info $ssh_command_cat. $!\n");
 					}
 					else
 					{
-						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \" cat '$logf'\" |");
-						# Open a pipe to cat program
-						open($lfile, '-|', "$remote_command \"cat '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"cat '$logf'\". $!\n");
+						my $read_command = &remote_error_filter_command("cat '$logf'", $logf);
+						&logmsg('DEBUG', "Retrieving log entries using command: $remote_command \"$read_command\" |");
+						# Open a pipe to the remote reader program
+						open($lfile, '-|', "$remote_command \"$read_command\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$read_command\". $!\n");
 					}
 				}
 				else
@@ -19751,15 +19802,17 @@ sub get_log_file
 						}
 						$ssh .= " -i $ssh_identity" if ($ssh_identity);
 						$ssh .= " $ssh_options" if ($ssh_options);
-						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$uncompress '$file'\"");
+						my $read_command = &remote_error_filter_command("$uncompress '$file'", $file);
+						&logmsg('DEBUG', "Compressed log file, will use command: $ssh $host_info \"$read_command\"");
 						# Open a pipe to zcat program for compressed log
-						open($lfile, '-|', "$ssh $host_info \"$uncompress '$file'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
+						open($lfile, '-|', "$ssh $host_info \"$read_command\"") || localdie("FATAL: cannot read from pipe to $ssh $host_info \"$read_command\". $!\n");
 					}
 					else
 					{
-						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$uncompress '$logf'\"");
+						my $read_command = &remote_error_filter_command("$uncompress '$logf'", $logf);
+						&logmsg('DEBUG', "Compressed log file, will use command: $remote_command \"$read_command\"");
 						# Open a pipe to zcat program for compressed log
-						open($lfile, '-|', "$remote_command \"$uncompress '$logf'\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$uncompress '$logf'\". $!\n");
+						open($lfile, '-|', "$remote_command \"$read_command\"") || localdie("FATAL: cannot read from pipe to $remote_command \"$read_command\". $!\n");
 					}
 				}
 				else

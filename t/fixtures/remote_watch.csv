@@ -1,0 +1,4 @@
+"2026-05-16 05:11:50.269 UTC","example_user","example_db",1001,"192.0.2.10:54321",00000001.000003e9,1,"SELECT","2026-05-16 05:00:00 UTC",1/1,0,LOG,00000,"ordinary log message",,,,,,,,,"example app","client backend",0
+"2026-05-16 05:12:50.269 UTC","example_user","example_db",1001,"192.0.2.10:54321",00000001.000003e9,2,"SELECT","2026-05-16 05:00:00 UTC",1/1,0,ERROR,42703,"first error line
+second ""quoted"" error line",,"error hint",,,,,,,"example app","client backend",0
+"2026-05-16 05:13:50.269 UTC","example_user","example_db",1001,"192.0.2.10:54321",00000001.000003e9,3,"SELECT","2026-05-16 05:00:00 UTC",1/1,0,LOG,00000,"another ordinary log message",,,,,,,,,"example app","client backend",0

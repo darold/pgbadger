@@ -112,6 +112,7 @@ Options:
     -v | --verbose         : enable verbose or debug mode. Disabled by default.
     -V | --version         : show pgBadger version and exit.
     -w | --watch-mode      : only report errors just like logwatch could do.
+                             SSH inputs are filtered on the remote host.
     -W | --wide-char       : encode html output of queries into UTF8 to avoid
                              Perl message "Wide character in print".
     -x | --extension       : output format. Values: text, html, bin or json.
@@ -240,6 +241,9 @@ Options:
 pgBadger is able to parse a remote log file using a passwordless ssh connection.
 Use -r or --remote-host to set the host IP address or hostname. There are also
 some additional options to fully control the ssh connection.
+
+In watch mode (-w), SSH log files are filtered on the remote host before being
+transferred. CSV records are filtered with awk, multiline fields are preserved.
 
     --ssh-identity file      path to the identity file to use.
     --ssh-option  options    list of -o options to use for the ssh connection.
