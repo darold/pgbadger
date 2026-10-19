@@ -5389,6 +5389,10 @@ sub parse_orphan_line
 			{
 				$cur_bind_info{$cur_pid}{bind}{'query'} .= $line;
 			}
+			elsif (exists $cur_bind_info{$cur_pid}{prepare}{'query'} && !exists $cur_info{$cur_pid}{query})
+			{
+				$cur_bind_info{$cur_pid}{prepare}{'query'} .= $line;
+			}
 			else
 			{
 				$cur_info{$cur_pid}{query} .= $line;
@@ -6170,14 +6174,14 @@ sub set_top_tempfile_info
 # Stores top N slowest sample queries
 sub set_top_prepare_bind_sample
 {
-	my ($type, $q, $dt, $t, $param, $db, $user, $remote, $app, $queryid) = @_;
+	my ($type, $q, $dt, $t, $param, $db, $dbname, $user, $remote, $app, $queryid) = @_;
 
 	return if ($sample <= 0);
 
 	if ($type eq 'prepare') {
 		$prepare_info{$db}{$q}{samples}{$dt}{query}     = $q;
 		$prepare_info{$db}{$q}{samples}{$dt}{date}      = $t;
-		$prepare_info{$db}{$q}{samples}{$dt}{db}        = $db;
+		$prepare_info{$db}{$q}{samples}{$dt}{db}        = $dbname;
 		$prepare_info{$db}{$q}{samples}{$dt}{user}      = $user;
 		$prepare_info{$db}{$q}{samples}{$dt}{remote}    = $remote;
 		$prepare_info{$db}{$q}{samples}{$dt}{app}       = $app;
@@ -6195,7 +6199,7 @@ sub set_top_prepare_bind_sample
 	if ($type eq 'bind') {
 		$bind_info{$db}{$q}{samples}{$dt}{query}        = $q;
 		$bind_info{$db}{$q}{samples}{$dt}{date}         = $t;
-		$bind_info{$db}{$q}{samples}{$dt}{db}           = $db;
+		$bind_info{$db}{$q}{samples}{$dt}{db}           = $dbname;
 		$bind_info{$db}{$q}{samples}{$dt}{user}         = $user;
 		$bind_info{$db}{$q}{samples}{$dt}{remote}       = $remote;
 		$bind_info{$db}{$q}{samples}{$dt}{app}          = $app;
@@ -13896,7 +13900,7 @@ sub print_prepare_consuming
 		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
-						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+						<div id="time-consuming-prepare-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
 			foreach my $u (sort {$prepare_info{$curdb}{$k}{users}{$b}{duration} <=> $prepare_info{$curdb}{$k}{users}{$a}{duration}} keys %{$prepare_info{$curdb}{$k}{users}})
@@ -14145,7 +14149,7 @@ sub print_bind_consuming
 		{
 			print $fh qq{
 						<!-- Involved users list collapse -->
-						<div id="time-consuming-prepapre-user-involved-rank-$rank" class="collapse">
+						<div id="time-consuming-bind-user-involved-rank-$rank" class="collapse">
 };
 			my $idx = 1;
 			foreach my $u (sort {$bind_info{$curdb}{$k}{users}{$b}{duration} <=> $bind_info{$curdb}{$k}{users}{$a}{duration}} keys %{$bind_info{$curdb}{$k}{users}})
