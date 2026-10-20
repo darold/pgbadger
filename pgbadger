@@ -4442,20 +4442,6 @@ sub process_file
 							delete $cur_info{$cur_pid};
 						}
 
-						# A completed query may still be buffered for THIS backend when the
-						# lines that would normally flush it were dropped by --dbuser/--dbname/
-						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
-						# entry stays in %cur_info and set_current_infos() refuses to overwrite
-						# its non-empty query slot, silently dropping this query.
-						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
-							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
-							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
-							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
-						{
-							&store_queries($prefix_vars{'t_pid'});
-							delete $cur_info{$prefix_vars{'t_pid'}};
-						}
-
 						# Parse the query now
 						&parse_query($fmt);
 					}
@@ -4564,19 +4550,13 @@ sub process_file
 							delete $cur_info{$cur_pid} if (!$log_duration || ($cur_info{$cur_pid}{duration} ne '' && $cur_info{$cur_pid}{query} ne ''));
 						}
 
-						# A completed query may still be buffered for THIS backend when the
-						# lines that would normally flush it were dropped by --dbuser/--dbname/
-						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
-						# entry stays in %cur_info and set_current_infos() refuses to overwrite
-						# its non-empty query slot, silently dropping this query.
-						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
-							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
-							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
-							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
-						{
-							&store_queries($prefix_vars{'t_pid'});
-							delete $cur_info{$prefix_vars{'t_pid'}};
-						}
+						# The backend of this new main message may still have a completed
+						# query buffered: with interleaved log lines from several backends,
+						# or when the line that would have flushed it was removed by a filter
+						# (--dbuser, --dbname, --exclude-*, ...). Store it now, otherwise
+						# set_current_infos() would not overwrite it and the query of this
+						# line would be lost (#886).
+						&flush_pending_query($prefix_vars{'t_pid'}, $cur_pid, $prefix_vars{'t_loglevel'});
 
 						# Process the log line
 						&parse_query($fmt);
@@ -4765,19 +4745,13 @@ sub process_file
 							delete $cur_info{$cur_pid} if (!$log_duration || ($cur_info{$cur_pid}{duration} ne '' && $cur_info{$cur_pid}{query} ne ''));
 						}
 
-						# A completed query may still be buffered for THIS backend when the
-						# lines that would normally flush it were dropped by --dbuser/--dbname/
-						# --dbclient/--exclude-* filtering. Flush it now: otherwise the pending
-						# entry stays in %cur_info and set_current_infos() refuses to overwrite
-						# its non-empty query slot, silently dropping this query.
-						if (exists $cur_info{$prefix_vars{'t_pid'}} && ($prefix_vars{'t_pid'} ne $cur_pid)
-							&& ($prefix_vars{'t_loglevel'} =~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/)
-							&& ($cur_info{$prefix_vars{'t_pid'}}{query} ne '')
-							&& (!$log_duration || ($cur_info{$prefix_vars{'t_pid'}}{duration} ne '')))
-						{
-							&store_queries($prefix_vars{'t_pid'});
-							delete $cur_info{$prefix_vars{'t_pid'}};
-						}
+						# The backend of this new main message may still have a completed
+						# query buffered: with interleaved log lines from several backends,
+						# or when the line that would have flushed it was removed by a filter
+						# (--dbuser, --dbname, --exclude-*, ...). Store it now, otherwise
+						# set_current_infos() would not overwrite it and the query of this
+						# line would be lost (#886).
+						&flush_pending_query($prefix_vars{'t_pid'}, $cur_pid, $prefix_vars{'t_loglevel'});
 
 						# Process the log line
 						&parse_query($fmt);
@@ -18022,6 +17996,26 @@ sub merge_explain_duplicate
 	delete $last_query_entry{$t_pid};
 
 	return 1;
+}
+
+####
+# Store the query buffered for backend $pid when a new main message
+# (LOG, ERROR, ...) is received for this same backend and the buffered
+# query has not been flushed already as the query of the previous line
+# ($cur_pid). With log_duration=on the query and its duration are logged
+# on separate lines, keep the entry until the duration has been seen.
+####
+sub flush_pending_query
+{
+	my ($pid, $cur_pid, $loglevel) = @_;
+
+	return if (!$pid || $pid eq $cur_pid || !exists $cur_info{$pid});
+	return if ($loglevel !~ /^(LOG|ERROR|FATAL|PANIC|WARNING)$/);
+	return if ($cur_info{$pid}{query} eq '');
+	return if ($log_duration && $cur_info{$pid}{duration} eq '');
+
+	&store_queries($pid);
+	delete $cur_info{$pid};
 }
 
 sub store_queries

@@ -13,7 +13,7 @@ use Test::More;
 # exactly the one that would have flushed pid 100's first query, so the following
 # slow query on pid 100 (IMPORTANT_slow_batch_query) used to disappear.
 
-plan tests => 8;
+plan tests => 13;
 
 my $LOG    = 't/fixtures/dbuser_filter.log';
 my $PREFIX = '%t:%r:%u@%d:[%p]:';
@@ -48,6 +48,34 @@ like($all, qr/IMPORTANT_slow_batch_query/,
 	'Slow batch query is present in the unfiltered report');
 like($all, qr/webapp/,
 	'webapp user is present in the unfiltered report');
+
+# --- Interleaved backends without any filter --------------------------------
+# Same fixture without the webapp line: the buffered query of pid 100 is not
+# flushed by the previous line (pid 200), it must be flushed when pid 100
+# logs its next main message.
+my $ILOG = 't/fixtures/interleaved_backends.log';
+my $ITXT = 't/interleaved_backends.txt';
+$ret = `perl pgbadger -q -f rds -p '$PREFIX' -o $ITXT $ILOG 2>&1`;
+is($?, 0, 'Generate rds report on interleaved backends');
+diag($ret) if $?;
+my $inter = slurp($ITXT);
+like($inter, qr/IMPORTANT_slow_batch_query/,
+	'Slow query is kept with interleaved backends and no filter');
+unlink $ITXT;
+
+# --- log_duration: statement and duration on separate lines ----------------
+# The early flush must not separate a query from its duration line.
+my $DLOG = 't/fixtures/interleaved_log_duration.log';
+my $DTXT = 't/interleaved_log_duration.txt';
+$ret = `perl pgbadger -q -f rds -p '$PREFIX' --log-duration -o $DTXT $DLOG 2>&1`;
+is($?, 0, 'Generate rds report with --log-duration on interleaved backends');
+diag($ret) if $?;
+my $ldur = slurp($DTXT);
+like($ldur, qr/^1\) 5s432ms .*split_query_a/m,
+	'Duration logged on a separate line is attached to its query');
+like($ldur, qr/^2\) 2ms .*split_query_c/m,
+	'Next query of the same backend keeps its own duration');
+unlink $DTXT;
 
 unlink $FILT, $ALL;
 

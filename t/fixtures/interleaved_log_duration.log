@@ -1,0 +1,6 @@
+2026-09-10 17:00:00 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  statement: /* split_query_a */ select 1 from tbl_a
+2026-09-10 17:00:00 UTC:10.0.0.9(5001):batch@appdb:[200]:LOG:  statement: /* split_query_b */ select 2 from tbl_b
+2026-09-10 17:00:01 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  duration: 5432.100 ms
+2026-09-10 17:00:01 UTC:10.0.0.9(5001):batch@appdb:[200]:LOG:  duration: 1.000 ms
+2026-09-10 17:00:02 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  statement: /* split_query_c */ select 3 from tbl_c
+2026-09-10 17:00:02 UTC:10.0.0.9(5000):batch@appdb:[100]:LOG:  duration: 2.000 ms
