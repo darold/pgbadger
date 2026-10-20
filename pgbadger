@@ -1355,9 +1355,12 @@ if ($last_parsed && -e $last_parsed)
 		localdie("FATAL: can't read last parsed line from $last_parsed, $!\n");
 	}
 }
-$tmp_last_parsed = 'tmp_' . basename($last_parsed) if ($last_parsed);
+# Temporary files shared between the parent and its child processes, the
+# name includes the parent pid so that concurrent pgbadger runs and the
+# leftovers of a run that died can not mix their content into this run.
+$tmp_last_parsed = 'tmp_' . basename($last_parsed) . "_$parent_pid" if ($last_parsed);
 $tmp_last_parsed = "$TMP_DIR/$tmp_last_parsed";
-$tmp_dblist = "$TMP_DIR/dblist.tmp";
+$tmp_dblist = "$TMP_DIR/dblist_$parent_pid.tmp";
 
 ###
 ### Explanation:
@@ -20186,6 +20189,12 @@ sub localdie
 	my ($package, $filename, $line) = caller;
 	print STDERR "$msg    - Error at line $line\n";
 	unlink("$PID_FILE");
+	# Remove temporary files shared with the child processes
+	if ($$ == $parent_pid)
+	{
+		unlink("$tmp_dblist") if ($tmp_dblist && -e "$tmp_dblist");
+		unlink("$tmp_last_parsed") if ($last_parsed && -e "$tmp_last_parsed");
+	}
 
 	exit($code || 1);
 }
