@@ -3015,7 +3015,10 @@ sub build_incremental_reports
 			# Generate reports for each specified output format
 			foreach $outfile (@outfiles)
 			{
-				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+				# Reports are already stored in a per-database subdirectory in
+				# incremental mode, do not prefix the file name with the database
+				# name or the calendar and links of the global index are broken.
+				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '');
 				$extens = $out_ext;
 				$current_out_file = $out_filename;
 
@@ -3113,7 +3116,10 @@ sub build_incremental_reports
 			# Generate reports for each specified output format
 			foreach $outfile (@outfiles)
 			{
-				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+				# Reports are already stored in a per-database subdirectory in
+				# incremental mode, do not prefix the file name with the database
+				# name or the calendar and links of the global index are broken.
+				my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '');
 				$extens = $out_ext;
 				$current_out_file = $out_filename;
 
@@ -3202,7 +3208,10 @@ sub build_month_reports
 		# Generate reports for each specified output format
 		foreach $outfile (@outfiles)
 		{
-			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+			# Reports are already stored in a per-database subdirectory in
+			# incremental mode, do not prefix the file name with the database
+			# name or the calendar and links of the global index are broken.
+			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '');
 			$extens = $out_ext;
 			$current_out_file = $out_filename;
 
@@ -3287,7 +3296,10 @@ sub build_day_reports
 		# Generate reports for each specified output format
 		foreach $outfile (@outfiles)
 		{
-			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '', $db);
+			# Reports are already stored in a per-database subdirectory in
+			# incremental mode, do not prefix the file name with the database
+			# name or the calendar and links of the global index are broken.
+			my ($out_filename, $out_ext) = &set_output_extension('', $outfile, '');
 			$extens = $out_ext;
 			$current_out_file = $out_filename;
 
