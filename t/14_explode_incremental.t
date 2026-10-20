@@ -9,7 +9,7 @@ use POSIX qw(strftime);
 #          with LAST_PARSED or the year directories.
 #  - #880: the retention (-R) must also remove per-database HTML reports.
 
-plan tests => 15;
+plan tests => 18;
 
 my $tmp = tempdir('pgbadger_explode_XXXX', TMPDIR => 1, CLEANUP => 1);
 
@@ -49,9 +49,12 @@ my $t0 = 1782864000;
 my $out = "$tmp/out";
 mkdir $out;
 gen_log("$tmp/a.log", $t0, 3, 'appdb', '../escaped', 'LAST_PARSED', '2025');
-my $ret = `perl pgbadger -q -I -E -O $out -f jsonlog --start-monday $tmp/a.log 2>&1`;
+# Not quiet: the warning about encoded database names is checked below
+my $ret = `perl pgbadger -I -E -O $out -f jsonlog --start-monday $tmp/a.log 2>&1`;
 is($?, 0, 'Incremental --explode run with unusual database names');
 diag($ret) if $?;
+like($ret, qr/WARNING: database name "2025" is not safe as a path.*use "%2532025" in URL/,
+	'First run warns about the encoded directory and gives the URL path');
 
 ok(!-e "$tmp/escaped", 'Database "../escaped" does not write outside the output directory');
 ok(-d "$out/%2E.%2Fescaped", 'Database "../escaped" is stored in an encoded directory');
@@ -66,9 +69,14 @@ like($index, qr{href="2026/week-\d+/index\.html"}, 'Calendar links to the weekly
 
 # Second run must not die on directories of the previous run
 gen_log("$tmp/b.log", $t0 + 3 * 86400, 1, 'appdb', '2025');
-$ret = `perl pgbadger -q -I -E -O $out -f jsonlog --start-monday -R 2 $tmp/b.log 2>&1`;
+gen_log("$tmp/c0.log", $t0 + 4 * 86400, 1, 'appdb', '2025');
+$ret = `perl pgbadger -I -E -O $out -f jsonlog --start-monday -R 2 $tmp/b.log 2>&1`;
 is($?, 0, 'Second incremental run with retention succeeds');
 diag($ret) if $?;
+unlike($ret, qr/WARNING/, 'Next run (cron) does not warn again about existing directories');
+like(`perl pgbadger -v -I -E -O $out -f jsonlog --start-monday $tmp/c0.log 2>&1`,
+	qr/DEBUG: database name "2025" is not safe as a path/,
+	'Message about existing directory is still available in debug mode');
 
 # --- #880 ---------------------------------------------------------------------
 my $rout = "$tmp/retention";

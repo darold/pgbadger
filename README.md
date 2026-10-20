@@ -720,6 +720,26 @@ option to force pgBadger to write JavaScript and CSS to separate files in
 the output directory. The resources will then be loaded using script and
 link tags.
 
+#### Per-database reports
+
+With the per-database option ( -E | --explode ), reports of each database
+are stored into a subdirectory of the output directory named after the
+database. Database names that are not safe as a path are percent-encoded:
+characters /, \\, % and control characters, a leading dot, purely numeric
+names and names of files written by pgBadger in the output directory
+(LAST\_PARSED for example). For example database "2025" is stored into
+directory "%32025" and database "../foo" into "%2E.%2Ffoo". Regular
+database names are not changed.
+
+As the directory name contains a percent sign, it must be written %25 in
+URLs to access the reports, for example:
+
+    https://myserver/pg_reports/%2532025/index.html
+
+pgBadger shows a warning with the directory and the URL path to use the
+first time such a directory is created. On later runs the message is only
+shown in debug mode so that a cron job is not noisy.
+
 #### Rebuilding reports
 
 Incremental reports can be rebuilt after a pgbadger report fix or a new

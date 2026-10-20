@@ -3028,7 +3028,7 @@ sub build_incremental_reports
 		foreach my $db (sort keys %DBLIST)
 		{
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
-			my $tmp_dir = "$destdir/" . &db_path_name($db, 1);
+			my $tmp_dir = "$destdir/" . &db_path_name($db, 1, "$destdir/");
 			$tmp_dir = $destdir if (!$report_per_database);
 
 			# Generate reports for each specified output format
@@ -3129,7 +3129,7 @@ sub build_incremental_reports
 		foreach my $db (sort keys %DBLIST)
 		{
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
-			my $tmp_dir = "$destdir/" . &db_path_name($db, 1);
+			my $tmp_dir = "$destdir/" . &db_path_name($db, 1, "$destdir/");
 			$tmp_dir = $destdir if (!$report_per_database);
 
 			# Generate reports for each specified output format
@@ -3221,7 +3221,7 @@ sub build_month_reports
 	my $dest_dir = $html_outdir || $outdir;
 	foreach my $db (sort keys %DBLIST)
 	{
-		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1);
+		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1, "$dest_dir/");
 		$tmp_dir = $dest_dir if (!$report_per_database);
 
 		# Generate reports for each specified output format
@@ -3309,7 +3309,7 @@ sub build_day_reports
 	my $dest_dir = $html_outdir || $outdir;
 	foreach my $db (sort keys %DBLIST)
 	{
-		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1);
+		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1, "$dest_dir/");
 		$tmp_dir = $dest_dir if (!$report_per_database);
 
 		# Generate reports for each specified output format
@@ -20326,7 +20326,7 @@ sub set_output_extension
 	$of ||= 'out.' . $ext;
 
 	# Append the current database name to the output file.
-	$of = &db_path_name($db) . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
+	$of = &db_path_name($db, 0, ($od ? ($od =~ m#/$# ? $od : "$od/") : ''), '_' . $of) . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
 
 	# Add the destination directory
 	$of = $od . '/' . $of if ($od && $of !~ m#^\Q$od\E# && $of ne '-');
@@ -20347,10 +20347,15 @@ sub set_output_extension
 # When $is_dir is true, names that would collide with pgbadger's own files
 # or directories have their first character encoded as well. Regular
 # database names are returned unchanged.
+#
+# $prefix and $suffix are prepended and appended to the returned name to
+# build the path where the report is written. When this path does not exist
+# yet a warning is emitted, otherwise the message is only shown in debug mode
+# so that a cron job is not noisy at each run.
 ####
 sub db_path_name
 {
-	my ($db, $is_dir) = @_;
+	my ($db, $is_dir, $prefix, $suffix) = @_;
 
 	return $db if (!defined $db || $db eq '');
 
@@ -20359,11 +20364,31 @@ sub db_path_name
 	if ($name =~ /^\./ || ($is_dir && ($name =~ /^\d+$/ || $name =~ /^(LAST_PARSED|index\.html)$/i))) {
 		$name =~ s/^(.)/sprintf('%%%02X', ord($1))/e;
 	}
-	if ($name ne $db && !$DB_PATH_WARNED{$db}++) {
-		&logmsg('WARNING', "database name \"$db\" is not safe as a path, reports will be stored using name \"$name\"");
+	if ($name ne $db && !$DB_PATH_WARNED{$db}++)
+	{
+		my $path = ($prefix || '') . $name . ($suffix || '');
+		my $level = (-e $path) ? 'DEBUG' : 'WARNING';
+		&logmsg($level, "database name \"$db\" is not safe as a path, reports will be stored into \"$path\""
+			. ($is_dir ? ", use \"" . &uri_path_escape($name) . "\" in URL to access them" : ''));
 	}
 
 	return $name;
+}
+
+####
+# Percent-encode a path segment to be used in an URL. Characters that are
+# not unreserved per RFC 3986 are encoded, including the percent sign used
+# by db_path_name() which must then be written %25 in the URL.
+####
+sub uri_path_escape
+{
+	my $str = shift;
+
+	return '' if (!defined $str);
+
+	$str =~ s/([^A-Za-z0-9\-\._~])/sprintf('%%%02X', ord($1))/ge;
+
+	return $str;
 }
 
 # Set timezone
