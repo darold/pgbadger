@@ -77,6 +77,7 @@ my $PID_DIR = $TMP_DIR;
 my $PID_FILE = undef;
 my %DBLIST = ();
 my $DBALL = 'postgres';
+my %DB_PATH_WARNED = ();
 my $LOG_EOL_TYPE = 'LF';
 
 # Factor used to estimate the total size of compressed file
@@ -3009,7 +3010,7 @@ sub build_incremental_reports
 		foreach my $db (sort keys %DBLIST)
 		{
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
-			my $tmp_dir = "$destdir/$db";
+			my $tmp_dir = "$destdir/" . &db_path_name($db, 1);
 			$tmp_dir = $destdir if (!$report_per_database);
 
 			# Generate reports for each specified output format
@@ -3110,7 +3111,7 @@ sub build_incremental_reports
 		foreach my $db (sort keys %DBLIST)
 		{
 			#next if ($#dbname >= 0 and !grep(/^$db$/i, @dbname));
-			my $tmp_dir = "$destdir/$db";
+			my $tmp_dir = "$destdir/" . &db_path_name($db, 1);
 			$tmp_dir = $destdir if (!$report_per_database);
 
 			# Generate reports for each specified output format
@@ -3202,7 +3203,7 @@ sub build_month_reports
 	my $dest_dir = $html_outdir || $outdir;
 	foreach my $db (sort keys %DBLIST)
 	{
-		my $tmp_dir = "$dest_dir/$db";
+		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1);
 		$tmp_dir = $dest_dir if (!$report_per_database);
 
 		# Generate reports for each specified output format
@@ -3290,7 +3291,7 @@ sub build_day_reports
 	my $dest_dir = $html_outdir || $outdir;
 	foreach my $db (sort keys %DBLIST)
 	{
-		my $tmp_dir = "$dest_dir/$db";
+		my $tmp_dir = "$dest_dir/" . &db_path_name($db, 1);
 		$tmp_dir = $dest_dir if (!$report_per_database);
 
 		# Generate reports for each specified output format
@@ -3353,7 +3354,10 @@ sub build_global_index
 	unless(opendir(DIR, "$dest_dir")) {
 		localdie("FATAL: can't opendir $dest_dir: $!\n");
 	}
-	my @dbs = grep { !/^\./ && !/^\d{4}$/ && -d "$dest_dir/$_" } readdir(DIR);
+	# Skip binary year directories and the resources directory (--extra-files),
+	# both are numeric. Database directories are never purely numeric, see
+	# db_path_name(). Entries are already directory names, do not encode them.
+	my @dbs = grep { !/^\./ && !/^\d+$/ && -d "$dest_dir/$_" } readdir(DIR);
 	closedir DIR;
 	@dbs = ($DBALL) if (!$report_per_database);
 
@@ -20304,7 +20308,7 @@ sub set_output_extension
 	$of ||= 'out.' . $ext;
 
 	# Append the current database name to the output file.
-	$of = $db . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
+	$of = &db_path_name($db) . '_' . $of if ($db && $report_per_database && $db ne $DBALL && $of ne '-');
 
 	# Add the destination directory
 	$of = $od . '/' . $of if ($od && $of !~ m#^\Q$od\E# && $of ne '-');
@@ -20312,6 +20316,36 @@ sub set_output_extension
 	&logmsg('DEBUG', "Output '$ext' reports will be written to $of") if (!$rebuild && !$report_per_database);
 
 	return ($of, $ext);
+}
+
+####
+# Return a database name that can safely be used as a file name or as a
+# directory name under the output directory when --explode is used.
+# Database names are user-controlled and can contain a slash, be "..",
+# be numeric (and collide with year directories of binary files) or be
+# the name of a file pgbadger writes into the output directory (LAST_PARSED).
+# Unsafe characters are percent-encoded, the percent sign itself is encoded
+# too so that two different database names can never share the same path.
+# When $is_dir is true, names that would collide with pgbadger's own files
+# or directories have their first character encoded as well. Regular
+# database names are returned unchanged.
+####
+sub db_path_name
+{
+	my ($db, $is_dir) = @_;
+
+	return $db if (!defined $db || $db eq '');
+
+	my $name = $db;
+	$name =~ s/([%\/\\\x00-\x1f\x7f])/sprintf('%%%02X', ord($1))/ge;
+	if ($name =~ /^\./ || ($is_dir && ($name =~ /^\d+$/ || $name =~ /^(LAST_PARSED|index\.html)$/i))) {
+		$name =~ s/^(.)/sprintf('%%%02X', ord($1))/e;
+	}
+	if ($name ne $db && !$DB_PATH_WARNED{$db}++) {
+		&logmsg('WARNING', "database name \"$db\" is not safe as a path, reports will be stored using name \"$name\"");
+	}
+
+	return $name;
 }
 
 # Set timezone
