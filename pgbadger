@@ -1390,6 +1390,21 @@ $tmp_dblist = "$TMP_DIR/dblist.tmp";
 my @all_outdir = ();
 push(@all_outdir, $outdir) if ($outdir);
 push(@all_outdir, $html_outdir) if ($html_outdir);
+# With --explode, HTML reports are stored per database into subdirectories
+# of the HTML output directory, add them to the list of directories to clean.
+# Only consider directories that look like a pgbadger database report
+# directory: not hidden, not numeric (year or resources directories) and
+# holding the global index file written by build_global_index().
+if ($report_per_database && $incremental)
+{
+	my $html_dir = $html_outdir || $outdir;
+	if ($html_dir && opendir(DIR, $html_dir))
+	{
+		my @dbdirs = grep { !/^\./ && !/^\d+$/ && -d "$html_dir/$_" && -f "$html_dir/$_/index.html" } readdir(DIR);
+		closedir DIR;
+		push(@all_outdir, map { "$html_dir/$_" } sort @dbdirs);
+	}
+}
 ### $retention_bin = 5 if (!$noclean && !$retention);
 ### $retention_bin = 0 if ($noclean && !$retention);
 ### $retention_bin = $retention if (!$noclean && $retention);
@@ -1450,7 +1465,7 @@ if ( scalar(@all_outdir) && ($saved_last_line{datetime} || $pgb_saved_last_line{
 
 			my @dyears = ();
 			if ( opendir(DIR, "$ret_dir") ) {
-				@dyears = grep { $_ =~ /^\d+$/ } readdir(DIR);
+				@dyears = grep { $_ =~ /^\d{4}$/ } readdir(DIR);
 				closedir DIR;
 			} else {
 				&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir: $!");
@@ -1484,7 +1499,7 @@ if ( scalar(@all_outdir) && ($saved_last_line{datetime} || $pgb_saved_last_line{
 			foreach my $y (sort { $a <=> $b } @dyears) {
 				my @dmonths = ();
 				if ( opendir(DIR, "$ret_dir/$y") ) {
-					@dmonths = grep { $_ =~ /^\d+$/ } readdir(DIR);
+					@dmonths = grep { $_ =~ /^\d{2}$/ && $_ >= 1 && $_ <= 12 } readdir(DIR);
 					closedir DIR;
 				} else {
 					&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir/$y: $!");
@@ -1527,7 +1542,7 @@ if ( scalar(@all_outdir) && ($saved_last_line{datetime} || $pgb_saved_last_line{
 				foreach my $m (sort { $a <=> $b } @dmonths) {
 					my @ddays = ();
 					if ( opendir(DIR, "$ret_dir/$y/$m") ) {
-						@ddays = grep { $_ =~ /^\d+$/ } readdir(DIR);
+						@ddays = grep { $_ =~ /^\d{2}$/ && $_ >= 1 && $_ <= 31 } readdir(DIR);
 						closedir DIR;
 					} else {
 						&logmsg('ERROR', "BIN/HTML Retention cleanup: can't opendir $ret_dir/$y/$m: $!");
