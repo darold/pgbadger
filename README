@@ -225,9 +225,8 @@ SYNOPSIS
     ssh connection.
 
     In watch mode (-w), SSH log files are filtered on the remote host before
-    being transferred. CSV filtering requires python3 on the remote host;
-    when it is not available, pgBadger prints a warning and transfers the
-    complete CSV file.
+    being transferred. CSV records are filtered with awk, multiline fields
+    are preserved.
 
         --ssh-identity file      path to the identity file to use.
         --ssh-option  options    list of -o options to use for the ssh connection.
