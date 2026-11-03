@@ -1,6 +1,28 @@
 
 /* <![CDATA[ */
 
+/*
+ * Limit the height of chart legends with more than legend_max_rows entries
+ * and make them scrollable (issue #790). When pack() is called the legend
+ * table is already attached to the DOM, and it is called before jqPlot
+ * measures the legend to position it and to compute the pie radius, so the
+ * reduced height and the scrollbar width are taken into account.
+ */
+var legend_max_rows = 10;
+if ($.jqplot && $.jqplot.TableLegendRenderer) {
+	var jqplot_legend_pack = $.jqplot.TableLegendRenderer.prototype.pack;
+	$.jqplot.TableLegendRenderer.prototype.pack = function(offsets) {
+		if (this._elem) {
+			var rows = this._elem.find('tr');
+			if (rows.length > legend_max_rows) {
+				var h = rows.eq(legend_max_rows).offset().top - this._elem.offset().top;
+				this._elem.addClass('jqplot-table-legend-scroll').css('max-height', h + 'px');
+			}
+		}
+		return jqplot_legend_pack.call(this, offsets);
+	};
+}
+
 function create_download_button (buttonid, cssclass) {
 	if (cssclass == undefined) {
 		cssclass ='btn btn-info';
@@ -8,10 +30,45 @@ function create_download_button (buttonid, cssclass) {
 	document.writeln('<button type="button" id="download'+buttonid+'" class="'+cssclass+'">Download</button>');
 }
 
+/*
+ * jqplotToImageStr() draws every legend row, ignoring the scroll area, so
+ * keep only the rows currently visible in a scrollable legend during the
+ * export and put all the rows back afterward.
+ */
+function chart_to_image (divid) {
+	var saved = [];
+	$('#'+divid+' table.jqplot-table-legend-scroll').each(function() {
+		var tbl = this, top = tbl.scrollTop;
+		var area = tbl.getBoundingClientRect().top + tbl.clientTop;
+		var body = $(tbl).find('tr').first().parent();
+		var rows = body.children('tr');
+		// rows fully visible in the scroll area, computed before detaching
+		var visible = rows.filter(function() {
+			var r = this.getBoundingClientRect();
+			return (r.top >= area - 1 && r.bottom <= area + tbl.clientHeight + 1);
+		});
+		rows.detach();
+		body.append(visible.length ? visible : rows.slice(0, legend_max_rows));
+		tbl.scrollTop = 0;
+		saved.push([tbl, body, rows, top]);
+	});
+	var img;
+	try {
+		img = $('#'+divid).jqplotToImageStr({});
+	} finally {
+		$.each(saved, function(i, s) {
+			s[1].children('tr').detach();
+			s[1].append(s[2]);
+			s[0].scrollTop = s[3];
+		});
+	}
+	return img;
+}
+
 function add_download_button_event (buttonid, divid) {
 
 	jQuery('#download'+buttonid).click( function() {
-		$('#pgbadgerModal img').attr('src', $('#'+divid).jqplotToImageStr({}));
+		$('#pgbadgerModal img').attr('src', chart_to_image(divid));
 		$('#pgbadgerModal').modal('toggle');
 	});
 

@@ -284,6 +284,13 @@ div#littleToc a:hover { text-decoration:none; background-color:#DDDDDD; }
     font-size: 1.2em;
 }
 
+table.jqplot-table-legend-scroll {
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 10;
+}
+
 .jqplot-highlighter-tooltip {
     border: 0px;
     font-size: 1.0em;
