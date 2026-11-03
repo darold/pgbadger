@@ -1,3 +1,55 @@
+2026-11-03 - v13.3
+
+This is a maintenance release of pgBadger that fixes issues and applied patches
+reported by users since last release.
+
+  - Add scroll on legend and mouseover graphs when the list of item is > 10.
+    Thanks to Francisco Reinolds for the feature request.
+  - Fix URL path of encoded database directories.
+  - Use per-run names for temporary dblist and last parsed files to prevent
+    two pgbadger running at the same time to read the same files.
+  - Fix wrong queries dropped when filtering with --dbuser. Thanks to Jackson
+    Popkin for the report.
+  - Fix retention (-R) not applied to HTML reports with --explode. Thanks to
+    Nhyalgotphores for the report.
+  - Sanitize database names used as path with the --explode option. Thanks to
+    Nhyalgotphores for the report.
+  - Fix empty calendar in incremental mode with the --explode option. Thanks
+    to Frazer McLean  for the report.
+  - Add filter of remote logs in watch mode on the remote host. Thanks to
+    David Turon for the patch.
+  - Fix multiline prepare query continuation. Thanks to Wu Shuwen for the patch.
+  - Fix prepare and bind user-details toggle targets. Thanks to Wu Shuwen for
+    the patch.
+  - Fix prepare and bind sample metadata argument mapping. Thanks to Wu Shuwen
+    for the patch.
+  - Fix multiline prepare query continuation. Thanks to Wu Shuwen for the patch.
+  - Fix multiline queries split between temporary files and query reports.
+  - Fix the same execution reported by both log_min_duration_statement and
+    auto_explain resulting in counted twice.
+  - Fix an "execute" message without duration stored a scalar in
+    %last_execute_stmt instead of a hash, so temporary files logged
+    after it were never associated to the query.
+  - Disable find recursion search in /tmp to find the pgbadger temporary file.
+  - Fix dropped queries when filtering by user. Thanks to Jackson Popkin for the
+    patch.
+  - Add copy of explain plan. Thanks to Hélios Gilles for the patch.
+  - Support more LOG messages:
+      - parameter "[^"]+" removed
+      - terminating .* timeout
+  - Handle "Query Parameters: ..." from auto_explain plan
+  - Fix csvlog duration leakage for statement-only entries. Thanks to NikuleskoA
+    for the patch.
+  - Add support for multiple output formats. Thanks to snakeice for the patch.
+  - Improve output file naming logic for incremental dumps. Thanks to Rodrigo
+    Bernardi for the patch.
+  - Fix several uninitialized variable error. Thanks to Nhyalgotphores, castle101
+    and vosteu257-lab for the report.
+  - Order all --* options in documentation. Thanks to Rodrigo Bernardi for the
+    patch.
+  - Fix dbname in --exclude-db documentation. Thanks to Robin Portigliatti for
+    the report.
+
 2025-12-29 - v13.2
 
 This is a maintenance release of pgBadger that fixes issues and applied patches
@@ -20,6 +72,8 @@ reported by users since last release.
     to Ulrich Konrad for the patch.
   - Add command --ssh-sudo to run commands over ssh as sudo. Thanks to Andrew
     Jackson for the patch.
+  - Filter SSH log streams on the remote host in watch mode to reduce network
+    bandwidth. CSV records are filtered without breaking multiline fields.
   - Fix possible precedence problem between ! and string eq. Thanks to Adrien
     Nayrat for the report.
   - Fix parsing of pgbouncer stats. Thanks to mrgtt for the report.
@@ -3080,4 +3134,3 @@ This release fixes lot of issues and adds several main features.
 	  are available
 	- Fix display of empty column of checkpoint when no checkpoint was found
 	  in log file
-
