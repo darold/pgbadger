@@ -12408,6 +12408,7 @@ sub print_lock_queries_report
 			<td>$max_time</td>
 			<td>$avg_time</td>
 			<td id="queries-most-frequent-waiting-examples-details-rank-$rank">
+				<a href="#queries-most-frequent-waiting-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 				<div id="query-a-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 				 $example
 			<!-- Examples collapse -->
@@ -12506,6 +12507,7 @@ sub print_lock_queries_report
 				<td>$rank</td>
 				<td>$time</td>
 				<td id="queries-that-waited-most-examples-details-rank-$rank">
+					<a href="#queries-that-waited-most-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-b-$rank" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					<pre>$details</pre>
 				</td>
@@ -12584,6 +12586,7 @@ sub print_tempfile_report
 				<td>$max_size</td>
 				<td>$avg_size</td>
 				<td id="queries-generating-most-temporary-files-examples-details-rank-$rank">
+					<a href="#queries-generating-most-temporary-files-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-c-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					$example
 				<!-- Examples collapse -->
@@ -12679,6 +12682,7 @@ sub print_tempfile_report
 				<td>$rank</td>
 				<td>$size</td>
 				<td id="queries-generating-largest-temporary-files-examples-details-rank-$rank">
+					<a href="#queries-generating-largest-temporary-files-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-d-$rank" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					<pre>$details</pre>
 				</td>
@@ -12738,6 +12742,7 @@ sub print_cancelled_report
 				<td>$rank</td>
 				<td>$count</td>
 				<td id="queries-generating-most-cancellation-examples-details-rank-$rank">
+					<a href="#queries-generating-most-cancellation-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-c-$rank" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					$example
 				<!-- Examples collapse -->
@@ -12827,6 +12832,7 @@ sub print_cancelled_report
 				<td>$rank</td>
 				<td>$count</td>
 				<td id="queries-generating-most-cancelled-examples-details-rank-$rank">
+					<a href="#queries-generating-most-cancelled-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-d-$rank" class="sql sql-largesize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 					<pre>$details</pre>
 				</td>
@@ -13113,6 +13119,7 @@ sub print_time_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-queries-examples-details-rank-$rank">
+					<a href="#time-consuming-queries-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-e-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 						<!-- Details collapse -->
 					    <div id="Atime_consuming_queries_details_$rank" class="collapse">
@@ -13369,6 +13376,7 @@ sub print_most_frequent
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="most-frequent-queries-examples-details-rank-$rank">
+					<a href="#most-frequent-queries-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-f-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 						<!-- Details collapse -->
 					    <div id="Amost_frequent_queries_details_$rank" class="collapse">
@@ -13626,6 +13634,7 @@ sub print_slowest_queries
 				</td>
 				<td>$duration</td>
 				<td id="normalized-slowest-queries-examples-details-rank-$rank">
+					<a href="#normalized-slowest-queries-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-g-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 						<!-- Details collapse -->
 					    <div id="Anormalized_slowest_queries_details_$rank" class="collapse">
@@ -13881,6 +13890,7 @@ sub print_prepare_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-prepare-examples-details-rank-$rank">
+					<a href="#time-consuming-prepare-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-e-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 						<!-- Details collapse -->
 					    <div id="Atime_consuming_prepare_details_$rank" class="collapse">
@@ -14130,6 +14140,7 @@ sub print_bind_consuming
 				<td>$max</td>
 				<td>$avg</td>
 				<td id="time-consuming-bind-examples-details-rank-$rank">
+					<a href="#time-consuming-bind-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="query-e-$rank" class="sql sql-mediumsize"><i class="glyphicon icon-copy" title="Click to select query"></i>$query</div>$md5
 						<!-- Details collapse -->
 					    <div id="Atime_consuming_bind_details_$rank" class="collapse">
@@ -14950,6 +14961,7 @@ sub show_error_as_html
 					<p><a href="#Amost_frequent_error_$rank" class="btn btn-default btn-xs" data-toggle="collapse">Details</a></p>
 				</td>
 				<td id="most-frequent-errors-events-examples-details-rank-$rank">
+					<a href="#most-frequent-errors-events-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<div id="event-c-$rank" class="sql sql-mediumsize">
 					<p class="error-pre"><span class="$error_level_class">$msg</span></p>
 					</div>
@@ -15158,6 +15170,7 @@ sub show_pgb_error_as_html
 					<p><a href="#Apgbmost_frequent_error_$rank" class="btn btn-default btn-xs" data-toggle="collapse">Details</a></p>
 				</td>
 				<td id="pgbmost-frequent-errors-events-examples-details-rank-$rank">
+					<a href="#pgbmost-frequent-errors-events-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<pre><span class="$error_level_class">$msg</span></pre>
 						<!-- Details collapse -->
 					    <div id="Apgbmost_frequent_error_$rank" class="collapse">
@@ -15330,6 +15343,7 @@ sub show_pgb_reserved_pool
 					<p><a href="#Apgbmost_used_reserved_pool_$rank" class="btn btn-default btn-xs" data-toggle="collapse">Details</a></p>
 				</td>
 				<td id="pgbmost-used-reserved-pool-examples-details-rank-$rank">
+					<a href="#pgbmost-used-reserved-pool-examples-details-rank-$rank" title="Permalink to this entry" style="float:right;text-decoration:none;">&para;</a>
 					<pre><span class="text-warning">$k</span></pre>
 					<!-- Details collapse -->
 					    <div id="Apgbmost_used_reserved_pool_$rank" class="collapse">
